@@ -2,6 +2,9 @@ cert.pem
 key.pem
 admin.key
 settings.json
+app.json
+app.json.tmp
+server.pid
 users.json
 users.json.tmp
 server.log

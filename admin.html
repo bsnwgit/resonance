@@ -61,14 +61,30 @@
     flex:0 0 auto;padding:10px 14px 12px;
     border-top:1px solid rgba(var(--glass),.14);background:rgba(0,0,0,.5);
   }
-  #tab_accounts{
+  #tab_app,#tab_accounts{
     width:100%;font:inherit;font-size:9.5px;letter-spacing:.14em;padding:7px 8px;
     cursor:pointer;text-align:left;background:none;color:rgba(var(--paper),.88);
     border:1px solid rgba(var(--glass),.22);
   }
-  #tab_accounts:hover{border-color:var(--hue);color:var(--hue)}
-  #tab_accounts.on{border-color:var(--hue-dim);color:var(--hue);
-                   background:rgba(var(--glass),.06)}
+  #tab_app{margin-bottom:5px}
+  #tab_app:hover,#tab_accounts:hover{border-color:var(--hue);color:var(--hue)}
+  #tab_app.on,#tab_accounts.on{border-color:var(--hue-dim);color:var(--hue);
+                               background:rgba(var(--glass),.06)}
+  /* a change here does nothing until the process restarts, so say so loudly */
+  .pending{
+    border-left:2px solid #e8b04a;padding-left:8px;margin-top:10px;
+    font-size:9px;letter-spacing:.06em;line-height:1.6;color:#f0cf94;
+    white-space:pre-line;
+  }
+  #portgrid{display:grid;grid-template-columns:1fr auto;gap:6px 10px;
+            align-items:center;margin-top:8px}
+  #portgrid label{font-size:9.5px;letter-spacing:.08em;color:rgba(var(--paper),.9)}
+  #portgrid input{width:88px;font:inherit;font-size:10px;padding:4px 6px;
+                  background:rgba(0,0,0,.6);color:var(--text);
+                  border:1px solid rgba(var(--glass),.16);outline:0;text-align:right}
+  #portgrid input:focus{border-color:var(--hue-dim)}
+  #portgrid .now{grid-column:1/-1;font-size:8.5px;letter-spacing:.06em;
+                 color:rgba(var(--paper),.7);margin:-2px 0 4px}
   #whobox{display:flex;align-items:center;gap:8px;margin-top:9px}
   #whoname{font-size:10px;letter-spacing:.08em;color:rgba(var(--paper),.92);
            overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -233,17 +249,17 @@
     <button data-tab="motion">MOTION</button>
     <button data-tab="voice">VOICE</button>
   </div>
-  <div class="seg" style="margin-bottom:8px">
-    <button id="b_save">SAVE FOR EVERYONE</button>
-    <button id="b_revert">REVERT</button>
-  </div>
-  <div id="savestate" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.88);margin:0 0 8px;line-height:1.5"></div>
-
   <div class="findrow">
     <input id="rigfind" type="search" placeholder="filter settings…" spellcheck="false">
     <button id="b_expand" title="expand all in this tab">+</button>
     <button id="b_collapse" title="collapse all in this tab">−</button>
   </div>
+
+  <div class="seg" style="margin-top:8px">
+    <button id="b_save">SAVE FOR EVERYONE</button>
+    <button id="b_revert">REVERT</button>
+  </div>
+  <div id="savestate" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.88);margin:6px 0 8px;line-height:1.5"></div>
   <section class="grp" data-tab="look">
     <h4>Geometry</h4>
     <div class="grpbody">  <div class="seg" data-set="mode">
@@ -431,6 +447,46 @@
   <div class="sl"><label>crackle</label><output id="o_crackle"></output><input id="s_crackle" type="range" min="0" max="1.5" step=".01"></div></div>
   </section>
 
+  <section class="grp" data-tab="app">
+    <h4>Ports</h4>
+    <div class="grpbody">
+  <div class="note">Which port each interface answers on. The two display
+ports serve the AI interface people use; the admin port serves this page.</div>
+  <div id="portgrid">
+    <label for="ap_http">display · plain HTTP</label>
+    <input id="ap_http" type="number" inputmode="numeric">
+    <div class="now" id="now_http"></div>
+    <label for="ap_https">display · HTTPS (microphone)</label>
+    <input id="ap_https" type="number" inputmode="numeric">
+    <div class="now" id="now_https"></div>
+    <label for="ap_admin">administration</label>
+    <input id="ap_admin" type="number" inputmode="numeric">
+    <div class="now" id="now_admin"></div>
+  </div>
+  <div class="note">Must be 1024–65535 and all different. Below 1024 needs
+root, and the server runs as an ordinary user.</div>
+    </div>
+  </section>
+
+  <section class="grp" data-tab="app">
+    <h4>Sessions</h4>
+    <div class="grpbody">
+  <label class="bklab">sign-in lasts (hours of inactivity)</label>
+  <input id="ap_session" type="number" inputmode="numeric">
+  <div class="note">How long an idle admin session survives before it has to
+sign in again. Activity pushes the deadline out.</div>
+    </div>
+  </section>
+
+  <section class="grp" data-tab="app">
+    <h4>Apply</h4>
+    <div class="grpbody">
+  <div class="seg"><button id="b_appsave">SAVE APP SETTINGS</button></div>
+  <div class="note" id="appnote"></div>
+  <div class="pending" id="apppending" hidden></div>
+    </div>
+  </section>
+
   <section class="grp" data-tab="accounts">
     <h4>Your account</h4>
     <div class="grpbody">
@@ -474,6 +530,7 @@
   </div><!-- /panelscroll -->
 
   <div id="panelfoot">
+    <button id="tab_app" data-tab="app">APP SETTINGS</button>
     <button id="tab_accounts" data-tab="accounts">ACCOUNTS</button>
     <div id="whobox">
       <div id="whoname">—</div>
@@ -756,6 +813,66 @@ window.addEventListener('beforeunload', e=>{
   if (isDirty){ e.preventDefault(); e.returnValue = ''; }
 });
 
+/* -------------------------------------------------------- app settings */
+/* How the server is wired, as opposed to how the interface looks. None of it
+   can take effect while the process is running, so the page's real job is to
+   be honest about what is configured versus what is actually bound. */
+const APP_FIELDS = {ap_http:'http_port', ap_https:'https_port',
+                    ap_admin:'admin_port', ap_session:'session_idle_hours'};
+
+function showPending(j){
+  const box = $('apppending');
+  const names = {http_port:'display · plain HTTP', https_port:'display · HTTPS',
+                 admin_port:'administration', session_idle_hours:'session length'};
+  const run = j.running || {};
+  ['http','https','admin'].forEach(k=>{
+    const el = $('now_' + k), p = run[k + '_port'];
+    if (el) el.textContent = p ? 'running on ' + p : 'not bound';
+  });
+  if (!j.pending || !j.pending.length){ box.hidden = true; return; }
+  const lines = j.pending.map(k=>{
+    const was = run[k], now = (j.app || {})[k];
+    return '   ' + (names[k] || k) + ': ' + was + ' → ' + now;
+  });
+  let msg = 'SAVED, BUT NOT YET IN EFFECT\n' + lines.join('\n') +
+            '\n\nRestart the server to apply:\n' +
+            '   ./serve.sh stop\n   ./serve.sh start';
+  if (j.pending.includes('admin_port'))
+    msg += '\n\nThis page moves to port ' + j.app.admin_port +
+           ' after the restart — the current address will stop answering.';
+  box.textContent = msg;
+  box.hidden = false;
+}
+
+async function loadApp(){
+  if (!ME || ME.role !== 'admin') return;
+  try{
+    const j = await api('/app');
+    Object.keys(APP_FIELDS).forEach(id=>{
+      const el = $(id); if (el) el.value = j.app[APP_FIELDS[id]];
+    });
+    showPending(j);
+  }catch(e){ $('appnote').className = 'note bad'; $('appnote').textContent = e.message; }
+}
+
+$('b_appsave').addEventListener('click', async ()=>{
+  const note = $('appnote');
+  note.className = 'note';
+  note.textContent = 'saving…';
+  const body = {};
+  Object.keys(APP_FIELDS).forEach(id=>{
+    const el = $(id);
+    if (el && el.value !== '') body[APP_FIELDS[id]] = parseInt(el.value, 10);
+  });
+  try{
+    const j = await api('/app', {method:'POST', body: JSON.stringify(body)});
+    note.textContent = (j.pending && j.pending.length)
+      ? 'saved — a restart is needed, see below'
+      : 'saved — nothing here differs from what is running';
+    showPending(j);
+  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+});
+
 /* ------------------------------------------------------------ accounts */
 async function refreshUsers(){
   const box = $('userlist');
@@ -855,6 +972,7 @@ function panelNav(){
     render();
     $('panelscroll').scrollTop = 0;
     if (tab === 'accounts') refreshUsers();
+    if (tab === 'app') loadApp();
   }
   tabButtons.forEach(b=> b.addEventListener('click', ()=> selectTab(b)));
   groups.forEach(g=> g.querySelector('h4').addEventListener('click', ()=>{
@@ -882,6 +1000,9 @@ function start(){
   if (ME.role !== 'admin'){
     document.body.classList.add('ro');
     $('b_save').style.display = 'none';
+    // /app is admin-only on the server, so a viewer would open an empty
+    // panel and be left wondering. Don't offer it.
+    $('tab_app').style.display = 'none';
     status('read-only account — you can look, not change');
   }
   panelNav();

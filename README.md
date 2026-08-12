@@ -180,6 +180,34 @@ Two roles:
 | `admin` | change every setting, manage accounts |
 | `viewer` | read the configuration, change nothing |
 
+### App settings
+
+**APP SETTINGS**, at the foot of the panel, covers how the server is wired
+rather than how the interface looks: the port each of the three listeners
+answers on, and how long an idle sign-in survives. It is stored in `app.json`.
+
+Nothing here takes effect until the process restarts — you cannot move the
+floor you are standing on. The panel shows what is configured against what is
+actually bound, and says plainly when a restart is owed:
+
+```bash
+./serve.sh stop
+./serve.sh start
+```
+
+Ports are checked before they are accepted: 1024–65535, all three different,
+and **not already in use by something else on the machine**. A port that fails
+to bind would otherwise only reveal itself at the next restart, with the admin
+interface gone and the fix being to edit JSON on the box by hand.
+
+`serve.sh` reads `app.json` too, and records the pid it started. Without that
+pid, changing the display port would leave `stop` looking at the new port while
+the old process was still running on the old one.
+
+The `PORT` environment variable still overrides everything and still shifts all
+three listeners together, so a second instance can be run without touching the
+stored configuration.
+
 Accounts live in `users.json` next to the server, mode `600`, passwords stored
 as PBKDF2-SHA256 with 600,000 rounds and a per-account salt. Sessions are
 in-memory, cookie-based, `HttpOnly` + `Secure` + `SameSite=Strict`, and expire
@@ -234,6 +262,8 @@ Admin listener only — everything below returns 404 on the public ports:
 | `GET` | `/auth/me` | who am I, and with what role |
 | `POST` | `/auth/password` | change a password; your own needs the current one |
 | `POST` | `/settings` | replace the configuration — `admin` role |
+| `GET` | `/app` | ports and session length, plus what is actually running |
+| `POST` | `/app` | change them — `admin` role, restart to apply |
 | `GET` | `/users` | list accounts — `admin` role |
 | `POST` | `/users` | create an account — `admin` role |
 | `POST` | `/users/role` | change a role — `admin` role |

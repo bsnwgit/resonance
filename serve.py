@@ -35,7 +35,96 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SETTINGS_PATH = os.path.join(ROOT, "settings.json")
 USERS_PATH = os.path.join(ROOT, "users.json")
+APP_PATH = os.path.join(ROOT, "app.json")
 _settings_lock = threading.Lock()
+_app_lock = threading.Lock()
+
+# ------------------------------------------------------------ app settings
+# How the server itself is wired, as opposed to how the interface looks.
+# Editable from the admin page, but nothing here can take effect until the
+# process restarts — you cannot move the floor you are standing on.
+APP_DEFAULTS = {
+    "http_port": 9700,               # the display, no microphone
+    "https_port": 9701,              # the display in full
+    "admin_port": 9702,              # this interface
+    "session_idle_hours": 8,
+}
+PORT_MIN, PORT_MAX = 1024, 65535     # below 1024 needs root; this runs as you
+
+
+def read_app():
+    cfg = dict(APP_DEFAULTS)
+    try:
+        with open(APP_PATH) as fh:
+            stored = json.load(fh)
+        if isinstance(stored, dict):
+            cfg.update({k: v for k, v in stored.items() if k in APP_DEFAULTS})
+    except (OSError, ValueError):
+        pass
+    return cfg
+
+
+def write_app(cfg):
+    with _app_lock:
+        tmp = APP_PATH + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump(cfg, fh, indent=2, sort_keys=True)
+        os.replace(tmp, APP_PATH)
+
+
+def port_free(p):
+    """Can we actually bind it? A port already taken by something else would
+    otherwise pass validation and only fail at the next restart — by which
+    point the admin interface is gone and the fix is editing JSON on the box
+    by hand. Ports this process already holds are its own and count as free."""
+    import socket
+    if p in (RUNNING.get("http_port"), RUNNING.get("https_port"),
+             RUNNING.get("admin_port")):
+        return True
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("0.0.0.0", p))
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+
+def validate_app(obj, current):
+    """Returns (config, error). Refuses anything that would leave the server
+    unable to start, because the only way back would be editing JSON on the
+    box by hand."""
+    cfg = dict(current)
+    for k in ("http_port", "https_port", "admin_port"):
+        if k not in obj:
+            continue
+        try:
+            v = int(obj[k])
+        except (TypeError, ValueError):
+            return None, "%s must be a whole number" % k.replace("_", " ")
+        if not (PORT_MIN <= v <= PORT_MAX):
+            return None, ("%s must be between %d and %d — below %d needs root, "
+                          "and this server runs as an ordinary user"
+                          % (k.replace("_", " "), PORT_MIN, PORT_MAX, PORT_MIN))
+        cfg[k] = v
+    ports = [cfg["http_port"], cfg["https_port"], cfg["admin_port"]]
+    if len(set(ports)) != 3:
+        return None, "the three ports must all differ"
+    for k in ("http_port", "https_port", "admin_port"):
+        if cfg[k] != current[k] and not port_free(cfg[k]):
+            return None, ("port %d is already in use by something else on this "
+                          "machine — the server would fail to start on it"
+                          % cfg[k])
+    if "session_idle_hours" in obj:
+        try:
+            h = int(obj["session_idle_hours"])
+        except (TypeError, ValueError):
+            return None, "session length must be a whole number of hours"
+        if not (1 <= h <= 168):
+            return None, "session length must be between 1 and 168 hours"
+        cfg["session_idle_hours"] = h
+    return cfg, None
 
 # ------------------------------------------------------------------ accounts
 # Local accounts only. No directory, no third party, no network call to log in
@@ -44,7 +133,8 @@ _settings_lock = threading.Lock()
 #   viewer  read the configuration, change nothing
 ROLES = ("admin", "viewer")
 PBKDF2_ROUNDS = 600_000          # ~0.3s per attempt: cheap once, costly to grind
-SESSION_IDLE = 8 * 3600          # inactivity before a session dies
+SESSION_IDLE = 8 * 3600          # inactivity before a session dies; set at startup
+RUNNING = {}                     # the ports actually bound, to compare against config
 MIN_PASSWORD = 10
 _users_lock = threading.Lock()
 _sessions = {}                   # token -> {"user","role","expires"}
@@ -326,6 +416,8 @@ def transcribe(raw, suffix, hint=None, model_name=None):
 
 SESSION_COOKIE = "rsn_sid"
 ADMIN_ONLY_FILES = ("/admin.html",)
+#: exist only on the admin listener; anywhere else they are simply not there
+ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app")
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -415,7 +507,11 @@ class Handler(SimpleHTTPRequestHandler):
         route = self.path.split("?")[0]
         # The configuration interface does not exist as far as the public
         # listeners are concerned — not hidden by CSS, not gated in JS, absent.
-        if route in ADMIN_ONLY_FILES and not self.admin_port:
+        # Answering 401 here would still confirm the route is there; 404 is
+        # the honest answer, because on this listener it genuinely is not.
+        if not self.admin_port and (route in ADMIN_ONLY_FILES
+                                    or route in ADMIN_ONLY_ROUTES
+                                    or route.startswith("/auth/")):
             return self._json(404, {"error": "not found"})
         if route == "/settings":
             # public: this is what every viewer's interface is built from
@@ -425,6 +521,20 @@ class Handler(SimpleHTTPRequestHandler):
             if not s:
                 return self._json(401, {"error": "not signed in"})
             return self._json(200, {"user": s["user"], "role": s["role"]})
+        if route == "/app":
+            if not self._require("admin"):
+                return
+            cfg = read_app()
+            # What is configured, what is actually bound, and therefore
+            # whether a restart is owed. The page should never have to guess.
+            pending = sorted(k for k in ("http_port", "https_port", "admin_port")
+                             if RUNNING.get(k) is not None and RUNNING[k] != cfg[k])
+            if RUNNING.get("session_idle_hours") not in (None, cfg["session_idle_hours"]):
+                pending.append("session_idle_hours")
+            return self._json(200, {"app": cfg, "running": RUNNING,
+                                    "pending": pending,
+                                    "limits": {"port_min": PORT_MIN,
+                                               "port_max": PORT_MAX}})
         if route == "/users":
             if not self._require("admin"):
                 return
@@ -474,7 +584,8 @@ class Handler(SimpleHTTPRequestHandler):
         from urllib.parse import urlparse, parse_qs
         parsed = urlparse(self.path)
 
-        if parsed.path.startswith(("/auth/", "/users")) or parsed.path == "/settings":
+        if parsed.path.startswith("/auth/") \
+                or parsed.path in ADMIN_ONLY_ROUTES or parsed.path == "/settings":
             if not self.admin_port:
                 # Nothing privileged is reachable from the display listeners.
                 return self._json(404, {"error": "not found"})
@@ -629,6 +740,27 @@ class Handler(SimpleHTTPRequestHandler):
             print("role of %s set to %s by %s" % (name, role, s["user"]), flush=True)
             return self._json(200, {"ok": True})
 
+        if parsed.path == "/app":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            cfg, err = validate_app(obj, read_app())
+            if err:
+                return self._json(400, {"error": err})
+            write_app(cfg)
+            print("app settings saved by %s: http=%d https=%d admin=%d session=%dh"
+                  % (s["user"], cfg["http_port"], cfg["https_port"],
+                     cfg["admin_port"], cfg["session_idle_hours"]), flush=True)
+            pending = sorted(k for k in ("http_port", "https_port", "admin_port")
+                             if RUNNING.get(k) is not None and RUNNING[k] != cfg[k])
+            if RUNNING.get("session_idle_hours") not in (None, cfg["session_idle_hours"]):
+                pending.append("session_idle_hours")
+            return self._json(200, {"ok": True, "app": cfg, "pending": pending,
+                                    "running": RUNNING})
+
         if parsed.path == "/settings":
             s = self._require("admin")
             if not s:
@@ -709,7 +841,25 @@ def start_tls(port, cert, key, admin_port=False):
 
 
 def main():
-    port = int(os.environ.get("PORT", "9700"))
+    global SESSION_IDLE
+    app = read_app()
+    # Environment still wins, so a one-off run on a different port needs no
+    # edit to the stored configuration. Setting PORT alone moves all three,
+    # as it always did — otherwise a second instance started with PORT=9800
+    # would quietly try to bind the first one's admin port.
+    def _env(name):
+        try:
+            return int(os.environ[name])
+        except (KeyError, ValueError):
+            return None
+    port = _env("PORT") or app["http_port"]
+    shifted = _env("PORT") is not None
+    tls_port = _env("HTTPS_PORT") or (port + 1 if shifted else app["https_port"])
+    adm_port = _env("ADMIN_PORT") or (port + 2 if shifted else app["admin_port"])
+    SESSION_IDLE = app["session_idle_hours"] * 3600
+    RUNNING.update({"http_port": port, "https_port": None, "admin_port": None,
+                    "session_idle_hours": app["session_idle_hours"]})
+
     cert, key = os.path.join(ROOT, "cert.pem"), os.path.join(ROOT, "key.pem")
     have_tls = os.path.exists(cert) and os.path.exists(key)
 
@@ -720,8 +870,9 @@ def main():
         threading.Thread(target=get_voice, args=(voice_list()[0],), daemon=True).start()
 
     if have_tls:
-        start_tls(port + 1, cert, key)
-        print("HTTPS on 0.0.0.0:%d  (mic + local STT work here)" % (port + 1), flush=True)
+        start_tls(tls_port, cert, key)
+        RUNNING["https_port"] = tls_port
+        print("HTTPS on 0.0.0.0:%d  (mic + local STT work here)" % tls_port, flush=True)
     else:
         print("no cert.pem/key.pem — HTTPS disabled, mic will be blocked", flush=True)
 
@@ -730,8 +881,9 @@ def main():
     # ---- admin listener: HTTPS or nothing ----
     if have_tls:
         first_pw = ensure_first_admin()
-        start_tls(port + 2, cert, key, admin_port=True)
-        print("ADMIN on 0.0.0.0:%d  (HTTPS only, sign-in required)" % (port + 2),
+        start_tls(adm_port, cert, key, admin_port=True)
+        RUNNING["admin_port"] = adm_port
+        print("ADMIN on 0.0.0.0:%d  (HTTPS only, sign-in required)" % adm_port,
               flush=True)
         if first_pw:
             print("", flush=True)
