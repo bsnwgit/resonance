@@ -62,8 +62,13 @@ case "${1:-status}" in
       setsid nohup "$PY" "$DIR/serve.py" \
         > "$DIR/server.log" 2>&1 < /dev/null &
     fi
-    sleep 1
-    p="$(pid_on_port)"
+    # give it a moment to bind, but do not declare failure on a slow start
+    p=""
+    for _ in $(seq 1 30); do
+      sleep 0.2
+      p="$(pid_on_port)"
+      [ -n "$p" ] && break
+    done
     if [ -n "$p" ]; then
       echo "$p" > "$PIDFILE"
       echo "started on $PORT (pid $p)"
@@ -78,7 +83,20 @@ case "${1:-status}" in
       echo "not running"
       rm -f "$PIDFILE"
     else
-      kill "$p" && echo "stopped $p"
+      kill "$p"
+      # Wait for it to actually go. Returning as soon as the signal is sent
+      # means `stop && start` races the old process, which is still holding
+      # the listening sockets — the restart then dies on "address already in
+      # use" and leaves nothing running at all.
+      for _ in $(seq 1 50); do
+        kill -0 "$p" 2>/dev/null || break
+        sleep 0.1
+      done
+      if kill -0 "$p" 2>/dev/null; then
+        echo "pid $p did not exit after 5s — still running"
+        exit 1
+      fi
+      echo "stopped $p"
       rm -f "$PIDFILE"
     fi
     ;;
