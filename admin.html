@@ -61,10 +61,12 @@
     flex:0 0 auto;padding:10px 14px 12px;
     border-top:1px solid rgba(var(--glass),.14);background:rgba(0,0,0,.5);
   }
-  #panelfoot #savestate{
+  #savestate{
     font-size:9px;letter-spacing:.06em;line-height:1.5;
-    color:rgba(var(--paper),.88);margin:6px 0 0;min-height:0;
+    color:rgba(var(--paper),.88);margin:8px 0 0;min-height:0;
   }
+  /* Ordinary separator, the same weight as the hairline between topics. */
+  .rule{height:1px;margin:9px 0 2px;background:rgba(var(--glass),.20)}
   /* Deliberately brighter than every other hairline: it separates saving the
      interface from configuring the server, which are different acts. */
   .footrule{
@@ -264,6 +266,8 @@
     <button data-tab="motion">MOTION</button>
     <button data-tab="voice">VOICE</button>
   </div>
+  <div id="savestate"></div>
+  <div class="rule"></div>
   <section class="grp" data-tab="look">
     <h4>Geometry</h4>
     <div class="grpbody">  <div class="seg" data-set="mode">
@@ -538,7 +542,6 @@ sign in again. Activity pushes the deadline out.</div>
       <button id="b_save">SAVE FOR EVERYONE</button>
       <button id="b_revert">REVERT</button>
     </div>
-    <div id="savestate"></div>
 
     <div class="footrule"></div>
 
