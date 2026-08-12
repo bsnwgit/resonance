@@ -18,7 +18,7 @@
     --glass:255,255,255;
     --paper:238,244,250;
     --text:#f2f6fa;
-    --ui:#8d9aa8;
+    --ui:#c3cedb;
     --ui-bright:#dfe9f2;
   }
   *{box-sizing:border-box;margin:0;padding:0}
@@ -63,9 +63,9 @@
   .msg{max-width:76ch;white-space:pre-wrap;word-break:break-word}
   .msg .who{
     display:block;font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;
-    color:rgba(var(--paper),.58);margin-bottom:5px;
+    color:rgba(var(--paper),.8);margin-bottom:5px;
   }
-  .msg.you .body{color:rgba(var(--paper),.62)}
+  .msg.you .body{color:rgba(var(--paper),.82)}
   .msg.ai  .body{color:var(--text)}
   .caret{display:inline-block;width:7px;height:13px;background:var(--text);
          vertical-align:-2px;margin-left:2px;animation:blink 1s steps(1) infinite}
@@ -89,24 +89,24 @@
     padding:12px 26px;border-top:1px solid rgba(var(--glass),.12);
     background:linear-gradient(to top,rgba(0,0,0,.6),rgba(0,0,0,.15));
   }
-  #bar .pr{color:rgba(var(--paper),.55);letter-spacing:.2em;font-size:10px}
+  #bar .pr{color:rgba(var(--paper),.78);letter-spacing:.2em;font-size:10px}
   #q{
     flex:1;background:none;border:0;outline:0;color:var(--text);
     font:inherit;font-size:13px;caret-color:var(--text);
   }
-  #q::placeholder{color:rgba(var(--paper),.26)}
+  #q::placeholder{color:rgba(var(--paper),.5)}
   .src{display:flex;gap:6px}
   .src button{
     font:inherit;font-weight:400;font-size:9px;letter-spacing:.18em;padding:3px 8px;
     background:none;border:1px solid rgba(var(--glass),.16);
-    color:rgba(var(--paper),.66);cursor:pointer;
+    color:rgba(var(--paper),.85);cursor:pointer;
   }
   .src button.on{border-color:var(--hue-dim);color:var(--hue)}
   .src button.rec{border-color:#ff5a5a;color:#ff8a8a}
   .src button[disabled]{opacity:.35;cursor:not-allowed}
 
   #fps{position:fixed;left:12px;top:10px;z-index:20;font-size:9px;letter-spacing:.14em;
-       color:rgba(var(--paper),.52)}
+       color:rgba(var(--paper),.76)}
 </style>
 </head>
 <body data-layout="hero">
