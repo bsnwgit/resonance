@@ -65,10 +65,17 @@ dependency on any of them. It will be adopted back into those applications once
 it is ready to be — as a consumer of this project, not as a part of it.
 
 **Settled:** the look, the interaction model, the local voice pipeline, the
-shared-settings and admin model.
+shared-settings model, and administration — its own HTTPS listener behind
+local accounts with roles, with a live preview of the real display.
 
-**Not done:** packaging it as a library other projects can install, and the
-adapter for a real assistant backend. Today it answers from built-in text.
+**Not done, in the order it matters:** the adapter for a real assistant
+backend — today it answers from built-in text, which is the one thing standing
+between this and doing its actual job. Then identity and memory, so a
+conversation can mean something an hour later. Then packaging it as a library
+other projects can install.
+
+The [Roadmap](#roadmap) carries the reasoning for each, including the
+decisions already taken about how identity and memory should work.
 
 ## How it works
 
@@ -159,8 +166,8 @@ separate listener, on a separate port, behind a username and password.
 
 **The public listeners have no route that accepts a write.** Not a guarded
 route — no route. `admin.html` is not served on them either, and returns 404.
-Users keep exactly three controls: microphone, mute, and push-to-talk vs
-hands-free.
+Users keep exactly four controls: microphone, mute, push-to-talk versus
+hands-free, and whether the transcript is shown.
 
 ### The admin interface
 
@@ -182,7 +189,7 @@ Two roles:
 
 ### What a viewer keeps
 
-The three controls a viewer has — mute, push-to-talk versus hands-free, and
+The controls a viewer has — mute, push-to-talk versus hands-free, and
 whether the transcript is shown — are remembered in their own browser and
 survive a reload, so a display stays how they left it. They are stored under
 one `localStorage` key and last until that browser's data is cleared.
@@ -345,6 +352,30 @@ the geometry follows the actual waveform.
 transcribed.** Auto-gain and noise suppression were disabled to preserve the
 dynamics the visualiser feeds on; the result was quiet audio and constant
 mishearing. There is now a toggle, defaulting to clean.
+
+**Setting `scrollbar-width` makes Chrome ignore `::-webkit-scrollbar`.** The
+standard property and the pseudo-elements are not additive: specify the
+standard one and the browser drops the webkit rules and falls back to the
+operating system's overlay bar, which on macOS is invisible until you scroll.
+Measured — the scroller reserved 0px of layout instead of 9. Safari ignores
+the standard properties entirely, so neither alone covers both. The
+pseudo-elements are unconditional and the standard properties sit behind
+`@supports not selector(::-webkit-scrollbar)`.
+
+**A `stop` that returns before the process exits will take the service down.**
+`stop && start` raced: the old process still held the listening sockets, the
+new one died on `Address already in use`, and the result was nothing running
+at all rather than an obvious failure. Stopping now waits for the pid to
+actually go, with a ceiling after which it reports failure instead of claiming
+success, and starting waits for the bind rather than assuming a second is
+enough.
+
+**Two code paths that render the same thing will not stay in step.** The
+transcript was revealed by three different routes — token stream, browser
+voice, neural voice — and only two of them scrolled. The neural path is the
+default engine, so the visible symptom was that a long spoken reply ran off
+the bottom and only appeared once something else forced a scroll. Everything
+that reveals text goes through one helper now.
 
 **A control panel hidden by CSS is still shipped.** The settings panel used to
 live in the display page and be revealed once an admin key checked out. Every
@@ -539,6 +570,24 @@ Roughly in order of value:
 ## Progress log
 
 Newest first.
+
+### 2026-08-12 — identity, and the interface reads better
+
+- **A new mark.** A standing wave: two fixed ends, a node at the centre, the
+  envelope swelling between them. Not a metaphor — it is what the visualiser
+  does. The full lockup sits above the sign-in.
+- **The transcript follows itself down** while a reply is written, on every
+  reveal path, and leaves the reader alone if they have scrolled up to
+  re-read.
+- **A viewer can switch the transcript off** and give the whole frame to the
+  field.
+- **A viewer's own controls persist** in their browser — mute, push-to-talk
+  versus hands-free, transcript on or off — and outrank the shared settings
+  until that browser's data is cleared. Deliberately only those three: the
+  shared document still defines everything else for everyone.
+- **Text throughout was too dim**; every opacity raised and the base UI colour
+  lifted. Every button now answers the pointer, and scrollbars match the rest
+  of the furniture rather than the operating system.
 
 ### 2026-08-12 — administration moved to its own port
 
