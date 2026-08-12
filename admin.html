@@ -67,6 +67,24 @@
   }
   /* Ordinary separator, the same weight as the hairline between topics. */
   .rule{height:1px;margin:9px 0 2px;background:rgba(var(--glass),.20)}
+
+  /* One hover treatment for every control on the page. The panel is dense,
+     and a button that does not answer the pointer reads as inert — the tab
+     row and the segmented controls had no hover at all. Disabled controls
+     are excluded, so a read-only account still gets no false affordance.
+     :not() carries the specificity needed to beat the .on selected state. */
+  .tabs button:hover:not(:disabled),
+  .seg button:hover:not(:disabled),
+  .findrow button:hover:not(:disabled),
+  .urow button:hover:not(:disabled),
+  #stagebar button:hover:not(:disabled),
+  #tab_app:hover:not(:disabled),
+  #tab_accounts:hover:not(:disabled),
+  #b_signout:hover:not(:disabled),
+  #gatebtn:hover:not(:disabled){
+    border-color:var(--hue);color:var(--hue);
+  }
+  button:disabled{cursor:not-allowed}
   /* Deliberately brighter than every other hairline: it separates saving the
      interface from configuring the server, which are different acts. */
   .footrule{

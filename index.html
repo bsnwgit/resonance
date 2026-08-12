@@ -102,6 +102,9 @@
     color:rgba(var(--paper),.85);cursor:pointer;
   }
   .src button.on{border-color:var(--hue-dim);color:var(--hue)}
+  /* same hover feedback the admin page gives, for the three controls a
+     viewer actually has */
+  .src button:hover:not([disabled]){border-color:var(--hue);color:var(--hue)}
   .src button.rec{border-color:#ff5a5a;color:#ff8a8a}
   .src button[disabled]{opacity:.35;cursor:not-allowed}
 
