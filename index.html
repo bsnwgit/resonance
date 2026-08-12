@@ -31,6 +31,32 @@
     -webkit-font-smoothing:antialiased;
   }
 
+
+  /* ---------- scrollbars ----------
+     Part of the furniture, not the operating system's idea of a control:
+     square like every other edge here, hairline-thin, no track, and a thumb
+     that lifts on hover the same way the buttons do. The inset comes from a
+     transparent border clipped to the content box, which is the only way to
+     get breathing room around a webkit thumb. */
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{
+    background:rgba(var(--glass),.24);
+    border:2px solid transparent;background-clip:content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover{
+    background:rgba(var(--glass),.46);
+    border:2px solid transparent;background-clip:content-box;
+  }
+  ::-webkit-scrollbar-corner{background:transparent}
+  /* Firefox has no ::-webkit-scrollbar, so it gets the standard properties.
+     They are scoped behind @supports on purpose: setting them unconditionally
+     makes Chrome ignore every rule above and fall back to the operating
+     system's overlay bar, and Safari ignores these properties outright. */
+  @supports not selector(::-webkit-scrollbar){
+    *{scrollbar-width:thin;scrollbar-color:rgba(var(--glass),.24) transparent}
+  }
+
   /* ---------- shell ---------- */
   #shell{position:fixed;inset:0;display:flex;flex-direction:column}
 
@@ -56,10 +82,7 @@
   #log{
     position:relative;z-index:3;overflow-y:auto;padding:22px 26px 8px;
     display:flex;flex-direction:column;gap:14px;
-    scrollbar-width:thin;scrollbar-color:rgba(var(--glass),.18) transparent;
   }
-  #log::-webkit-scrollbar{width:6px}
-  #log::-webkit-scrollbar-thumb{background:rgba(var(--glass),.18)}
   .msg{max-width:76ch;white-space:pre-wrap;word-break:break-word}
   .msg .who{
     display:block;font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;
