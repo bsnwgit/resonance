@@ -374,11 +374,70 @@
   <div class="sl"><label>line weight</label><output id="o_lw"></output><input id="s_lw" type="range" min=".3" max="3" step=".05"></div></div>
   </section>
   <section class="grp" data-tab="voice">
+    <h4>Assistant</h4>
+    <div class="grpbody">
+  <div class="note">Which assistant answers. OPENAI-COMPATIBLE is a dialect,
+not a vendor: Ollama, OpenClaw, LM Studio and vLLM all speak it, so the
+difference between them is the base URL.</div>
+  <div class="seg" id="bk_provider" style="margin-top:8px">
+    <button data-v="demo" class="on">DEMO</button>
+    <button data-v="openai">OPENAI-COMPATIBLE</button>
+  </div>
+
+  <label class="bklab">preset</label>
+  <div class="seg" id="bk_preset">
+    <button data-v="ollama">OLLAMA</button>
+    <button data-v="openclaw">OPENCLAW</button>
+    <button data-v="lmstudio">LM STUDIO</button>
+    <button data-v="openai">OPENAI</button>
+  </div>
+
+  <label class="bklab">base URL</label>
+  <input id="bk_url" type="text" spellcheck="false" autocomplete="off"
+         placeholder="http://127.0.0.1:11434/v1">
+  <label class="bklab">model</label>
+  <input id="bk_model" type="text" spellcheck="false" autocomplete="off"
+         placeholder="qwen2.5:3b">
+  <div class="note" id="bk_models"></div>
+
+  <label class="bklab">API key</label>
+  <input id="bk_key" type="password" spellcheck="false" autocomplete="off"
+         placeholder="unchanged">
+  <div class="note">Held on the server and never sent back to a browser. Leave
+blank to keep the stored one; a local model needs none.</div>
+
+  <label class="bklab">system prompt</label>
+  <textarea id="bk_system" rows="4" spellcheck="false"></textarea>
+  <div class="note">A reply is read aloud, so this asks for plain prose. A
+bulleted answer spoken out is unusable.</div>
+
+  <div class="sl"><label>reply limit (tokens)</label><output id="o_bkmax"></output><input id="s_bkmax" type="range" min="16" max="2000" step="16"></div>
+  <div class="sl"><label>temperature</label><output id="o_bktemp"></output><input id="s_bktemp" type="range" min="0" max="1.5" step=".05"></div>
+  <div class="sl"><label>turns of context</label><output id="o_bkhist"></output><input id="s_bkhist" type="range" min="0" max="24" step="1"></div>
+  <div class="sl"><label>timeout</label><output id="o_bktimeout"></output><input id="s_bktimeout" type="range" min="5" max="600" step="5"></div>
+
+  <label class="bklab">keep model loaded</label>
+  <input id="bk_keepalive" type="text" spellcheck="false" autocomplete="off"
+         placeholder="30m">
+  <div class="note">An Ollama extension. Without it the model unloads after a
+few minutes idle and the next question waits for it to load again — measured
+at 28s for a 7b on this hardware. Blank it for a hosted provider.</div>
+
+  <div class="seg" style="margin-top:10px">
+    <button id="b_bksave">SAVE ASSISTANT</button>
+    <button id="b_bktest">TEST</button>
+    <button id="b_bkforget">FORGET KEY</button>
+  </div>
+  <div class="note" id="bknote"></div>
+    </div>
+  </section>
+
+  <section class="grp" data-tab="voice">
     <h4>Setup &amp; self-test</h4>
     <div class="grpbody">
   <div class="seg" data-set="backend">
     <button data-v="demo" class="on">DEMO REPLIES</button>
-    <button data-v="api" disabled>CONNECTED AI</button>
+    <button data-v="api">CONNECTED AI</button>
   </div>
   <div style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5">
     DEMO answers from built-in text, so you can prove the whole chain works
@@ -583,7 +642,7 @@ sign in again. Activity pushes the deadline out.</div>
   </div><!-- /panelscroll -->
 
   <div id="panelfoot">
-    <div class="seg">
+    <div class="seg" id="saverow">
       <button id="b_save">SAVE FOR EVERYONE</button>
       <button id="b_revert">REVERT</button>
     </div>
@@ -933,6 +992,145 @@ $('b_appsave').addEventListener('click', async ()=>{
   }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
 });
 
+/* ------------------------------------------------------------ assistant */
+/* Which model answers. Kept apart from the shared settings because it holds
+   a credential and that document is world-readable — the same reason the
+   accounts live in their own file. The key is never sent back to a browser,
+   so the field shows a placeholder rather than a value. */
+const BK_FIELDS = {bk_url:'base_url', bk_model:'model', bk_system:'system',
+                   bk_keepalive:'keep_alive'};
+const BK_SLIDERS = {s_bkmax:['max_tokens', v=>v],
+                    s_bktemp:['temperature', v=>(+v).toFixed(2)],
+                    s_bkhist:['history_turns', v=> v==0 ? 'none' : v],
+                    s_bktimeout:['timeout', v=> v+'s']};
+/* A preset is only a base URL and a hint at the model format. It exists so
+   nobody has to remember that OpenClaw listens on 18789 and routes by putting
+   an agent id in the model field. */
+const BK_PRESETS = {
+  ollama:   {base_url:'http://127.0.0.1:11434/v1', hint:'qwen2.5:3b',   keep_alive:'30m'},
+  openclaw: {base_url:'http://127.0.0.1:18789/v1', hint:'openclaw:main', keep_alive:''},
+  lmstudio: {base_url:'http://127.0.0.1:1234/v1',  hint:'',             keep_alive:''},
+  openai:   {base_url:'https://api.openai.com/v1', hint:'gpt-4o-mini',  keep_alive:''}
+};
+let BK = null;
+
+function bkNote(m, bad){
+  const el = $('bknote');
+  el.className = 'note' + (bad ? ' bad' : '');
+  el.textContent = m;
+}
+
+function bkPaint(){
+  if (!BK) return;
+  Object.keys(BK_FIELDS).forEach(id=>{
+    const el = $(id); if (el) el.value = BK[BK_FIELDS[id]] == null ? '' : BK[BK_FIELDS[id]];
+  });
+  Object.keys(BK_SLIDERS).forEach(id=>{
+    const [key, fmt] = BK_SLIDERS[id];
+    const el = $(id), out = $('o_' + id.slice(2));
+    if (el){ el.value = BK[key]; if (out) out.textContent = fmt(BK[key]); }
+  });
+  document.querySelectorAll('#bk_provider button').forEach(b=>
+    b.classList.toggle('on', b.dataset.v === BK.provider));
+  $('bk_key').placeholder = BK.has_key ? 'unchanged — a key is stored' : 'none stored';
+}
+
+async function loadBackend(){
+  if (!ME || ME.role !== 'admin') return;
+  try{
+    const j = await api('/backend');
+    BK = Object.assign({}, j.backend, {has_key: j.has_key});
+    bkPaint();
+    bkNote(BK.provider === 'demo'
+      ? 'answering from built-in text — pick a provider to connect one'
+      : BK.model + ' at ' + BK.base_url);
+    listModels();
+  }catch(e){ bkNote(e.message, true); }
+}
+
+/* Ollama will tell us what it has. Saves typing a model name from memory and
+   getting it subtly wrong, which returns a 404 that reads like a dead server. */
+async function listModels(){
+  const el = $('bk_models');
+  if (!BK || BK.provider === 'demo' || !BK.base_url){ el.textContent = ''; return; }
+  /* Just ask. Ollama answers /api/tags; anything else 404s and we say
+     nothing. Sniffing for port 11434 was wrong — it misses Ollama on another
+     port or behind a tunnel, which is exactly when you most want the list. */
+  try{
+    const base = BK.base_url.replace(/\/v1\/?$/, '');
+    const r = await fetch(base + '/api/tags', {cache:'no-store'});
+    const j = await r.json();
+    const names = (j.models || []).map(m=>m.name);
+    el.textContent = names.length ? 'installed there: ' + names.join(', ') : '';
+  }catch(e){ el.textContent = ''; }
+}
+
+function bkCollect(){
+  const body = {provider: (document.querySelector('#bk_provider button.on')||{}).dataset.v || 'demo'};
+  Object.keys(BK_FIELDS).forEach(id=>{ const el=$(id); if (el) body[BK_FIELDS[id]] = el.value; });
+  Object.keys(BK_SLIDERS).forEach(id=>{
+    const el=$(id); if (el) body[BK_SLIDERS[id][0]] = parseFloat(el.value);
+  });
+  const k = $('bk_key').value;
+  if (k) body.api_key = k;
+  return body;
+}
+
+document.querySelector('#bk_provider').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#bk_provider button').forEach(x=> x.classList.toggle('on', x===b));
+});
+
+document.querySelector('#bk_preset').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if (!b) return;
+  const p = BK_PRESETS[b.dataset.v]; if (!p) return;
+  $('bk_url').value = p.base_url;
+  $('bk_keepalive').value = p.keep_alive;
+  if (p.hint) $('bk_model').placeholder = p.hint;
+  document.querySelectorAll('#bk_provider button')
+          .forEach(x=> x.classList.toggle('on', x.dataset.v === 'openai'));
+  bkNote('preset filled in — set the model, then save');
+});
+
+$('b_bksave').addEventListener('click', async ()=>{
+  bkNote('saving…');
+  try{
+    const j = await api('/backend', {method:'POST', body: JSON.stringify(bkCollect())});
+    BK = Object.assign({}, j.backend, {has_key: j.has_key});
+    $('bk_key').value = '';
+    bkPaint();
+    bkNote('saved · ' + (BK.provider === 'demo' ? 'built-in replies'
+                                                : BK.model + ' at ' + BK.base_url));
+    listModels();
+  }catch(e){ bkNote(e.message, true); }
+});
+
+$('b_bkforget').addEventListener('click', async ()=>{
+  try{
+    const j = await api('/backend', {method:'POST', body: JSON.stringify({clear_key:true})});
+    BK.has_key = j.has_key; bkPaint();
+    bkNote('key cleared');
+  }catch(e){ bkNote(e.message, true); }
+});
+
+/* A real round trip, not a reachability ping. A base URL that answers and a
+   model name that does not exist look identical until something asks. */
+$('b_bktest').addEventListener('click', async ()=>{
+  bkNote('asking it something…');
+  const t0 = Date.now();
+  try{
+    const r = await fetch('/ask', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({text:'Reply with one short sentence confirming you are reachable.'})
+    });
+    const j = await r.json().catch(()=>({}));
+    if (j.demo) return bkNote('still on DEMO — nothing was asked of a model');
+    if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
+    bkNote('replied in ' + (j.ms || (Date.now()-t0)) + 'ms via ' + j.model +
+           '\n\n' + j.reply);
+  }catch(e){ bkNote(e.message, true); }
+});
+
 /* ------------------------------------------------------------ accounts */
 async function refreshUsers(){
   const box = $('userlist');
@@ -1026,13 +1224,26 @@ function panelNav(){
   /* Two homes now: the row at the top and the pinned entry at the foot.
      Treat them as one set so exactly one is ever lit. */
   const tabButtons = [...document.querySelectorAll('#panel button[data-tab]')];
+  /* SAVE FOR EVERYONE writes the shared settings document, so it only
+     belongs on the tabs that edit it. App settings and accounts each save
+     their own thing with their own button, and offering a second save that
+     means something else is how somebody presses the wrong one. */
+  const SETTINGS_TABS = new Set(['look', 'motion', 'voice']);
+  function syncSaveRow(){
+    const show = SETTINGS_TABS.has(tab) ? '' : 'none';
+    ['saverow', 'savestate'].forEach(id=>{
+      const el = $(id); if (el) el.style.display = show;
+    });
+  }
   function selectTab(b){
     tab = b.dataset.tab;
     tabButtons.forEach(x=> x.classList.toggle('on', x === b));
     render();
+    syncSaveRow();
     $('panelscroll').scrollTop = 0;
     if (tab === 'accounts') refreshUsers();
     if (tab === 'app') loadApp();
+    if (tab === 'voice') loadBackend();
   }
   tabButtons.forEach(b=> b.addEventListener('click', ()=> selectTab(b)));
   groups.forEach(g=> g.querySelector('h4').addEventListener('click', ()=>{
@@ -1048,6 +1259,7 @@ function panelNav(){
   });
   findEl.addEventListener('input', render);
   render();
+  syncSaveRow();
 }
 
 /* ----------------------------------------------------------------- boot */

@@ -1591,15 +1591,44 @@ function stream(text, r){
    text so the whole chain — mic, VAD, transcription, wake word, speech,
    geometry — can be commissioned and proven BEFORE any backend exists, and
    flipped back to afterwards to isolate whether a fault is ours or theirs. */
+/* Recent turns, so a question can refer to the last answer. In the tab only:
+   nothing is written down and nothing survives a reload. Persisting this is a
+   separate decision with its own entry on the roadmap, deliberately not made
+   by accident here. */
+const convo = [];
+const CONVO_MAX = 24;
+function remember(role, content){
+  convo.push({role, content});
+  while (convo.length > CONVO_MAX) convo.shift();
+}
+function forgetConversation(){ convo.length = 0; }
+
 async function askBackend(text){
   if (S.backend === 'demo') return REPLIES[replyIx++ % REPLIES.length];
-  return REPLIES[replyIx++ % REPLIES.length];     // TODO: real adapter
+  try{
+    const r = await fetch('ask', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({text, history: convo})
+    });
+    const j = await r.json().catch(()=>({}));
+    // the server still being on demo is not an error, just not wired up yet
+    if (j && j.demo) return REPLIES[replyIx++ % REPLIES.length];
+    if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
+    if (j.ms) ev('reply ' + j.ms + 'ms');
+    return j.reply;
+  }catch(e){
+    /* Say something. A voice interface that goes quiet is indistinguishable
+       from a broken one, and the person may not be looking at the screen. */
+    note('backend: ' + e.message);
+    return "I could not reach the assistant just then.";
+  }
 }
 
 function submit(text){
   addMsg('you', text);
+  remember('user', text);
   qEl.value = '';
-  askBackend(text).then(reply => respond(reply));
+  askBackend(text).then(reply => { remember('assistant', reply); respond(reply); });
 }
 qEl.addEventListener('keydown', e=>{
   if (e.key !== 'Enter') return;
@@ -2020,6 +2049,12 @@ const Wake = {
   sleepNow(sayBye){
     this.awake = false;
     this.until = 0;
+    /* The conversation is over, so what it was holding goes with it. On a
+       screen anyone can walk up to, carrying context into the next person's
+       session is a leak they cannot see — the model would simply reference
+       it. A device that is allowed to remember will opt out of this once
+       device kinds exist; until then the safe behaviour is the only one. */
+    forgetConversation();
     syncTalk(); syncWake();
     if (sayBye) farewell();
     else micNote('asleep — say “' + S.wakeword + '” to start again');
