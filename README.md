@@ -413,33 +413,41 @@ Roughly in order of value:
   does not. Not encryption in the browser: if the browser holds the key it is
   obfuscation, and the secrecy belongs in the server-side mapping. Devices are
   listed in the admin page with when they were last seen, and deletable there.
-- **The identity path is the policy.** How a device identifies itself decides
-  what it is allowed to keep, so there is no separate setting anyone can
-  forget to set.
+- **Memory is a per-device property.** Whether a device keeps anything is one
+  setting. Its default comes from how the device identifies itself, because
+  that is what each path usually means, and an admin can override it either
+  way from the device list.
 
-  A device on the **declared-name** path never remembers. That is a hard rule
-  with no override: configuring a kiosk is what turns memory off, and a later
-  mistake cannot turn it back on. `?display=` therefore doubles as a general
-  "do not remember anything here" switch, useful for a demo machine or a
-  loaner as much as for a wall screen.
+  | path | default | admin can |
+  | --- | --- | --- |
+  | declared name | does not remember | turn it on |
+  | token | remembers | turn it off |
 
-  A device on the **token** path remembers. A token is a device, a device has
-  an owner, and what is kept on it is the owner's to be responsible for — the
-  same way anything else on their machine is. Requiring an admin to enrol each
-  device first would mean the feature does nothing until someone does
-  bookkeeping, on a system whose point is a group of internal devices talking
-  to one server.
+  A **declared name** defaults to not remembering because the first thing you
+  name is a wall screen anyone walks up to, and configuring the kiosk should
+  be what switches memory off. But a name is really a *durability* mechanism —
+  it survives a browser wipe where a token does not — so someone with a
+  personal device who wants their identity to outlast clearing browser data
+  will name it too, and will want memory. Hence the override rather than a
+  hard rule. A named device with memory switched on should be conspicuous in
+  the device list, not hidden behind an unlabelled checkbox: the default is
+  off for a reason.
 
-  What an admin gets instead is the ability to turn memory off for a device
-  after the fact, and to delete what it holds. That covers the machine that
-  turns out to be shared without needing every ordinary device enrolled by
-  hand first — correctable rather than gated.
+  A **token** defaults to remembering. A token is a device, a device has an
+  owner, and what is kept on it is the owner's to be responsible for. Gating
+  it behind enrolment would mean the feature does nothing until someone does
+  bookkeeping across a fleet of internal machines. The admin control is
+  revocation instead — turn it off for a device, delete what it holds — which
+  covers the machine that turns out to be shared without gating every
+  ordinary one.
 
-  Two guarantees, and they are not the same one. A device that never remembers
-  must also drop everything it is holding at the conversation boundary — the
-  wake word opens one, the sleep word and the awake timeout close one, and
-  that machinery already exists. One is about what survives the session; the
-  other about what survives the person standing there.
+  One property, two effects. A device that is not remembering must also drop
+  everything it is holding at the conversation boundary — the wake word opens
+  one, the sleep word and the awake timeout close one, and that machinery
+  already exists. One is about what survives the session, the other about what
+  survives the person standing there, and tying both to the same setting is
+  what stops them contradicting each other.
+
 - **Diagnostics.** Technical events keyed to a device: the microphone would not
   open, transcription took four seconds, the voice service returned an error,
   this browser has no recorder. No conversation content. A health view per
