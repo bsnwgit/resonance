@@ -431,6 +431,32 @@ Roughly in order of value:
 
 - **Backend adapter.** Replace `askBackend()` with a real assistant, keeping
   demo mode as the fallback.
+- **Deployment mode: personal or shared.** Everything below assumes a server
+  several people can reach. One person running this on their own machine, for
+  themselves, is a different product, and making them fish a generated
+  password out of a log to configure their own laptop is absurd.
+
+  The distinction is not how much security someone wants, it is where the
+  boundary already is. Nothing else can reach `127.0.0.1`, so on a personal
+  install the network is the boundary and accounts add nothing.
+
+  **Personal** binds loopback only and has no accounts, no sign-in, no PIN.
+  The admin page opens straight up. Memory simply works: there is exactly one
+  identity — the machine — so there is nothing to scope it against and nothing
+  to authenticate. It also needs no certificate at all, because browsers treat
+  `http://localhost` as a secure context and the microphone works there
+  unprompted. Start it, open localhost, talk to it.
+
+  **Shared** is everything else, and stays the default, because the safe
+  default is the one that assumes it can be reached.
+
+  The guard is a warning, not a refusal. Personal mode bound to anything other
+  than loopback prints loudly at startup and shows a banner in the interface —
+  somebody may genuinely want it reachable from their own phone on their own
+  network, and that is their call. What must not happen is a laptop configured
+  as personal quietly joining an office network with no accounts and
+  everything open.
+
 - **HTTPS only.** Retire the plain listener. The microphone already refuses to
   work on it, so today it mostly generates confusion about why half the
   interface is dead. Make it a permanent redirect to the HTTPS port rather
