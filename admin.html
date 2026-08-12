@@ -77,7 +77,7 @@
   }
 
   /* ---------- admin shell ---------- */
-  #wrap{position:fixed;inset:0;display:none;grid-template-columns:340px 1fr}
+  #wrap{position:fixed;inset:0;display:none;grid-template-columns:425px 1fr}
   #wrap.on{display:grid}
   #panel{
     position:relative;height:100%;min-height:0;display:flex;flex-direction:column;
@@ -416,6 +416,7 @@ difference between them is the base URL.</div>
     <button data-v="openai">OPENAI-COMPATIBLE</button>
   </div>
 
+  <div id="bk_conn">
   <label class="bklab">preset</label>
   <div class="seg" id="bk_preset">
     <button data-v="ollama">OLLAMA</button>
@@ -438,11 +439,6 @@ difference between them is the base URL.</div>
   <div class="note">Held on the server and never sent back to a browser. Leave
 blank to keep the stored one; a local model needs none.</div>
 
-  <label class="bklab">system prompt</label>
-  <textarea id="bk_system" rows="4" spellcheck="false"></textarea>
-  <div class="note">A reply is read aloud, so this asks for plain prose. A
-bulleted answer spoken out is unusable.</div>
-
   <div class="sl"><label>reply limit (tokens)</label><output id="o_bkmax"></output><input id="s_bkmax" type="range" min="16" max="2000" step="16"></div>
   <div class="sl"><label>temperature</label><output id="o_bktemp"></output><input id="s_bktemp" type="range" min="0" max="1.5" step=".05"></div>
   <div class="sl"><label>turns of context</label><output id="o_bkhist"></output><input id="s_bkhist" type="range" min="0" max="24" step="1"></div>
@@ -454,6 +450,7 @@ bulleted answer spoken out is unusable.</div>
   <div class="note">An Ollama extension. Without it the model unloads after a
 few minutes idle and the next question waits for it to load again — measured
 at 28s for a 7b on this hardware. Blank it for a hosted provider.</div>
+  </div><!-- /bk_conn -->
 
   <div class="seg" style="margin-top:10px">
     <button id="b_bksave">SAVE ASSISTANT</button>
@@ -461,6 +458,22 @@ at 28s for a 7b on this hardware. Blank it for a hosted provider.</div>
     <button id="b_bkforget">FORGET KEY</button>
   </div>
   <div class="note" id="bknote"></div>
+    </div>
+  </section>
+
+  <section class="grp" data-tab="ai" id="grp_prompt">
+    <h4>System prompt</h4>
+    <div class="grpbody">
+  <div class="note">What the assistant is told before every question. A reply
+here is read aloud, so this asks for plain prose — a bulleted answer spoken
+out is unusable, and this is the single biggest difference between a voice
+interface and a chat box.</div>
+  <textarea id="bk_system" rows="8" spellcheck="false"></textarea>
+  <div class="seg" style="margin-top:8px">
+    <button id="b_bksaveprompt">SAVE PROMPT</button>
+    <button id="b_bkresetprompt" title="back to the wording this ships with">RESET</button>
+  </div>
+  <div class="note" id="promptnote"></div>
     </div>
   </section>
 
@@ -1057,6 +1070,23 @@ function bkNote(m, bad){
   el.textContent = m;
 }
 
+/* Nothing below the provider choice applies to DEMO: there is no connection
+   to configure and the built-in replies ignore the prompt. Leaving the fields
+   on screen would be a panel full of controls wired to nothing, which is
+   worse than a short panel. */
+function bkSyncProvider(){
+  const p = (document.querySelector('#bk_provider button.on') || {}).dataset;
+  const connected = p && p.v !== 'demo';
+  const conn = $('bk_conn');
+  if (conn) conn.style.display = connected ? '' : 'none';
+  // inline display beats the tab renderer's hidden attribute, so it has to be
+  // cleared rather than left for render() to undo
+  const prompt = $('grp_prompt');
+  if (prompt) prompt.style.display = connected ? '' : 'none';
+  const test = $('b_bktest');
+  if (test) test.disabled = !connected;
+}
+
 function bkPaint(){
   if (!BK) return;
   Object.keys(BK_FIELDS).forEach(id=>{
@@ -1070,6 +1100,7 @@ function bkPaint(){
   document.querySelectorAll('#bk_provider button').forEach(b=>
     b.classList.toggle('on', b.dataset.v === BK.provider));
   $('bk_key').placeholder = BK.has_key ? 'unchanged — a key is stored' : 'none stored';
+  bkSyncProvider();
 }
 
 async function loadBackend(){
@@ -1116,6 +1147,7 @@ function bkCollect(){
 document.querySelector('#bk_provider').addEventListener('click', e=>{
   const b = e.target.closest('button'); if (!b) return;
   document.querySelectorAll('#bk_provider button').forEach(x=> x.classList.toggle('on', x===b));
+  bkSyncProvider();
 });
 
 document.querySelector('#bk_preset').addEventListener('click', e=>{
@@ -1126,6 +1158,7 @@ document.querySelector('#bk_preset').addEventListener('click', e=>{
   if (p.hint) $('bk_model').placeholder = p.hint;
   document.querySelectorAll('#bk_provider button')
           .forEach(x=> x.classList.toggle('on', x.dataset.v === 'openai'));
+  bkSyncProvider();
   bkNote('preset filled in — set the model, then save');
 });
 
@@ -1140,6 +1173,32 @@ $('b_bksave').addEventListener('click', async ()=>{
                                                 : BK.model + ' at ' + BK.base_url));
     listModels();
   }catch(e){ bkNote(e.message, true); }
+});
+
+/* The prompt has its own save because it has its own section, and with one
+   section open at a time it would otherwise mean opening a different one to
+   commit what you just typed. Both write the whole assistant document — the
+   field keeps its value while collapsed, so either button captures it. */
+const SHIPPED_PROMPT = 'You are a spoken assistant. Answer in one or two ' +
+  'short sentences unless asked for more. Write plain prose only — no ' +
+  'markdown, lists, headings, or emoji — because your reply is read aloud.';
+
+$('b_bksaveprompt').addEventListener('click', async ()=>{
+  const note = $('promptnote');
+  note.className = 'note'; note.textContent = 'saving…';
+  try{
+    const j = await api('/backend', {method:'POST', body: JSON.stringify(bkCollect())});
+    BK = Object.assign({}, j.backend, {has_key: j.has_key});
+    bkPaint();
+    note.textContent = 'saved';
+  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+});
+
+$('b_bkresetprompt').addEventListener('click', ()=>{
+  $('bk_system').value = SHIPPED_PROMPT;
+  const note = $('promptnote');
+  note.className = 'note';
+  note.textContent = 'back to the shipped wording — not saved yet';
 });
 
 $('b_bkforget').addEventListener('click', async ()=>{
