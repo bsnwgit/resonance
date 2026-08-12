@@ -70,9 +70,11 @@ local accounts with roles, with a live preview of the real display.
 
 **Not done, in the order it matters:** the adapter for a real assistant
 backend — today it answers from built-in text, which is the one thing standing
-between this and doing its actual job. Then identity and memory, so a
-conversation can mean something an hour later. Then packaging it as a library
-other projects can install.
+between this and doing its actual job. Then the deployment shapes, because a
+single person running this on their own laptop should not have to configure
+accounts to talk to it. Then identity and memory, so a conversation can mean
+something an hour later. Then packaging it as a library other projects can
+install.
 
 The [Roadmap](#roadmap) carries the reasoning for each, including the
 decisions already taken about how identity and memory should work.
