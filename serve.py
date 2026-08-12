@@ -2,9 +2,17 @@
 """Static server + local speech-to-text for Resonance.
 
 Listeners:
-  PORT      (default 9700) plain HTTP — fine for everything except the mic
-  PORT + 1  (default 9701) HTTPS      — required for getUserMedia, which the
-                                        browser refuses on an insecure origin
+  PORT      (default 9700) plain HTTP  — fine for everything except the mic
+  PORT + 1  (default 9701) HTTPS       — required for getUserMedia, which the
+                                         browser refuses on an insecure origin
+  PORT + 2  (default 9702) HTTPS ADMIN — the configuration interface, behind a
+                                         username and password
+
+The admin listener is HTTPS-only and deliberately refuses to start without a
+certificate: it takes a password, and a password over plain HTTP crosses the
+network in the clear. If it is missing from the startup banner, run
+make-cert.sh. There is no way to write settings from the public listeners —
+they serve the display and answer GET /settings, nothing more.
 
 POST /stt  accepts an audio blob and returns {"text": "..."} transcribed by
 faster-whisper running HERE. Nothing is sent to any third party — this exists
@@ -20,28 +28,135 @@ Plain `python3 -m http.server` also honours conditional GETs, so a browser can
 sit on a cached copy of index.html and you end up debugging code that is no
 longer running. This sends no-store on everything instead.
 """
-import functools, hmac, inspect, json, os, secrets, ssl, sys, tempfile, threading, time
+import base64, functools, hashlib, hmac, http.cookies, inspect, json, os, re, \
+       secrets, ssl, sys, tempfile, threading, time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SETTINGS_PATH = os.path.join(ROOT, "settings.json")
-KEY_PATH = os.path.join(ROOT, "admin.key")
+USERS_PATH = os.path.join(ROOT, "users.json")
 _settings_lock = threading.Lock()
 
+# ------------------------------------------------------------------ accounts
+# Local accounts only. No directory, no third party, no network call to log in
+# — the same principle as the speech pipeline. Two roles:
+#   admin   configure everything, manage accounts
+#   viewer  read the configuration, change nothing
+ROLES = ("admin", "viewer")
+PBKDF2_ROUNDS = 600_000          # ~0.3s per attempt: cheap once, costly to grind
+SESSION_IDLE = 8 * 3600          # inactivity before a session dies
+MIN_PASSWORD = 10
+_users_lock = threading.Lock()
+_sessions = {}                   # token -> {"user","role","expires"}
+_sessions_lock = threading.Lock()
+_login_fails = {}                # client ip -> [count, blocked_until]
 
-def admin_key():
-    """One shared admin secret. Env wins; otherwise generate and persist so
-    it survives restarts. Everyone else gets read-only settings."""
-    k = os.environ.get("ADMIN_KEY")
-    if k:
-        return k
-    if os.path.exists(KEY_PATH):
-        return open(KEY_PATH).read().strip()
-    k = secrets.token_urlsafe(18)
-    with open(KEY_PATH, "w") as fh:
-        fh.write(k)
-    os.chmod(KEY_PATH, 0o600)
-    return k
+
+def hash_password(password, salt=None):
+    salt = salt or secrets.token_bytes(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, PBKDF2_ROUNDS)
+    return salt.hex(), dk.hex()
+
+
+def verify_password(password, salt_hex, hash_hex):
+    try:
+        _, dk = hash_password(password, bytes.fromhex(salt_hex))
+    except ValueError:
+        return False
+    return hmac.compare_digest(dk, hash_hex)
+
+
+def read_users():
+    try:
+        with open(USERS_PATH) as fh:
+            doc = json.load(fh)
+        return doc.get("users", {}) if isinstance(doc, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def write_users(users):
+    with _users_lock:
+        tmp = USERS_PATH + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump({"version": 1, "users": users}, fh, indent=2, sort_keys=True)
+        os.chmod(tmp, 0o600)                     # password hashes
+        os.replace(tmp, USERS_PATH)
+
+
+def ensure_first_admin():
+    """A fresh install has no accounts, and an admin interface nobody can log
+    into is useless. Mint one and print the password exactly once — the same
+    bootstrap the old shared key used, minus the URL."""
+    users = read_users()
+    if users:
+        return None
+    pw = secrets.token_urlsafe(15)
+    salt, dk = hash_password(pw)
+    users["admin"] = {"salt": salt, "hash": dk, "role": "admin",
+                      "created": int(time.time())}
+    write_users(users)
+    return pw
+
+
+def valid_username(name):
+    return bool(re.fullmatch(r"[A-Za-z0-9._-]{2,32}", name or ""))
+
+
+def new_session(username, role):
+    token = secrets.token_urlsafe(32)
+    with _sessions_lock:
+        _sessions[token] = {"user": username, "role": role,
+                            "expires": time.time() + SESSION_IDLE}
+    return token
+
+
+def get_session(token):
+    """Sliding expiry: every authenticated request pushes the deadline out, so
+    a session dies from inactivity rather than mid-edit."""
+    if not token:
+        return None
+    now = time.time()
+    with _sessions_lock:
+        s = _sessions.get(token)
+        if not s:
+            return None
+        if s["expires"] < now:
+            _sessions.pop(token, None)
+            return None
+        s["expires"] = now + SESSION_IDLE
+        return dict(s)
+
+
+def drop_session(token):
+    with _sessions_lock:
+        _sessions.pop(token, None)
+
+
+def drop_sessions_for(username):
+    """Deleting an account or changing its password must not leave a live
+    session behind that still carries the old rights."""
+    with _sessions_lock:
+        for t in [t for t, s in _sessions.items() if s["user"] == username]:
+            _sessions.pop(t, None)
+
+
+def login_blocked(ip):
+    rec = _login_fails.get(ip)
+    return bool(rec and rec[1] > time.time())
+
+
+def note_login_failure(ip):
+    """Back off geometrically after a handful of misses. A local password is
+    only as good as the number of guesses somebody gets per minute."""
+    rec = _login_fails.setdefault(ip, [0, 0])
+    rec[0] += 1
+    if rec[0] >= 5:
+        rec[1] = time.time() + min(300, 15 * (2 ** (rec[0] - 5)))
+
+
+def clear_login_failures(ip):
+    _login_fails.pop(ip, None)
 
 
 def read_settings():
@@ -209,7 +324,20 @@ def transcribe(raw, suffix, hint=None, model_name=None):
                 pass
 
 
+SESSION_COOKIE = "rsn_sid"
+ADMIN_ONLY_FILES = ("/admin.html",)
+
+
 class Handler(SimpleHTTPRequestHandler):
+    #: set per-listener by make_server — the admin port is a different surface
+    #: with different rules, not the same surface with an extra check
+    admin_port = False
+
+    def __init__(self, *args, admin_port=False, **kw):
+        # must land before super().__init__, which serves the request outright
+        self.admin_port = admin_port
+        super().__init__(*args, **kw)
+
     # ---------- no-cache ----------
     def end_headers(self):
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
@@ -235,14 +363,75 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    # ---------- identity ----------
+    def _session(self):
+        """Who is calling, or None. Only ever consulted on the admin port —
+        a cookie replayed at the public listeners buys nothing, because those
+        listeners have no privileged route to reach."""
+        if not self.admin_port:
+            return None
+        raw = self.headers.get("Cookie")
+        if not raw:
+            return None
+        try:
+            jar = http.cookies.SimpleCookie(raw)
+        except http.cookies.CookieError:
+            return None
+        morsel = jar.get(SESSION_COOKIE)
+        return get_session(morsel.value) if morsel else None
+
+    def _require(self, role=None):
+        """Returns the session, or answers 401/403 and returns None. `role`
+        of "admin" demands it; None accepts any signed-in account."""
+        s = self._session()
+        if not s:
+            self._json(401, {"error": "not signed in"})
+            return None
+        if role == "admin" and s["role"] != "admin":
+            self._json(403, {"error": "this account is read-only"})
+            return None
+        return s
+
+    def _same_origin(self):
+        """Every state-changing call must come from this interface itself.
+        Belt and braces over SameSite=Strict, which older browsers ignore."""
+        origin = self.headers.get("Origin")
+        if not origin:
+            return True                      # non-browser client, no ambient cookie
+        host = self.headers.get("Host") or ""
+        return origin.split("//")[-1] == host
+
+    def _set_cookie(self, token, clear=False):
+        # Secure is unconditional: the admin listener is HTTPS-only by design
+        bits = [
+            "%s=%s" % (SESSION_COOKIE, "" if clear else token),
+            "Path=/", "HttpOnly", "Secure", "SameSite=Strict",
+            "Max-Age=0" if clear else "Max-Age=%d" % SESSION_IDLE,
+        ]
+        self.send_header("Set-Cookie", "; ".join(bits))
+
     # ---------- routes ----------
     def do_GET(self):
         route = self.path.split("?")[0]
+        # The configuration interface does not exist as far as the public
+        # listeners are concerned — not hidden by CSS, not gated in JS, absent.
+        if route in ADMIN_ONLY_FILES and not self.admin_port:
+            return self._json(404, {"error": "not found"})
         if route == "/settings":
             # public: this is what every viewer's interface is built from
             return self._json(200, {"settings": read_settings()})
-        if route == "/settings/whoami":
-            return self._json(200, {"admin": self._is_admin()})
+        if route == "/auth/me":
+            s = self._session()
+            if not s:
+                return self._json(401, {"error": "not signed in"})
+            return self._json(200, {"user": s["user"], "role": s["role"]})
+        if route == "/users":
+            if not self._require("admin"):
+                return
+            return self._json(200, {"users": [
+                {"username": n, "role": u.get("role", "viewer"),
+                 "created": u.get("created")}
+                for n, u in sorted(read_users().items())]})
         if route == "/tts/voices":
             return self._json(200, {"voices": voice_list(),
                                     "loaded": sorted(_voices.keys())})
@@ -253,12 +442,9 @@ class Handler(SimpleHTTPRequestHandler):
                 "allowed": list(ALLOWED),
                 "error": _model_err,
             })
+        if route == "/" and self.admin_port:
+            self.path = "/admin.html"        # the admin port opens on admin.html
         return super().do_GET()
-
-    def _is_admin(self):
-        supplied = self.headers.get("X-Admin-Key") or ""
-        # constant-time compare so the key can't be guessed by timing
-        return bool(supplied) and hmac.compare_digest(supplied, admin_key())
 
     def _body(self, limit=256 * 1024):
         try:
@@ -269,24 +455,189 @@ class Handler(SimpleHTTPRequestHandler):
             return None
         return self.rfile.read(n)
 
+    def _json_body(self):
+        raw = self._body()
+        if raw is None:
+            self._json(400, {"error": "empty or oversized body"})
+            return None
+        try:
+            obj = json.loads(raw)
+        except ValueError:
+            self._json(400, {"error": "invalid json"})
+            return None
+        if not isinstance(obj, dict):
+            self._json(400, {"error": "expected an object"})
+            return None
+        return obj
+
     def do_POST(self):
         from urllib.parse import urlparse, parse_qs
         parsed = urlparse(self.path)
 
-        if parsed.path == "/settings":
-            if not self._is_admin():
-                return self._json(403, {"error": "admin key required"})
-            raw = self._body()
-            if raw is None:
-                return self._json(400, {"error": "empty or oversized body"})
+        if parsed.path.startswith(("/auth/", "/users")) or parsed.path == "/settings":
+            if not self.admin_port:
+                # Nothing privileged is reachable from the display listeners.
+                return self._json(404, {"error": "not found"})
+            if not self._same_origin():
+                return self._json(403, {"error": "cross-origin request refused"})
+
+        if parsed.path == "/auth/login":
+            ip = self.address_string()
+            if login_blocked(ip):
+                return self._json(429, {"error": "too many attempts — wait a moment"})
+            obj = self._json_body()
+            if obj is None:
+                return
+            name = str(obj.get("username") or "").strip()
+            users = read_users()
+            u = users.get(name)
+            ok = bool(u) and verify_password(str(obj.get("password") or ""),
+                                             u.get("salt", ""), u.get("hash", ""))
+            if not ok:
+                note_login_failure(ip)
+                print("failed sign-in for %r from %s" % (name, ip), flush=True)
+                # never say which half was wrong
+                return self._json(401, {"error": "wrong username or password"})
+            clear_login_failures(ip)
+            role = u.get("role", "viewer")
+            token = new_session(name, role)
+            body = json.dumps({"ok": True, "user": name, "role": role}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self._set_cookie(token)
+            self.end_headers()
+            print("signed in: %s (%s)" % (name, role), flush=True)
+            return self.wfile.write(body)
+
+        if parsed.path == "/auth/logout":
+            raw = self.headers.get("Cookie") or ""
             try:
-                obj = json.loads(raw)
-            except ValueError:
-                return self._json(400, {"error": "invalid json"})
-            if not isinstance(obj, dict):
-                return self._json(400, {"error": "expected an object"})
+                jar = http.cookies.SimpleCookie(raw)
+                m = jar.get(SESSION_COOKIE)
+                if m:
+                    drop_session(m.value)
+            except http.cookies.CookieError:
+                pass
+            body = json.dumps({"ok": True}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self._set_cookie(None, clear=True)
+            self.end_headers()
+            return self.wfile.write(body)
+
+        if parsed.path == "/auth/password":
+            s = self._require()
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            users = read_users()
+            target = str(obj.get("username") or s["user"])
+            # anyone may change their own; only an admin may change someone else's
+            if target != s["user"] and s["role"] != "admin":
+                return self._json(403, {"error": "this account is read-only"})
+            if target not in users:
+                return self._json(404, {"error": "no such account"})
+            # changing your own demands the current one, so a walk-up at an
+            # unlocked browser cannot lock the owner out
+            if target == s["user"]:
+                cur = str(obj.get("current") or "")
+                if not verify_password(cur, users[target].get("salt", ""),
+                                       users[target].get("hash", "")):
+                    return self._json(403, {"error": "current password is wrong"})
+            new = str(obj.get("password") or "")
+            if len(new) < MIN_PASSWORD:
+                return self._json(400, {"error": "password must be at least %d characters"
+                                                 % MIN_PASSWORD})
+            salt, dk = hash_password(new)
+            users[target].update({"salt": salt, "hash": dk})
+            write_users(users)
+            drop_sessions_for(target)          # old sessions die with the old password
+            print("password changed for %s by %s" % (target, s["user"]), flush=True)
+            return self._json(200, {"ok": True, "signed_out": True})
+
+        if parsed.path == "/users":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            name = str(obj.get("username") or "").strip()
+            if not valid_username(name):
+                return self._json(400, {"error": "username: 2-32 chars, letters, "
+                                                 "digits, dot, dash, underscore"})
+            users = read_users()
+            if name in users:
+                return self._json(409, {"error": "that account already exists"})
+            pw = str(obj.get("password") or "")
+            if len(pw) < MIN_PASSWORD:
+                return self._json(400, {"error": "password must be at least %d characters"
+                                                 % MIN_PASSWORD})
+            role = obj.get("role") if obj.get("role") in ROLES else "viewer"
+            salt, dk = hash_password(pw)
+            users[name] = {"salt": salt, "hash": dk, "role": role,
+                           "created": int(time.time())}
+            write_users(users)
+            print("account created: %s (%s) by %s" % (name, role, s["user"]), flush=True)
+            return self._json(200, {"ok": True, "username": name, "role": role})
+
+        if parsed.path == "/users/delete":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            name = str(obj.get("username") or "")
+            users = read_users()
+            if name not in users:
+                return self._json(404, {"error": "no such account"})
+            # An interface nobody can administer is a brick. Refuse to remove
+            # the last admin, including yourself.
+            admins = [n for n, u in users.items() if u.get("role") == "admin"]
+            if users[name].get("role") == "admin" and len(admins) <= 1:
+                return self._json(409, {"error": "this is the only admin account"})
+            users.pop(name)
+            write_users(users)
+            drop_sessions_for(name)
+            print("account deleted: %s by %s" % (name, s["user"]), flush=True)
+            return self._json(200, {"ok": True})
+
+        if parsed.path == "/users/role":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            name, role = str(obj.get("username") or ""), obj.get("role")
+            users = read_users()
+            if name not in users:
+                return self._json(404, {"error": "no such account"})
+            if role not in ROLES:
+                return self._json(400, {"error": "role must be admin or viewer"})
+            admins = [n for n, u in users.items() if u.get("role") == "admin"]
+            if role != "admin" and name in admins and len(admins) <= 1:
+                return self._json(409, {"error": "this is the only admin account"})
+            users[name]["role"] = role
+            write_users(users)
+            drop_sessions_for(name)            # re-sign-in picks up the new rights
+            print("role of %s set to %s by %s" % (name, role, s["user"]), flush=True)
+            return self._json(200, {"ok": True})
+
+        if parsed.path == "/settings":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
             write_settings(obj)
-            print("settings saved (%d keys)" % len(obj), flush=True)
+            print("settings saved (%d keys) by %s" % (len(obj), s["user"]), flush=True)
             return self._json(200, {"ok": True, "keys": len(obj)})
 
         if parsed.path == "/tts":
@@ -343,14 +694,24 @@ class Handler(SimpleHTTPRequestHandler):
         })
 
 
-def make_server(port):
-    handler = functools.partial(Handler, directory=ROOT)
+def make_server(port, admin_port=False):
+    handler = functools.partial(Handler, directory=ROOT, admin_port=admin_port)
     return ThreadingHTTPServer(("0.0.0.0", port), handler)
+
+
+def start_tls(port, cert, key, admin_port=False):
+    srv = make_server(port, admin_port=admin_port)
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(cert, key)
+    srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
 
 
 def main():
     port = int(os.environ.get("PORT", "9700"))
     cert, key = os.path.join(ROOT, "cert.pem"), os.path.join(ROOT, "key.pem")
+    have_tls = os.path.exists(cert) and os.path.exists(key)
 
     # warm the model in the background so the first utterance isn't slow
     for _n in (MODEL_NAME, "base.en"):      # warm both sides of the trade
@@ -358,20 +719,34 @@ def main():
     if voice_list():
         threading.Thread(target=get_voice, args=(voice_list()[0],), daemon=True).start()
 
-    if os.path.exists(cert) and os.path.exists(key):
-        tls_port = port + 1
-        srv = make_server(tls_port)
-        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ctx.load_cert_chain(cert, key)
-        srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
-        threading.Thread(target=srv.serve_forever, daemon=True).start()
-        print("HTTPS on 0.0.0.0:%d  (mic + local STT work here)" % tls_port, flush=True)
+    if have_tls:
+        start_tls(port + 1, cert, key)
+        print("HTTPS on 0.0.0.0:%d  (mic + local STT work here)" % (port + 1), flush=True)
     else:
         print("no cert.pem/key.pem — HTTPS disabled, mic will be blocked", flush=True)
 
     print("HTTP  on 0.0.0.0:%d  (no-store)" % port, flush=True)
-    print("admin key: %s" % admin_key(), flush=True)
-    print("           append ?admin=<key> to the URL to unlock settings", flush=True)
+
+    # ---- admin listener: HTTPS or nothing ----
+    if have_tls:
+        first_pw = ensure_first_admin()
+        start_tls(port + 2, cert, key, admin_port=True)
+        print("ADMIN on 0.0.0.0:%d  (HTTPS only, sign-in required)" % (port + 2),
+              flush=True)
+        if first_pw:
+            print("", flush=True)
+            print("  first-run account created — this is printed ONCE:", flush=True)
+            print("      username: admin", flush=True)
+            print("      password: %s" % first_pw, flush=True)
+            print("  change it after signing in.", flush=True)
+            print("", flush=True)
+        else:
+            print("       %d account(s) configured" % len(read_users()), flush=True)
+    else:
+        print("ADMIN disabled — it takes a password and refuses to serve one "
+              "over plain HTTP.", flush=True)
+        print("       run ./make-cert.sh <host> and restart.", flush=True)
+
     make_server(port).serve_forever()
 
 

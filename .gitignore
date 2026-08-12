@@ -2,6 +2,8 @@ cert.pem
 key.pem
 admin.key
 settings.json
+users.json
+users.json.tmp
 server.log
 voices/
 stt-venv/

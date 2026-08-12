@@ -105,100 +105,6 @@
   .src button.rec{border-color:#ff5a5a;color:#ff8a8a}
   .src button[disabled]{opacity:.35;cursor:not-allowed}
 
-  /* ---------- control rig ---------- */
-  #rigbtn{
-    position:fixed;top:10px;right:12px;z-index:20;cursor:pointer;
-    font:inherit;font-size:9px;letter-spacing:.2em;padding:6px 10px;
-    background:rgba(0,0,0,.55);color:rgba(var(--paper),.82);
-    border:1px solid rgba(var(--glass),.18);
-  }
-  #rig{
-    position:fixed;top:38px;right:12px;z-index:20;width:252px;max-height:86vh;overflow-y:auto;
-    background:rgba(4,6,10,.94);border:1px solid rgba(var(--glass),.16);
-    padding:14px 14px 18px;display:none;
-    scrollbar-width:thin;scrollbar-color:rgba(var(--glass),.18) transparent;
-  }
-  #rig.open{display:block}
-  /* ---- rig: tabs > collapsible sections ---- */
-  .tabs{display:flex;gap:4px;margin-bottom:10px}
-  .tabs button{
-    flex:1;font:inherit;font-size:9px;letter-spacing:.18em;padding:6px 4px;cursor:pointer;
-    background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.66);
-  }
-  .tabs button.on{border-color:var(--hue-dim);color:var(--hue);background:rgba(var(--glass),.08)}
-  .findrow{display:flex;gap:4px;margin:0 0 4px}
-  .findrow button{
-    font:inherit;font-size:12px;line-height:1;width:24px;cursor:pointer;
-    background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.72);
-  }
-  .findrow button:hover{color:var(--hue);border-color:var(--hue-dim)}
-  #rigfind{
-    flex:1;min-width:0;margin:0;font:inherit;font-size:9.5px;padding:5px 7px;
-    background:rgba(0,0,0,.5);color:var(--text);
-    border:1px solid rgba(var(--glass),.18);outline:0;-webkit-appearance:none;appearance:none;
-  }
-  #rigfind::placeholder{color:rgba(var(--paper),.38)}
-
-  /* a real divider between topics, not just spacing */
-  .grp{
-    border-top:1px solid rgba(var(--glass),.20);
-    margin-top:14px;padding-top:2px;
-  }
-  .grp:first-of-type{border-top:0;margin-top:8px}
-  .grp[hidden]{display:none}
-  #rig h4{
-    font-size:9px;letter-spacing:.24em;text-transform:uppercase;font-weight:400;
-    color:rgba(var(--paper),.78);margin:10px 0 8px;padding:0 0 6px 12px;
-    border-bottom:1px solid rgba(var(--glass),.10);
-    cursor:pointer;position:relative;user-select:none;
-  }
-  #rig h4:hover{color:var(--hue)}
-  #rig h4::before{                       /* disclosure caret */
-    content:'';position:absolute;left:0;top:4px;
-    border-left:4px solid rgba(var(--paper),.55);
-    border-top:3.5px solid transparent;border-bottom:3.5px solid transparent;
-    transform:rotate(90deg);transform-origin:2px 3.5px;transition:transform .12s;
-  }
-  .grp.shut h4::before{transform:rotate(0deg)}
-  .grp.shut .grpbody{display:none}
-  .grpbody{padding-bottom:4px}
-  .seg{display:flex;flex-wrap:wrap;gap:4px}
-  .seg button{
-    font:inherit;font-size:9.5px;letter-spacing:.1em;padding:5px 8px;cursor:pointer;
-    background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.78);
-  }
-  .seg button.on{border-color:var(--hue-dim);color:var(--hue);background:rgba(var(--glass),.06)}
-  .sl{display:grid;grid-template-columns:1fr auto;gap:2px 8px;margin:9px 0;align-items:center}
-  .sl label{font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.78)}
-  .sl output{font-size:9.5px;color:var(--text)}
-  .sl input{grid-column:1/-1;width:100%;height:2px;-webkit-appearance:none;appearance:none;
-            background:rgba(var(--glass),.18);outline:0}
-  .sl input::-webkit-slider-thumb{-webkit-appearance:none;width:9px;height:9px;background:var(--hue);cursor:pointer}
-  .sl input::-moz-range-thumb{width:9px;height:9px;border:0;background:var(--hue);cursor:pointer}
-  #voicesel,#neuralvoice,#wakeword,#sleepword,#greetings,#wakealiases,#sleepaliases,#farewells{
-    width:100%;margin:9px 0 4px;font:inherit;font-size:9.5px;padding:5px 6px;
-    background:rgba(0,0,0,.6);color:var(--text);
-    border:1px solid rgba(var(--glass),.16);outline:0;
-  }
-  #voicesel option,#neuralvoice option{background:#0a0d14;color:#dfe9f2}
-  /* engine-specific blocks: exactly one is ever shown, and both start at the
-     SAME y so switching engines doesn't move the voice list. The margin has
-     to sit on the wrapper, not on the select inside it, or the wrapped list
-     lands 9px higher than the bare one. */
-  #browservoice{display:none;margin:9px 0 0}
-  #browservoice > #voicesel{margin-top:0}
-  #wakeword,#sleepword{letter-spacing:.12em;text-transform:lowercase}
-  #greetings,#wakealiases,#sleepaliases,#farewells{resize:vertical;line-height:1.6;min-height:44px}
-  /* LEARN prompts must sit next to the button that starts the training —
-     they used to go to the mic section's note, which is invisible when that
-     topic is folded, so the user never saw "say it now". */
-  .learnnote{
-    font-size:9px;letter-spacing:.06em;line-height:1.5;margin-top:6px;
-    color:rgba(var(--paper),.72);min-height:0;
-  }
-  .learnnote.live{
-    color:var(--hue);border-left:2px solid var(--hue-dim);padding-left:7px;
-  }
   #fps{position:fixed;left:12px;top:10px;z-index:20;font-size:9px;letter-spacing:.14em;
        color:rgba(var(--paper),.52)}
 </style>
@@ -206,213 +112,6 @@
 <body data-layout="hero">
 
 <div id="fps"></div>
-<button id="rigbtn">RIG</button>
-
-<div id="rig">
-  <div class="tabs">
-    <button data-tab="look"   class="on">LOOK</button>
-    <button data-tab="motion">MOTION</button>
-    <button data-tab="voice">VOICE</button>
-  </div>
-  <div class="seg" style="margin-bottom:8px">
-    <button id="b_save">SAVE FOR EVERYONE</button>
-    <button id="b_revert">REVERT</button>
-    <button id="b_exit" title="drop the admin key and reload as an ordinary user">EXIT ADMIN</button>
-  </div>
-  <div id="savestate" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.72);margin:0 0 8px;line-height:1.5"></div>
-
-  <div class="findrow">
-    <input id="rigfind" type="search" placeholder="filter settings…" spellcheck="false">
-    <button id="b_expand" title="expand all in this tab">+</button>
-    <button id="b_collapse" title="collapse all in this tab">−</button>
-  </div>
-  <section class="grp" data-tab="look">
-    <h4>Geometry</h4>
-    <div class="grpbody">  <div class="seg" data-set="mode">
-    <button data-v="stack" class="on">STACK</button>
-    <button data-v="disc">DISC</button>
-    <button data-v="orb">ORB</button>
-    <button data-v="knot">KNOT</button>
-  </div></div>
-  </section>
-  <section class="grp" data-tab="look">
-    <h4>Palette</h4>
-    <div class="grpbody">  <div class="seg" data-set="palette">
-    <button data-v="blue" class="on">BLUE</button>
-    <button data-v="milk">MILK</button>
-    <button data-v="ice">ICE</button>
-    <button data-v="amber">AMBER</button>
-    <button data-v="bone">BONE</button>
-  </div></div>
-  </section>
-  <section class="grp" data-tab="look">
-    <h4>Layout</h4>
-    <div class="grpbody">  <div class="seg" data-set="layout">
-    <button data-v="hero" class="on">HERO</button>
-    <button data-v="bleed">FULL BLEED</button>
-  </div></div>
-  </section>
-  <section class="grp" data-tab="look">
-    <h4>Form &amp; size</h4>
-    <div class="grpbody">  <div class="sl"><label>amplitude</label><output id="o_amp"></output><input id="s_amp" type="range" min="0" max="2.5" step=".01"></div>
-  <div class="sl"><label>lines</label><output id="o_lines"></output><input id="s_lines" type="range" min="1" max="40" step="1"></div>
-  <div class="sl"><label>layer phase</label><output id="o_lag"></output><input id="s_lag" type="range" min="0" max="14" step=".1"></div>
-  <div class="sl"><label>depth</label><output id="o_depth"></output><input id="s_depth" type="range" min="0" max="600" step="5"></div>
-  <div class="sl"><label>spread</label><output id="o_spread"></output><input id="s_spread" type="range" min="200" max="1100" step="10"></div>
-  <div class="sl"><label>perspective</label><output id="o_persp"></output><input id="s_persp" type="range" min="260" max="3000" step="20"></div></div>
-  </section>
-  <section class="grp" data-tab="motion">
-    <h4>Rotation</h4>
-    <div class="grpbody">  <div class="seg" data-set="tmode">
-    <button data-v="turntable" class="on">TURNTABLE</button>
-    <button data-v="free">FREE TUMBLE</button>
-  </div>
-  <div class="sl"><label>spin (platter)</label><output id="o_spin"></output><input id="s_spin" type="range" min="0" max="4" step=".01"></div>
-  <div class="sl"><label>tilt / view height</label><output id="o_tilt"></output><input id="s_tilt" type="range" min="0" max="1.2" step=".001"></div>
-  <div class="sl"><label>wobble</label><output id="o_wobble"></output><input id="s_wobble" type="range" min="0" max="4" step=".01"></div>
-  <div class="sl"><label>roll / lean</label><output id="o_roll"></output><input id="s_roll" type="range" min="0" max="4" step=".01"></div>
-  <div class="sl"><label>master rate</label><output id="o_tumble"></output><input id="s_tumble" type="range" min="0" max="3" step=".01"></div>
-  <div class="sl"><label>re-aim every</label><output id="o_reo"></output><input id="s_reo" type="range" min="3" max="40" step="1"></div>
-  <div class="seg" style="margin-top:8px">
-    <button id="b_reo">RE-AIM NOW</button>
-  </div></div>
-  </section>
-  <section class="grp" data-tab="look">
-    <h4>Glass</h4>
-    <div class="grpbody">  <div class="sl"><label>bloom</label><output id="o_bloom"></output><input id="s_bloom" type="range" min="0" max="2" step=".01"></div>
-  <div class="sl"><label>blur radius</label><output id="o_blur"></output><input id="s_blur" type="range" min="0" max="30" step="1"></div>
-  <div class="sl"><label>milk</label><output id="o_milk"></output><input id="s_milk" type="range" min="0" max="2" step=".01"></div>
-  <div class="sl"><label>grain</label><output id="o_grain"></output><input id="s_grain" type="range" min="0" max="1.5" step=".01"></div>
-  <div class="sl"><label>scanlines</label><output id="o_scan"></output><input id="s_scan" type="range" min="0" max="1" step=".01"></div>
-  <div class="sl"><label>line weight</label><output id="o_lw"></output><input id="s_lw" type="range" min=".3" max="3" step=".05"></div></div>
-  </section>
-  <section class="grp" data-tab="voice">
-    <h4>Setup &amp; self-test</h4>
-    <div class="grpbody">
-  <div class="seg" data-set="backend">
-    <button data-v="demo" class="on">DEMO REPLIES</button>
-    <button data-v="api" disabled>CONNECTED AI</button>
-  </div>
-  <div style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.72);margin-top:6px;line-height:1.5">
-    DEMO answers from built-in text, so you can prove the whole chain works
-    before connecting anything. Keep it here during setup.
-  </div>
-  <div class="seg" style="margin-top:8px"><button id="b_selftest">RUN SELF-TEST</button></div>
-  <div id="selftest" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.72);margin-top:6px;line-height:1.6;white-space:pre-line"></div>
-    </div>
-  </section>
-
-  <section class="grp" data-tab="voice">
-    <h4>Test drive</h4>
-    <div class="grpbody">  <div class="seg">
-    <button id="b_idle">IDLE</button>
-    <button id="b_think">THINKING</button>
-    <button id="b_speak">SPEAK SAMPLE</button>
-  </div>
-  <div class="sl" style="margin-top:10px"><label>token rate ms</label><output id="o_rate"></output><input id="s_rate" type="range" min="15" max="180" step="5"></div></div>
-  </section>
-  <section class="grp" data-tab="voice">
-    <h4>Speech out (TTS)</h4>
-    <div class="grpbody">  <div class="seg" data-set="ttsengine">
-    <button data-v="local" class="on">NEURAL (server)</button>
-    <button data-v="browser">BROWSER</button>
-  </div>
-  <select id="neuralvoice"></select>
-  <div id="browservoice">
-  <select id="voicesel"></select>
-  <div class="sl"><label>pitch</label><output id="o_vpitch"></output><input id="s_vpitch" type="range" min=".5" max="2" step=".05"></div>
-  </div>
-  <div class="sl"><label>speech rate</label><output id="o_vrate"></output><input id="s_vrate" type="range" min=".5" max="2" step=".05"></div>
-  <div id="voicenote" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.72);margin:2px 0 8px;line-height:1.5"></div>
-  <div class="seg" data-set="src">
-    <button data-v="token">TOKEN</button>
-    <button data-v="tts" class="on">TTS</button>
-  </div>
-  <div class="seg" style="margin-top:8px">
-    <button id="b_beep">BEEP</button>
-    <button id="b_test">TEST VOICE</button>
-    <button id="b_diag">DIAGNOSE</button>
-  </div>
-  <div id="ttsnote" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.72);margin-top:8px;line-height:1.5"></div></div>
-  </section>
-  <section class="grp" data-tab="voice">
-    <h4>Speech in (mic)</h4>
-    <div class="grpbody">  <div class="seg" data-set="ptt">
-    <button data-v="1" class="on">PUSH TO TALK</button>
-    <button data-v="0">AUTO (voice detect)</button>
-  </div>
-  <div class="seg" style="margin-top:6px"><button id="b_mic">MIC ONLY (no transcript)</button></div>
-  <div class="sl"><label>mic gain</label><output id="o_micgain"></output><input id="s_micgain" type="range" min=".2" max="5" step=".05"></div>
-  <div class="sl"><label>noise gate</label><output id="o_micgate"></output><input id="s_micgate" type="range" min="0" max=".15" step=".002"></div>
-  <div class="seg" data-set="sttmodel" style="margin-top:6px">
-    <button data-v="base.en">FAST (base.en)</button>
-    <button data-v="small.en" class="on">ACCURATE (small.en)</button>
-  </div>
-  <div class="sl"><label>end-of-speech wait</label><output id="o_hangover"></output><input id="s_hangover" type="range" min=".2" max="1.5" step=".05"></div>
-  <div class="seg" data-set="micdsp" style="margin-top:6px">
-    <button data-v="clean" class="on">CLEAN (best recognition)</button>
-    <button data-v="raw">RAW (best visuals)</button>
-  </div>
-  <div class="seg" style="margin-top:6px"><button id="b_cal">CALIBRATE (stay quiet 2s)</button></div>
-  <div id="miclevel" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.72);margin-top:6px;line-height:1.5">level —</div>
-  <div id="micnote" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.72);margin-top:8px;line-height:1.5">off</div></div>
-  </section>
-  <section class="grp" data-tab="voice">
-    <h4>Wake word</h4>
-    <div class="grpbody">  <div class="seg" data-set="wake">
-    <button data-v="off">OFF</button>
-    <button data-v="auto" class="on">AUTO ONLY</button>
-    <button data-v="always">ALWAYS</button>
-  </div>
-  <input id="wakeword" type="text" spellcheck="false" autocomplete="off" placeholder="trigger word">
-  <div class="seg" style="margin-top:6px"><button id="b_learn">LEARN HOW I SAY IT (3x)</button></div>
-  <div id="learnwakenote" class="learnnote"></div>
-  <label style="display:block;font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.78);margin-top:10px">also accept (learned)</label>
-  <textarea id="wakealiases" rows="3" spellcheck="false" placeholder="one per line"></textarea>
-
-<div class="sl"><label>stays awake for</label><output id="o_wakewindow"></output><input id="s_wakewindow" type="range" min="3" max="60" step="1"></div>
-  <label style="display:block;font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.78);margin-top:8px">when that time runs out</label>
-  <div class="seg" data-set="byeontimeout">
-    <button data-v="1" class="on">SAY FAREWELL</button>
-    <button data-v="0">GO QUIET</button>
-  </div>
-  <label style="display:block;font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.78);margin-top:10px">greeting phrases</label>
-  <textarea id="greetings" rows="4" spellcheck="false" placeholder="one per line — {name} inserts the wake word"></textarea>
-  <div class="seg"><button id="b_greet">TEST GREETING</button></div>
-  <div id="wakestate" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.72);margin-top:6px;line-height:1.5"></div></div>
-    </section>
-
-  <section class="grp" data-tab="voice">
-    <h4>Sleep word</h4>
-    <div class="grpbody">
-  <label style="display:block;font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.78);margin-top:0">word that ends the conversation at once</label>
-  <input id="sleepword" type="text" spellcheck="false" autocomplete="off" placeholder="e.g. goodbye">
-  <div class="seg" style="margin-top:6px"><button id="b_learnsleep">LEARN HOW I SAY IT (3x)</button></div>
-  <div id="learnsleepnote" class="learnnote"></div>
-  <label style="display:block;font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.78);margin-top:10px">also accept (learned)</label>
-  <textarea id="sleepaliases" rows="2" spellcheck="false" placeholder="one per line"></textarea>
-
-  <label style="display:block;font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.78);margin-top:10px">farewell phrases</label>
-  <textarea id="farewells" rows="3" spellcheck="false" placeholder="one per line — {name} inserts the wake word"></textarea>
-  <div class="seg"><button id="b_bye">TEST FAREWELL</button></div>
-  
-    <div id="sleepstate" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.72);margin-top:6px;line-height:1.5"></div>
-    </div>
-</section>
-  <section class="grp" data-tab="motion">
-    <h4>Spectrum</h4>
-    <div class="grpbody">  <div class="sl"><label>spike width</label><output id="o_spike"></output><input id="s_spike" type="range" min=".004" max=".09" step=".001"></div>
-  <div class="sl"><label>spike decay</label><output id="o_decay"></output><input id="s_decay" type="range" min=".25" max="4" step=".05"></div>
-  <div class="sl"><label>body / swell</label><output id="o_body"></output><input id="s_body" type="range" min="0" max="1.5" step=".01"></div>
-  <div class="sl"><label>peak colour</label><output id="o_grad"></output><input id="s_grad" type="range" min="0" max="1.5" step=".01"></div>
-  <div class="sl"><label>heat threshold</label><output id="o_hot"></output><input id="s_hot" type="range" min=".1" max="2.5" step=".01"></div></div>
-  </section>
-  <section class="grp" data-tab="motion">
-    <h4>Noise floor</h4>
-    <div class="grpbody">  <div class="sl"><label>static level</label><output id="o_floor"></output><input id="s_floor" type="range" min="0" max="2" step=".01"></div>
-  <div class="sl"><label>crackle</label><output id="o_crackle"></output><input id="s_crackle" type="range" min="0" max="1.5" step=".01"></div></div>
-  </section>
-</div>
 
 <div id="shell">
   <div id="screen">
@@ -446,6 +145,20 @@
    Phases 2 (TTS) and 3 (mic) plug into the same place: they only need to
    push a 0..1 number into Drive.level each frame.  Nothing else changes.
    ===================================================================== */
+
+/* Every control that used to live in this page now lives in admin.html,
+   so these lookups must tolerate an absent element rather than throw. */
+const $ = (id)=> document.getElementById(id);
+const on = (id, ev, fn)=>{ const e = $(id); if (e) e.addEventListener(ev, fn); };
+
+/* PREVIEW: this page inside the admin page's iframe. Same page, same code —
+   the preview is the real thing rather than a second implementation that can
+   drift from it. */
+const PREVIEW = new URLSearchParams(location.search).has('preview');
+function relay(slot, text, live){
+  if (PREVIEW && window.parent !== window)
+    window.parent.postMessage({rsn:1, kind:'status', slot, text, live:!!live}, '*');
+}
 
 /* ---------------------------------------------------------------- state */
 const S = {
@@ -1252,7 +965,7 @@ function calibrate(){
   }, 50);
 }
 
-function micNote(m){ const el = document.getElementById('micnote'); if (el) el.textContent = m; }
+function micNote(m){ const el = $('micnote'); if (el) el.textContent = m; relay('micnote', m); }
 
 /* ============================================== PHASE 3b — SPEECH TO TEXT
    Local. Audio is recorded in the browser and POSTed to /stt on this same
@@ -1708,8 +1421,9 @@ function unlockTTS(){ ttsUnlocked = true; }
   window.addEventListener(ev, unlockTTS, true));
 
 function note(msg){
-  const el = document.getElementById('ttsnote');
+  const el = $('ttsnote');
   if (el) el.textContent = msg;
+  relay('ttsnote', msg);
 }
 
 /* Rolling lifecycle trace, so it's visible where speech dies without
@@ -1801,71 +1515,14 @@ qEl.addEventListener('keydown', e=>{
   submit(v);
 });
 
-/* ================================================================== RIG */
-const rig = document.getElementById('rig');
-
-/* ---- rig navigation: tabs, collapsible topics, live filter ----
-   Collapse state is remembered per section and survives tab switches and
-   filtering. Filtering opens matches temporarily without destroying what
-   you had folded away. */
-const groups = [...rig.querySelectorAll('.grp')];
-const shut = new Map();                 // section -> folded?
-let rigTab = 'look';
-
-// start folded, except the first topic of each tab, so the panel opens small
-const seen = new Set();
-groups.forEach(g=>{
-  const first = !seen.has(g.dataset.tab);
-  seen.add(g.dataset.tab);
-  shut.set(g, !first);
-});
-
-const findEl = document.getElementById('rigfind');
-
-function renderRig(){
-  const q = (findEl.value || '').trim().toLowerCase();
-  groups.forEach(g=>{
-    const show = q ? g.textContent.toLowerCase().includes(q) : g.dataset.tab === rigTab;
-    g.hidden = !show;
-    // while filtering, matches are forced open; otherwise honour the fold
-    g.classList.toggle('shut', q ? false : !!shut.get(g));
-  });
-}
-
-function showTab(t){
-  rigTab = t;
-  rig.querySelectorAll('.tabs button').forEach(b=> b.classList.toggle('on', b.dataset.tab===t));
-  renderRig();
-  rig.scrollTop = 0;
-}
-
-rig.querySelector('.tabs').addEventListener('click', e=>{
-  const b = e.target.closest('button'); if (b) showTab(b.dataset.tab);
-});
-
-groups.forEach(g=>{
-  g.querySelector('h4').addEventListener('click', ()=>{
-    shut.set(g, !shut.get(g));
-    renderRig();
-  });
-});
-
-function foldAll(v){
-  groups.forEach(g=>{ if (g.dataset.tab === rigTab) shut.set(g, v); });
-  findEl.value = '';
-  renderRig();
-}
-document.getElementById('b_expand').addEventListener('click', ()=> foldAll(false));
-document.getElementById('b_collapse').addEventListener('click', ()=> foldAll(true));
-
-findEl.addEventListener('input', renderRig);
 /* Commissioning check: exercises each link in the chain and says which one
    is broken, rather than leaving you to guess from silence. */
 async function selfTest(){
-  const el = document.getElementById('selftest');
+  const el = $('selftest');
   const lines = [];
-  const say = (ok, m) => { lines.push((ok ? '  ok   ' : '  FAIL ') + m); el.textContent = lines.join('\n'); };
-  el.textContent = 'running…';
+  const show = (t)=>{ if (el) el.textContent = t; relay('selftest', t); };
+  const say = (ok, m) => { lines.push((ok ? '  ok   ' : '  FAIL ') + m); show(lines.join('\n')); };
+  show('running…');
 
   say(!!window.isSecureContext, 'secure origin (' + location.protocol + ') — needed for the mic');
 
@@ -1905,14 +1562,8 @@ async function selfTest(){
 
   lines.push(lines.some(l=>l.startsWith('  FAIL')) ? '\nsomething above needs fixing.'
                                                    : '\nall green — safe to connect a real backend.');
-  el.textContent = lines.join('\n');
+  show(lines.join('\n'));
 }
-document.getElementById('b_selftest').addEventListener('click', selfTest);
-document.getElementById('b_save').addEventListener('click', ()=> Settings.save());
-document.getElementById('b_revert').addEventListener('click', ()=> Settings.revert());
-document.getElementById('b_exit').addEventListener('click', ()=> Settings.exit());
-showTab('look');
-document.getElementById('rigbtn').onclick = ()=> rig.classList.toggle('open');
 
 function setPalette(p){
   const c = PALETTES[p]; const r = document.documentElement.style;
@@ -1954,9 +1605,10 @@ document.querySelectorAll('.seg[data-set]').forEach(seg=>{
 
 const SLIDERS = [];
 function slider(id, key, fmt){
-  const s = document.getElementById('s_'+id), o = document.getElementById('o_'+id);
-  const paint = ()=>{ s.value = S[key]; o.textContent = fmt? fmt(S[key]) : S[key]; };
-  const sync  = ()=>{ S[key] = parseFloat(s.value); o.textContent = fmt? fmt(S[key]) : S[key]; };
+  const s = $('s_'+id), o = $('o_'+id);
+  if (!s) return;                 // the controls live on the admin page now
+  const paint = ()=>{ s.value = S[key]; if (o) o.textContent = fmt? fmt(S[key]) : S[key]; };
+  const sync  = ()=>{ S[key] = parseFloat(s.value); if (o) o.textContent = fmt? fmt(S[key]) : S[key]; };
   s.addEventListener('input', sync); paint();
   SLIDERS.push(paint);
 }
@@ -2004,24 +1656,24 @@ slider('hot','hot',         v=>v.toFixed(2));
 slider('floor','floor',     v=>v.toFixed(2));
 slider('crackle','crackle', v=>v.toFixed(2));
 
-const scanEl = document.getElementById('scan');
-document.getElementById('s_scan').addEventListener('input', ()=> scanEl.style.opacity = S.scan);
-scanEl.style.opacity = S.scan;
+const scanEl = $('scan');
+if (scanEl) scanEl.style.opacity = S.scan;
 
-// dragging tilt should move the platter immediately, not at the next re-aim
-document.getElementById('s_tilt').addEventListener('input', ()=>{ tiltAim = S.tilt; });
-
-document.getElementById('b_reo').onclick   = reorient;
-document.getElementById('b_idle').onclick  = ()=>{ clearTimeout(streamTimer); Speech.stop(); Drive.phase='idle'; };
-document.getElementById('b_think').onclick = ()=>{ clearTimeout(streamTimer); Speech.stop(); Drive.phase='thinking'; };
-document.getElementById('b_speak').onclick = ()=> respond(REPLIES[replyIx++ % REPLIES.length]);
+/* Actions the admin page cannot perform itself: they need a microphone, a
+   speaker or the canvas. It asks this page to do them instead. */
+const CMD = {
+  reorient: ()=> reorient(),
+  idle:     ()=>{ clearTimeout(streamTimer); Speech.stop(); Drive.phase='idle'; },
+  thinking: ()=>{ clearTimeout(streamTimer); Speech.stop(); Drive.phase='thinking'; },
+  speak:    ()=> respond(REPLIES[replyIx++ % REPLIES.length]),
+};
 
 /* ------------------------------------------------------------ first run */
 /* ------------------------------------------------- voice enumeration
    getVoices() is empty until the engine has loaded them, so it has to be
    re-read on voiceschanged as well as at startup. */
 /* neural voice picker — names come from what's installed on the server */
-const nvSel = document.getElementById('neuralvoice');
+const nvSel = $('neuralvoice');
 /* Only one engine is ever in use, so only show that engine's controls.
    The 180-entry browser list next to the neural picker was pure noise. */
 function syncEngine(){
@@ -2062,13 +1714,14 @@ if (nvSel){
 syncEngine();          // correct from the first paint
 Play.probe();
 
-const voiceSel = document.getElementById('voicesel');
+const voiceSel = $('voicesel');
 function loadVoices(){
   if (!Speech.supported) return;
   const v = window.speechSynthesis.getVoices();
   if (!v.length) return;
   Speech.voices = v;
   const prev = Speech.voice && Speech.voice.name;
+  if (!voiceSel) return;
   voiceSel.innerHTML = '';
   v.forEach((vo,i)=>{
     const o = document.createElement('option');
@@ -2091,7 +1744,7 @@ function loadVoices(){
                                      or an embedded webview rather than a
                                      real browser                          */
 let audioCtx = null;
-document.getElementById('b_beep').onclick = ()=>{
+CMD.beep = ()=>{
   try{
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC){ note('no Web Audio in this browser at all'); return; }
@@ -2115,7 +1768,7 @@ document.getElementById('b_beep').onclick = ()=>{
 /* Speaks synchronously inside the click — no timer, so user activation is
    definitely still live. If this is silent but the page is otherwise fine,
    the problem is the voice or the output device, not the gesture gate. */
-document.getElementById('b_test').onclick = ()=>{
+CMD.testvoice = ()=>{
   if (S.ttsengine === 'local' && Play.available){
     Speech.stop();
     respond('Neural voice check. This is ' + (S.ttsvoice||'the default voice') +
@@ -2138,7 +1791,7 @@ document.getElementById('b_test').onclick = ()=>{
   }, 1200);
 };
 
-document.getElementById('b_diag').onclick = ()=>{
+CMD.diagnose = ()=>{
   const ss = window.speechSynthesis;
   const v = Speech.voice;
   note([
@@ -2373,14 +2026,16 @@ const Learn = {
   target:'wake',
 
   say(m, live){
-    const el = document.getElementById(
-      this.target === 'sleep' ? 'learnsleepnote' : 'learnwakenote');
+    const slot = this.target === 'sleep' ? 'learnsleepnote' : 'learnwakenote';
+    const el = $(slot);
     if (el){ el.textContent = m; el.classList.toggle('live', !!live); }
+    relay(slot, m, live);
   },
   clearNotes(){
     ['learnwakenote','learnsleepnote'].forEach(id=>{
-      const el = document.getElementById(id);
+      const el = $(id);
       if (el){ el.textContent = ''; el.classList.remove('live'); }
+      relay(id, '');
     });
   },
 
@@ -2514,14 +2169,14 @@ talkBtn.addEventListener('click', async ()=>{
 });
 
 // rig: mic without transcription
-document.getElementById('b_cal').addEventListener('click', calibrate);
-document.getElementById('b_mic').addEventListener('click', ()=>{
+CMD.calibrate = calibrate;
+CMD.miconly = ()=>{
   if (Mic.active) Mic.stop(); else { Speech.stop(); Mic.start(); }
-});
+};
 
 if (!window.isSecureContext || !Mic.ok){
   talkBtn.disabled = true;
-  document.getElementById('b_mic').disabled = true;
+  /* no mic button on this page any more */
   micNote(!Mic.ok ? 'no getUserMedia in this browser'
                   : 'insecure origin (' + location.protocol + ') — mic is blocked here. ' +
                     'Open the https:// URL on port 9701 instead.');
@@ -2529,30 +2184,35 @@ if (!window.isSecureContext || !Mic.ok){
   micNote('mic available, but this browser has no MediaRecorder — visual only');
 }
 bindField('wakealiases','wakealiases');
-document.getElementById('b_learn').addEventListener('click', ()=> Learn.start('wake'));
-document.getElementById('b_learnsleep').addEventListener('click', ()=> Learn.start('sleep'));
+CMD.learnwake  = ()=> Learn.start('wake');
+CMD.learnsleep = ()=> Learn.start('sleep');
 
-const sleepIn = document.getElementById('sleepword');
-FIELDS.push(()=>{ sleepIn.value = S.sleepword; });
-sleepIn.value = S.sleepword;
-sleepIn.addEventListener('input', ()=>{ S.sleepword = sleepIn.value.trim(); syncWake(); });
+const sleepIn = $('sleepword');
+if (sleepIn){
+  FIELDS.push(()=>{ sleepIn.value = S.sleepword; });
+  sleepIn.value = S.sleepword;
+  sleepIn.addEventListener('input', ()=>{ S.sleepword = sleepIn.value.trim(); syncWake(); });
+}
 
 bindField('sleepaliases','sleepaliases');
 
 bindField('farewells','farewells');
-document.getElementById('b_bye').addEventListener('click', ()=> farewell());
+CMD.farewell = ()=> farewell();
+CMD.selftest = ()=> selfTest();
 
 bindField('greetings','greetings');
-document.getElementById('b_greet').addEventListener('click', ()=> greet());
+CMD.greet = ()=> greet();
 
-const wakeIn = document.getElementById('wakeword');
-FIELDS.push(()=>{ wakeIn.value = S.wakeword; });
-wakeIn.value = S.wakeword;
-wakeIn.addEventListener('input', ()=>{
-  S.wakeword = wakeIn.value.trim();
-  Wake.awake = false;                       // new word means start over
-  syncTalk(); syncWake();
-});
+const wakeIn = $('wakeword');
+if (wakeIn){
+  FIELDS.push(()=>{ wakeIn.value = S.wakeword; });
+  wakeIn.value = S.wakeword;
+  wakeIn.addEventListener('input', ()=>{
+    S.wakeword = wakeIn.value.trim();
+    Wake.awake = false;                     // new word means start over
+    syncTalk(); syncWake();
+  });
+}
 slider('wakewindow','wakewindow', v=>v+'s');
 
 syncPtt();
@@ -2572,7 +2232,7 @@ muteBtn.addEventListener('click', ()=> setMuted(!muted));
 if (!Speech.supported){ setMuted(true); muteBtn.disabled = true; }
 
 if (Speech.supported){
-  voiceSel.addEventListener('change', ()=>{
+  if (voiceSel) voiceSel.addEventListener('change', ()=>{
     Speech.voice = Speech.voices[voiceSel.value|0] || null;
     Speech.stop(); Drive.phase='idle';
   });
@@ -2587,53 +2247,17 @@ if (Speech.supported){
   S.src = 'token';
   document.querySelectorAll('.seg[data-set="src"] button[data-v="tts"]')
           .forEach(b=> b.disabled = true);
-  voiceSel.disabled = true;
+  if (voiceSel) voiceSel.disabled = true;
   note('this browser has no speechSynthesis — TTS unavailable');
 }
 syncSeg('src');
 
 /* ================================================ SHARED SETTINGS
    One document on the server defines the interface for everyone who opens
-   the URL. Viewers read it; only a holder of the admin key can write it.
-   This is the mockup's stand-in for the admin-section requirement: users
-   get the interface, not the controls. */
-const ADMIN_KEY_STORE = 'resonance.adminkey';
+   the URL. This page only ever READS it: writing lives behind a sign-in on
+   the admin listener, and the public listeners have no route that accepts a
+   write at all. There is no key in this page and no gate to get wrong. */
 const Settings = {
-  key: null,
-  dirty: false,
-
-  init(){
-    const q = new URLSearchParams(location.search).get('admin');
-    if (q){
-      sessionStorage.setItem(ADMIN_KEY_STORE, q);
-      history.replaceState({}, '', location.pathname);   // keep it out of the bar
-    }
-    this.key = sessionStorage.getItem(ADMIN_KEY_STORE);
-  },
-
-  /* Ask the server, don't take the URL's word for it. */
-  async verify(){
-    if (!this.key) return false;
-    try{
-      const r = await fetch('settings/whoami', {
-        headers:{'X-Admin-Key': this.key}, cache:'no-store'
-      });
-      const j = await r.json();
-      this.isAdmin = !!(j && j.admin);
-      return this.isAdmin;
-    }catch(e){ this.isAdmin = false; return false; }
-  },
-
-  forget(){
-    sessionStorage.removeItem(ADMIN_KEY_STORE);
-    this.key = null; this.isAdmin = false;
-  },
-
-  exit(){
-    this.forget();
-    location.replace(location.pathname);     // come back as an ordinary viewer
-  },
-
   async load(){
     try{
       const r = await fetch('settings', {cache:'no-store'});
@@ -2644,31 +2268,6 @@ const Settings = {
       if (n) repaintAll();
       return n;
     }catch(e){ return -1; }
-  },
-
-  async save(){
-    if (!this.key){ this.status('no admin key', true); return; }
-    this.status('saving…');
-    try{
-      const r = await fetch('settings', {
-        method:'POST',
-        headers:{'Content-Type':'application/json','X-Admin-Key':this.key},
-        body: JSON.stringify(S)
-      });
-      const j = await r.json();
-      if (j.error) this.status(j.error, true);
-      else { this.dirty = false; this.status('saved for everyone · ' + j.keys + ' settings'); }
-    }catch(e){ this.status('save failed: ' + e.message, true); }
-  },
-
-  async revert(){
-    const n = await this.load();
-    this.status(n >= 0 ? 'reloaded from server' : 'could not reach server', n < 0);
-  },
-
-  status(m, bad){
-    const el = document.getElementById('savestate');
-    if (el){ el.textContent = m; el.style.color = bad ? '#ff8a8a' : ''; }
   }
 };
 
@@ -2687,28 +2286,45 @@ function repaintAll(){
   setTimeout(resize, 0);
 }
 
-/* The panel starts hidden for EVERYONE and is only revealed once the server
-   confirms the key. Two bugs this fixes:
-     - the gate was client-side only, so ?admin=anything showed the panel
-       even though the server would reject every write
-     - the key lives in sessionStorage, so once unlocked the plain URL kept
-       showing the rig in that same tab, with no way back to a user's view */
-document.getElementById('rigbtn').style.display = 'none';
-rig.style.display = 'none';
+/* ------------------------------------------------------ preview channel
+   The admin page shows this page in an iframe and drives it from there, so
+   what an operator tunes against is the real renderer rather than a copy of
+   it. Two directions:
+     in   settings — apply without saving, for live preview
+          cmd      — do something only a browser can do: speak, listen, beep
+     out  status   — the note text the panel used to display in-page
+   Only accepted from the parent frame, and only when this page was opened
+   as a preview. A page nobody framed ignores the channel entirely. */
+if (PREVIEW){
+  window.addEventListener('message', e=>{
+    if (e.source !== window.parent) return;
+    const m = e.data;
+    if (!m || m.rsn !== 1) return;
+    if (m.kind === 'settings' && m.settings){
+      Object.keys(m.settings).forEach(k=>{ if (k in S) S[k] = m.settings[k]; });
+      repaintAll();
+      if (scanEl) scanEl.style.opacity = S.scan;
+      tiltAim = S.tilt;
+    } else if (m.kind === 'cmd' && typeof CMD[m.cmd] === 'function'){
+      try { CMD[m.cmd](); }
+      catch(err){ relay('ttsnote', m.cmd + ' failed: ' + err.message); }
+    }
+  });
+  document.body.dataset.preview = '1';
+}
 
-Settings.init();
-Settings.verify().then(ok=>{
-  if (ok){
-    document.getElementById('rigbtn').style.display = '';
-    rig.style.display = '';
-  } else if (Settings.key){
-    Settings.forget();                       // stale or wrong key — drop it
-  }
+/* Load once, then — if this is a preview — hand the settled document to the
+   admin page. It owns the defaults; a top-level `const` is not a property of
+   window, so the parent cannot reach in and read it, nor should it have to. */
+Settings.load().then(()=>{
+  if (PREVIEW && window.parent !== window)
+    window.parent.postMessage({rsn:1, kind:'ready', settings:S}, '*');
 });
-Settings.load();
 
 setPalette('blue');
-addMsg('ai', "Surface online. Type below, or press TALK and speak to me — transcription runs locally on this server, not in the cloud. I answer aloud; AUDIO mutes me. RIG, top right, has form, palette, glass, voice and mic.");
+addMsg('ai', PREVIEW
+  ? "Preview. This is the display exactly as it is served — every control on the left drives this frame live."
+  : "Surface online. Type below, or press TALK and speak to me — transcription runs locally on this server, not in the cloud. I answer aloud; AUDIO mutes me.");
 </script>
 </body>
 </html>
