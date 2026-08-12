@@ -405,48 +405,94 @@ Roughly in order of value:
   interface is dead. Make it a permanent redirect to the HTTPS port rather
   than deleting it, or every bookmark and kiosk startup URL dies silently on
   the day it changes. Lets cookies carry `Secure` unconditionally.
-- **Device identity.** A random, unguessable token issued by the server on
-  first visit and held in an `HttpOnly` cookie, so page script cannot read it
-  and it rides along with every request. A name declared in the URL —
-  `?display=workshop` — takes precedence when present and rebinds that device
-  to its existing record, because a name survives a browser wipe and a token
-  does not. Not encryption in the browser: if the browser holds the key it is
-  obfuscation, and the secrecy belongs in the server-side mapping. Devices are
-  listed in the admin page with when they were last seen, and deletable there.
-- **Memory is a per-device property.** Whether a device keeps anything is one
-  setting. Its default comes from how the device identifies itself, because
-  that is what each path usually means, and an admin can override it either
-  way from the device list.
+- **Identity, in three strengths.** How a device or person identifies itself
+  decides what may be kept, because the strength of the claim and the
+  durability of the memory should move together.
 
-  | path | default | admin can |
+  | identity | what proves it | memory |
   | --- | --- | --- |
-  | declared name | does not remember | turn it on |
-  | token | remembers | turn it off |
+  | named, no PIN | nothing, it is a place | none |
+  | token | possession of the browser | device memory, lost when browser data is cleared |
+  | named + PIN | a credential | server memory, longer retention, follows the person |
 
-  A **declared name** defaults to not remembering because the first thing you
-  name is a wall screen anyone walks up to, and configuring the kiosk should
-  be what switches memory off. But a name is really a *durability* mechanism —
-  it survives a browser wipe where a token does not — so someone with a
-  personal device who wants their identity to outlast clearing browser data
-  will name it too, and will want memory. Hence the override rather than a
-  hard rule. A named device with memory switched on should be conspicuous in
-  the device list, not hidden behind an unlabelled checkbox: the default is
-  off for a reason.
+  A **token** is issued by the server on first visit: random, unguessable, in
+  an `HttpOnly` cookie so page script cannot read it and it rides along with
+  every request. Not encrypted in the browser — if the browser holds the key
+  that is obfuscation, and the secrecy belongs in the server-side mapping. A
+  token is a device, a device has an owner, and what is kept on it is the
+  owner's to be responsible for.
 
-  A **token** defaults to remembering. A token is a device, a device has an
-  owner, and what is kept on it is the owner's to be responsible for. Gating
-  it behind enrolment would mean the feature does nothing until someone does
-  bookkeeping across a fleet of internal machines. The admin control is
-  revocation instead — turn it off for a device, delete what it holds — which
-  covers the machine that turns out to be shared without gating every
-  ordinary one.
+  A **declared name** — `?display=workshop` — takes precedence over a token
+  and rebinds that device to its record, because a name survives a browser
+  wipe and a token does not. On its own it is a bearer identifier with no
+  secret: names are guessable, so a name alone can never unlock memory.
 
-  One property, two effects. A device that is not remembering must also drop
-  everything it is holding at the conversation boundary — the wake word opens
-  one, the sleep word and the awake timeout close one, and that machinery
-  already exists. One is about what survives the session, the other about what
-  survives the person standing there, and tying both to the same setting is
-  what stops them contradicting each other.
+  A **PIN** turns a name into a portable identity, and is the difference
+  between a place and a person. Hashed server-side with the same PBKDF2 as the
+  admin passwords, never compared in the browser. Rate limiting and lockout
+  are what make a short PIN viable, reusing the geometric back-off already
+  built for admin sign-in, and the obvious sequences are refused. An admin
+  sets the required length so a sensitive area can demand more digits —
+  raising it must force existing shorter PINs to change on next unlock, or it
+  only protects new ones. An admin resets a forgotten PIN from the device
+  list: with no email here that is the only recovery path, and it has to exist
+  in the first version.
+
+  Unlocking grants a session — persistent on a personal device, and on
+  anything shared it must end at the conversation boundary, or the next person
+  inherits the identity along with the screen.
+
+  Recorded plainly: a PIN is not a password, and this is a lightweight account
+  system rather than a small feature. Six digits is a low bar that rate
+  limiting carries. It suits an internal tool and a number keyed into a
+  screen, and it should not be the only thing standing in front of anything
+  genuinely sensitive. It depends on HTTPS only — a PIN must never be
+  enterable on the plain listener.
+
+  Devices and identities are listed in the admin page with when they were last
+  seen, and deletable there.
+
+- **Memory.** Give conversations meaning across sessions — derived, not
+  verbatim. A rolling summary or a small set of retained facts, not a
+  transcript: it survives context limits, and it is a far smaller thing to
+  hold than everything anybody ever said.
+
+  Whether anything is kept is one property, defaulting from the identity above
+  and overridable by an admin in either direction. A named place defaults to
+  nothing and can be switched on — naming is really a durability mechanism, so
+  the person who names a device is often exactly the person who wants memory
+  to outlast a browser wipe. A named device with memory on should be
+  conspicuous in the list, since the default is off for a reason. A token
+  defaults to remembering, with revocation rather than enrolment as the
+  control, so a machine that turns out to be shared can be corrected without
+  gating every ordinary one.
+
+  One property, two effects: anything not remembering also drops what it is
+  holding at the conversation boundary — the wake word opens one, the sleep
+  word and the awake timeout close one. One is about what survives the
+  session, the other about what survives the person standing there, and tying
+  both to the same setting stops them contradicting.
+
+  Bounded on purpose — a rolling summary and a capped set of facts, oldest
+  ageing out — with the retention window admin-configurable, because "longer"
+  means one thing in a workshop and another in a room where customers can be
+  overheard.
+
+  Visible and deletable in the admin page, and visible and deletable **by the
+  person it is about** once there is an identity to attach it to. Memory you
+  cannot inspect is memory you cannot correct or trust.
+
+  What changes at the authenticated tier is attribution. Device memory is
+  something a browser said; server memory under a named identity is what a
+  particular person has been discussing, on a server somebody administers.
+  Nothing stops an admin reading it and pretending otherwise would be theatre,
+  which is precisely why it is derived rather than verbatim and why whatever
+  writes it is told not to retain credentials or addresses. The protection is
+  what goes in.
+
+  Deliberately sequenced after the adapter has seen real use. Whether the
+  useful unit is a summary per session, extracted facts, or something narrower
+  is an empirical question, and guessing means building the wrong shape.
 
 - **Diagnostics.** Technical events keyed to a device: the microphone would not
   open, transcription took four seconds, the voice service returned an error,
@@ -475,26 +521,6 @@ Roughly in order of value:
   and *failing*, so a fault is visible without reading anything.
 - **Domain vocabulary hints.** `?hint=` already exists and is unused; a host
   application knows its own hostnames and interfaces.
-- **Memory.** Give conversations meaning across sessions — derived, not
-  verbatim. A rolling summary or a small set of retained facts, not a
-  transcript: it survives context limits, and it is a far smaller thing to
-  hold than everything anybody ever said. Scoped to the device and governed by
-  the identity path above, which is what makes it coherent without viewer
-  accounts at all. Visible and deletable in
-  the admin page, because memory you cannot inspect is memory you cannot
-  correct or trust. Whatever writes it is told not to retain credentials or
-  addresses; the protection is what goes in, not access control, since anyone
-  who runs the server can read what is stored.
-
-  Bounded on purpose: a rolling summary and a capped set of retained facts,
-  oldest ageing out. This is not a system that needs years of history, and a
-  bound means "how long do we keep this" has an answer rather than being
-  unlimited by omission.
-
-  Deliberately sequenced after the adapter has seen real use. Whether the
-  useful unit is a summary per session, extracted facts, or something narrower
-  is an empirical question, and guessing means building the wrong shape and
-  living with it.
 - **Unprompted speech.** Let a host application make it speak — an alert
   arrives, the geometry wakes, it tells you. That is a different product from
   a chat box.
