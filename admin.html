@@ -120,11 +120,16 @@
     border-color:var(--hue);color:var(--hue);
   }
   button:disabled{cursor:not-allowed}
-  /* Same strength as .rule above — only the spacing differs, because this one
-     separates saving the interface from configuring the server. */
-  .footrule{
-    height:1px;margin:11px 0;background:rgba(var(--glass),.55);
+  /* Saving is the consequential act on this page — everything else previews,
+     this is what reaches other people. Heavier border and brighter text so it
+     does not read as one more control in a column of them. */
+  #saverow{margin:10px 0 0}
+  #saverow button{
+    border:2px solid rgba(var(--glass),.45);
+    color:var(--text);padding:6px 10px;letter-spacing:.12em;
   }
+  #saverow button:hover:not(:disabled){border-color:var(--hue);color:var(--hue)}
+  #saverule{margin:10px 0 2px}
   #tab_app,#tab_accounts{
     width:100%;font:inherit;font-size:9.5px;letter-spacing:.14em;padding:7px 8px;
     cursor:pointer;text-align:left;background:none;color:rgba(var(--paper),.88);
@@ -317,6 +322,12 @@
   </div>
   <div id="savestate"></div>
   <div class="rule"></div>
+
+  <div class="seg" id="saverow">
+    <button id="b_save">SAVE FOR EVERYONE</button>
+    <button id="b_revert">REVERT</button>
+  </div>
+  <div class="rule" id="saverule"></div>
   <section class="grp" data-tab="look">
     <h4>Geometry</h4>
     <div class="grpbody">  <div class="seg" data-set="mode">
@@ -646,13 +657,6 @@ sign in again. Activity pushes the deadline out.</div>
   </div><!-- /panelscroll -->
 
   <div id="panelfoot">
-    <div class="seg" id="saverow">
-      <button id="b_save">SAVE FOR EVERYONE</button>
-      <button id="b_revert">REVERT</button>
-    </div>
-
-    <div class="footrule"></div>
-
     <button id="tab_app" data-tab="app">APP SETTINGS</button>
     <button id="tab_accounts" data-tab="accounts">ACCOUNTS</button>
     <div id="whobox">
@@ -1216,12 +1220,10 @@ function panelNav(){
   const groups = [...document.querySelectorAll('#panel .grp')];
   const shut = new Map();
   let tab = 'look';
-  const seen = new Set();
-  groups.forEach(g=>{
-    const first = !seen.has(g.dataset.tab);
-    seen.add(g.dataset.tab);
-    shut.set(g, !first);
-  });
+  /* Everything starts closed, so a tab opens as a list of topics rather
+     than as one topic and a list. With one section open at a time, an
+     already-expanded section is a choice made on the reader's behalf. */
+  groups.forEach(g=> shut.set(g, true));
   const findEl = $('rigfind');
   function render(){
     const q = (findEl.value || '').trim().toLowerCase();
@@ -1241,13 +1243,15 @@ function panelNav(){
   const SETTINGS_TABS = new Set(['look', 'motion', 'voice']);
   function syncSaveRow(){
     const show = SETTINGS_TABS.has(tab) ? '' : 'none';
-    ['saverow', 'savestate'].forEach(id=>{
+    ['saverow', 'savestate', 'saverule'].forEach(id=>{
       const el = $(id); if (el) el.style.display = show;
     });
   }
   function selectTab(b){
     tab = b.dataset.tab;
     tabButtons.forEach(x=> x.classList.toggle('on', x === b));
+    // arriving at a tab shows its topics closed, not whatever was left open
+    groups.forEach(g=>{ if (g.dataset.tab === tab) shut.set(g, true); });
     render();
     syncSaveRow();
     $('panelscroll').scrollTop = 0;
