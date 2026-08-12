@@ -106,6 +106,15 @@
   }
   body[data-layout="bleed"] .msg.ai .body{text-shadow:0 0 16px rgba(0,0,0,.9)}
 
+  /* A viewer can switch the transcript off and give the whole frame to the
+     field. Must come after the layout rules: same specificity, so source
+     order is what lets it override the hero split. */
+  body[data-text="off"] #log{display:none}
+  body[data-text="off"] #bar .pr,
+  body[data-text="off"] #q{display:none}
+  body[data-text="off"] #screen{flex:1 1 auto}
+  body[data-text="off"] #bar{justify-content:flex-end}
+
   /* ---------- composer ---------- */
   #bar{
     position:relative;z-index:4;flex:0 0 auto;display:flex;align-items:center;gap:12px;
@@ -159,6 +168,7 @@
       <button id="pttbtn" title="how Resonance decides when you have finished speaking">⌨ SPACE</button>
       <button id="talkbtn" title="speak to Resonance — mic drives the geometry and your words are transcribed">🎤 TALK</button>
       <button id="mute" class="on" title="mute its voice">🔊 AUDIO</button>
+      <button id="textbtn" class="on" title="hide the transcript and give the space to the field">▤ TEXT</button>
     </span>
   </div>
 </div>
@@ -240,6 +250,16 @@ const ctx  = cv.getContext('2d');
 const off  = document.createElement('canvas');       // geometry buffer
 const octx = off.getContext('2d');
 const logEl= document.getElementById('log');
+
+/* Keep the newest line in view while a reply is being written, rather than
+   jumping once at the end. Only follows when the reader is already at the
+   bottom: if they have scrolled up to re-read something, yanking them back
+   is worse than not following. */
+let followLive = true;
+function followLog(){ if (followLive) logEl.scrollTop = logEl.scrollHeight; }
+logEl.addEventListener('scroll', ()=>{
+  followLive = (logEl.scrollHeight - logEl.clientHeight - logEl.scrollTop) < 24;
+});
 const qEl  = document.getElementById('q');
 const fpsEl= document.getElementById('fps');
 
@@ -1185,6 +1205,7 @@ const Play = {
 
   async start(text, r, done){
     this.body = r.body; this.caret = r.caret; this.full = text; this.onDone = done;
+    this.shown = 0;
     try{
       const resp = await fetch('tts?voice=' + encodeURIComponent(S.ttsvoice || '') +
                                '&rate=' + encodeURIComponent(S.vrate), {
@@ -1241,9 +1262,19 @@ const Play = {
       binA[j] += ((m/255)*1.9 - binA[j]) * 0.40;
     }
 
-    // reveal the transcript across the known audio duration
+    // Reveal the transcript across the known audio duration, following it
+    // down as it grows. This path is the default engine and used to write
+    // the text without ever scrolling, so a long reply ran off the bottom
+    // and only came into view once something else forced a scroll.
     const p = Math.min(1, (now - this.startedAt)/this.dur);
-    if (this.body) this.body.textContent = this.full.slice(0, Math.ceil(p*this.full.length));
+    if (this.body){
+      const upto = this.full.slice(0, Math.ceil(p*this.full.length));
+      if (upto.length !== this.shown){
+        this.body.textContent = upto;
+        this.shown = upto.length;
+        followLog();
+      }
+    }
   },
 
   finishUp(){
@@ -1385,7 +1416,7 @@ const Speech = {
   reveal(n){
     if (!this.body) return;
     this.body.textContent = this.full.slice(0, Math.min(n, this.full.length));
-    logEl.scrollTop = logEl.scrollHeight;
+    followLog();
   },
 
   step(){
@@ -1468,6 +1499,7 @@ function addMsg(who, text){
                  '<span class="body"></span>';
   el.querySelector('.body').textContent = text;
   logEl.appendChild(el);
+  followLive = true;
   logEl.scrollTop = logEl.scrollHeight;
   return el.querySelector('.body');
 }
@@ -1511,7 +1543,7 @@ function stream(text, r){
       const tk = toks[i++];
       body.textContent += tk;
       Drive.hit(tk.trim().length);
-      logEl.scrollTop = logEl.scrollHeight;
+      followLog();
 
       let d = S.rate * (0.6 + Math.random()*0.9);
       if (/[,;:]\s*$/.test(tk)) d += S.rate*3.5;      // breath
@@ -2255,6 +2287,27 @@ function setMuted(v){
   muteBtn.title = muted ? 'unmute its voice' : 'mute its voice';
 }
 muteBtn.addEventListener('click', ()=> setMuted(!muted));
+
+/* ---- transcript on/off: a viewer's own choice ----
+   Kept in localStorage rather than the shared settings document, because one
+   person wanting a clean field should not take the transcript away from
+   everyone else looking at the same URL. */
+const TEXT_STORE = 'resonance.text';
+const textBtn = $('textbtn');
+function setTextVisible(on){
+  document.body.dataset.text = on ? 'on' : 'off';
+  if (textBtn){
+    textBtn.classList.toggle('on', on);
+    textBtn.title = on ? 'hide the transcript and give the space to the field'
+                       : 'show the transcript again';
+  }
+  try{ localStorage.setItem(TEXT_STORE, on ? '1' : '0'); }catch(e){}
+  setTimeout(resize, 0);              // the canvas box just changed size
+}
+if (textBtn)
+  textBtn.addEventListener('click', ()=> setTextVisible(document.body.dataset.text === 'off'));
+setTextVisible((()=>{ try{ return localStorage.getItem(TEXT_STORE) !== '0'; }
+                      catch(e){ return true; } })());
 if (!Speech.supported){ setMuted(true); muteBtn.disabled = true; }
 
 if (Speech.supported){

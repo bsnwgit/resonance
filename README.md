@@ -362,13 +362,18 @@ reporting — see [SECURITY.md](SECURITY.md).
 
 ## Brand
 
-`icon.svg` (64×64) and `lockup.svg` (216×64). The mark reads as the product: a
-listening lens above a sheared stack of waveform lines, which is the
-visualiser's own STACK geometry seen at a tilt.
+`icon.svg` (64×64) and `lockup.svg` (216×64).
 
-> Both marks are **being redrawn**. They currently carry the house style of the
-> suite this was extracted from, including the old name in the wordmark, and
-> are not the identity this project will ship with.
+The mark is a **standing wave**: two fixed ends, a node at the centre, and the
+envelope swelling between them. That is not a metaphor — it is what the
+visualiser actually does. It is a stationary field rather than a scrolling
+chart, standing modes carry the voice, and the nodes stay put while everything
+between them moves. The mark states the mechanism instead of decorating it.
+
+Near-black field, the interface's own pale ink for the live envelope and a
+dimmer one for its mirror, and a single blue reserved for the nodes — the
+brightest of them at the centre, where the signal is. It reduces to the
+twin-lobe silhouette at favicon size and stays legible to 16px.
 
 ## Roadmap
 

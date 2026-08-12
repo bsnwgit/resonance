@@ -29,12 +29,14 @@
   /* ---------- sign-in ---------- */
   #gate{position:fixed;inset:0;display:none;place-items:center;z-index:50;background:var(--ink)}
   #gate.on{display:grid}
+  /* the lockup sits above the card, not inside it, so the card stays a form.
+     It carries the name, so the card keeps only the surface label. */
+  #gatestack{display:flex;flex-direction:column;align-items:center;gap:18px}
+  #gatemark{display:block;width:248px;height:73px}
   #gatecard{width:320px;padding:26px 24px;border:1px solid rgba(var(--glass),.14);
             background:rgba(255,255,255,.02)}
-  #gatecard h1{font-size:12px;letter-spacing:.34em;font-weight:400;
-               color:rgba(var(--paper),.96);margin-bottom:2px}
-  #gatecard .sub{font-size:9px;letter-spacing:.14em;color:rgba(var(--paper),.72);
-                 margin-bottom:20px}
+  #gatecard .sub{font-size:9px;letter-spacing:.24em;color:rgba(var(--paper),.8);
+                 margin-bottom:18px}
   #gatecard label{display:block;font-size:9px;letter-spacing:.14em;
                   color:rgba(var(--paper),.8);margin:12px 0 4px}
   #gatecard input{width:100%;font:inherit;font-size:12px;padding:7px 8px;
@@ -279,8 +281,9 @@
 <body>
 
 <div id="gate">
+  <div id="gatestack">
+  <img id="gatemark" src="lockup.svg" alt="Resonance" width="248" height="73">
   <div id="gatecard">
-    <h1>RESONANCE</h1>
     <div class="sub">ADMINISTRATION</div>
     <form id="gateform">
       <label for="u">username</label>
@@ -290,6 +293,7 @@
       <button id="gatebtn" type="submit">SIGN IN</button>
     </form>
     <div id="gateerr"></div>
+  </div>
   </div>
 </div>
 
