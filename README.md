@@ -423,13 +423,17 @@ Roughly in order of value:
   "do not remember anything here" switch, useful for a demo machine or a
   loaner as much as for a wall screen.
 
-  A device on the **token** path is eligible to remember but does not until an
-  admin marks it as someone's in the device list. The display listener has no
-  authentication by design, so every browser that ever opens the URL gets a
-  token — a visitor's laptop, a borrowed phone, a browser opened once out of
-  curiosity. Making the token alone sufficient would have all of them quietly
-  accumulating memory, so the deliberate act enables it and the accident
-  produces silence.
+  A device on the **token** path remembers. A token is a device, a device has
+  an owner, and what is kept on it is the owner's to be responsible for — the
+  same way anything else on their machine is. Requiring an admin to enrol each
+  device first would mean the feature does nothing until someone does
+  bookkeeping, on a system whose point is a group of internal devices talking
+  to one server.
+
+  What an admin gets instead is the ability to turn memory off for a device
+  after the fact, and to delete what it holds. That covers the machine that
+  turns out to be shared without needing every ordinary device enrolled by
+  hand first — correctable rather than gated.
 
   Two guarantees, and they are not the same one. A device that never remembers
   must also drop everything it is holding at the conversation boundary — the
