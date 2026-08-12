@@ -413,13 +413,29 @@ Roughly in order of value:
   does not. Not encryption in the browser: if the browser holds the key it is
   obfuscation, and the secrecy belongs in the server-side mapping. Devices are
   listed in the admin page with when they were last seen, and deletable there.
-- **Declared device kind.** Each device is *shared* or *personal*, and both
-  kinds run against the same server at once, so it cannot be a global setting.
-  A shared screen drops everything it was holding at the conversation
-  boundary — the wake word opens one, the sleep word and the awake timeout
-  close one, and that machinery already exists — so nothing carries from one
-  visitor to the next. A personal device treats the same boundary as the end
-  of a thread and keeps its continuity.
+- **The identity path is the policy.** How a device identifies itself decides
+  what it is allowed to keep, so there is no separate setting anyone can
+  forget to set.
+
+  A device on the **declared-name** path never remembers. That is a hard rule
+  with no override: configuring a kiosk is what turns memory off, and a later
+  mistake cannot turn it back on. `?display=` therefore doubles as a general
+  "do not remember anything here" switch, useful for a demo machine or a
+  loaner as much as for a wall screen.
+
+  A device on the **token** path is eligible to remember but does not until an
+  admin marks it as someone's in the device list. The display listener has no
+  authentication by design, so every browser that ever opens the URL gets a
+  token — a visitor's laptop, a borrowed phone, a browser opened once out of
+  curiosity. Making the token alone sufficient would have all of them quietly
+  accumulating memory, so the deliberate act enables it and the accident
+  produces silence.
+
+  Two guarantees, and they are not the same one. A device that never remembers
+  must also drop everything it is holding at the conversation boundary — the
+  wake word opens one, the sleep word and the awake timeout close one, and
+  that machinery already exists. One is about what survives the session; the
+  other about what survives the person standing there.
 - **Diagnostics.** Technical events keyed to a device: the microphone would not
   open, transcription took four seconds, the voice service returned an error,
   this browser has no recorder. No conversation content. A health view per
@@ -451,12 +467,17 @@ Roughly in order of value:
   verbatim. A rolling summary or a small set of retained facts, not a
   transcript: it survives context limits, and it is a far smaller thing to
   hold than everything anybody ever said. Scoped to the device and governed by
-  its declared kind, which is what makes it coherent without viewer accounts —
-  a personal device remembers, a shared one does not. Visible and deletable in
+  the identity path above, which is what makes it coherent without viewer
+  accounts at all. Visible and deletable in
   the admin page, because memory you cannot inspect is memory you cannot
   correct or trust. Whatever writes it is told not to retain credentials or
   addresses; the protection is what goes in, not access control, since anyone
   who runs the server can read what is stored.
+
+  Bounded on purpose: a rolling summary and a capped set of retained facts,
+  oldest ageing out. This is not a system that needs years of history, and a
+  bound means "how long do we keep this" has an answer rather than being
+  unlimited by omission.
 
   Deliberately sequenced after the adapter has seen real use. Whether the
   useful unit is a summary per session, extracted facts, or something narrower
