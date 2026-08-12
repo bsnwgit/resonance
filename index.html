@@ -196,6 +196,40 @@ function relay(slot, text, live){
     window.parent.postMessage({rsn:1, kind:'status', slot, text, live:!!live}, '*');
 }
 
+/* ------------------------------------------------------- viewer prefs
+   The three controls a viewer actually has, remembered in this browser
+   until its data is cleared, so a display stays how they left it.
+
+   Deliberately narrow: everything else — look, geometry, palette, voice,
+   wake word — stays in the shared settings document, because the whole
+   point of that document is that one admin decides what everyone sees.
+   Only what a viewer can already reach is theirs to keep.
+
+   A stored choice outranks the admin's value, and keeps outranking it after
+   the admin changes theirs. Once someone has muted this display it stays
+   muted for them; clearing browser data is what puts it back.
+
+   The microphone is NOT remembered. Re-opening it on load would trip a
+   permission prompt nobody asked for, and a page that turns your microphone
+   on by itself is not a page anyone should ship. */
+const PREFS_KEY = 'resonance.prefs';
+const Prefs = {
+  data: {},
+  load(){
+    try{
+      const raw = JSON.parse(localStorage.getItem(PREFS_KEY));
+      this.data = (raw && typeof raw === 'object') ? raw : {};
+    }catch(e){ this.data = {}; }
+  },
+  has(k){ return Object.prototype.hasOwnProperty.call(this.data, k); },
+  get(k, fallback){ return this.has(k) ? this.data[k] : fallback; },
+  set(k, v){
+    this.data[k] = v;
+    try{ localStorage.setItem(PREFS_KEY, JSON.stringify(this.data)); }catch(e){}
+  }
+};
+Prefs.load();
+
 /* ---------------------------------------------------------------- state */
 const S = {
   mode:'stack', palette:'blue', layout:'hero',
@@ -2190,14 +2224,15 @@ function syncWake(){
       'Switch the composer chip to AUTO, or set ALWAYS to require it in both modes.';
 }
 
-function setPtt(v){
+function setPtt(v, remember){
   S.ptt = !!v;
+  if (remember) Prefs.set('ptt', S.ptt);
   PTT.up();                              // never leave the gate stuck open
   Mic.open = !S.ptt;                     // AUTO means permanently open
   if (!S.ptt) Listen.sawSpeech = false;  // don't send whatever was buffered
   syncPtt(); syncTalk(); syncWake();
 }
-pttBtn.addEventListener('click', ()=> setPtt(!S.ptt));
+pttBtn.addEventListener('click', ()=> setPtt(!S.ptt, true));
 
 const typingInComposer = () =>
   document.activeElement === qEl ||
@@ -2279,35 +2314,33 @@ syncWake();
 
 /* ---- mute: the one audio control ordinary users get ---- */
 const muteBtn = document.getElementById('mute');
-function setMuted(v){
+function setMuted(v, remember){
   muted = v;
+  if (remember) Prefs.set('muted', !!v);
   if (muted) Speech.stop();
   muteBtn.textContent = muted ? '🔇 MUTED' : '🔊 AUDIO';
   muteBtn.classList.toggle('on', !muted);
   muteBtn.title = muted ? 'unmute its voice' : 'mute its voice';
 }
-muteBtn.addEventListener('click', ()=> setMuted(!muted));
+muteBtn.addEventListener('click', ()=> setMuted(!muted, true));
 
 /* ---- transcript on/off: a viewer's own choice ----
    Kept in localStorage rather than the shared settings document, because one
    person wanting a clean field should not take the transcript away from
    everyone else looking at the same URL. */
-const TEXT_STORE = 'resonance.text';
 const textBtn = $('textbtn');
-function setTextVisible(on){
+function setTextVisible(on, remember){
   document.body.dataset.text = on ? 'on' : 'off';
+  if (remember) Prefs.set('text', !!on);
   if (textBtn){
     textBtn.classList.toggle('on', on);
     textBtn.title = on ? 'hide the transcript and give the space to the field'
                        : 'show the transcript again';
   }
-  try{ localStorage.setItem(TEXT_STORE, on ? '1' : '0'); }catch(e){}
   setTimeout(resize, 0);              // the canvas box just changed size
 }
 if (textBtn)
-  textBtn.addEventListener('click', ()=> setTextVisible(document.body.dataset.text === 'off'));
-setTextVisible((()=>{ try{ return localStorage.getItem(TEXT_STORE) !== '0'; }
-                      catch(e){ return true; } })());
+  textBtn.addEventListener('click', ()=> setTextVisible(document.body.dataset.text === 'off', true));
 if (!Speech.supported){ setMuted(true); muteBtn.disabled = true; }
 
 if (Speech.supported){
@@ -2395,7 +2428,21 @@ if (PREVIEW){
 /* Load once, then — if this is a preview — hand the settled document to the
    admin page. It owns the defaults; a top-level `const` is not a property of
    window, so the parent cannot reach in and read it, nor should it have to. */
+/* Applied twice: once now so the interface never flashes the admin's value
+   before the viewer's, and again after the settings arrive, because loading
+   them overwrites S wholesale — including ptt, which is a viewer control
+   living in an admin document. A preview deliberately skips all of it: the
+   admin is looking at what a fresh viewer gets, not at their own habits. */
+function applyPrefs(){
+  if (PREVIEW) return;
+  if (Prefs.has('ptt'))   setPtt(Prefs.get('ptt'));
+  if (Prefs.has('muted') && Speech.supported) setMuted(Prefs.get('muted'));
+  setTextVisible(Prefs.get('text', true));
+}
+applyPrefs();
+
 Settings.load().then(()=>{
+  applyPrefs();
   if (PREVIEW && window.parent !== window)
     window.parent.postMessage({rsn:1, kind:'ready', settings:S}, '*');
 });

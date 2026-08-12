@@ -65,10 +65,19 @@ dependency on any of them. It will be adopted back into those applications once
 it is ready to be — as a consumer of this project, not as a part of it.
 
 **Settled:** the look, the interaction model, the local voice pipeline, the
-shared-settings and admin model.
+shared-settings model, and administration — its own HTTPS listener behind
+local accounts with roles, with a live preview of the real display.
 
-**Not done:** packaging it as a library other projects can install, and the
-adapter for a real assistant backend. Today it answers from built-in text.
+**Not done, in the order it matters:** the adapter for a real assistant
+backend — today it answers from built-in text, which is the one thing standing
+between this and doing its actual job. Then the deployment shapes, because a
+single person running this on their own laptop should not have to configure
+accounts to talk to it. Then identity and memory, so a conversation can mean
+something an hour later. Then packaging it as a library other projects can
+install.
+
+The [Roadmap](#roadmap) carries the reasoning for each, including the
+decisions already taken about how identity and memory should work.
 
 ## How it works
 
@@ -159,8 +168,8 @@ separate listener, on a separate port, behind a username and password.
 
 **The public listeners have no route that accepts a write.** Not a guarded
 route — no route. `admin.html` is not served on them either, and returns 404.
-Users keep exactly three controls: microphone, mute, and push-to-talk vs
-hands-free.
+Users keep exactly four controls: microphone, mute, push-to-talk versus
+hands-free, and whether the transcript is shown.
 
 ### The admin interface
 
@@ -179,6 +188,25 @@ Two roles:
 | --- | --- |
 | `admin` | change every setting, manage accounts |
 | `viewer` | read the configuration, change nothing |
+
+### What a viewer keeps
+
+The controls a viewer has — mute, push-to-talk versus hands-free, and
+whether the transcript is shown — are remembered in their own browser and
+survive a reload, so a display stays how they left it. They are stored under
+one `localStorage` key and last until that browser's data is cleared.
+
+A stored choice outranks the shared setting, and keeps outranking it after an
+admin changes theirs: once someone has muted a display it stays muted for
+them. A browser that has never touched a control follows the admin's document
+exactly.
+
+Nothing else is kept per viewer. Look, geometry, palette, voice and wake word
+remain wholly admin-controlled, because the point of the shared document is
+that one person decides what everyone sees.
+
+The microphone is deliberately not remembered — re-opening it on load would
+raise a permission prompt nobody asked for.
 
 ### App settings
 
@@ -327,6 +355,30 @@ transcribed.** Auto-gain and noise suppression were disabled to preserve the
 dynamics the visualiser feeds on; the result was quiet audio and constant
 mishearing. There is now a toggle, defaulting to clean.
 
+**Setting `scrollbar-width` makes Chrome ignore `::-webkit-scrollbar`.** The
+standard property and the pseudo-elements are not additive: specify the
+standard one and the browser drops the webkit rules and falls back to the
+operating system's overlay bar, which on macOS is invisible until you scroll.
+Measured — the scroller reserved 0px of layout instead of 9. Safari ignores
+the standard properties entirely, so neither alone covers both. The
+pseudo-elements are unconditional and the standard properties sit behind
+`@supports not selector(::-webkit-scrollbar)`.
+
+**A `stop` that returns before the process exits will take the service down.**
+`stop && start` raced: the old process still held the listening sockets, the
+new one died on `Address already in use`, and the result was nothing running
+at all rather than an obvious failure. Stopping now waits for the pid to
+actually go, with a ceiling after which it reports failure instead of claiming
+success, and starting waits for the bind rather than assuming a second is
+enough.
+
+**Two code paths that render the same thing will not stay in step.** The
+transcript was revealed by three different routes — token stream, browser
+voice, neural voice — and only two of them scrolled. The neural path is the
+default engine, so the visible symptom was that a long spoken reply ran off
+the bottom and only appeared once something else forced a scroll. Everything
+that reveals text goes through one helper now.
+
 **A control panel hidden by CSS is still shipped.** The settings panel used to
 live in the display page and be revealed once an admin key checked out. Every
 viewer was still sent the whole thing — 105 elements of it — and the gate was
@@ -381,15 +433,186 @@ Roughly in order of value:
 
 - **Backend adapter.** Replace `askBackend()` with a real assistant, keeping
   demo mode as the fallback.
+- **Two separate settings: what it binds to, and what it takes to get in.**
+  Everything else here assumes a server several people can reach. One person
+  running this on their own machine is a different product, and making them
+  fish a generated password out of a log to configure their own laptop is
+  absurd.
+
+  These are deliberately not one "mode". Binding and authentication are
+  independent, and collapsing them into a single label produces a label that
+  lies the moment someone changes the binding. The interface should report the
+  actual pair — what it is reachable at, and what it takes to get in — rather
+  than a name.
+
+  | bound to | to get in | fits |
+  | --- | --- | --- |
+  | loopback | nothing | your own machine; nothing else can reach it |
+  | one address | nothing | your own home network, your call, stated plainly |
+  | one address | a single PIN, no accounts | a home network you would rather not leave open |
+  | everything | accounts and roles | anywhere other people are |
+
+  At **loopback with no authentication** the network is already the boundary,
+  so accounts add nothing. This install also needs no certificate at all:
+  browsers treat `http://localhost` as a secure context, so the microphone
+  works unprompted. Start it, open localhost, talk to it — none of the setup
+  ceremony below applies. Memory simply works, because one machine is one
+  identity and there is nothing to scope it against or authenticate.
+
+  **Beyond loopback with no authentication** is a genuine choice somebody may
+  want on their own network, and it is not dressed up as anything else: the
+  structural argument for skipping accounts is gone, and what is left is the
+  owner accepting a risk on a network they control. It warns loudly at startup
+  and banners in the interface. Not refused — but a laptop configured this way
+  that later joins an office network must not be quiet about it.
+
+  **A single PIN with no accounts** is the middle rung and costs nothing new —
+  the PIN machinery below, applied to the whole display rather than to a named
+  identity. No account management, no admin sign-in, just a number at the
+  door. For a home server it is probably the right answer: it keeps a guest's
+  phone or a smart television out without turning a house into an enterprise.
+
+  **Accounts and roles** stay the default, because the safe default is the one
+  that assumes it can be reached.
+
+  Two things worth stating even where none of this applies: binding to one
+  specific address rather than every interface is worth doing regardless, so a
+  laptop that later joins another network does not follow you onto it — and a
+  firewall rule, which is outside this application entirely, does more than
+  anything inside it.
+
+- **HTTPS only.** Retire the plain listener. The microphone already refuses to
+  work on it, so today it mostly generates confusion about why half the
+  interface is dead. Make it a permanent redirect to the HTTPS port rather
+  than deleting it, or every bookmark and kiosk startup URL dies silently on
+  the day it changes. Lets cookies carry `Secure` unconditionally.
+- **Identity, in three strengths.** How a device or person identifies itself
+  decides what may be kept, because the strength of the claim and the
+  durability of the memory should move together.
+
+  | identity | what proves it | memory |
+  | --- | --- | --- |
+  | named, no PIN | nothing, it is a place | none |
+  | token | possession of the browser | device memory, lost when browser data is cleared |
+  | named + PIN | a credential | server memory, longer retention, follows the person |
+
+  A **token** is issued by the server on first visit: random, unguessable, in
+  an `HttpOnly` cookie so page script cannot read it and it rides along with
+  every request. Not encrypted in the browser — if the browser holds the key
+  that is obfuscation, and the secrecy belongs in the server-side mapping. A
+  token is a device, a device has an owner, and what is kept on it is the
+  owner's to be responsible for.
+
+  A **declared name** — `?display=workshop` — takes precedence over a token
+  and rebinds that device to its record, because a name survives a browser
+  wipe and a token does not. On its own it is a bearer identifier with no
+  secret: names are guessable, so a name alone can never unlock memory.
+
+  A **PIN** turns a name into a portable identity, and is the difference
+  between a place and a person. Hashed server-side with the same PBKDF2 as the
+  admin passwords, never compared in the browser. Rate limiting and lockout
+  are what make a short PIN viable, reusing the geometric back-off already
+  built for admin sign-in, and the obvious sequences are refused. An admin
+  resets a forgotten PIN from the device list: with no email here that is the
+  only recovery path, and it has to exist in the first version.
+
+  **An admin sets the required length**, so a sensitive area can demand more
+  digits than the default. Raising it is not advisory — every existing PIN
+  shorter than the new minimum is marked, and the next time that identity
+  unlocks it must set a conforming one before it can go any further. Warning
+  and letting them past would mean the setting only ever protected accounts
+  created after it changed, which is the failure that looks like success.
+
+  The old PIN still authenticates that change: unlock with it, then set the
+  new one. Anything else means an admin resetting every identity by hand the
+  day the policy tightens. An identity that never comes back stays locked
+  until it does, which is the correct outcome, and the admin list shows who is
+  still outstanding so the rollout is visible rather than assumed. Lowering
+  the requirement invalidates nothing.
+
+  Unlocking grants a session — persistent on a personal device, and on
+  anything shared it must end at the conversation boundary, or the next person
+  inherits the identity along with the screen.
+
+  Recorded plainly: a PIN is not a password, and this is a lightweight account
+  system rather than a small feature. Six digits is a low bar that rate
+  limiting carries. It suits an internal tool and a number keyed into a
+  screen, and it should not be the only thing standing in front of anything
+  genuinely sensitive. It depends on HTTPS only — a PIN must never be
+  enterable on the plain listener.
+
+  Devices and identities are listed in the admin page with when they were last
+  seen, and deletable there.
+
+- **Memory.** Give conversations meaning across sessions — derived, not
+  verbatim. A rolling summary or a small set of retained facts, not a
+  transcript: it survives context limits, and it is a far smaller thing to
+  hold than everything anybody ever said.
+
+  Whether anything is kept is one property, defaulting from the identity above
+  and overridable by an admin in either direction. A named place defaults to
+  nothing and can be switched on — naming is really a durability mechanism, so
+  the person who names a device is often exactly the person who wants memory
+  to outlast a browser wipe. A named device with memory on should be
+  conspicuous in the list, since the default is off for a reason. A token
+  defaults to remembering, with revocation rather than enrolment as the
+  control, so a machine that turns out to be shared can be corrected without
+  gating every ordinary one.
+
+  One property, two effects: anything not remembering also drops what it is
+  holding at the conversation boundary — the wake word opens one, the sleep
+  word and the awake timeout close one. One is about what survives the
+  session, the other about what survives the person standing there, and tying
+  both to the same setting stops them contradicting.
+
+  Bounded on purpose — a rolling summary and a capped set of facts, oldest
+  ageing out — with the retention window admin-configurable, because "longer"
+  means one thing in a workshop and another in a room where customers can be
+  overheard.
+
+  Visible and deletable in the admin page, and visible and deletable **by the
+  person it is about** once there is an identity to attach it to. Memory you
+  cannot inspect is memory you cannot correct or trust.
+
+  What changes at the authenticated tier is attribution. Device memory is
+  something a browser said; server memory under a named identity is what a
+  particular person has been discussing, on a server somebody administers.
+  Nothing stops an admin reading it and pretending otherwise would be theatre,
+  which is precisely why it is derived rather than verbatim and why whatever
+  writes it is told not to retain credentials or addresses. The protection is
+  what goes in.
+
+  Deliberately sequenced after the adapter has seen real use. Whether the
+  useful unit is a summary per session, extracted facts, or something narrower
+  is an empirical question, and guessing means building the wrong shape.
+
+- **Diagnostics.** Technical events keyed to a device: the microphone would not
+  open, transcription took four seconds, the voice service returned an error,
+  this browser has no recorder. No conversation content. A health view per
+  device in the admin page, so a failing screen can be found without anyone
+  standing in front of it.
 - **Package for reuse.** Separate the visualiser core from the demo chat shell,
   give it an instance API, ship ESM + UMD. Still zero dependencies.
+- **Separable speech service.** Run faster-whisper and Piper as their own
+  process, so the models can sit on different hardware from the interface,
+  stay warm when the interface restarts, and be shared by more than one
+  consumer. The seam is already HTTP — `/stt` and `/tts` — so this is a
+  question of where those routes point rather than a restructuring. Keep
+  `serve.py` proxying them so the browser still sees one origin, and neither
+  CORS nor a second certificate enters the picture. Worth doing at the point
+  there is a second consumer, not before.
+- **Voice library.** Add and remove Piper voices from the admin page rather
+  than by hand with `curl`, hold several, and choose which are offered.
+  Today the library is whatever happens to be sitting in `voices/`, which
+  means adding a voice needs shell access to the machine. Transcription
+  models are deliberately out of scope: faster-whisper fetches those itself
+  on first use, and the panel already picks between them.
 - **Barge-in.** Detect speech during playback and duck immediately. Nobody
   tolerates waiting out a wrong answer.
 - **State in the geometry.** Distinct colour and motion for thinking, speaking
   and *failing*, so a fault is visible without reading anything.
 - **Domain vocabulary hints.** `?hint=` already exists and is unused; a host
   application knows its own hostnames and interfaces.
-- **Persistent transcripts.** Timestamped and retrievable, for an audit trail.
 - **Unprompted speech.** Let a host application make it speak — an alert
   arrives, the geometry wakes, it tells you. That is a different product from
   a chat box.
@@ -397,6 +620,24 @@ Roughly in order of value:
 ## Progress log
 
 Newest first.
+
+### 2026-08-12 — identity, and the interface reads better
+
+- **A new mark.** A standing wave: two fixed ends, a node at the centre, the
+  envelope swelling between them. Not a metaphor — it is what the visualiser
+  does. The full lockup sits above the sign-in.
+- **The transcript follows itself down** while a reply is written, on every
+  reveal path, and leaves the reader alone if they have scrolled up to
+  re-read.
+- **A viewer can switch the transcript off** and give the whole frame to the
+  field.
+- **A viewer's own controls persist** in their browser — mute, push-to-talk
+  versus hands-free, transcript on or off — and outrank the shared settings
+  until that browser's data is cleared. Deliberately only those three: the
+  shared document still defines everything else for everyone.
+- **Text throughout was too dim**; every opacity raised and the base UI colour
+  lifted. Every button now answers the pointer, and scrollbars match the rest
+  of the furniture rather than the operating system.
 
 ### 2026-08-12 — administration moved to its own port
 

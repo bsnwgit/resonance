@@ -5,7 +5,7 @@
 | Branch | Purpose |
 |---|---|
 | `main` | Production-ready code — reflects what is deployed |
-| `feature/<name>` / `fix/<name>` | Individual features or bug fixes, branched from `main` |
+| `feature/<name>` / `fix/<name>` / `design/<name>` | One round of work, branched from `main` |
 
 ## Workflow
 
@@ -50,7 +50,7 @@ only really be judged live.
 
 ```bash
 rsync -az --exclude-from=.gitignore ./ <host>:<path>/
-ssh <host> '<path>/serve.sh stop; <path>/serve.sh start'
+ssh <host> '<path>/serve.sh stop && <path>/serve.sh start'
 ```
 
 - **Never deploy directly from a feature branch to anything shared** — merge to
@@ -66,12 +66,18 @@ these are generated on the server and are either secret or large:
 
 | Path | Why |
 |---|---|
-| `admin.key` | grants write access to the shared settings |
+| `users.json` | password hashes and roles |
 | `key.pem`, `cert.pem` | TLS private key and certificate |
-| `settings.json` | deployment state, not source |
+| `settings.json` | the shared interface configuration — deployment state, not source |
+| `app.json` | ports and session length — deployment state, not source |
+| `server.pid` | whichever process happens to be running |
 | `voices/` | Piper models, 60–120 MB each, downloadable |
 | `stt-venv/` | virtualenv |
 | `server.log`, `*.wav` | runtime noise |
+
+`admin.key` appears in `.gitignore` and no longer exists. The shared key it
+held was retired when administration moved behind accounts; the ignore rule
+stays so an old deployment's leftover file cannot be committed by accident.
 
 If you add anything that writes a credential to disk, add it here **and** to
 `.gitignore` in the same commit.
@@ -84,7 +90,7 @@ Deliberately flat — this is a single page plus a single server file.
 |---|---|
 | `index.html` | the display: visualiser and chat surface. No controls. |
 | `admin.html` | the configuration interface, served only on the admin port |
-| `serve.py` | static serving, `/stt`, `/tts`, `/settings`, accounts and sessions |
+| `serve.py` | static serving, `/stt`, `/tts`, `/settings`, `/app`, accounts and sessions |
 | `serve.sh` | start/stop, resolving the PID from the port |
 | `make-cert.sh` | self-signed certificate for the HTTPS listener |
 
@@ -111,8 +117,12 @@ absent. If you add a route that writes, it goes behind `_require('admin')` and
 returns 404 when `self.admin_port` is false. The display page must never
 regain a control that writes.
 
-**Settings are admin-only by design.** Ordinary users get the microphone, mute,
-and the push-to-talk/hands-free choice. Nothing else. A visibility gate must be
+**Settings are admin-only by design.** A viewer gets the microphone, mute, the
+push-to-talk/hands-free choice, and whether the transcript is shown. Nothing
+else, and adding a fifth is a decision rather than a convenience. Those four
+are remembered in that viewer's browser and outrank the shared settings;
+everything else belongs to the shared document, because the point of it is
+that one person decides what everyone sees. A visibility gate must be
 confirmed by the server — never inferred in the browser.
 
 **Record the non-obvious failures.** The *Engineering notes* section of the
@@ -128,5 +138,5 @@ Examples:
   feat: add barge-in during playback
   fix: stop the wake gate expiring mid-answer
   chore: bump faster-whisper
-  docs: expand the admin key section
+  docs: expand the accounts section
 ```
