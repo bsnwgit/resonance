@@ -180,6 +180,25 @@ Two roles:
 | `admin` | change every setting, manage accounts |
 | `viewer` | read the configuration, change nothing |
 
+### What a viewer keeps
+
+The three controls a viewer has — mute, push-to-talk versus hands-free, and
+whether the transcript is shown — are remembered in their own browser and
+survive a reload, so a display stays how they left it. They are stored under
+one `localStorage` key and last until that browser's data is cleared.
+
+A stored choice outranks the shared setting, and keeps outranking it after an
+admin changes theirs: once someone has muted a display it stays muted for
+them. A browser that has never touched a control follows the admin's document
+exactly.
+
+Nothing else is kept per viewer. Look, geometry, palette, voice and wake word
+remain wholly admin-controlled, because the point of the shared document is
+that one person decides what everyone sees.
+
+The microphone is deliberately not remembered — re-opening it on load would
+raise a permission prompt nobody asked for.
+
 ### App settings
 
 **APP SETTINGS**, at the foot of the panel, covers how the server is wired
