@@ -91,8 +91,11 @@
     font-size:9px;letter-spacing:.06em;line-height:1.5;
     color:rgba(var(--paper),.88);margin:8px 0 0;min-height:0;
   }
-  /* Ordinary separator, the same weight as the hairline between topics. */
-  .rule{height:1px;margin:9px 0 2px;background:rgba(var(--glass),.20)}
+  /* Both dividers read at the same strength: one closes the panel header,
+     the other separates saving the interface from configuring the server.
+     Brighter than the hairline between topics, so they group rather than
+     merge into the section rules. */
+  .rule{height:1px;margin:9px 0 2px;background:rgba(var(--glass),.55)}
 
   /* One hover treatment for every control on the page. The panel is dense,
      and a button that does not answer the pointer reads as inert — the tab
@@ -111,8 +114,8 @@
     border-color:var(--hue);color:var(--hue);
   }
   button:disabled{cursor:not-allowed}
-  /* Deliberately brighter than every other hairline: it separates saving the
-     interface from configuring the server, which are different acts. */
+  /* Same strength as .rule above — only the spacing differs, because this one
+     separates saving the interface from configuring the server. */
   .footrule{
     height:1px;margin:11px 0;background:rgba(var(--glass),.55);
   }
