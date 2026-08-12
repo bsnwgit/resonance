@@ -431,31 +431,53 @@ Roughly in order of value:
 
 - **Backend adapter.** Replace `askBackend()` with a real assistant, keeping
   demo mode as the fallback.
-- **Deployment mode: personal or shared.** Everything below assumes a server
-  several people can reach. One person running this on their own machine, for
-  themselves, is a different product, and making them fish a generated
-  password out of a log to configure their own laptop is absurd.
+- **Two separate settings: what it binds to, and what it takes to get in.**
+  Everything else here assumes a server several people can reach. One person
+  running this on their own machine is a different product, and making them
+  fish a generated password out of a log to configure their own laptop is
+  absurd.
 
-  The distinction is not how much security someone wants, it is where the
-  boundary already is. Nothing else can reach `127.0.0.1`, so on a personal
-  install the network is the boundary and accounts add nothing.
+  These are deliberately not one "mode". Binding and authentication are
+  independent, and collapsing them into a single label produces a label that
+  lies the moment someone changes the binding. The interface should report the
+  actual pair — what it is reachable at, and what it takes to get in — rather
+  than a name.
 
-  **Personal** binds loopback only and has no accounts, no sign-in, no PIN.
-  The admin page opens straight up. Memory simply works: there is exactly one
-  identity — the machine — so there is nothing to scope it against and nothing
-  to authenticate. It also needs no certificate at all, because browsers treat
-  `http://localhost` as a secure context and the microphone works there
-  unprompted. Start it, open localhost, talk to it.
+  | bound to | to get in | fits |
+  | --- | --- | --- |
+  | loopback | nothing | your own machine; nothing else can reach it |
+  | one address | nothing | your own home network, your call, stated plainly |
+  | one address | a single PIN, no accounts | a home network you would rather not leave open |
+  | everything | accounts and roles | anywhere other people are |
 
-  **Shared** is everything else, and stays the default, because the safe
-  default is the one that assumes it can be reached.
+  At **loopback with no authentication** the network is already the boundary,
+  so accounts add nothing. This install also needs no certificate at all:
+  browsers treat `http://localhost` as a secure context, so the microphone
+  works unprompted. Start it, open localhost, talk to it — none of the setup
+  ceremony below applies. Memory simply works, because one machine is one
+  identity and there is nothing to scope it against or authenticate.
 
-  The guard is a warning, not a refusal. Personal mode bound to anything other
-  than loopback prints loudly at startup and shows a banner in the interface —
-  somebody may genuinely want it reachable from their own phone on their own
-  network, and that is their call. What must not happen is a laptop configured
-  as personal quietly joining an office network with no accounts and
-  everything open.
+  **Beyond loopback with no authentication** is a genuine choice somebody may
+  want on their own network, and it is not dressed up as anything else: the
+  structural argument for skipping accounts is gone, and what is left is the
+  owner accepting a risk on a network they control. It warns loudly at startup
+  and banners in the interface. Not refused — but a laptop configured this way
+  that later joins an office network must not be quiet about it.
+
+  **A single PIN with no accounts** is the middle rung and costs nothing new —
+  the PIN machinery below, applied to the whole display rather than to a named
+  identity. No account management, no admin sign-in, just a number at the
+  door. For a home server it is probably the right answer: it keeps a guest's
+  phone or a smart television out without turning a house into an enterprise.
+
+  **Accounts and roles** stay the default, because the safe default is the one
+  that assumes it can be reached.
+
+  Two things worth stating even where none of this applies: binding to one
+  specific address rather than every interface is worth doing regardless, so a
+  laptop that later joins another network does not follow you onto it — and a
+  firewall rule, which is outside this application entirely, does more than
+  anything inside it.
 
 - **HTTPS only.** Retire the plain listener. The microphone already refuses to
   work on it, so today it mostly generates confusion about why half the
