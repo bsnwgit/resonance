@@ -432,11 +432,22 @@ Roughly in order of value:
   admin passwords, never compared in the browser. Rate limiting and lockout
   are what make a short PIN viable, reusing the geometric back-off already
   built for admin sign-in, and the obvious sequences are refused. An admin
-  sets the required length so a sensitive area can demand more digits —
-  raising it must force existing shorter PINs to change on next unlock, or it
-  only protects new ones. An admin resets a forgotten PIN from the device
-  list: with no email here that is the only recovery path, and it has to exist
-  in the first version.
+  resets a forgotten PIN from the device list: with no email here that is the
+  only recovery path, and it has to exist in the first version.
+
+  **An admin sets the required length**, so a sensitive area can demand more
+  digits than the default. Raising it is not advisory — every existing PIN
+  shorter than the new minimum is marked, and the next time that identity
+  unlocks it must set a conforming one before it can go any further. Warning
+  and letting them past would mean the setting only ever protected accounts
+  created after it changed, which is the failure that looks like success.
+
+  The old PIN still authenticates that change: unlock with it, then set the
+  new one. Anything else means an admin resetting every identity by hand the
+  day the policy tightens. An identity that never comes back stays locked
+  until it does, which is the correct outcome, and the admin list shows who is
+  still outstanding so the rollout is visible rather than assumed. Lowering
+  the requirement invalidates nothing.
 
   Unlocking grants a session — persistent on a personal device, and on
   anything shared it must end at the conversation boundary, or the next person
