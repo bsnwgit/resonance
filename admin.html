@@ -61,6 +61,15 @@
     flex:0 0 auto;padding:10px 14px 12px;
     border-top:1px solid rgba(var(--glass),.14);background:rgba(0,0,0,.5);
   }
+  #panelfoot #savestate{
+    font-size:9px;letter-spacing:.06em;line-height:1.5;
+    color:rgba(var(--paper),.88);margin:6px 0 0;min-height:0;
+  }
+  /* Deliberately brighter than every other hairline: it separates saving the
+     interface from configuring the server, which are different acts. */
+  .footrule{
+    height:1px;margin:11px 0;background:rgba(var(--glass),.55);
+  }
   #tab_app,#tab_accounts{
     width:100%;font:inherit;font-size:9.5px;letter-spacing:.14em;padding:7px 8px;
     cursor:pointer;text-align:left;background:none;color:rgba(var(--paper),.88);
@@ -244,22 +253,17 @@
 <div id="wrap">
 <div id="panel">
   <div id="panelscroll">
-  <div class="tabs">
-    <button data-tab="look"   class="on">LOOK</button>
-    <button data-tab="motion">MOTION</button>
-    <button data-tab="voice">VOICE</button>
-  </div>
   <div class="findrow">
     <input id="rigfind" type="search" placeholder="filter settings…" spellcheck="false">
     <button id="b_expand" title="expand all in this tab">+</button>
     <button id="b_collapse" title="collapse all in this tab">−</button>
   </div>
 
-  <div class="seg" style="margin-top:8px">
-    <button id="b_save">SAVE FOR EVERYONE</button>
-    <button id="b_revert">REVERT</button>
+  <div class="tabs">
+    <button data-tab="look"   class="on">LOOK</button>
+    <button data-tab="motion">MOTION</button>
+    <button data-tab="voice">VOICE</button>
   </div>
-  <div id="savestate" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.88);margin:6px 0 8px;line-height:1.5"></div>
   <section class="grp" data-tab="look">
     <h4>Geometry</h4>
     <div class="grpbody">  <div class="seg" data-set="mode">
@@ -530,6 +534,14 @@ sign in again. Activity pushes the deadline out.</div>
   </div><!-- /panelscroll -->
 
   <div id="panelfoot">
+    <div class="seg">
+      <button id="b_save">SAVE FOR EVERYONE</button>
+      <button id="b_revert">REVERT</button>
+    </div>
+    <div id="savestate"></div>
+
+    <div class="footrule"></div>
+
     <button id="tab_app" data-tab="app">APP SETTINGS</button>
     <button id="tab_accounts" data-tab="accounts">ACCOUNTS</button>
     <div id="whobox">
