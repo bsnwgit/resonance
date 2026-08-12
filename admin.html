@@ -107,6 +107,17 @@
      merge into the section rules. */
   .rule{height:1px;margin:9px 0 2px;background:rgba(var(--glass),.55)}
 
+  /* The topics are bounded, so it is obvious where the list of them starts
+     and stops rather than the column running on into the foot. Same strength
+     as the rules above it. */
+  #grpbox{
+    border:1px solid rgba(var(--glass),.55);
+    padding:2px 10px 12px;
+    margin-top:10px;
+  }
+  /* the first topic's own top rule would double up with the box edge */
+  #grpbox .grp:first-of-type{border-top:0;margin-top:6px}
+
   /* One hover treatment for every control on the page. The panel is dense,
      and a button that does not answer the pointer reads as inert — the tab
      row and the segmented controls had no hover at all. Disabled controls
@@ -164,10 +175,21 @@
   #portgrid{display:grid;grid-template-columns:1fr auto;gap:6px 10px;
             align-items:center;margin-top:8px}
   #portgrid label{font-size:9.5px;letter-spacing:.08em;color:rgba(var(--paper),.9)}
-  #portgrid input{width:88px;font:inherit;font-size:10px;padding:4px 6px;
-                  background:rgba(0,0,0,.6);color:var(--text);
-                  border:1px solid rgba(var(--glass),.16);outline:0;text-align:right}
-  #portgrid input:focus{border-color:var(--hue-dim)}
+  /* the session field is the same kind of thing as a port — a small number
+     you type, not prose — so it takes the same treatment */
+  #portgrid input,#ap_session{
+    width:88px;font:inherit;font-size:10px;padding:4px 6px;
+    background:rgba(0,0,0,.6);color:var(--text);
+    border:1px solid rgba(var(--glass),.16);outline:0;text-align:right;
+  }
+  #portgrid input:focus,#ap_session:focus{border-color:var(--hue-dim)}
+  #ap_session{display:block;margin:4px 0}
+  /* the spinner arrows are the operating system's, and look it */
+  #portgrid input::-webkit-outer-spin-button,
+  #portgrid input::-webkit-inner-spin-button,
+  #ap_session::-webkit-outer-spin-button,
+  #ap_session::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  #portgrid input,#ap_session{-moz-appearance:textfield;appearance:textfield}
   #pw_cur:focus,#pw_new:focus,#nu_name:focus,#nu_pw:focus,
   #bk_url:focus,#bk_model:focus,#bk_key:focus,#bk_keepalive:focus,
   #bk_system:focus{border-color:var(--hue-dim)}
@@ -345,6 +367,8 @@
     <button id="b_revert">REVERT</button>
   </div>
   <div class="rule" id="saverule"></div>
+
+  <div id="grpbox">
   <section class="grp" data-tab="look">
     <h4>Geometry</h4>
     <div class="grpbody">  <div class="seg" data-set="mode">
@@ -684,6 +708,7 @@ sign in again. Activity pushes the deadline out.</div>
   <div class="note" id="usernote"></div>
     </div>
   </section>
+  </div><!-- /grpbox -->
   </div><!-- /panelscroll -->
 
   <div id="panelfoot">
