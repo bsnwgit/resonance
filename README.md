@@ -400,6 +400,31 @@ Roughly in order of value:
 
 - **Backend adapter.** Replace `askBackend()` with a real assistant, keeping
   demo mode as the fallback.
+- **HTTPS only.** Retire the plain listener. The microphone already refuses to
+  work on it, so today it mostly generates confusion about why half the
+  interface is dead. Make it a permanent redirect to the HTTPS port rather
+  than deleting it, or every bookmark and kiosk startup URL dies silently on
+  the day it changes. Lets cookies carry `Secure` unconditionally.
+- **Device identity.** A random, unguessable token issued by the server on
+  first visit and held in an `HttpOnly` cookie, so page script cannot read it
+  and it rides along with every request. A name declared in the URL —
+  `?display=workshop` — takes precedence when present and rebinds that device
+  to its existing record, because a name survives a browser wipe and a token
+  does not. Not encryption in the browser: if the browser holds the key it is
+  obfuscation, and the secrecy belongs in the server-side mapping. Devices are
+  listed in the admin page with when they were last seen, and deletable there.
+- **Declared device kind.** Each device is *shared* or *personal*, and both
+  kinds run against the same server at once, so it cannot be a global setting.
+  A shared screen drops everything it was holding at the conversation
+  boundary — the wake word opens one, the sleep word and the awake timeout
+  close one, and that machinery already exists — so nothing carries from one
+  visitor to the next. A personal device treats the same boundary as the end
+  of a thread and keeps its continuity.
+- **Diagnostics.** Technical events keyed to a device: the microphone would not
+  open, transcription took four seconds, the voice service returned an error,
+  this browser has no recorder. No conversation content. A health view per
+  device in the admin page, so a failing screen can be found without anyone
+  standing in front of it.
 - **Package for reuse.** Separate the visualiser core from the demo chat shell,
   give it an instance API, ship ESM + UMD. Still zero dependencies.
 - **Separable speech service.** Run faster-whisper and Piper as their own
@@ -422,7 +447,21 @@ Roughly in order of value:
   and *failing*, so a fault is visible without reading anything.
 - **Domain vocabulary hints.** `?hint=` already exists and is unused; a host
   application knows its own hostnames and interfaces.
-- **Persistent transcripts.** Timestamped and retrievable, for an audit trail.
+- **Memory.** Give conversations meaning across sessions — derived, not
+  verbatim. A rolling summary or a small set of retained facts, not a
+  transcript: it survives context limits, and it is a far smaller thing to
+  hold than everything anybody ever said. Scoped to the device and governed by
+  its declared kind, which is what makes it coherent without viewer accounts —
+  a personal device remembers, a shared one does not. Visible and deletable in
+  the admin page, because memory you cannot inspect is memory you cannot
+  correct or trust. Whatever writes it is told not to retain credentials or
+  addresses; the protection is what goes in, not access control, since anyone
+  who runs the server can read what is stored.
+
+  Deliberately sequenced after the adapter has seen real use. Whether the
+  useful unit is a summary per session, extracted facts, or something narrower
+  is an empirical question, and guessing means building the wrong shape and
+  living with it.
 - **Unprompted speech.** Let a host application make it speak — an alert
   arrives, the geometry wakes, it tells you. That is a different product from
   a chat box.
