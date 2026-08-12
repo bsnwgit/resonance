@@ -143,6 +143,9 @@
                   background:rgba(0,0,0,.6);color:var(--text);
                   border:1px solid rgba(var(--glass),.16);outline:0;text-align:right}
   #portgrid input:focus{border-color:var(--hue-dim)}
+  #pw_cur:focus,#pw_new:focus,#nu_name:focus,#nu_pw:focus,
+  #bk_url:focus,#bk_model:focus,#bk_key:focus,#bk_keepalive:focus,
+  #bk_system:focus{border-color:var(--hue-dim)}
   #portgrid .now{grid-column:1/-1;font-size:8.5px;letter-spacing:.06em;
                  color:rgba(var(--paper),.7);margin:-2px 0 4px}
   #whobox{display:flex;align-items:center;gap:8px;margin-top:9px}
@@ -181,7 +184,8 @@
           padding-bottom:6px}
   .bklab{display:block;font-size:9.5px;letter-spacing:.1em;
          color:rgba(var(--paper),.9);margin-top:10px}
-  #pw_cur,#pw_new,#nu_name,#nu_pw{
+  #pw_cur,#pw_new,#nu_name,#nu_pw,
+  #bk_url,#bk_model,#bk_key,#bk_keepalive,#bk_system{
     width:100%;margin:4px 0;font:inherit;font-size:9.5px;padding:5px 6px;
     background:rgba(0,0,0,.6);color:var(--text);
     border:1px solid rgba(var(--glass),.16);outline:0;
@@ -265,7 +269,10 @@
   #browservoice{display:none;margin:9px 0 0}
   #browservoice > #voicesel{margin-top:0}
   #wakeword,#sleepword{letter-spacing:.12em;text-transform:lowercase}
-  #greetings,#wakealiases,#sleepaliases,#farewells{resize:vertical;line-height:1.6;min-height:44px}
+  #bk_key{letter-spacing:.18em}
+  #bk_url,#bk_model,#bk_keepalive{letter-spacing:.04em}
+  #greetings,#wakealiases,#sleepaliases,#farewells,
+  #bk_system{resize:vertical;line-height:1.6;min-height:44px}
   /* LEARN prompts must sit next to the button that starts the training —
      they used to go to the mic section's note, which is invisible when that
      topic is folded, so the user never saw "say it now". */
