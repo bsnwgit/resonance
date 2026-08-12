@@ -93,6 +93,11 @@
     font-size:9px;letter-spacing:.06em;line-height:1.5;
     color:rgba(var(--paper),.88);margin:8px 0 0;min-height:0;
   }
+  /* the one state where the admin's view and everyone else's disagree */
+  #savestate.alert{
+    color:#ff6b6b;letter-spacing:.1em;
+    border-left:2px solid #ff6b6b;padding-left:7px;
+  }
   /* Both dividers read at the same strength: one closes the panel header,
      the other separates saving the interface from configuring the server.
      Brighter than the hairline between topics, so they group rather than
@@ -106,7 +111,6 @@
      :not() carries the specificity needed to beat the .on selected state. */
   .tabs button:hover:not(:disabled),
   .seg button:hover:not(:disabled),
-  .findrow button:hover:not(:disabled),
   .urow button:hover:not(:disabled),
   #stagebar button:hover:not(:disabled),
   #tab_app:hover:not(:disabled),
@@ -207,12 +211,7 @@
     background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.85);
   }
   .tabs button.on{border-color:var(--hue-dim);color:var(--hue);background:rgba(var(--glass),.08)}
-  .findrow{display:flex;gap:4px;margin:0 0 4px}
-  .findrow button{
-    font:inherit;font-size:12px;line-height:1;width:24px;cursor:pointer;
-    background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.88);
-  }
-  .findrow button:hover{color:var(--hue);border-color:var(--hue-dim)}
+  .findrow{display:flex;margin:0 0 4px}
   #rigfind{
     flex:1;min-width:0;margin:0;font:inherit;font-size:9.5px;padding:5px 7px;
     background:rgba(0,0,0,.5);color:var(--text);
@@ -309,8 +308,6 @@
   <div id="panelscroll">
   <div class="findrow">
     <input id="rigfind" type="search" placeholder="filter settings…" spellcheck="false">
-    <button id="b_expand" title="expand all in this tab">+</button>
-    <button id="b_collapse" title="collapse all in this tab">−</button>
   </div>
 
   <div class="tabs">
@@ -906,11 +903,17 @@ async function voiceLists(){
 /* -------------------------------------------------------------- saving */
 function dirty(){
   isDirty = true;
-  status('unsaved changes — the preview is showing them, viewers are not');
+  /* Red, because this is the one state where what the admin is looking at
+     and what everyone else is looking at have come apart. It is easy to tune
+     something, be satisfied by the preview, and walk away having changed
+     nothing for anybody. */
+  status('UNSAVED — the preview shows these changes, viewers do not', true);
 }
 function status(m, bad){
   const el = $('savestate');
-  if (el){ el.textContent = m; el.style.color = bad ? '#ff8a8a' : ''; }
+  if (!el) return;
+  el.textContent = m;
+  el.classList.toggle('alert', !!bad);
 }
 
 $('b_save').addEventListener('click', async ()=>{
@@ -1253,17 +1256,18 @@ function panelNav(){
     if (tab === 'voice') loadBackend();
   }
   tabButtons.forEach(b=> b.addEventListener('click', ()=> selectTab(b)));
+  /* One section open at a time. Opening another closes the one before it,
+     so the column stays short enough to take in at a glance rather than
+     becoming a wall you scroll through hunting for a control. Clicking the
+     open one closes it, leaving none open, which is a legitimate state. */
   groups.forEach(g=> g.querySelector('h4').addEventListener('click', ()=>{
-    shut.set(g, !shut.get(g)); render();
+    const wasOpen = !shut.get(g);
+    groups.forEach(x=>{ if (x.dataset.tab === g.dataset.tab) shut.set(x, true); });
+    shut.set(g, wasOpen);
+    render();
+    // opening a section further down should not leave its heading off-screen
+    if (!wasOpen) g.scrollIntoView({block:'nearest'});
   }));
-  $('b_expand').addEventListener('click', ()=>{
-    groups.forEach(g=>{ if (g.dataset.tab === tab) shut.set(g,false); });
-    findEl.value=''; render();
-  });
-  $('b_collapse').addEventListener('click', ()=>{
-    groups.forEach(g=>{ if (g.dataset.tab === tab) shut.set(g,true); });
-    findEl.value=''; render();
-  });
   findEl.addEventListener('input', render);
   render();
   syncSaveRow();
