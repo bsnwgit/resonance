@@ -383,6 +383,20 @@ Roughly in order of value:
   demo mode as the fallback.
 - **Package for reuse.** Separate the visualiser core from the demo chat shell,
   give it an instance API, ship ESM + UMD. Still zero dependencies.
+- **Separable speech service.** Run faster-whisper and Piper as their own
+  process, so the models can sit on different hardware from the interface,
+  stay warm when the interface restarts, and be shared by more than one
+  consumer. The seam is already HTTP — `/stt` and `/tts` — so this is a
+  question of where those routes point rather than a restructuring. Keep
+  `serve.py` proxying them so the browser still sees one origin, and neither
+  CORS nor a second certificate enters the picture. Worth doing at the point
+  there is a second consumer, not before.
+- **Voice library.** Add and remove Piper voices from the admin page rather
+  than by hand with `curl`, hold several, and choose which are offered.
+  Today the library is whatever happens to be sitting in `voices/`, which
+  means adding a voice needs shell access to the machine. Transcription
+  models are deliberately out of scope: faster-whisper fetches those itself
+  on first use, and the panel already picks between them.
 - **Barge-in.** Detect speech during playback and duck immediately. Nobody
   tolerates waiting out a wrong answer.
 - **State in the geometry.** Distinct colour and motion for thinking, speaking
