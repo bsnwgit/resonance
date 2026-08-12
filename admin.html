@@ -140,7 +140,18 @@
     border:1px solid rgba(var(--glass),.22);
   }
   #tab_app{margin-bottom:5px}
-  #tab_ai{margin:0 0 4px}
+  /* One tab wide and sitting under the last of them: the row is three
+     flex:1 buttons with two 4px gaps, so a third of what is left after the
+     gaps matches exactly. Centred and right-aligned like the tab it follows,
+     rather than left-aligned like the full-width entries in the foot. */
+  #tab_ai{
+    /* display:block is load-bearing — a button is inline-block by default and
+       margin-left:auto does nothing to one, so it stayed on the left. */
+    display:block;
+    width:calc((100% - 8px) / 3);
+    margin:0 0 4px auto;
+    text-align:center;
+  }
   #tab_ai:hover,#tab_app:hover,#tab_accounts:hover{border-color:var(--hue);color:var(--hue)}
   #tab_ai.on,#tab_app.on,#tab_accounts.on{border-color:var(--hue-dim);color:var(--hue);
                                           background:rgba(var(--glass),.06)}
