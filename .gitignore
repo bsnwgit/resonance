@@ -1,0 +1,12 @@
+cert.pem
+key.pem
+admin.key
+settings.json
+server.log
+voices/
+stt-venv/
+venv/
+__pycache__/
+*.pyc
+*.wav
+.DS_Store

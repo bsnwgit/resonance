@@ -1,0 +1,2714 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resonance — voice and visual interface</title>
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<style>
+  :root{
+    /* palette is swapped at runtime by setPalette() — but ONLY the canvas
+       channel. --paper is fixed neutral white and is what all text uses, so
+       the transcript stays legible no matter how dark the geometry hue goes
+       (the blue was pulled down deliberately to give the peak ramp somewhere
+       to travel, which dragged every label down with it). */
+    --ink:#05060a;
+    --hue:#dfe9f2;
+    --hue-dim:#7d93a8;
+    --glass:255,255,255;
+    --paper:238,244,250;
+    --text:#f2f6fa;
+    --ui:#8d9aa8;
+    --ui-bright:#dfe9f2;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--ink);
+    color:var(--ui);
+    font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- shell ---------- */
+  #shell{position:fixed;inset:0;display:flex;flex-direction:column}
+
+  /* ---------- the screen ---------- */
+  #screen{position:relative;flex:1 1 auto;min-height:0;overflow:hidden;background:var(--ink)}
+  #cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+  /* glass stack — everything below sits ON TOP of the canvas */
+  .ov{position:absolute;inset:0;pointer-events:none}
+  #milk{background:radial-gradient(ellipse at 50% 45%,
+          rgba(var(--glass),.055) 0%,
+          rgba(var(--glass),.022) 42%,
+          rgba(var(--glass),0) 72%);}
+  #scan{background:repeating-linear-gradient(to bottom,
+          rgba(0,0,0,.30) 0px, rgba(0,0,0,.30) 1px,
+          rgba(0,0,0,0) 1px, rgba(0,0,0,0) 3px);
+        opacity:.35;mix-blend-mode:multiply}
+  #vign{background:radial-gradient(ellipse at 50% 50%,
+          rgba(0,0,0,0) 40%, rgba(0,0,0,.55) 78%, rgba(0,0,0,.88) 100%);}
+  #edge{box-shadow:inset 0 0 120px 30px rgba(0,0,0,.75);}
+
+  /* ---------- transcript ---------- */
+  #log{
+    position:relative;z-index:3;overflow-y:auto;padding:22px 26px 8px;
+    display:flex;flex-direction:column;gap:14px;
+    scrollbar-width:thin;scrollbar-color:rgba(var(--glass),.18) transparent;
+  }
+  #log::-webkit-scrollbar{width:6px}
+  #log::-webkit-scrollbar-thumb{background:rgba(var(--glass),.18)}
+  .msg{max-width:76ch;white-space:pre-wrap;word-break:break-word}
+  .msg .who{
+    display:block;font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;
+    color:rgba(var(--paper),.58);margin-bottom:5px;
+  }
+  .msg.you .body{color:rgba(var(--paper),.62)}
+  .msg.ai  .body{color:var(--text)}
+  .caret{display:inline-block;width:7px;height:13px;background:var(--text);
+         vertical-align:-2px;margin-left:2px;animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  /* layout: hero = viz on top, transcript below.  bleed = transcript over viz. */
+  body[data-layout="hero"]  #screen{flex:0 0 52%}
+  body[data-layout="hero"]  #log{flex:1 1 auto;border-top:1px solid rgba(var(--glass),.10)}
+  body[data-layout="bleed"] #screen{flex:1 1 auto}
+  body[data-layout="bleed"] #log{
+    position:absolute;inset:auto 0 0 0;max-height:62%;z-index:3;
+    padding:40px 26px 14px;
+    -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 60px);
+            mask-image:linear-gradient(to bottom,transparent 0,#000 60px);
+  }
+  body[data-layout="bleed"] .msg.ai .body{text-shadow:0 0 16px rgba(0,0,0,.9)}
+
+  /* ---------- composer ---------- */
+  #bar{
+    position:relative;z-index:4;flex:0 0 auto;display:flex;align-items:center;gap:12px;
+    padding:12px 26px;border-top:1px solid rgba(var(--glass),.12);
+    background:linear-gradient(to top,rgba(0,0,0,.6),rgba(0,0,0,.15));
+  }
+  #bar .pr{color:rgba(var(--paper),.55);letter-spacing:.2em;font-size:10px}
+  #q{
+    flex:1;background:none;border:0;outline:0;color:var(--text);
+    font:inherit;font-size:13px;caret-color:var(--text);
+  }
+  #q::placeholder{color:rgba(var(--paper),.26)}
+  .src{display:flex;gap:6px}
+  .src button{
+    font:inherit;font-weight:400;font-size:9px;letter-spacing:.18em;padding:3px 8px;
+    background:none;border:1px solid rgba(var(--glass),.16);
+    color:rgba(var(--paper),.66);cursor:pointer;
+  }
+  .src button.on{border-color:var(--hue-dim);color:var(--hue)}
+  .src button.rec{border-color:#ff5a5a;color:#ff8a8a}
+  .src button[disabled]{opacity:.35;cursor:not-allowed}
+
+  /* ---------- control rig ---------- */
+  #rigbtn{
+    position:fixed;top:10px;right:12px;z-index:20;cursor:pointer;
+    font:inherit;font-size:9px;letter-spacing:.2em;padding:6px 10px;
+    background:rgba(0,0,0,.55);color:rgba(var(--paper),.82);
+    border:1px solid rgba(var(--glass),.18);
+  }
+  #rig{
+    position:fixed;top:38px;right:12px;z-index:20;width:252px;max-height:86vh;overflow-y:auto;
+    background:rgba(4,6,10,.94);border:1px solid rgba(var(--glass),.16);
+    padding:14px 14px 18px;display:none;
+    scrollbar-width:thin;scrollbar-color:rgba(var(--glass),.18) transparent;
+  }
+  #rig.open{display:block}
+  /* ---- rig: tabs > collapsible sections ---- */
+  .tabs{display:flex;gap:4px;margin-bottom:10px}
+  .tabs button{
+    flex:1;font:inherit;font-size:9px;letter-spacing:.18em;padding:6px 4px;cursor:pointer;
+    background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.66);
+  }
+  .tabs button.on{border-color:var(--hue-dim);color:var(--hue);background:rgba(var(--glass),.08)}
+  .findrow{display:flex;gap:4px;margin:0 0 4px}
+  .findrow button{
+    font:inherit;font-size:12px;line-height:1;width:24px;cursor:pointer;
+    background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.72);
+  }
+  .findrow button:hover{color:var(--hue);border-color:var(--hue-dim)}
+  #rigfind{
+    flex:1;min-width:0;margin:0;font:inherit;font-size:9.5px;padding:5px 7px;
+    background:rgba(0,0,0,.5);color:var(--text);
+    border:1px solid rgba(var(--glass),.18);outline:0;-webkit-appearance:none;appearance:none;
+  }
+  #rigfind::placeholder{color:rgba(var(--paper),.38)}
+
+  /* a real divider between topics, not just spacing */
+  .grp{
+    border-top:1px solid rgba(var(--glass),.20);
+    margin-top:14px;padding-top:2px;
+  }
+  .grp:first-of-type{border-top:0;margin-top:8px}
+  .grp[hidden]{display:none}
+  #rig h4{
+    font-size:9px;letter-spacing:.24em;text-transform:uppercase;font-weight:400;
+    color:rgba(var(--paper),.78);margin:10px 0 8px;padding:0 0 6px 12px;
+    border-bottom:1px solid rgba(var(--glass),.10);
+    cursor:pointer;position:relative;user-select:none;
+  }
+  #rig h4:hover{color:var(--hue)}
+  #rig h4::before{                       /* disclosure caret */
+    content:'';position:absolute;left:0;top:4px;
+    border-left:4px solid rgba(var(--paper),.55);
+    border-top:3.5px solid transparent;border-bottom:3.5px solid transparent;
+    transform:rotate(90deg);transform-origin:2px 3.5px;transition:transform .12s;
+  }
+  .grp.shut h4::before{transform:rotate(0deg)}
+  .grp.shut .grpbody{display:none}
+  .grpbody{padding-bottom:4px}
+  .seg{display:flex;flex-wrap:wrap;gap:4px}
+  .seg button{
+    font:inherit;font-size:9.5px;letter-spacing:.1em;padding:5px 8px;cursor:pointer;
+    background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.78);
+  }
+  .seg button.on{border-color:var(--hue-dim);color:var(--hue);background:rgba(var(--glass),.06)}
+  .sl{display:grid;grid-template-columns:1fr auto;gap:2px 8px;margin:9px 0;align-items:center}
+  .sl label{font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.78)}
+  .sl output{font-size:9.5px;color:var(--text)}
+  .sl input{grid-column:1/-1;width:100%;height:2px;-webkit-appearance:none;appearance:none;
+            background:rgba(var(--glass),.18);outline:0}
+  .sl input::-webkit-slider-thumb{-webkit-appearance:none;width:9px;height:9px;background:var(--hue);cursor:pointer}
+  .sl input::-moz-range-thumb{width:9px;height:9px;border:0;background:var(--hue);cursor:pointer}
+  #voicesel,#neuralvoice,#wakeword,#sleepword,#greetings,#wakealiases,#sleepaliases,#farewells{
+    width:100%;margin:9px 0 4px;font:inherit;font-size:9.5px;padding:5px 6px;
+    background:rgba(0,0,0,.6);color:var(--text);
+    border:1px solid rgba(var(--glass),.16);outline:0;
+  }
+  #voicesel option,#neuralvoice option{background:#0a0d14;color:#dfe9f2}
+  /* engine-specific blocks: exactly one is ever shown, and both start at the
+     SAME y so switching engines doesn't move the voice list. The margin has
+     to sit on the wrapper, not on the select inside it, or the wrapped list
+     lands 9px higher than the bare one. */
+  #browservoice{display:none;margin:9px 0 0}
+  #browservoice > #voicesel{margin-top:0}
+  #wakeword,#sleepword{letter-spacing:.12em;text-transform:lowercase}
+  #greetings,#wakealiases,#sleepaliases,#farewells{resize:vertical;line-height:1.6;min-height:44px}
+  /* LEARN prompts must sit next to the button that starts the training —
+     they used to go to the mic section's note, which is invisible when that
+     topic is folded, so the user never saw "say it now". */
+  .learnnote{
+    font-size:9px;letter-spacing:.06em;line-height:1.5;margin-top:6px;
+    color:rgba(var(--paper),.72);min-height:0;
+  }
+  .learnnote.live{
+    color:var(--hue);border-left:2px solid var(--hue-dim);padding-left:7px;
+  }
+  #fps{position:fixed;left:12px;top:10px;z-index:20;font-size:9px;letter-spacing:.14em;
+       color:rgba(var(--paper),.52)}
+</style>
+</head>
+<body data-layout="hero">
+
+<div id="fps"></div>
+<button id="rigbtn">RIG</button>
+
+<div id="rig">
+  <div class="tabs">
+    <button data-tab="look"   class="on">LOOK</button>
+    <button data-tab="motion">MOTION</button>
+    <button data-tab="voice">VOICE</button>
+  </div>
+  <div class="seg" style="margin-bottom:8px">
+    <button id="b_save">SAVE FOR EVERYONE</button>
+    <button id="b_revert">REVERT</button>
+    <button id="b_exit" title="drop the admin key and reload as an ordinary user">EXIT ADMIN</button>
+  </div>
+  <div id="savestate" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.72);margin:0 0 8px;line-height:1.5"></div>
+
+  <div class="findrow">
+    <input id="rigfind" type="search" placeholder="filter settings…" spellcheck="false">
+    <button id="b_expand" title="expand all in this tab">+</button>
+    <button id="b_collapse" title="collapse all in this tab">−</button>
+  </div>
+  <section class="grp" data-tab="look">
+    <h4>Geometry</h4>
+    <div class="grpbody">  <div class="seg" data-set="mode">
+    <button data-v="stack" class="on">STACK</button>
+    <button data-v="disc">DISC</button>
+    <button data-v="orb">ORB</button>
+    <button data-v="knot">KNOT</button>
+  </div></div>
+  </section>
+  <section class="grp" data-tab="look">
+    <h4>Palette</h4>
+    <div class="grpbody">  <div class="seg" data-set="palette">
+    <button data-v="blue" class="on">BLUE</button>
+    <button data-v="milk">MILK</button>
+    <button data-v="ice">ICE</button>
+    <button data-v="amber">AMBER</button>
+    <button data-v="bone">BONE</button>
+  </div></div>
+  </section>
+  <section class="grp" data-tab="look">
+    <h4>Layout</h4>
+    <div class="grpbody">  <div class="seg" data-set="layout">
+    <button data-v="hero" class="on">HERO</button>
+    <button data-v="bleed">FULL BLEED</button>
+  </div></div>
+  </section>
+  <section class="grp" data-tab="look">
+    <h4>Form &amp; size</h4>
+    <div class="grpbody">  <div class="sl"><label>amplitude</label><output id="o_amp"></output><input id="s_amp" type="range" min="0" max="2.5" step=".01"></div>
+  <div class="sl"><label>lines</label><output id="o_lines"></output><input id="s_lines" type="range" min="1" max="40" step="1"></div>
+  <div class="sl"><label>layer phase</label><output id="o_lag"></output><input id="s_lag" type="range" min="0" max="14" step=".1"></div>
+  <div class="sl"><label>depth</label><output id="o_depth"></output><input id="s_depth" type="range" min="0" max="600" step="5"></div>
+  <div class="sl"><label>spread</label><output id="o_spread"></output><input id="s_spread" type="range" min="200" max="1100" step="10"></div>
+  <div class="sl"><label>perspective</label><output id="o_persp"></output><input id="s_persp" type="range" min="260" max="3000" step="20"></div></div>
+  </section>
+  <section class="grp" data-tab="motion">
+    <h4>Rotation</h4>
+    <div class="grpbody">  <div class="seg" data-set="tmode">
+    <button data-v="turntable" class="on">TURNTABLE</button>
+    <button data-v="free">FREE TUMBLE</button>
+  </div>
+  <div class="sl"><label>spin (platter)</label><output id="o_spin"></output><input id="s_spin" type="range" min="0" max="4" step=".01"></div>
+  <div class="sl"><label>tilt / view height</label><output id="o_tilt"></output><input id="s_tilt" type="range" min="0" max="1.2" step=".001"></div>
+  <div class="sl"><label>wobble</label><output id="o_wobble"></output><input id="s_wobble" type="range" min="0" max="4" step=".01"></div>
+  <div class="sl"><label>roll / lean</label><output id="o_roll"></output><input id="s_roll" type="range" min="0" max="4" step=".01"></div>
+  <div class="sl"><label>master rate</label><output id="o_tumble"></output><input id="s_tumble" type="range" min="0" max="3" step=".01"></div>
+  <div class="sl"><label>re-aim every</label><output id="o_reo"></output><input id="s_reo" type="range" min="3" max="40" step="1"></div>
+  <div class="seg" style="margin-top:8px">
+    <button id="b_reo">RE-AIM NOW</button>
+  </div></div>
+  </section>
+  <section class="grp" data-tab="look">
+    <h4>Glass</h4>
+    <div class="grpbody">  <div class="sl"><label>bloom</label><output id="o_bloom"></output><input id="s_bloom" type="range" min="0" max="2" step=".01"></div>
+  <div class="sl"><label>blur radius</label><output id="o_blur"></output><input id="s_blur" type="range" min="0" max="30" step="1"></div>
+  <div class="sl"><label>milk</label><output id="o_milk"></output><input id="s_milk" type="range" min="0" max="2" step=".01"></div>
+  <div class="sl"><label>grain</label><output id="o_grain"></output><input id="s_grain" type="range" min="0" max="1.5" step=".01"></div>
+  <div class="sl"><label>scanlines</label><output id="o_scan"></output><input id="s_scan" type="range" min="0" max="1" step=".01"></div>
+  <div class="sl"><label>line weight</label><output id="o_lw"></output><input id="s_lw" type="range" min=".3" max="3" step=".05"></div></div>
+  </section>
+  <section class="grp" data-tab="voice">
+    <h4>Setup &amp; self-test</h4>
+    <div class="grpbody">
+  <div class="seg" data-set="backend">
+    <button data-v="demo" class="on">DEMO REPLIES</button>
+    <button data-v="api" disabled>CONNECTED AI</button>
+  </div>
+  <div style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.72);margin-top:6px;line-height:1.5">
+    DEMO answers from built-in text, so you can prove the whole chain works
+    before connecting anything. Keep it here during setup.
+  </div>
+  <div class="seg" style="margin-top:8px"><button id="b_selftest">RUN SELF-TEST</button></div>
+  <div id="selftest" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.72);margin-top:6px;line-height:1.6;white-space:pre-line"></div>
+    </div>
+  </section>
+
+  <section class="grp" data-tab="voice">
+    <h4>Test drive</h4>
+    <div class="grpbody">  <div class="seg">
+    <button id="b_idle">IDLE</button>
+    <button id="b_think">THINKING</button>
+    <button id="b_speak">SPEAK SAMPLE</button>
+  </div>
+  <div class="sl" style="margin-top:10px"><label>token rate ms</label><output id="o_rate"></output><input id="s_rate" type="range" min="15" max="180" step="5"></div></div>
+  </section>
+  <section class="grp" data-tab="voice">
+    <h4>Speech out (TTS)</h4>
+    <div class="grpbody">  <div class="seg" data-set="ttsengine">
+    <button data-v="local" class="on">NEURAL (server)</button>
+    <button data-v="browser">BROWSER</button>
+  </div>
+  <select id="neuralvoice"></select>
+  <div id="browservoice">
+  <select id="voicesel"></select>
+  <div class="sl"><label>pitch</label><output id="o_vpitch"></output><input id="s_vpitch" type="range" min=".5" max="2" step=".05"></div>
+  </div>
+  <div class="sl"><label>speech rate</label><output id="o_vrate"></output><input id="s_vrate" type="range" min=".5" max="2" step=".05"></div>
+  <div id="voicenote" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.72);margin:2px 0 8px;line-height:1.5"></div>
+  <div class="seg" data-set="src">
+    <button data-v="token">TOKEN</button>
+    <button data-v="tts" class="on">TTS</button>
+  </div>
+  <div class="seg" style="margin-top:8px">
+    <button id="b_beep">BEEP</button>
+    <button id="b_test">TEST VOICE</button>
+    <button id="b_diag">DIAGNOSE</button>
+  </div>
+  <div id="ttsnote" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.72);margin-top:8px;line-height:1.5"></div></div>
+  </section>
+  <section class="grp" data-tab="voice">
+    <h4>Speech in (mic)</h4>
+    <div class="grpbody">  <div class="seg" data-set="ptt">
+    <button data-v="1" class="on">PUSH TO TALK</button>
+    <button data-v="0">AUTO (voice detect)</button>
+  </div>
+  <div class="seg" style="margin-top:6px"><button id="b_mic">MIC ONLY (no transcript)</button></div>
+  <div class="sl"><label>mic gain</label><output id="o_micgain"></output><input id="s_micgain" type="range" min=".2" max="5" step=".05"></div>
+  <div class="sl"><label>noise gate</label><output id="o_micgate"></output><input id="s_micgate" type="range" min="0" max=".15" step=".002"></div>
+  <div class="seg" data-set="sttmodel" style="margin-top:6px">
+    <button data-v="base.en">FAST (base.en)</button>
+    <button data-v="small.en" class="on">ACCURATE (small.en)</button>
+  </div>
+  <div class="sl"><label>end-of-speech wait</label><output id="o_hangover"></output><input id="s_hangover" type="range" min=".2" max="1.5" step=".05"></div>
+  <div class="seg" data-set="micdsp" style="margin-top:6px">
+    <button data-v="clean" class="on">CLEAN (best recognition)</button>
+    <button data-v="raw">RAW (best visuals)</button>
+  </div>
+  <div class="seg" style="margin-top:6px"><button id="b_cal">CALIBRATE (stay quiet 2s)</button></div>
+  <div id="miclevel" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.72);margin-top:6px;line-height:1.5">level —</div>
+  <div id="micnote" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.72);margin-top:8px;line-height:1.5">off</div></div>
+  </section>
+  <section class="grp" data-tab="voice">
+    <h4>Wake word</h4>
+    <div class="grpbody">  <div class="seg" data-set="wake">
+    <button data-v="off">OFF</button>
+    <button data-v="auto" class="on">AUTO ONLY</button>
+    <button data-v="always">ALWAYS</button>
+  </div>
+  <input id="wakeword" type="text" spellcheck="false" autocomplete="off" placeholder="trigger word">
+  <div class="seg" style="margin-top:6px"><button id="b_learn">LEARN HOW I SAY IT (3x)</button></div>
+  <div id="learnwakenote" class="learnnote"></div>
+  <label style="display:block;font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.78);margin-top:10px">also accept (learned)</label>
+  <textarea id="wakealiases" rows="3" spellcheck="false" placeholder="one per line"></textarea>
+
+<div class="sl"><label>stays awake for</label><output id="o_wakewindow"></output><input id="s_wakewindow" type="range" min="3" max="60" step="1"></div>
+  <label style="display:block;font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.78);margin-top:8px">when that time runs out</label>
+  <div class="seg" data-set="byeontimeout">
+    <button data-v="1" class="on">SAY FAREWELL</button>
+    <button data-v="0">GO QUIET</button>
+  </div>
+  <label style="display:block;font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.78);margin-top:10px">greeting phrases</label>
+  <textarea id="greetings" rows="4" spellcheck="false" placeholder="one per line — {name} inserts the wake word"></textarea>
+  <div class="seg"><button id="b_greet">TEST GREETING</button></div>
+  <div id="wakestate" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.72);margin-top:6px;line-height:1.5"></div></div>
+    </section>
+
+  <section class="grp" data-tab="voice">
+    <h4>Sleep word</h4>
+    <div class="grpbody">
+  <label style="display:block;font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.78);margin-top:0">word that ends the conversation at once</label>
+  <input id="sleepword" type="text" spellcheck="false" autocomplete="off" placeholder="e.g. goodbye">
+  <div class="seg" style="margin-top:6px"><button id="b_learnsleep">LEARN HOW I SAY IT (3x)</button></div>
+  <div id="learnsleepnote" class="learnnote"></div>
+  <label style="display:block;font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.78);margin-top:10px">also accept (learned)</label>
+  <textarea id="sleepaliases" rows="2" spellcheck="false" placeholder="one per line"></textarea>
+
+  <label style="display:block;font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.78);margin-top:10px">farewell phrases</label>
+  <textarea id="farewells" rows="3" spellcheck="false" placeholder="one per line — {name} inserts the wake word"></textarea>
+  <div class="seg"><button id="b_bye">TEST FAREWELL</button></div>
+  
+    <div id="sleepstate" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.72);margin-top:6px;line-height:1.5"></div>
+    </div>
+</section>
+  <section class="grp" data-tab="motion">
+    <h4>Spectrum</h4>
+    <div class="grpbody">  <div class="sl"><label>spike width</label><output id="o_spike"></output><input id="s_spike" type="range" min=".004" max=".09" step=".001"></div>
+  <div class="sl"><label>spike decay</label><output id="o_decay"></output><input id="s_decay" type="range" min=".25" max="4" step=".05"></div>
+  <div class="sl"><label>body / swell</label><output id="o_body"></output><input id="s_body" type="range" min="0" max="1.5" step=".01"></div>
+  <div class="sl"><label>peak colour</label><output id="o_grad"></output><input id="s_grad" type="range" min="0" max="1.5" step=".01"></div>
+  <div class="sl"><label>heat threshold</label><output id="o_hot"></output><input id="s_hot" type="range" min=".1" max="2.5" step=".01"></div></div>
+  </section>
+  <section class="grp" data-tab="motion">
+    <h4>Noise floor</h4>
+    <div class="grpbody">  <div class="sl"><label>static level</label><output id="o_floor"></output><input id="s_floor" type="range" min="0" max="2" step=".01"></div>
+  <div class="sl"><label>crackle</label><output id="o_crackle"></output><input id="s_crackle" type="range" min="0" max="1.5" step=".01"></div></div>
+  </section>
+</div>
+
+<div id="shell">
+  <div id="screen">
+    <canvas id="cv"></canvas>
+    <div class="ov" id="milk"></div>
+    <div class="ov" id="scan"></div>
+    <div class="ov" id="vign"></div>
+    <div class="ov" id="edge"></div>
+  </div>
+
+  <div id="log"></div>
+
+  <div id="bar">
+    <span class="pr">&gt;</span>
+    <input id="q" autocomplete="off" spellcheck="false" placeholder="ask Resonance…">
+    <!-- user-facing control. The TOKEN/TTS source switch is a rig/admin
+         thing and lives in the panel; this is the one users get. -->
+    <span class="src">
+      <button id="pttbtn" title="how Resonance decides when you have finished speaking">⌨ SPACE</button>
+      <button id="talkbtn" title="speak to Resonance — mic drives the geometry and your words are transcribed">🎤 TALK</button>
+      <button id="mute" class="on" title="mute its voice">🔊 AUDIO</button>
+    </span>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+   RESONANCE — chat surface
+   Phase 1 of 3.  The geometry is driven by a SIMULATED TOKEN STREAM.
+   Phases 2 (TTS) and 3 (mic) plug into the same place: they only need to
+   push a 0..1 number into Drive.level each frame.  Nothing else changes.
+   ===================================================================== */
+
+/* ---------------------------------------------------------------- state */
+const S = {
+  mode:'stack', palette:'blue', layout:'hero',
+  amp:1.0, lines:16, lag:3, depth:230, spread:620, persp:1100,
+  tumble:1.0, reorient:12,
+  tmode:'turntable', spin:1.0, tilt:0.187, wobble:1.0, roll:1.0,
+  bloom:1.30, blur:15, milk:1.0, grain:.55, scan:.35, lw:1.0,
+  rate:55, floor:0.55, crackle:0.5,
+  spike:0.020, body:0.45, decay:1.0,
+  grad:1.0, hot:0.62,
+  src:'tts', vrate:1.0, vpitch:1.0,
+  ttsengine:'local', ttsvoice:'',      // local = neural voice on the server
+  micgain:1.6, micgate:0.020, ptt:true, micdsp:'clean',   // clean | raw
+  sttmodel:'small.en', hangover:0.55,
+  backend:'demo',              // demo | api  — demo answers from built-in text
+  wake:'auto', wakeword:'resonance', wakewindow:12,   // off | auto | always
+  wakealiases:'',                                 // what the model ACTUALLY hears you say
+  sleepword:'goodbye', sleepaliases:'', byeontimeout:true,
+  farewells:"{name} going quiet.\nStanding by.\nGoodbye.",
+  greetings:"{name} here. Go ahead.\n{name} online. What do you need?\n"+
+            "Yes? {name} is listening.\n{name} awake, go ahead.",
+};
+
+const PALETTES = {
+  blue : {hue:'#3f7fd0', dim:'#2f6f9e', glass:'120,186,255', ink:'#01040c', hot:'#e8f6ff'},
+  milk : {hue:'#9fb3c6', dim:'#8ea3b6', glass:'236,244,252', ink:'#05070b', hot:'#ffffff'},
+  ice  : {hue:'#5f9fc0', dim:'#4f8ba6', glass:'169,220,242', ink:'#04080d', hot:'#e2f9ff'},
+  amber: {hue:'#b08248', dim:'#a3743a', glass:'242,196,137', ink:'#0b0703', hot:'#fff0cf'},
+  bone : {hue:'#938d7e', dim:'#8b8474', glass:'216,210,196', ink:'#080705', hot:'#fffaf0'},
+};
+
+/* Peak colour ramp: troughs sit at `hue`, crests run up to `hot`. Values
+   are quantised to 16 steps so we build ~16 colour strings a frame rather
+   than one per chunk. */
+const rgbCache = {}, mixCache = {};
+function toRgb(h){
+  return rgbCache[h] || (rgbCache[h] = [
+    parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)]);
+}
+function ramp(pal, t){
+  const q = Math.round(Math.max(0,Math.min(1,t))*15);
+  const key = pal.hue+q;
+  if (mixCache[key]) return mixCache[key];
+  const a = toRgb(pal.hue), b = toRgb(pal.hot), f = q/15;
+  return mixCache[key] =
+    'rgb('+(a[0]+(b[0]-a[0])*f|0)+','+(a[1]+(b[1]-a[1])*f|0)+','+(a[2]+(b[2]-a[2])*f|0)+')';
+}
+
+/* ------------------------------------------------------------- elements */
+const cv   = document.getElementById('cv');
+const ctx  = cv.getContext('2d');
+const off  = document.createElement('canvas');       // geometry buffer
+const octx = off.getContext('2d');
+const logEl= document.getElementById('log');
+const qEl  = document.getElementById('q');
+const fpsEl= document.getElementById('fps');
+
+let W=0,H=0,DPR=1;
+function resize(){
+  const r = cv.getBoundingClientRect();
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  const w = Math.max(1, Math.round(r.width  * DPR));
+  const h = Math.max(1, Math.round(r.height * DPR));
+  // assigning width/height clears the canvas, so only touch it on a real
+  // size change — otherwise any layout jiggle blanks a frame
+  if (w === W && h === H) return;
+  W = w; H = h;
+  cv.width=W; cv.height=H; off.width=W; off.height=H;
+}
+new ResizeObserver(resize).observe(document.getElementById('screen'));
+
+/* ================================================================ DRIVE
+   The single seam between "what is making noise" and "what is drawn".
+   Drive.level is 0..1.  Phase 2/3 just write to it from a real analyser. */
+const Drive = {
+  level:0,          // smoothed energy actually used by the geometry
+  target:0,         // what level is chasing
+  impulse:0,        // decaying token energy
+  phase:'idle',     // idle | thinking | speaking
+  extLevel:null,    // phase 3: real measured level; null = internal model
+
+  hit(weight){                       // one token arrived
+    this.impulse = Math.min(1.15, this.impulse + 0.22 + weight*0.030);
+    exciteBins(weight);              // and light up part of the spectrum
+  },
+  step(dt){
+    this.impulse *= Math.pow(0.055, dt);          // fast decay, frame-rate safe
+    if (this.extLevel != null)          this.target = this.extLevel;
+    else if (this.phase === 'speaking') this.target = this.impulse;
+    else if (this.phase === 'thinking') this.target = 0.13 + Math.sin(now*7.5)*0.045;
+    else                                this.target = 0.0;
+    // asymmetric slew: snap up, fall away slowly — this is what makes it
+    // read as a voice rather than as a meter. Real audio needs a quicker
+    // release or it smears over the gaps between words.
+    const up = this.extLevel != null ? 0.55 : 0.30;
+    const dn = this.extLevel != null ? 0.16 : 0.075;
+    const k = this.target > this.level ? up : dn;
+    this.level += (this.target - this.level) * (1 - Math.pow(1-k, dt*60));
+  }
+};
+
+/* ========================================== FIELD MODEL (stationary in x)
+   The earlier version was an oscilloscope: one sample pushed per frame
+   into a ring buffer, every point reading further back in time. That
+   makes the pattern TRANSLATE — data sweeping across a chart — which is
+   exactly the behaviour we don't want.
+
+   This model has no time axis along the line at all. Every x position is
+   a fixed place that moves up and down where it stands:
+
+     voice — standing modes. Spatial shape sin(mπu) is FIXED; only the
+             amplitude oscillates in time. Nodes never move, so the form
+             vibrates like a struck string rather than scrolling.
+     noise — value noise evaluated at (position, time). Position is the
+             lookup key, not an offset into history, so static shimmers
+             in place and agitated regions bloom and fade where they are.
+
+   Depth across the stack comes from a per-layer TEMPORAL phase offset
+   (the "layer phase" control): layers rise and fall out of sync with one
+   another, which ripples the sheet without any of it travelling.        */
+
+/* ---------------------------------------------------------- voice modes */
+const MODES = 10;
+const mW = new Float32Array(MODES);   // temporal rate, rad/s
+const mPh = new Float32Array(MODES);  // phase
+const mG = new Float32Array(MODES);   // static gain — low modes carry body
+const mD = new Float32Array(MODES);   // slow random gain drift
+const mA = new Float32Array(MODES);   // live amplitude
+for (let m=0;m<MODES;m++){
+  mW[m]  = 2.1 + m*1.85 + Math.random()*1.1;
+  mPh[m] = Math.random()*Math.PI*2;
+  // geometric falloff, not 1/m — a high mode packs many more wiggles into
+  // the same span, so a shallow rolloff lets it dominate and the form
+  // reads as scribble instead of a voice with body
+  mG[m]  = Math.pow(0.62, m);
+}
+
+function stepVoice(dt){
+  const e = Drive.level;
+  for (let m=0;m<MODES;m++){
+    mD[m] += ((Math.random()*2-1) - mD[m]) * 0.06;
+    // higher modes only wake up once there's real energy — consonants
+    const want = e * Math.pow(e, m*0.20) * mG[m] * (0.75 + 0.35*mD[m]);
+    mA[m] += (want - mA[m]) * (1 - Math.pow(0.02, dt));
+  }
+  stepBins(dt);
+}
+
+/* ------------------------------------------------------- formant bins
+   Standing modes alone give smooth swells — an ocean, not a voice. A
+   voice on a graph is SPIKES at particular places in the spectrum that
+   jump and fall away.
+
+   So: a bank of bins at fixed positions across the span. A token doesn't
+   raise the whole surface, it excites a cluster of bins — a formant —
+   which spikes and decays. Positions never move, so this stays in place;
+   what changes is which parts of the spectrum are lit. */
+const BINS = 30;
+const binU = new Float32Array(BINS);   // fixed position, 0..1
+const binA = new Float32Array(BINS);   // live height
+const binS = new Float32Array(BINS);   // sign — spikes punch both ways
+const binK = new Float32Array(BINS);   // per-bin decay
+for (let j=0;j<BINS;j++){
+  binU[j] = (j + 0.5)/BINS;
+  binS[j] = Math.random() < 0.5 ? -1 : 1;
+  binK[j] = 0.02 + Math.random()*0.16;
+}
+
+function exciteBins(weight){
+  const clusters = 1 + (Math.random()*3|0);
+  for (let q=0;q<clusters;q++){
+    const c = Math.random()*BINS|0;
+    const spread = 1 + (Math.random()*3|0);
+    for (let d=-spread; d<=spread; d++){
+      const j = c+d; if (j<0 || j>=BINS) continue;
+      const f = 1 - Math.abs(d)/(spread+1);
+      binA[j] = Math.min(2.4, binA[j] + (0.30 + weight*0.040)*f*(0.5+Math.random()));
+    }
+  }
+}
+
+function stepBins(dt){
+  for (let j=0;j<BINS;j++) binA[j] *= Math.pow(binK[j], dt*S.decay*3);
+  // thinking: sparse low flickers so the fabric isn't dead while it waits
+  if (Drive.phase === 'thinking' && Math.random() < 0.10){
+    binA[Math.random()*BINS|0] += 0.05 + Math.random()*0.10;
+  }
+}
+
+/* Spike field, rebuilt once per frame and shared by every line — so the
+   spikes line up through the depth of the fabric instead of each layer
+   inventing its own. Periodic, so rings can sample it too. */
+const FN = 256;
+const field = new Float32Array(FN);
+function buildField(){
+  field.fill(0);
+  const sig = Math.max(0.004, S.spike), inv = 1/(2*sig*sig);
+  const reach = Math.ceil(3*sig*FN);
+  for (let j=0;j<BINS;j++){
+    const a = binA[j]*binS[j];
+    if (Math.abs(a) < 0.002) continue;
+    const c = Math.round(binU[j]*FN);
+    for (let d=-reach; d<=reach; d++){
+      const du = d/FN;
+      field[((c+d)%FN+FN)%FN] += a * Math.exp(-du*du*inv);
+    }
+  }
+}
+const fieldAtU = u => field[((Math.round(u*FN)%FN)+FN)%FN];
+
+/* Spatial basis tables. Rebuilt only when the point count changes, so the
+   per-frame cost is one multiply-add per mode per point. */
+let obN = 0, obTab = null, rbN = 0, rbTab = null;
+function basisOpen(N){                       // fixed at both ends
+  if (obN === N) return obTab;
+  obN = N; obTab = new Float32Array(N*MODES);
+  for (let i=0;i<N;i++){
+    const u = i/(N-1);
+    for (let m=0;m<MODES;m++) obTab[i*MODES+m] = Math.sin((m+1)*Math.PI*u);
+  }
+  return obTab;
+}
+function basisRing(N){                       // periodic — no seam
+  if (rbN === N) return rbTab;
+  rbN = N; rbTab = new Float32Array((N+1)*MODES);
+  for (let i=0;i<=N;i++){
+    const a = (i/N)*Math.PI*2;
+    for (let m=0;m<MODES;m++) rbTab[i*MODES+m] = Math.cos((m+1)*a + mPh[m]);
+  }
+  return rbTab;
+}
+
+// per-line temporal coefficients; tOff is the layer's phase offset
+const co = new Float32Array(MODES);
+function lineCoef(tOff){
+  for (let m=0;m<MODES;m++) co[m] = mA[m]*Math.cos(mW[m]*(now+tOff) + mPh[m]);
+}
+function modeSum(tab, i){
+  let v = 0, b = i*MODES;
+  for (let m=0;m<MODES;m++) v += tab[b+m]*co[m];
+  return v;
+}
+
+/* ----------------------------------------------------- in-place noise
+   Hash-based value noise keyed on (lane, position, time). Nothing is
+   stored and nothing scrolls: ask for position i at time t and you get
+   that point's current value. Each line has its own lane, so lines stay
+   uncorrelated; each also gets a slowly moving envelope so some stretches
+   are agitated while others sit almost flat.                            */
+function hash3(a,b,c){
+  let h = Math.imul(a,374761393) + Math.imul(b,668265263) + Math.imul(c,1274126177);
+  h = Math.imul(h ^ (h>>>13), 1274126177);
+  return ((h ^ (h>>>16)) >>> 0) / 2147483648 - 1;      // -1..1
+}
+function tn(a,b,t,rate){                     // smooth in time, rough in space
+  const tt = t*rate, t0 = Math.floor(tt), f = tt-t0, s = f*f*(3-2*f);
+  return hash3(a,b,t0)*(1-s) + hash3(a,b,t0+1)*s;
+}
+function tn2(a,x,t,rate,sc){                 // smooth in both
+  const xx = x*sc, x0 = Math.floor(xx), fx = xx-x0, sx = fx*fx*(3-2*fx);
+  const tt = t*rate, t0 = Math.floor(tt), ft = tt-t0, st = ft*ft*(3-2*ft);
+  const v0 = hash3(a,x0,t0)*(1-sx)   + hash3(a,x0+1,t0)*sx;
+  const v1 = hash3(a,x0,t0+1)*(1-sx) + hash3(a,x0+1,t0+1)*sx;
+  return v0*(1-st) + v1*st;
+}
+function nzRaw(k,i){
+  const t = now, A = Math.imul(k,1013) + 7;
+  const fizz   = tn (A,   i, t, 20);                  // per-point static
+  const wander = tn2(A+1, i, t, 2.0,  0.14);          // smooth undulation
+  let   env    = 0.5 + 0.5*tn2(A+2, i, t, 0.45, 0.035);
+  env *= env;                                         // bias toward quiet
+  const laneE  = 0.30 + 0.70*(0.5 + 0.5*tn(A+3, 0, t, 0.30));
+  let cr = tn(A+4, i, t, 7);                          // sparse crackle
+  cr = Math.abs(cr) > 0.90 ? (cr - Math.sign(cr)*0.90)/0.10 : 0;
+  return (fizz*0.90 + wander*0.50) * (0.12 + env*1.8) * laneE
+       + cr * 1.1 * (0.35 + S.crackle);
+}
+// floor ducks under a loud voice rather than switching off
+function noiseAmp(){ return S.floor * 0.115 * (1 - 0.55*Math.min(1, Drive.level)); }
+function lineNoise(k,i){ return nzRaw(k,i) * noiseAmp(); }
+function ringNoise(k,i,N){
+  const w = i/N;                                      // crossfade seam shut
+  return (nzRaw(k,i)*(1-w) + nzRaw(k,0)*w) * noiseAmp();
+}
+
+/* ============================================================== TUMBLE
+   Continuous angular velocity on all three axes, re-aimed periodically —
+   so it drifts most of the time and visibly reorients now and then. */
+/* Axis note: internally Y is the vertical axis, so the "turntable spin"
+   is rotation about Y. Controls are labelled by BEHAVIOUR (spin / tilt /
+   roll) rather than by letter, because z-up and y-up conventions disagree
+   and the letters were causing confusion. */
+const ang = {x:0.187, y:0.55, z:0.0};
+const vel = {x:0.0004, y:0.0042, z:0.0000};
+const aim = {x:0.0004, y:0.0042, z:0.0000};
+let tiltAim = 0.187;
+let nextReorient = 6;
+
+function reorient(){
+  const r = () => (Math.random()-0.5);
+  if (S.tmode === 'turntable'){
+    // the platter never stops and never flips — only its rate drifts
+    aim.y = 0.0014 + Math.random()*0.0020;
+    aim.z = r()*0.0007;
+    aim.x = 0;
+    tiltAim = S.tilt * (0.72 + Math.random()*0.56);
+  } else {
+    const big = Math.random() < 0.55;
+    aim.y = 0.0030 + r()*0.010;
+    aim.x = r() * (big ? 0.016 : 0.0035);
+    aim.z = r() * (big ? 0.012 : 0.0022);
+  }
+  nextReorient = now + S.reorient*(0.6 + Math.random()*0.8);
+}
+
+function stepTumble(dt){
+  if (now > nextReorient) reorient();
+  const k = 1 - Math.pow(0.986, dt*60);
+  const s = S.tumble * dt * 60;
+
+  vel.x += (aim.x - vel.x)*k;
+  vel.y += (aim.y - vel.y)*k;
+  vel.z += (aim.z - vel.z)*k;
+
+  if (S.tmode === 'turntable'){
+    ang.y += vel.y * s * S.spin;             // the platter
+    ang.z += vel.z * s * S.roll;             // slow lean
+    // hold a shallow viewing height instead of integrating — this is what
+    // keeps it edge-on, a record seen from the side rather than from above
+    const want = tiltAim + Math.sin(now*0.19)*0.045*S.wobble
+                         + Math.sin(now*0.07+1.3)*0.030*S.wobble;
+    ang.x += (want - ang.x) * (1 - Math.pow(0.992, dt*60));
+  } else {
+    ang.x += vel.x*s; ang.y += vel.y*s; ang.z += vel.z*s;
+  }
+}
+
+/* ============================================================ GEOMETRY
+   Each builder returns an array of polylines; each polyline is a flat
+   array [x,y,z, x,y,z, …] in model space. */
+
+/* Layer phase offset, in seconds. Layers vibrate out of sync with each
+   other; nothing propagates along the line. */
+const phaseOf = k => k * S.lag * 0.012;
+/* Spikes stay at the same place in every layer but breathe out of phase
+   through the depth, so they read as one ridge running through the fabric
+   rather than as unrelated bumps per line. */
+const layerGain = k => 0.72 + 0.28*Math.cos(5.5*(now + phaseOf(k)*2.2));
+
+function buildStack(){
+  const N = 190, lines = S.lines;
+  const tab = basisOpen(N);
+  const out = [];
+  for (let k=0;k<lines;k++){
+    const kt  = lines>1 ? k/(lines-1) : .5;
+    const z   = (kt-0.5) * S.depth;
+    const fade= 1 - Math.abs(kt-0.5)*0.55;       // centre layers loudest
+    lineCoef(phaseOf(k));
+    const gain = layerGain(k);
+    const pts = new Float32Array(N*3), amp = new Float32Array(N);
+    for (let i=0;i<N;i++){
+      const it = i/(N-1);
+      // taper the ends so the static dissolves instead of stopping dead
+      const env = Math.pow(Math.sin(Math.PI*it), 1.35);
+      const v = modeSum(tab,i)*S.body*fade
+              + fieldAtU(it)*gain*env
+              + lineNoise(k,i)*env;
+      pts[i*3  ] = (it-0.5) * S.spread;
+      pts[i*3+1] = -v * 130 * S.amp;
+      pts[i*3+2] = z;
+      amp[i] = v;                     // pre-scale, so colour is scale-free
+    }
+    out.push({p:pts, a:amp});
+  }
+  return out;
+}
+
+function buildOrb(){
+  const rings = Math.max(3, S.lines), N = 96, R = S.spread*0.30;
+  const tab = basisRing(N);
+  const out = [];
+  for (let k=0;k<rings;k++){
+    const lat = (-0.5 + (k+0.5)/rings) * Math.PI;   // -pi/2 .. pi/2
+    const cy  = Math.sin(lat)*R, rr = Math.cos(lat)*R;
+    lineCoef(phaseOf(k));
+    const gain = layerGain(k);
+    const pts = new Float32Array((N+1)*3), amp = new Float32Array(N+1);
+    for (let i=0;i<=N;i++){
+      const a = (i/N)*Math.PI*2;
+      const s = modeSum(tab,i)*S.body + fieldAtU(i/N)*gain;
+      const v = s*Math.cos(lat) + ringNoise(k,i,N);
+      const r = rr + v * 60 * S.amp;
+      pts[i*3  ] = Math.cos(a)*r;
+      pts[i*3+1] = cy + s*10*S.amp;
+      pts[i*3+2] = Math.sin(a)*r * (S.depth/230);
+      amp[i] = v;
+    }
+    out.push({p:pts, a:amp});
+  }
+  return out;
+}
+
+/* DISC — concentric rings lying flat in the horizontal plane, displaced
+   vertically by the signal. Kept a true circle (no depth scaling) so the
+   viewing tilt alone flattens it into an ellipse: a record on a turntable,
+   seen from the side. */
+function buildDisc(){
+  const rings = Math.max(2, S.lines), N = 132, R = S.spread*0.44;
+  const tab = basisRing(N);
+  const out = [];
+  for (let k=0;k<rings;k++){
+    const rt = (k+1)/rings;
+    const rr = R*rt;
+    const lift = (rt-0.5) * S.depth * 0.10;        // very shallow cone
+    lineCoef(phaseOf(k));
+    const gain = layerGain(k);
+    const pts = new Float32Array((N+1)*3), amp = new Float32Array(N+1);
+    for (let i=0;i<=N;i++){
+      const a = (i/N)*Math.PI*2;
+      const s = modeSum(tab,i)*S.body + fieldAtU(i/N)*gain;
+      const v = s*(0.35 + 0.65*rt) + ringNoise(k,i,N);
+      pts[i*3  ] = Math.cos(a)*rr;
+      pts[i*3+1] = lift - v * 100 * S.amp;
+      pts[i*3+2] = Math.sin(a)*rr;
+      amp[i] = v;
+    }
+    out.push({p:pts, a:amp});
+  }
+  return out;
+}
+
+function buildKnot(){
+  const strands = Math.max(1, Math.round(S.lines/3)), N = 340;
+  const R = S.spread*0.22, out = [];
+  const tab = basisRing(N);
+  for (let k=0;k<strands;k++){
+    const off = k*0.13;
+    lineCoef(phaseOf(k));
+    const gain = layerGain(k);
+    const pts = new Float32Array(N*3), amp = new Float32Array(N);
+    for (let i=0;i<N;i++){
+      const t = (i/N)*Math.PI*2;
+      const s = modeSum(tab,i)*S.body + fieldAtU(i/N)*gain;
+      const v = s + ringNoise(k,i,N);
+      const w = 1 + v * 0.55 * S.amp;
+      const rr = (2 + Math.cos(3*t + off)) * R * 0.5 * w;
+      pts[i*3  ] = Math.cos(2*t + off) * rr;
+      pts[i*3+1] = Math.sin(2*t + off) * rr;
+      pts[i*3+2] = Math.sin(3*t + off) * R * (S.depth/230) * w;
+      amp[i] = v;
+    }
+    out.push({p:pts, a:amp});
+  }
+  return out;
+}
+
+/* ========================================================== PROJECTION */
+let cx_=1,sx_=0,cy_=1,sy_=0,cz_=1,sz_=0;
+function setAngles(){
+  cx_=Math.cos(ang.x); sx_=Math.sin(ang.x);
+  cy_=Math.cos(ang.y); sy_=Math.sin(ang.y);
+  cz_=Math.cos(ang.z); sz_=Math.sin(ang.z);
+}
+const P = {x:0,y:0,z:0};
+function rot(x,y,z){
+  const y1 =  y*cx_ - z*sx_,  z1 =  y*sx_ + z*cx_;
+  const x2 =  x*cy_ + z1*sy_, z2 = -x*sy_ + z1*cy_;
+  P.x = x2*cz_ - y1*sz_;
+  P.y = x2*sz_ + y1*cz_;
+  P.z = z2;
+}
+
+/* ============================================================== RENDER
+   Polylines are cut into chunks, each chunk sorted by depth and stroked
+   once. ~100–200 strokes/frame instead of thousands of segments, but you
+   still get real occlusion cueing where lines cross. */
+const CHUNK = 16;
+const chunks = [];
+
+function render(){
+  setAngles();
+  buildField();
+  const build = S.mode==='stack' ? buildStack
+              : S.mode==='disc'  ? buildDisc
+              : S.mode==='orb'   ? buildOrb : buildKnot;
+  const polys = build();
+
+  const cx = W/2, cy = H/2, f = S.persp*DPR;
+  const zoom = Math.min(W,H) / (760*DPR) * DPR;
+
+  chunks.length = 0;
+  for (const poly of polys){
+    const pts = poly.p, amp = poly.a;
+    const n = pts.length/3;
+    let seg=null, segZ=0, segA=0, segN=0;
+    for (let i=0;i<n;i++){
+      rot(pts[i*3], pts[i*3+1], pts[i*3+2]);
+      const sc = f/(f + P.z*zoom);
+      if (sc <= 0.02) { seg=null; continue; }
+      if (!seg){ seg=[]; segZ=0; segA=0; segN=0; chunks.push({p:seg, z:0, a:0}); }
+      seg.push(cx + P.x*sc*zoom, cy + P.y*sc*zoom);
+      segZ += P.z; segN++;
+      // depth averages, but heat takes the chunk's PEAK — averaging would
+      // dilute a sharp spike across its whole chunk and wash the colour out
+      const av = Math.abs(amp[i]); if (av > segA) segA = av;
+      const cur = chunks[chunks.length-1];
+      cur.z = segZ/segN; cur.a = segA;
+      if (seg.length/2 >= CHUNK && i < n-1){
+        const carry = [seg[seg.length-2], seg[seg.length-1]];
+        seg = carry.slice(); segZ = P.z; segA = av; segN = 1;
+        chunks.push({p:seg, z:P.z, a:segA});
+      }
+    }
+  }
+  chunks.sort((a,b)=> b.z - a.z);              // painter: far first
+
+  /* --- geometry buffer --- */
+  octx.clearRect(0,0,W,H);
+  octx.lineCap='round'; octx.lineJoin='round';
+  const pal = PALETTES[S.palette];
+  const halfD = Math.max(60, S.depth);
+  for (const c of chunks){
+    const p = c.p; if (p.length < 4) continue;
+    const d = Math.max(-1, Math.min(1, c.z/halfD));      // -1 near .. 1 far
+    const a = 0.92 - (d+1)*0.34;                          // near = brighter
+    const w = (1.55 - (d+1)*0.42) * S.lw * DPR;
+    // crest heat: troughs stay in the base hue, peaks run up toward `hot`
+    // and pick up extra alpha and weight so they read as energy, not just
+    // a different colour
+    let g = c.a / Math.max(0.05, S.hot);
+    g = Math.min(1, g); g = g*g*(3-2*g) * S.grad;
+    octx.globalAlpha = Math.min(1, Math.max(0.05, a) * (1 + 0.55*g));
+    octx.lineWidth   = Math.max(0.35*DPR, w * (1 + 0.5*g));
+    octx.strokeStyle = ramp(pal, g);
+    octx.beginPath();
+    octx.moveTo(p[0],p[1]);
+    for (let i=2;i<p.length;i+=2) octx.lineTo(p[i],p[i+1]);
+    octx.stroke();
+  }
+  octx.globalAlpha = 1;
+
+  /* --- composite: bloom, then sharp, then milk --- */
+  ctx.globalCompositeOperation='source-over';
+  ctx.fillStyle = pal.ink; ctx.fillRect(0,0,W,H);
+
+  if (S.bloom > 0.01 && S.blur > 0){
+    ctx.save();
+    ctx.filter = 'blur('+(S.blur*DPR)+'px)';
+    ctx.globalAlpha = Math.min(1, S.bloom*0.85);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.drawImage(off,0,0);
+    ctx.restore();
+  }
+  ctx.globalCompositeOperation='lighter';
+  ctx.globalAlpha = 0.92;
+  ctx.drawImage(off,0,0);
+
+  /* milk — the opaque-screen wash that sells it as glass, not vector art */
+  if (S.milk > 0.01){
+    const g = ctx.createRadialGradient(W*0.5,H*0.45,0, W*0.5,H*0.45, Math.max(W,H)*0.62);
+    g.addColorStop(0,   'rgba('+pal.glass+','+(0.052*S.milk)+')');
+    g.addColorStop(0.5, 'rgba('+pal.glass+','+(0.020*S.milk)+')');
+    g.addColorStop(1,   'rgba('+pal.glass+',0)');
+    ctx.globalCompositeOperation='lighter';
+    ctx.globalAlpha=1; ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  }
+
+  /* grain */
+  if (S.grain > 0.01 && grainPat){
+    ctx.globalCompositeOperation='overlay';
+    ctx.globalAlpha = 0.10*S.grain;
+    ctx.save();
+    ctx.translate((Math.random()*256|0)-256, (Math.random()*256|0)-256);
+    ctx.fillStyle = grainPat; ctx.fillRect(0,0,W+256,H+256);
+    ctx.restore();
+  }
+  ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
+}
+
+/* grain tile */
+let grainPat = null;
+(function makeGrain(){
+  const g = document.createElement('canvas'); g.width=g.height=256;
+  const c = g.getContext('2d'), d = c.createImageData(256,256);
+  for (let i=0;i<d.data.length;i+=4){
+    const v = 90 + (Math.random()*76|0);
+    d.data[i]=d.data[i+1]=d.data[i+2]=v; d.data[i+3]=255;
+  }
+  c.putImageData(d,0,0);
+  grainPat = ctx.createPattern(g,'repeat');
+})();
+
+/* ================================================================ LOOP */
+let now=0, last=performance.now(), frames=0, fpsT=0;
+function frame(t){
+  requestAnimationFrame(frame);
+  if (document.hidden) { last = t; return; }
+  let dt = (t-last)/1000; last=t;
+  if (dt > 0.1) dt = 0.1;               // tab-return guard
+  now += dt;
+
+  Speech.step();
+  Wake.step();
+  Listen.overrun();
+  stepTumble(dt);
+  stepVoice(dt);          // decays the bins…
+  Mic.step();             // …so the mic must overwrite them after, not before
+  Drive.step(dt);
+  render();
+
+  frames++; if (t-fpsT > 500){ fpsEl.textContent = Math.round(frames*1000/(t-fpsT))+' FPS';
+                               frames=0; fpsT=t; }
+}
+resize(); requestAnimationFrame(frame);
+
+/* ====================================================== TOKEN STREAMING
+   Phase 1 driver.  Streams canned text word-by-word; every token is an
+   impulse into Drive.  Punctuation buys a pause, which is most of what
+   makes the motion read as speech. */
+const REPLIES = [
+  "Interface check. I am rendering from a simulated token stream — no telemetry is attached to this surface. Every impulse you see in the geometry is one token arriving, nothing more.",
+  "Three forms are loaded. STACK is a scrolling waveform given depth: each line reads the same signal a few frames further back, so rotation turns the delay into a twist. ORB is a sphere of latitude rings displaced radially. KNOT is a parametric torus knot that breathes.",
+  "The tumble is continuous angular velocity on all three axes, re-aimed on an interval. It drifts most of the time, then visibly reorients — which is the behaviour you described, rather than a fixed spin.",
+  "Depth cueing is painter's-algorithm only. Chunks are sorted back to front and stroked with alpha and weight falling off with distance, so crossings occlude correctly without any real z-buffer.",
+  "Speech synthesis is live. The browser engine will not route through an audio analyser, so there is no real envelope to read — what it gives is one boundary event per word. Each word is split into its estimated syllables and pulsed at speech rate, which is what you are watching now.",
+  "The microphone is live and the transcription is local. Your audio is recorded here, posted to this same server, and turned into text by a Whisper model running on the box itself — none of it goes to a third party. The spikes you see while you talk are your real formants, not an estimate.",
+];
+let replyIx = 0;
+let streamTimer = null;
+
+/* ================================================= PHASE 3 — MIC DRIVE
+   The first source that isn't estimated. Phases 1 and 2 had to *invent* an
+   envelope; here we measure one.
+
+     level  — RMS of the time-domain buffer, written straight to
+               Drive.extLevel so the geometry's amplitude is real
+     spikes — the FFT is folded onto the formant bins, log-spaced across
+               90 Hz .. 4.2 kHz (where speech actually lives), taking the
+               PEAK in each band rather than the mean so formants stay
+               sharp. binA is what buildField() already reads, so the
+               spikes now sit at genuine spectral positions instead of
+               being scattered by exciteBins().
+
+   getUserMedia needs a secure context — over plain HTTP the button is
+   disabled and says so. Browser AGC/denoise are switched off: they are
+   tuned to flatten exactly the dynamics we want to see.               */
+const Mic = {
+  ok: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+  active:false, ctx:null, node:null, analyser:null, stream:null,
+  td:null, fd:null, lo:null, hi:null,
+
+  async start(){
+    if (this.active) return;
+    if (!window.isSecureContext){
+      micNote('BLOCKED: mic needs a secure origin. Use the https:// URL (port 9701).');
+      return;
+    }
+    if (!this.ok){ micNote('this browser exposes no getUserMedia'); return; }
+    try{
+      /* I originally forced all processing OFF to keep the dynamics the
+         visualiser feeds on. That is the wrong default once a human is
+         actually being transcribed: with auto-gain off, a normally-spoken
+         word arrives quiet and the model mishears it, so you end up having
+         to stress every word. CLEAN turns the browser's gain and denoise
+         back on — much better recognition, slightly flatter geometry.   */
+      const clean = S.micdsp !== 'raw';
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        audio: clean
+          ? { echoCancellation:true,  noiseSuppression:true,  autoGainControl:true }
+          : { echoCancellation:false, noiseSuppression:false, autoGainControl:false }
+      });
+    }catch(e){
+      micNote('mic refused: ' + (e && e.name ? e.name : e) +
+              (e && e.name === 'NotAllowedError' ? ' — permission denied in the browser' : ''));
+      return;
+    }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    this.ctx = new AC();
+    if (this.ctx.state === 'suspended') await this.ctx.resume();
+    this.node = this.ctx.createMediaStreamSource(this.stream);
+    this.analyser = this.ctx.createAnalyser();
+    this.analyser.fftSize = 2048;
+    this.analyser.smoothingTimeConstant = 0.55;
+    this.node.connect(this.analyser);        // NOT to destination — no echo
+    this.td = new Uint8Array(this.analyser.fftSize);
+    this.fd = new Uint8Array(this.analyser.frequencyBinCount);
+
+    // precompute the log-spaced band edges once
+    const nyq = this.ctx.sampleRate/2, n = this.analyser.frequencyBinCount;
+    const f0 = 90, f1 = 4200;
+    this.lo = new Int32Array(BINS); this.hi = new Int32Array(BINS);
+    for (let j=0;j<BINS;j++){
+      const fa = f0*Math.pow(f1/f0, j/BINS);
+      const fb = f0*Math.pow(f1/f0, (j+1)/BINS);
+      this.lo[j] = Math.max(0, Math.floor(fa/nyq*n));
+      this.hi[j] = Math.min(n, Math.max(this.lo[j]+1, Math.ceil(fb/nyq*n)));
+    }
+    this.active = true;
+    this.floor = -1;                                    // reseed per session
+    Drive.phase = 'speaking';
+    micNote('live · ' + Math.round(this.ctx.sampleRate/1000) + ' kHz · ' +
+            (this.stream.getAudioTracks()[0] || {}).label);
+    syncMic();
+  },
+
+  stop(){
+    this.active = false;
+    Drive.extLevel = null;
+    Drive.phase = 'idle';
+    try { if (this.stream) this.stream.getTracks().forEach(t=>t.stop()); } catch(e){}
+    try { if (this.ctx) this.ctx.close(); } catch(e){}
+    this.stream = null; this.ctx = null; this.analyser = null;
+    micNote('off');
+    syncMic();
+  },
+
+  open:false,        // push-to-talk gate; ignored when S.ptt is off
+  raw:0, level:0, floor:0.010, thresh:0.010, vadOpen:false,
+
+  step(){
+    if (!this.active || !this.analyser) return;
+    // While it is speaking, its own voice is coming out of the
+    // speakers and back into the mic. Hand the geometry back to the TTS
+    // driver rather than letting it chase its own echo.
+    if (Speech.active){ Drive.extLevel = null; return; }
+    // Push-to-talk: key up means the mic is closed, so hand the geometry
+    // back to the idle model rather than showing room noise.
+    if (S.ptt && !this.open){ Drive.extLevel = null; return; }
+
+    this.analyser.getByteTimeDomainData(this.td);
+    let sum = 0;
+    for (let i=0;i<this.td.length;i++){ const v = (this.td[i]-128)/128; sum += v*v; }
+    const raw = Math.sqrt(sum/this.td.length) * S.micgain * 3.2;
+    this.raw = raw;                                     // pre-gate, for metering
+
+    /* The visual gate and the speech detector must NOT be the same number.
+       Sharing one made the gate do two jobs: raise it so the utterance
+       actually ends, and you then have to shout to be heard at all.
+
+       So the geometry keeps the user's gate, while detection uses a
+       threshold that floats just above the measured room floor. The floor
+       falls quickly toward quiet and rises very slowly, so it settles on
+       the noise level rather than on your voice. */
+    if (this.floor < 0) this.floor = raw;               // seed from the room
+    const a = raw < this.floor ? 0.020 : 0.0030;        // fall fast, rise slow
+    this.floor += (raw - this.floor) * a;
+    this.thresh = Math.max(0.006, this.floor*2.2 + 0.004);
+    this.vadOpen = raw > this.thresh;
+
+    const lvl = raw < S.micgate ? 0 : raw;              // visual gate only
+    this.level = lvl;
+    Drive.extLevel = Math.min(1.25, lvl);
+    Listen.feed(raw, this.vadOpen);
+    meter();
+
+    this.analyser.getByteFrequencyData(this.fd);
+    const gateOpen = lvl > 0;
+    for (let j=0;j<BINS;j++){
+      let m = 0;
+      for (let i=this.lo[j]; i<this.hi[j]; i++) if (this.fd[i] > m) m = this.fd[i];
+      const v = gateOpen ? (m/255) * S.micgain : 0;
+      binA[j] += (v*1.9 - binA[j]) * 0.40;              // smooth, keep punch
+    }
+  }
+};
+/* Live level readout. The gate is the single most important number for
+   hands-free to work at all, and it is unguessable without seeing the
+   room's actual noise floor — so show it. */
+let _meterAt = 0;
+function meter(){
+  if (now - _meterAt < 0.1) return;
+  _meterAt = now;
+  const el = document.getElementById('miclevel');
+  if (!el) return;
+  const raw = Mic.raw || 0;
+  const open = raw >= S.micgate;
+  el.style.whiteSpace = 'pre-line';
+  const bars = Math.min(20, Math.round(raw*40));
+  el.textContent =
+    'level ' + raw.toFixed(3) +
+    '  [' + '#'.repeat(bars).padEnd(20,'·') + ']\n' +
+    'voice thresh ' + (Mic.thresh||0).toFixed(3) +
+    ' (room ' + (Mic.floor||0).toFixed(3) + ')  ' +
+    (Mic.vadOpen ? (Listen.sawSpeech ? 'SPEAKING' : 'voice') : 'quiet') +
+    '   ·   visual gate ' + S.micgate.toFixed(3) + (open ? ' open' : '');
+}
+
+/* Measure the room for 2s and put the gate just above it. */
+function calibrate(){
+  if (!Mic.active){ micNote('press TALK first, then calibrate'); return; }
+  let peak = 0, n = 0;
+  micNote('calibrating — stay quiet…');
+  const id = setInterval(()=>{
+    peak = Math.max(peak, Mic.raw || 0); n++;
+    if (n >= 40){
+      clearInterval(id);
+      const g = Math.min(0.15, peak*1.6 + 0.004);
+      S.micgate = g;
+      const sl = document.getElementById('s_micgate');
+      if (sl){ sl.value = g; sl.dispatchEvent(new Event('input')); }
+      micNote('gate set to ' + g.toFixed(3) + ' (room floor ' + peak.toFixed(3) + ')');
+    }
+  }, 50);
+}
+
+function micNote(m){ const el = document.getElementById('micnote'); if (el) el.textContent = m; }
+
+/* ============================================== PHASE 3b — SPEECH TO TEXT
+   Local. Audio is recorded in the browser and POSTed to /stt on this same
+   origin, where faster-whisper transcribes it on the server itself. Nothing
+   leaves the machine — deliberately NOT the browser's SpeechRecognition,
+   which in Chrome ships your audio to Google. That matters here because the
+   whole point is reading hostnames, addresses and device names aloud.
+
+   Voice activity detection reuses the mic's own RMS: the noise gate that
+   already decides whether the geometry reacts doubles as the "is anyone
+   talking" test, so there is only one threshold to tune. The recorder runs
+   continuously and is cut ~0.9s after speech stops; whisper's own VAD trims
+   the leading silence, so nothing gets clipped at the start of a word.    */
+const Listen = {
+  on:false, paused:false, busy:false,
+  mr:null, mime:'', chunks:[], sawSpeech:false, quietAt:0, armedAt:0,
+
+  supported(){
+    return typeof MediaRecorder !== 'undefined' && typeof fetch === 'function';
+  },
+
+  start(stream){
+    if (this.on || !stream) return;
+    if (!this.supported()){ micNote('no MediaRecorder in this browser'); return; }
+    this.on = true;
+    this._arm(stream);
+    syncTalk();
+  },
+
+  _arm(stream){
+    const want = ['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4'];
+    this.mime = want.find(t => MediaRecorder.isTypeSupported(t)) || '';
+    let mr;
+    try { mr = new MediaRecorder(stream, this.mime ? {mimeType:this.mime} : undefined); }
+    catch(e){ micNote('recorder failed: ' + e.message); this.on = false; syncTalk(); return; }
+    this.chunks = []; this.sawSpeech = false; this.quietAt = 0; this.armedAt = now;
+    mr.ondataavailable = e => { if (e.data && e.data.size) this.chunks.push(e.data); };
+    mr.onstop = () => this._flush();
+    try { mr.start(); } catch(e){ micNote('recorder start failed: ' + e.message); }
+    this.mr = mr;
+  },
+
+  _flush(){
+    const had = this.sawSpeech;
+    const blob = new Blob(this.chunks, {type: this.mime || 'audio/webm'});
+    this.chunks = [];
+    // re-arm straight away so the next utterance isn't missed
+    if (this.on && !this.paused && Mic.stream) this._arm(Mic.stream);
+    if (had && blob.size > 2000) this._send(blob);
+  },
+
+  async _send(blob){
+    this.busy = true; micNote('transcribing…'); syncTalk();
+    try{
+      /* No hint. Biasing the decoder toward the wake word — by either
+         initial_prompt or hotwords — makes it treat the word as context
+         already given and OMIT it from the transcript, which silently
+         breaks the matching it was supposed to help. Measured both ways.
+         The endpoint still accepts ?hint= for domain vocabulary later. */
+      const t0 = performance.now();
+      const r = await fetch('stt?model=' + encodeURIComponent(S.sttmodel), {
+        method:'POST',
+        headers:{'Content-Type': blob.type || 'audio/webm'},
+        body: blob
+      });
+      const j = await r.json();
+      if (j.error)      micNote('stt error: ' + j.error);
+      else if (j.text)  {
+        if (Learn.on){ Learn.take(j.text); }
+        else {
+            const trip = Math.round(performance.now() - t0);
+          micNote('heard "' + j.text + '"  ·  ' + j.ms + 'ms decode, ' +
+                  trip + 'ms round trip, +' + Math.round(S.hangover*1000) + 'ms silence wait');
+          const act = Wake.gate(j.text);
+          if (act) submit(act);
+        }
+      }
+      else              micNote('nothing recognised — try speaking a little louder');
+    }catch(e){
+      micNote('stt request failed: ' + e.message);
+    }
+    this.busy = false; syncTalk();
+  },
+
+  /* --- push-to-talk: the key decides the boundaries, not the VAD --- */
+  beginPTT(){
+    if (!this.on || this.paused || !Mic.stream) return;
+    this._arm(Mic.stream);            // fresh recording, no stale silence
+  },
+  endPTT(heldFor){
+    if (!this.on || this.paused || !this.mr) return;
+    if (heldFor < 0.3){               // stray tap, not an utterance
+      this.sawSpeech = false;
+      this._cut();
+      micNote('too short — hold SPACE while you speak');
+      return;
+    }
+    this.sawSpeech = true;            // they held the key; send it regardless
+    this._cut();
+  },
+
+  /* fed from Mic.step with the gated level: >0 means the gate is open */
+  feed(raw, speaking){
+    if (!this.on || this.paused || !this.mr) return;
+    if (S.ptt) return;                // key edges do the cutting instead
+    if (speaking){
+      this.sawSpeech = true; this.quietAt = 0;
+      return;
+    }
+    if (this.sawSpeech){
+      if (!this.quietAt) this.quietAt = now;
+      else if (now - this.quietAt > S.hangover) this._cut();   // end of utterance
+    } else if (now - this.armedAt > 20){
+      this._cut();                                         // bin idle silence
+    }
+  },
+
+  /* Safety net. If the room noise floor sits above the gate, the level
+     never returns to zero, the utterance never "ends", and nothing is ever
+     sent — the geometry reacts happily while it stays silent. Cut
+     regardless after MAXLEN so speech always gets through. */
+  MAXLEN: 12,
+  overrun(){
+    if (!this.on || this.paused || !this.mr || S.ptt) return;
+    if (this.sawSpeech && now - this.armedAt > this.MAXLEN){
+      micNote('long utterance — sending. If this keeps happening, raise the noise gate.');
+      this._cut();
+    }
+  },
+
+  _cut(){ this.quietAt = 0; try { this.mr.stop(); } catch(e){} },
+
+  stop(){
+    this.on = false; this.paused = false;
+    if (typeof Wake !== 'undefined') Wake.awake = false;
+    if (typeof PTT !== 'undefined'){ PTT.held = false; Mic.open = false; }
+    try { if (this.mr) this.mr.stop(); } catch(e){}
+    this.mr = null; this.chunks = [];
+    syncTalk();
+  },
+
+  // don't record its own voice coming back through the speakers
+  pause(){
+    if (this.on && !this.paused){
+      this.paused = true;
+      try { if (this.mr) this.mr.stop(); } catch(e){}
+      this.mr = null;
+    }
+  },
+  resume(){
+    if (this.on && this.paused){
+      this.paused = false;
+      if (Mic.stream) this._arm(Mic.stream);
+    }
+  }
+};
+
+/* ============================================ NEURAL VOICE (server-side)
+   Browser speechSynthesis uses whatever the OS ships, which is mostly old
+   concatenative engines — hence the machine-like sound. This plays a neural
+   voice rendered on the server instead.
+
+   It also fixes something phase 2 could only fake: because the audio goes
+   through Web Audio, we finally get a REAL analyser on its own
+   voice. The geometry stops being driven by estimated syllables and starts
+   being driven by the actual waveform and spectrum, exactly like the mic. */
+const Play = {
+  available:false, probed:false, voices:[],
+  ctx:null, an:null, src:null, gain:null, td:null, fd:null, lo:null, hi:null,
+  playing:false, startedAt:0, dur:1, body:null, caret:null, full:'', onDone:null,
+
+  async probe(){
+    try{
+      const r = await fetch('tts/voices', {cache:'no-store'});
+      const j = await r.json();
+      this.voices = j.voices || [];
+      this.available = this.voices.length > 0;
+      if (!S.ttsvoice && this.voices.length) S.ttsvoice = this.voices[0];
+    }catch(e){ this.available = false; }
+    this.probed = true;
+    paintVoiceList();
+    return this.available;
+  },
+
+  _audio(){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!this.ctx) this.ctx = new AC();
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    return this.ctx;
+  },
+
+  async start(text, r, done){
+    this.body = r.body; this.caret = r.caret; this.full = text; this.onDone = done;
+    try{
+      const resp = await fetch('tts?voice=' + encodeURIComponent(S.ttsvoice || '') +
+                               '&rate=' + encodeURIComponent(S.vrate), {
+        method:'POST', headers:{'Content-Type':'text/plain; charset=utf-8'}, body:text
+      });
+      if (!resp.ok){ throw new Error('tts ' + resp.status); }
+      const buf = await resp.arrayBuffer();
+      const ctx = this._audio();
+      const audio = await ctx.decodeAudioData(buf);
+
+      const an = ctx.createAnalyser();
+      an.fftSize = 2048; an.smoothingTimeConstant = 0.5;
+      const src = ctx.createBufferSource();
+      src.buffer = audio;
+      src.connect(an); an.connect(ctx.destination);
+
+      this.an = an; this.src = src;
+      this.td = new Uint8Array(an.fftSize);
+      this.fd = new Uint8Array(an.frequencyBinCount);
+      const nyq = ctx.sampleRate/2, n = an.frequencyBinCount, f0 = 90, f1 = 4200;
+      this.lo = new Int32Array(BINS); this.hi = new Int32Array(BINS);
+      for (let j=0;j<BINS;j++){
+        this.lo[j] = Math.max(0, Math.floor(f0*Math.pow(f1/f0, j/BINS)/nyq*n));
+        this.hi[j] = Math.min(n, Math.max(this.lo[j]+1,
+                       Math.ceil(f0*Math.pow(f1/f0, (j+1)/BINS)/nyq*n)));
+      }
+
+      this.dur = audio.duration || 1;
+      this.startedAt = now;
+      this.playing = true;
+      Drive.phase = 'speaking';
+      src.onended = ()=> this.finishUp();
+      src.start();
+    }catch(e){
+      note('neural voice failed (' + e.message + ') — falling back to the browser voice');
+      S.ttsengine = 'browser'; syncSeg('ttsengine');
+      Speech.local = false;
+      Speech.next();                        // retry through the browser engine
+    }
+  },
+
+  step(){
+    if (!this.playing || !this.an) return;
+
+    this.an.getByteTimeDomainData(this.td);
+    let sum = 0;
+    for (let i=0;i<this.td.length;i++){ const v = (this.td[i]-128)/128; sum += v*v; }
+    Drive.extLevel = Math.min(1.25, Math.sqrt(sum/this.td.length) * 3.4);
+
+    this.an.getByteFrequencyData(this.fd);
+    for (let j=0;j<BINS;j++){
+      let m = 0;
+      for (let i=this.lo[j]; i<this.hi[j]; i++) if (this.fd[i] > m) m = this.fd[i];
+      binA[j] += ((m/255)*1.9 - binA[j]) * 0.40;
+    }
+
+    // reveal the transcript across the known audio duration
+    const p = Math.min(1, (now - this.startedAt)/this.dur);
+    if (this.body) this.body.textContent = this.full.slice(0, Math.ceil(p*this.full.length));
+  },
+
+  finishUp(){
+    this.playing = false;
+    Drive.extLevel = null;
+    if (this.body) this.body.textContent = this.full;
+    if (this.caret) this.caret.remove();
+    const d = this.onDone; this.onDone = null;
+    if (d) d();
+  },
+
+  stop(){
+    if (this.src){ try { this.src.onended = null; this.src.stop(); } catch(e){} }
+    this.src = null; this.an = null; this.playing = false;
+    Drive.extLevel = null;
+  }
+};
+
+/* ================================================== PHASE 2 — TTS DRIVE
+   speechSynthesis will not route through a Web Audio analyser, so there is
+   no real envelope to read. What it does give is a `boundary` event per
+   word. That's too coarse on its own — one pulse per word looks robotic —
+   so each word is broken into its estimated syllables and pulsed at speech
+   rate. The geometry never learns this isn't a real envelope: it still only
+   sees Drive.hit() and Drive.level, exactly as in phase 1.
+
+   Safari (and some remote voices elsewhere) fire no boundary events at all.
+   If none arrives shortly after speech starts, we fall back to a synthetic
+   envelope timed from the text length, and reveal the transcript
+   proportionally instead of per-word.                                   */
+function syllables(w){
+  w = w.toLowerCase().replace(/[^a-z]/g,'');
+  if (!w) return 1;
+  const m = w.match(/[aeiouy]+/g);
+  let n = m ? m.length : 1;
+  if (w.length > 3 && /e$/.test(w) && n > 1) n--;    // silent trailing e
+  return Math.max(1, Math.min(7, n));
+}
+
+const Speech = {
+  supported: typeof window !== 'undefined' && 'speechSynthesis' in window,
+  voices: [], voice: null,
+  active: false, synthetic: false,
+  parts: [], pi: 0, base: 0, partLen: 0,
+  body: null, caret: null, full: '',
+  syl: 0, nextAt: 0, gap: 0.18,
+  sawBoundary: false, fallbackAt: 0, startedAt: 0, synthDur: 1,
+
+  speak(text, r){
+    this.stop();
+    this.full = text; this.body = r.body; this.caret = r.caret;
+    // chunk by sentence: long single utterances get truncated in Chrome
+    this.parts = text.match(/[^.!?]+[.!?]*\s*/g) || [text];
+    this.pi = 0; this.base = 0;
+    this.active = true;
+    Listen.pause();
+    Drive.phase = 'thinking';
+    if (S.ttsengine === 'local' && Play.available){
+      this.local = true;
+      Play.start(text, r, ()=> this.finish());
+      return;
+    }
+    this.local = false;
+    /* speak() MUST be called synchronously inside the user gesture that
+       triggered it. Chrome gates speechSynthesis on user activation at the
+       moment of the call, and a priming utterance does not buy permission
+       for a later one — so the old setTimeout "thinking" pause meant every
+       utterance was silently dropped. The thinking beat now comes for free
+       from the engine's own start latency: phase stays 'thinking' until
+       onstart fires. */
+    this.next();
+  },
+
+  next(){
+    if (this.pi >= this.parts.length){ this.finish(); return; }
+    const part = this.parts[this.pi];
+    this.partLen = part.length;
+    const u = new SpeechSynthesisUtterance(part);
+    if (this.voice) u.voice = this.voice;
+    u.rate = S.vrate; u.pitch = S.vpitch;
+
+    u.onboundary = e => {
+      if (e.name && e.name !== 'word') return;
+      if (!this.sawBoundary) ev('boundary');
+      this.sawBoundary = true; this.synthetic = false;
+      const ci = e.charIndex || 0;
+      const w  = (part.slice(ci).match(/^\S+/) || [''])[0];
+      this.reveal(this.base + ci + w.length);
+      this.syl    = syllables(w);
+      this.gap    = Math.max(0.055, 0.185 / S.vrate);
+      this.nextAt = now;
+    };
+    const advance = () => {
+      if (!this.active) return;
+      this.base += part.length; this.pi++; this.next();
+    };
+    u.onend = advance;
+    u.onerror = e => {
+      const why = (e && e.error) || 'unknown';
+      ev('ERROR:' + why);
+      if (why === 'not-allowed')
+        note('BLOCKED: the browser wants a real click on the page first. Press TEST VOICE.');
+      else if (why !== 'interrupted' && why !== 'canceled')
+        note('speech error: ' + why);
+      advance();
+    };
+    // arm the fallback from when audio actually STARTS, not from speak():
+    // queueing delay would otherwise burn the window and fire a spurious
+    // burst of synthetic pulses before the first real boundary lands
+    u.onstart = () => {
+      ev('start');
+      Drive.phase = 'speaking';
+      this.startedAt = now;
+      this.fallbackAt = now + 0.9;
+    };
+
+    this.startedAt = now;
+    this.sawBoundary = false;
+    this.fallbackAt  = now + 3.0;      // generous until onstart tightens it
+    // ~13 chars/sec of speech at rate 1.0
+    this.synthDur = Math.max(0.4, part.length / (13 * S.vrate));
+    if (this.pi === 0) evLog.length = 0;
+    ev('speak(' + this.pi + ')');
+    try { window.speechSynthesis.speak(u); }
+    catch(err){ this.goSynthetic(); }
+  },
+
+  goSynthetic(){
+    if (this.synthetic) return;
+    this.synthetic = true;
+    // onstart may never have fired (blocked, or a voice that reports
+    // nothing), so drop into 'speaking' here or the pulses do nothing
+    Drive.phase = 'speaking';
+    this.gap = Math.max(0.055, 0.185 / S.vrate);
+    this.nextAt = now;
+    note('no boundary events from this voice — using estimated envelope');
+  },
+
+  reveal(n){
+    if (!this.body) return;
+    this.body.textContent = this.full.slice(0, Math.min(n, this.full.length));
+    logEl.scrollTop = logEl.scrollHeight;
+  },
+
+  step(){
+    if (!this.active) return;
+    if (this.local){ Play.step(); return; }
+
+    if (!this.sawBoundary && !this.synthetic && now > this.fallbackAt) this.goSynthetic();
+
+    if (this.synthetic){
+      if (now >= this.nextAt){
+        Drive.hit(3 + Math.random()*5);
+        this.nextAt = now + this.gap*(0.7 + Math.random()*0.7);
+      }
+      const p = Math.min(1, (now - this.startedAt)/this.synthDur);
+      this.reveal(this.base + Math.floor(p*this.partLen));
+    } else {
+      // one pulse per estimated syllable, spread across the word
+      while (this.syl > 0 && now >= this.nextAt){
+        Drive.hit(3 + Math.random()*5);
+        this.syl--;
+        this.nextAt += this.gap*(0.75 + Math.random()*0.5);
+      }
+    }
+  },
+
+  finish(){
+    this.active = false; this.synthetic = false; this.syl = 0; this.local = false;
+    Drive.extLevel = null;
+    Listen.resume();
+    this.reveal(this.full.length);
+    if (this.caret) this.caret.remove();
+    Drive.phase = 'idle';
+  },
+
+  stop(){
+    const was = this.active;
+    this.active = false; this.syl = 0; this.local = false;
+    Play.stop();
+    if (was) Listen.resume();
+    // cancel() on an idle queue can itself wedge Chrome — only call it when
+    // there is actually something to cancel
+    if (!this.supported) return;
+    try {
+      const ss = window.speechSynthesis;
+      if (ss.speaking || ss.pending || ss.paused) ss.cancel();
+    } catch(e){}
+  }
+};
+window.addEventListener('beforeunload', ()=>{ Speech.stop(); Mic.stop(); Listen.stop(); });
+
+/* Browsers gate speechSynthesis on user activation at the moment speak() is
+   called. No priming utterance here: a queued blank utterance can wedge
+   Chrome's speech queue and kill every later one, which is a worse failure
+   than the one it prevents. The real fix is calling speak() synchronously
+   inside the gesture; this flag exists only for the DIAGNOSE readout. */
+let ttsUnlocked = false;
+function unlockTTS(){ ttsUnlocked = true; }
+['pointerdown','keydown','touchstart'].forEach(ev =>
+  window.addEventListener(ev, unlockTTS, true));
+
+function note(msg){
+  const el = document.getElementById('ttsnote');
+  if (el) el.textContent = msg;
+}
+
+/* Rolling lifecycle trace, so it's visible where speech dies without
+   anyone needing to open devtools. */
+const evLog = [];
+function ev(s){
+  evLog.push(s);
+  if (evLog.length > 7) evLog.shift();
+  note(evLog.join('  →  '));
+}
+
+function addMsg(who, text){
+  const el = document.createElement('div');
+  el.className = 'msg ' + who;
+  el.innerHTML = '<span class="who">'+(who==='you'?'operator':'resonance')+'</span>'+
+                 '<span class="body"></span>';
+  el.querySelector('.body').textContent = text;
+  logEl.appendChild(el);
+  logEl.scrollTop = logEl.scrollHeight;
+  return el.querySelector('.body');
+}
+
+function newReply(){
+  const body = addMsg('ai','');
+  const caret = document.createElement('span'); caret.className='caret';
+  body.parentElement.appendChild(caret);
+  return {body, caret};
+}
+
+/* One entry point; the source decides who drives the geometry.
+   Muting only silences the VOICE — the reply still streams and the geometry
+   still reacts, so the surface never looks dead just because audio is off. */
+let muted = false;
+function respond(text){
+  clearTimeout(streamTimer);
+  Speech.stop();
+  const r = newReply();
+  if (S.src === 'tts' && Speech.supported && !muted) Speech.speak(text, r);
+  else stream(text, r);
+}
+
+function stream(text, r){
+  clearTimeout(streamTimer);
+  Drive.phase = 'thinking';
+  const body = r.body, caret = r.caret;
+
+  const toks = text.match(/\S+\s*/g) || [];
+  let i = 0;
+  const think = 500 + Math.random()*700;
+
+  setTimeout(()=>{
+    Drive.phase = 'speaking';
+    (function next(){
+      if (i >= toks.length){
+        caret.remove();
+        Drive.phase = 'idle';
+        return;
+      }
+      const tk = toks[i++];
+      body.textContent += tk;
+      Drive.hit(tk.trim().length);
+      logEl.scrollTop = logEl.scrollHeight;
+
+      let d = S.rate * (0.6 + Math.random()*0.9);
+      if (/[,;:]\s*$/.test(tk)) d += S.rate*3.5;      // breath
+      if (/[.!?]\s*$/.test(tk)) d += S.rate*7;        // full stop
+      streamTimer = setTimeout(next, d);
+    })();
+  }, think);
+}
+
+/* The one place a real assistant gets wired in. DEMO answers from built-in
+   text so the whole chain — mic, VAD, transcription, wake word, speech,
+   geometry — can be commissioned and proven BEFORE any backend exists, and
+   flipped back to afterwards to isolate whether a fault is ours or theirs. */
+async function askBackend(text){
+  if (S.backend === 'demo') return REPLIES[replyIx++ % REPLIES.length];
+  return REPLIES[replyIx++ % REPLIES.length];     // TODO: real adapter
+}
+
+function submit(text){
+  addMsg('you', text);
+  qEl.value = '';
+  askBackend(text).then(reply => respond(reply));
+}
+qEl.addEventListener('keydown', e=>{
+  if (e.key !== 'Enter') return;
+  const v = qEl.value.trim(); if (!v) return;
+  submit(v);
+});
+
+/* ================================================================== RIG */
+const rig = document.getElementById('rig');
+
+/* ---- rig navigation: tabs, collapsible topics, live filter ----
+   Collapse state is remembered per section and survives tab switches and
+   filtering. Filtering opens matches temporarily without destroying what
+   you had folded away. */
+const groups = [...rig.querySelectorAll('.grp')];
+const shut = new Map();                 // section -> folded?
+let rigTab = 'look';
+
+// start folded, except the first topic of each tab, so the panel opens small
+const seen = new Set();
+groups.forEach(g=>{
+  const first = !seen.has(g.dataset.tab);
+  seen.add(g.dataset.tab);
+  shut.set(g, !first);
+});
+
+const findEl = document.getElementById('rigfind');
+
+function renderRig(){
+  const q = (findEl.value || '').trim().toLowerCase();
+  groups.forEach(g=>{
+    const show = q ? g.textContent.toLowerCase().includes(q) : g.dataset.tab === rigTab;
+    g.hidden = !show;
+    // while filtering, matches are forced open; otherwise honour the fold
+    g.classList.toggle('shut', q ? false : !!shut.get(g));
+  });
+}
+
+function showTab(t){
+  rigTab = t;
+  rig.querySelectorAll('.tabs button').forEach(b=> b.classList.toggle('on', b.dataset.tab===t));
+  renderRig();
+  rig.scrollTop = 0;
+}
+
+rig.querySelector('.tabs').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if (b) showTab(b.dataset.tab);
+});
+
+groups.forEach(g=>{
+  g.querySelector('h4').addEventListener('click', ()=>{
+    shut.set(g, !shut.get(g));
+    renderRig();
+  });
+});
+
+function foldAll(v){
+  groups.forEach(g=>{ if (g.dataset.tab === rigTab) shut.set(g, v); });
+  findEl.value = '';
+  renderRig();
+}
+document.getElementById('b_expand').addEventListener('click', ()=> foldAll(false));
+document.getElementById('b_collapse').addEventListener('click', ()=> foldAll(true));
+
+findEl.addEventListener('input', renderRig);
+/* Commissioning check: exercises each link in the chain and says which one
+   is broken, rather than leaving you to guess from silence. */
+async function selfTest(){
+  const el = document.getElementById('selftest');
+  const lines = [];
+  const say = (ok, m) => { lines.push((ok ? '  ok   ' : '  FAIL ') + m); el.textContent = lines.join('\n'); };
+  el.textContent = 'running…';
+
+  say(!!window.isSecureContext, 'secure origin (' + location.protocol + ') — needed for the mic');
+
+  try{
+    const r = await fetch('settings', {cache:'no-store'});
+    const j = await r.json();
+    say(r.ok, 'shared settings readable (' + Object.keys(j.settings||{}).length + ' stored)');
+  }catch(e){ say(false, 'shared settings unreachable: ' + e.message); }
+
+  try{
+    const r = await fetch('stt/status', {cache:'no-store'});
+    const j = await r.json();
+    say(r.ok && !j.error, 'speech-to-text service · model ' + j.model +
+        ' · loaded [' + (j.loaded||[]).join(', ') + ']');
+  }catch(e){ say(false, 'speech-to-text unreachable: ' + e.message); }
+
+  try{
+    const r = await fetch('tts/voices', {cache:'no-store'});
+    const j = await r.json();
+    say((j.voices||[]).length > 0, 'neural voice service · ' +
+        (j.voices||[]).length + ' installed · using ' + (S.ttsvoice || 'default'));
+  }catch(e){ say(false, 'neural voice service unreachable: ' + e.message); }
+
+  say(Speech.supported && Speech.voices.length > 0,
+      'speech out · ' + Speech.voices.length + ' voices · ' +
+      (Speech.voice ? Speech.voice.name : 'none selected'));
+  say(!!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia), 'microphone API present');
+  say(typeof MediaRecorder !== 'undefined', 'audio recorder present');
+  say(Mic.active, 'microphone open' + (Mic.active ? '' : ' — press TALK to test it'));
+
+  const reply = await askBackend('self test');
+  say(!!reply, 'backend (' + S.backend + ') answered ' + (reply ? reply.length + ' chars' : 'nothing'));
+
+  const before = document.querySelectorAll('.msg').length;
+  respond(reply);
+  say(document.querySelectorAll('.msg').length > before, 'reply rendered and spoken');
+
+  lines.push(lines.some(l=>l.startsWith('  FAIL')) ? '\nsomething above needs fixing.'
+                                                   : '\nall green — safe to connect a real backend.');
+  el.textContent = lines.join('\n');
+}
+document.getElementById('b_selftest').addEventListener('click', selfTest);
+document.getElementById('b_save').addEventListener('click', ()=> Settings.save());
+document.getElementById('b_revert').addEventListener('click', ()=> Settings.revert());
+document.getElementById('b_exit').addEventListener('click', ()=> Settings.exit());
+showTab('look');
+document.getElementById('rigbtn').onclick = ()=> rig.classList.toggle('open');
+
+function setPalette(p){
+  const c = PALETTES[p]; const r = document.documentElement.style;
+  r.setProperty('--hue',c.hue); r.setProperty('--hue-dim',c.dim);
+  r.setProperty('--glass',c.glass); r.setProperty('--ink',c.ink);
+}
+
+// `src` appears both in the composer chips and in the rig, so a click has
+// to update every seg bound to that key, not just the one clicked
+const BOOL_KEYS = new Set(['ptt','byeontimeout']);
+function syncSeg(key){
+  document.querySelectorAll('.seg[data-set="'+key+'"] button').forEach(b=>
+    b.classList.toggle('on',
+      BOOL_KEYS.has(key) ? (b.dataset.v === '1') === !!S[key] : b.dataset.v === S[key]));
+}
+document.querySelectorAll('.seg[data-set]').forEach(seg=>{
+  const key = seg.dataset.set;
+  seg.addEventListener('click', e=>{
+    const b = e.target.closest('button');
+    if (!b || b.disabled) return;
+    S[key] = BOOL_KEYS.has(key) ? b.dataset.v === '1' : b.dataset.v;
+    syncSeg(key);
+    if (key==='palette') setPalette(S[key]);
+    if (key==='tmode')   reorient();
+    if (key==='src'){ Speech.stop(); clearTimeout(streamTimer); Drive.phase='idle'; }
+    if (key==='ptt'){ setPtt(S.ptt); syncWake(); }
+    if (key==='wake'){ Wake.awake = false; syncTalk(); syncWake(); }
+    if (key==='byeontimeout') syncWake();
+    if (key==='ttsengine'){ Speech.stop(); syncEngine(); }
+    if (key==='micdsp' && Mic.active){        // constraints apply at open time
+      const wasListening = Listen.on;
+      Listen.stop(); Mic.stop();
+      micNote('reopening mic with ' + S.micdsp + ' processing…');
+      Mic.start().then(()=>{ if (wasListening && Mic.active) Listen.start(Mic.stream); });
+    }
+    if (key==='layout'){ document.body.dataset.layout = S.layout; setTimeout(resize,0); }
+  });
+});
+
+const SLIDERS = [];
+function slider(id, key, fmt){
+  const s = document.getElementById('s_'+id), o = document.getElementById('o_'+id);
+  const paint = ()=>{ s.value = S[key]; o.textContent = fmt? fmt(S[key]) : S[key]; };
+  const sync  = ()=>{ S[key] = parseFloat(s.value); o.textContent = fmt? fmt(S[key]) : S[key]; };
+  s.addEventListener('input', sync); paint();
+  SLIDERS.push(paint);
+}
+
+/* Text areas / inputs are bound by hand; collect their painters too so one
+   call can rebuild the whole panel after settings arrive from the server. */
+const FIELDS = [];
+function bindField(id, key){
+  const el = document.getElementById(id);
+  if (!el) return;
+  const paint = ()=>{ el.value = S[key] == null ? '' : S[key]; };
+  el.addEventListener('input', ()=>{ S[key] = el.value; });
+  paint();
+  FIELDS.push(paint);
+}
+slider('amp','amp',   v=>v.toFixed(2));
+slider('lines','lines');
+slider('lag','lag');
+slider('depth','depth');
+slider('spread','spread');
+slider('persp','persp');
+slider('spin','spin',     v=>v.toFixed(2));
+slider('tilt','tilt',     v=>v.toFixed(3));
+slider('wobble','wobble', v=>v.toFixed(2));
+slider('roll','roll',     v=>v.toFixed(2));
+slider('tumble','tumble', v=>v.toFixed(2));
+slider('reo','reorient', v=>v+'s');
+slider('bloom','bloom', v=>v.toFixed(2));
+slider('blur','blur',   v=>v+'px');
+slider('milk','milk',   v=>v.toFixed(2));
+slider('grain','grain', v=>v.toFixed(2));
+slider('scan','scan',   v=>v.toFixed(2));
+slider('lw','lw',       v=>v.toFixed(2));
+slider('rate','rate',   v=>v+'ms');
+slider('vrate','vrate',   v=>v.toFixed(2)+'x');
+slider('vpitch','vpitch', v=>v.toFixed(2));
+slider('micgain','micgain', v=>v.toFixed(2));
+slider('micgate','micgate', v=>v.toFixed(3));
+slider('hangover','hangover', v=>Math.round(v*1000)+'ms');
+slider('spike','spike',     v=>v.toFixed(3));
+slider('decay','decay',     v=>v.toFixed(2));
+slider('body','body',       v=>v.toFixed(2));
+slider('grad','grad',       v=>v.toFixed(2));
+slider('hot','hot',         v=>v.toFixed(2));
+slider('floor','floor',     v=>v.toFixed(2));
+slider('crackle','crackle', v=>v.toFixed(2));
+
+const scanEl = document.getElementById('scan');
+document.getElementById('s_scan').addEventListener('input', ()=> scanEl.style.opacity = S.scan);
+scanEl.style.opacity = S.scan;
+
+// dragging tilt should move the platter immediately, not at the next re-aim
+document.getElementById('s_tilt').addEventListener('input', ()=>{ tiltAim = S.tilt; });
+
+document.getElementById('b_reo').onclick   = reorient;
+document.getElementById('b_idle').onclick  = ()=>{ clearTimeout(streamTimer); Speech.stop(); Drive.phase='idle'; };
+document.getElementById('b_think').onclick = ()=>{ clearTimeout(streamTimer); Speech.stop(); Drive.phase='thinking'; };
+document.getElementById('b_speak').onclick = ()=> respond(REPLIES[replyIx++ % REPLIES.length]);
+
+/* ------------------------------------------------------------ first run */
+/* ------------------------------------------------- voice enumeration
+   getVoices() is empty until the engine has loaded them, so it has to be
+   re-read on voiceschanged as well as at startup. */
+/* neural voice picker — names come from what's installed on the server */
+const nvSel = document.getElementById('neuralvoice');
+/* Only one engine is ever in use, so only show that engine's controls.
+   The 180-entry browser list next to the neural picker was pure noise. */
+function syncEngine(){
+  const neural = S.ttsengine === 'local' && (!Play.probed || Play.available);
+  const nv = document.getElementById('neuralvoice');
+  const bv = document.getElementById('browservoice');
+  if (nv) nv.style.display = neural ? 'block' : 'none';
+  if (bv) bv.style.display = neural ? 'none'  : 'block';
+}
+
+function paintVoiceList(){
+  const note = document.getElementById('voicenote');
+  if (!nvSel) return;
+  if (!Play.available){
+    nvSel.innerHTML = '<option>none installed</option>';
+    nvSel.disabled = true;
+    if (note) note.textContent = 'No neural voices on the server — using the browser voice.';
+    syncEngine();                       // must still fall back to the browser list
+    return;
+  }
+  nvSel.disabled = false;
+  nvSel.innerHTML = '';
+  Play.voices.forEach(v=>{
+    const o = document.createElement('option');
+    o.value = v;
+    o.textContent = v.replace(/^en_/,'').replace(/-/g,' ');
+    nvSel.appendChild(o);
+  });
+  if (S.ttsvoice) nvSel.value = S.ttsvoice;
+  if (note) note.textContent = Play.voices.length +
+    ' neural voices · rendered on the server, and the geometry follows the real waveform.';
+  syncEngine();
+}
+if (nvSel){
+  nvSel.addEventListener('change', ()=>{ S.ttsvoice = nvSel.value; Speech.stop(); });
+  FIELDS.push(()=>{ if (Play.available && S.ttsvoice) nvSel.value = S.ttsvoice; });
+}
+syncEngine();          // correct from the first paint
+Play.probe();
+
+const voiceSel = document.getElementById('voicesel');
+function loadVoices(){
+  if (!Speech.supported) return;
+  const v = window.speechSynthesis.getVoices();
+  if (!v.length) return;
+  Speech.voices = v;
+  const prev = Speech.voice && Speech.voice.name;
+  voiceSel.innerHTML = '';
+  v.forEach((vo,i)=>{
+    const o = document.createElement('option');
+    o.value = i; o.textContent = vo.name + ' · ' + vo.lang + (vo.localService ? '' : ' · net');
+    voiceSel.appendChild(o);
+  });
+  let pick = v.findIndex(x => x.name === prev);
+  if (pick < 0) pick = v.findIndex(x => x.default);
+  if (pick < 0) pick = v.findIndex(x => /^en/i.test(x.lang));
+  if (pick < 0) pick = 0;
+  voiceSel.value = pick;
+  Speech.voice = v[pick];
+  note(v.length + ' voices. Local voices fire word events; some network voices do not.');
+}
+/* BEEP — a plain Web Audio tone. This deliberately does not touch
+   speechSynthesis, so it splits the problem cleanly in two:
+     beep audible, speech silent  -> the speech engine / chosen voice
+     neither audible              -> the PAGE has no audio at all: muted tab,
+                                     site sound blocked, wrong output device,
+                                     or an embedded webview rather than a
+                                     real browser                          */
+let audioCtx = null;
+document.getElementById('b_beep').onclick = ()=>{
+  try{
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC){ note('no Web Audio in this browser at all'); return; }
+    audioCtx = audioCtx || new AC();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const t = audioCtx.currentTime;
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'sine'; o.frequency.value = 440;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.30, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t); o.stop(t + 0.5);
+    note('BEEP sent · AudioContext=' + audioCtx.state +
+         ' · heard it? then audio works and the problem is the speech engine.' +
+         ' Silent? then the PAGE has no audio — muted tab, site sound blocked,' +
+         ' wrong output device, or not a real browser window.');
+  } catch(e){ note('beep failed: ' + e.message); }
+};
+
+/* Speaks synchronously inside the click — no timer, so user activation is
+   definitely still live. If this is silent but the page is otherwise fine,
+   the problem is the voice or the output device, not the gesture gate. */
+document.getElementById('b_test').onclick = ()=>{
+  if (S.ttsengine === 'local' && Play.available){
+    Speech.stop();
+    respond('Neural voice check. This is ' + (S.ttsvoice||'the default voice') +
+            ', rendered on your own server.');
+    return;
+  }
+  if (!Speech.supported){ note('no speechSynthesis in this browser'); return; }
+  Speech.stop();
+  const u = new SpeechSynthesisUtterance('Resonance interface online.');
+  if (Speech.voice) u.voice = Speech.voice;
+  u.rate = S.vrate; u.pitch = S.vpitch; u.volume = 1;
+  u.onstart = ()=> note('STARTED — audio is playing now. Hear nothing? Check output device/volume.');
+  u.onend   = ()=> note('finished cleanly.');
+  u.onerror = e => note('FAILED: ' + ((e && e.error) || 'unknown'));
+  note('queued…');
+  window.speechSynthesis.speak(u);
+  setTimeout(()=>{
+    if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending)
+      note('never started — the engine dropped it. Try a different voice (prefer a local one).');
+  }, 1200);
+};
+
+document.getElementById('b_diag').onclick = ()=>{
+  const ss = window.speechSynthesis;
+  const v = Speech.voice;
+  note([
+    'supported=' + Speech.supported,
+    'voices=' + Speech.voices.length,
+    'voice=' + (v ? v.name + (v.localService ? ' (local)' : ' (NETWORK)') : 'none'),
+    'speaking=' + (ss ? ss.speaking : '-') + ' pending=' + (ss ? ss.pending : '-') +
+      ' paused=' + (ss ? ss.paused : '-'),
+    'unlocked=' + ttsUnlocked,
+    'source=' + S.src + (S.src !== 'tts' ? '  <-- TTS chip is OFF' : ''),
+    'origin=' + location.protocol,
+    'audioCtx=' + (audioCtx ? audioCtx.state : 'not-created'),
+    'ua=' + navigator.userAgent.slice(0,90)
+  ].join(' · '));
+};
+
+/* ---- TALK: the user-facing conversational control. Turns on the mic
+   (so the geometry reacts to your voice) AND transcription (so it
+   answers). The rig keeps a mic-only toggle for visual work.        ---- */
+const talkBtn = document.getElementById('talkbtn');
+function syncTalk(){
+  const live = Mic.active || Listen.on;
+  const gated = live && Wake.armed();
+  talkBtn.textContent =
+      Listen.busy      ? '🎤 …'
+    : PTT.held         ? '🔴 REC'
+    : live && S.ptt    ? '🎤 HOLD SPACE'
+    : gated && Wake.awake ? '🎤 AWAKE'
+    : gated            ? '🎤 ASLEEP'
+    : live             ? '🎤 LISTENING'
+    :                    '🎤 TALK';
+  talkBtn.classList.toggle('on', live);
+  talkBtn.classList.toggle('rec', PTT.held);
+}
+
+/* ---- push to talk ----
+   Space is the key, so it must not fire while the composer has focus (you
+   need spaces when typing) and it must not scroll the page. Key repeat
+   fires keydown continuously, hence the held guard. */
+const PTT = {
+  held:false, downAt:0,
+
+  down(){
+    if (this.held) return;
+    if (!Listen.on){ micNote('press TALK first to arm the microphone'); return; }
+    this.held = true; this.downAt = now;
+    Mic.open = true;
+    Speech.stop();                    // barge in over it mid-sentence
+    Listen.beginPTT();
+    micNote('recording — release SPACE to send');
+    syncTalk();
+  },
+
+  up(){
+    if (!this.held) return;
+    this.held = false;
+    Mic.open = false;
+    Listen.endPTT(now - this.downAt);
+    syncTalk();
+  }
+};
+
+/* ================================================== WAKE WORD
+   In AUTO mode the mic hears everything in the room, so without a gate the
+   it answers every passing remark. The wake word is that gate.
+
+   Once triggered it stays awake for a window, refreshed by each utterance,
+   so a back-and-forth flows without repeating the word. Let the
+   conversation lapse into a natural pause and it goes back to sleep, and
+   the word is needed again.
+
+   The window is deliberately on the WALL clock, not the animation clock:
+   `now` freezes when the tab is hidden, which would leave it awake
+   indefinitely. It is also refreshed when it finishes speaking —
+   time spent listening to the answer is not the user going quiet.        */
+const wallNow = () => performance.now()/1000;
+
+const Wake = {
+  awake:false, until:0,
+
+  norm(s){
+    return (s||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+  },
+
+  /* A small model mishears short words constantly — a one-syllable wake
+     word comes back with the wrong vowel, a trailing full stop, or a stray
+     plural. Exact matching makes waking a coin flip, so accept any token
+     within a small edit distance. */
+  _lev(a,b){
+    if (a === b) return 0;
+    const m = a.length, n = b.length;
+    if (!m || !n) return m || n;
+    let prev = Array.from({length:n+1}, (_,j)=>j), cur = new Array(n+1);
+    for (let i=1;i<=m;i++){
+      cur[0] = i;
+      for (let j=1;j<=n;j++){
+        cur[j] = Math.min(prev[j]+1, cur[j-1]+1, prev[j-1] + (a[i-1]===b[j-1]?0:1));
+      }
+      [prev, cur] = [cur, prev];
+    }
+    return prev[n];
+  },
+
+  /* Consonant skeleton — vowels are what a small model gets wrong, so two
+     spellings of the same spoken word collapse together: berth -> brth,
+     birth -> brth. */
+  _skel(x){ return x.replace(/[^a-z]/g,'').replace(/(?!^)[aeiouy]/g,''); },
+
+  /* Every accepted form: the configured word plus anything LEARN captured.
+     A general ASR will never reliably spell one short word the way a given
+     person says it — so rather than fight the speller, accept whatever it
+     actually produces for you. */
+  _list(word, aliases){
+    const list = [this.norm(word)];
+    (aliases||'').split(/[\n,]/).forEach(a=>{
+      const t = this.norm(a);
+      if (t && list.indexOf(t) < 0) list.push(t);
+    });
+    return list.filter(Boolean);
+  },
+  candidates(){      return this._list(S.wakeword,  S.wakealiases);  },
+  sleepCandidates(){ return this._list(S.sleepword, S.sleepaliases); },
+
+  /* Ending a conversation on purpose beats waiting out a timer — say the
+     sleep word and it stops listening immediately, so you can talk
+     to someone else without it answering. */
+  heardSleep(text){
+    const toks = this.norm(text).split(' ').filter(Boolean);
+    if (!toks.length) return false;
+    for (const w of this.sleepCandidates()) if (this._tryWord(toks, w)) return true;
+    return false;
+  },
+
+  sleepNow(sayBye){
+    this.awake = false;
+    this.until = 0;
+    syncTalk(); syncWake();
+    if (sayBye) farewell();
+    else micNote('asleep — say “' + S.wakeword + '” to start again');
+  },
+
+  /* Token-based, so a stray plural "s" cannot be left behind in the
+     command. */
+  _tryWord(toks, w){
+    const tol  = w.length >= 7 ? 2 : w.length >= 4 ? 1 : 0;
+    const skel = this._skel(w);
+    const wlen = w.split(' ').length;                 // aliases may be 2 words
+    if (wlen > 1){                                    // multi-word alias
+      const joined = toks.join(' ');
+      const at = joined.indexOf(w);
+      if (at >= 0){
+        const rest = joined.slice(at + w.length).trim();
+        return {trigger:true, rest};
+      }
+      return null;
+    }
+    for (let k=0;k<toks.length;k++){
+      const t = toks[k];
+      const rest = () => toks.slice(k+1).join(' ').trim();
+      if (t === w) return {trigger:true, rest:rest()};
+      // the transcriber often splits a compound: "goodbye" -> "good bye".
+      // EXACT only on the joined pair, or "good bytes" would match too.
+      if (k+1 < toks.length && t + toks[k+1] === w)
+        return {trigger:true, rest: toks.slice(k+2).join(' ').trim(), fuzzy:t+' '+toks[k+1]};
+      if (t.startsWith(w) && t.length - w.length <= 2) return {trigger:true, rest:rest()};
+      if (tol && this._lev(t, w) <= tol) return {trigger:true, rest:rest(), fuzzy:t};
+      if (t.length >= 3 && Math.abs(t.length - w.length) <= 2 && this._skel(t) === skel)
+        return {trigger:true, rest:rest(), fuzzy:t};
+    }
+    return null;
+  },
+
+  heard(text){
+    const toks = this.norm(text).split(' ').filter(Boolean);
+    if (!toks.length) return {trigger:false, rest:''};
+    for (const w of this.candidates()){
+      const hit = this._tryWord(toks, w);
+      if (hit) return hit;
+    }
+    return {trigger:false, rest:''};
+  },
+
+  touch(){ this.until = wallNow() + S.wakewindow; },
+
+  /* returns text to act on, or null to ignore the utterance entirely */
+  // is the gate in effect right now?
+  armed(){
+    if (S.wake === 'off') return false;
+    if (S.wake === 'auto' && S.ptt) return false;   // holding SPACE is explicit
+    return true;
+  },
+
+  gate(text){
+    if (!this.armed()) return text;
+    if (this.awake && wallNow() < this.until){
+      if (this.heardSleep(text)){ this.sleepNow(true); return null; }
+      this.touch();
+      return text;
+    }
+    const h = this.heard(text);
+    if (!h.trigger){
+      micNote('asleep — say “' + S.wakeword + '” to wake me');
+      return null;
+    }
+    this.awake = true; this.touch(); syncTalk(); syncWake();
+    if (h.fuzzy) micNote('woke on "' + h.fuzzy + '" (near “' + S.wakeword + '”)');
+    if (!h.rest){                            // just the name — say hello back
+      greet();
+      return null;
+    }
+    return h.rest;
+  },
+
+  step(){
+    if (!this.armed()){ this.awake = false; return; }
+    if (!this.awake) return;
+    if (Speech.active){ this.touch(); return; }   // don't age out mid-answer
+    if (wallNow() > this.until){
+      // same exit as the sleep word, so the user can choose to be told
+      this.sleepNow(!!S.byeontimeout);
+    }
+  }
+};
+
+/* LEARN — capture what the transcriber actually returns when this person
+   says their wake word, and accept those forms from then on. This is the
+   fix that survives an ASR that simply will not spell your pronunciation
+   the way you spell it. */
+const Learn = {
+  on:false, left:0, got:[],
+
+  target:'wake',
+
+  say(m, live){
+    const el = document.getElementById(
+      this.target === 'sleep' ? 'learnsleepnote' : 'learnwakenote');
+    if (el){ el.textContent = m; el.classList.toggle('live', !!live); }
+  },
+  clearNotes(){
+    ['learnwakenote','learnsleepnote'].forEach(id=>{
+      const el = document.getElementById(id);
+      if (el){ el.textContent = ''; el.classList.remove('live'); }
+    });
+  },
+
+  start(target){
+    this.target = target || 'wake';
+    this.clearNotes();
+    if (!Mic.active || !Listen.on){
+      this.say('Press TALK first (bottom right), then try again.');
+      return;
+    }
+    this.on = true; this.left = 3; this.got = [];
+    Wake.awake = false;
+    this.say('LISTENING 1 of 3 — say your ' + this.target + ' word now, then pause.', true);
+  },
+
+  take(text){
+    const t = Wake.norm(text);
+    if (t) this.got.push(t.split(' ').slice(0,2).join(' '));
+    this.left--;
+    if (this.left > 0){
+      this.say('Heard “' + t + '”.  LISTENING ' + (4-this.left) +
+               ' of 3 — say it again.', true);
+      return;
+    }
+    this.on = false;
+    const isWake = this.target === 'wake';
+    const key    = isWake ? 'wakealiases' : 'sleepaliases';
+    const have   = isWake ? Wake.candidates() : Wake.sleepCandidates();
+    const add = [...new Set(this.got)].filter(x => x && have.indexOf(x) < 0);
+    if (add.length){
+      const cur = (S[key]||'').split(/[\n,]/).map(x=>x.trim()).filter(Boolean);
+      S[key] = [...new Set([...cur, ...add])].join('\n');
+      const el = document.getElementById(key);
+      if (el) el.value = S[key];
+      this.say('Learned: ' + add.join(', ') +
+               ' — I now answer to these as well as “' +
+               (isWake ? S.wakeword : S.sleepword) + '”.');
+    } else {
+      this.say('Nothing new to add — “' + this.got.join('”, “') +
+               '” already matched.');
+    }
+  }
+};
+
+/* Spoken greeting when woken by name. Uses whatever the wake word is set
+   to, so renaming it renames the greeting. */
+const FALLBACK_GREETING = '{name} here. Go ahead.';
+function greetingText(){
+  const raw  = (S.wakeword || 'resonance').trim();
+  const name = raw.charAt(0).toUpperCase() + raw.slice(1);
+  const pool = (S.greetings || '').split('\n').map(x=>x.trim()).filter(Boolean);
+  const pick = pool.length ? pool[(Math.random()*pool.length)|0] : FALLBACK_GREETING;
+  return pick.replace(/\{name\}/gi, name);
+}
+function greet(){ respond(greetingText()); }
+
+const FALLBACK_FAREWELL = 'Going quiet.';
+function farewellText(){
+  const raw  = (S.wakeword || 'resonance').trim();
+  const name = raw.charAt(0).toUpperCase() + raw.slice(1);
+  const pool = (S.farewells || '').split('\n').map(x=>x.trim()).filter(Boolean);
+  const pick = pool.length ? pool[(Math.random()*pool.length)|0] : FALLBACK_FAREWELL;
+  return pick.replace(/\{name\}/gi, name);
+}
+function farewell(){ respond(farewellText()); }
+
+/* ---- input mode: the user's choice, not an admin setting ----
+   SPACE = hold to talk, release to send.
+   AUTO  = the mic listens and sends when you stop speaking. */
+const pttBtn = document.getElementById('pttbtn');
+function syncPtt(){
+  pttBtn.textContent = S.ptt ? '⌨ SPACE' : '🎙 AUTO';
+  pttBtn.title = S.ptt
+    ? 'push to talk — hold SPACE while speaking (click for hands-free)'
+    : 'hands-free — sends when you stop speaking (click for push-to-talk)';
+  syncSeg('ptt');                        // keep the rig's copy in step
+}
+function syncWake(){
+  const sl = document.getElementById('sleepstate');
+  if (sl) sl.textContent =
+      S.wake === 'off' ? 'Not used while the wake word is off.'
+    : !Wake.armed()    ? 'Not in effect — the wake gate is inactive in this mode.'
+    : Wake.awake       ? 'Say “' + (S.sleepword||'…') + '” to end the conversation now.'
+    : 'Ready — used once it is awake.';
+  if (sl && S.byeontimeout && Wake.armed() && S.wake !== 'off')
+    sl.textContent += ' Also spoken when the awake timer runs out.';
+  const el = document.getElementById('wakestate');
+  if (!el) return;
+  el.textContent =
+      S.wake === 'off'                 ? 'OFF — every utterance is acted on.'
+    : Wake.armed()                     ? 'ACTIVE — say “' + (S.wakeword||'…') +
+                                          '” to wake. Now: ' + (Wake.awake ? 'AWAKE' : 'ASLEEP')
+    : 'NOT IN EFFECT — you are in SPACE mode, and AUTO ONLY skips the gate there. ' +
+      'Switch the composer chip to AUTO, or set ALWAYS to require it in both modes.';
+}
+
+function setPtt(v){
+  S.ptt = !!v;
+  PTT.up();                              // never leave the gate stuck open
+  Mic.open = !S.ptt;                     // AUTO means permanently open
+  if (!S.ptt) Listen.sawSpeech = false;  // don't send whatever was buffered
+  syncPtt(); syncTalk(); syncWake();
+}
+pttBtn.addEventListener('click', ()=> setPtt(!S.ptt));
+
+const typingInComposer = () =>
+  document.activeElement === qEl ||
+  (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName));
+
+window.addEventListener('keydown', e => {
+  if (e.code !== 'Space' || !S.ptt) return;
+  if (typingInComposer()) return;
+  e.preventDefault();                 // no page scroll, no button re-activation
+  PTT.down();
+});
+window.addEventListener('keyup', e => {
+  if (e.code !== 'Space' || !S.ptt) return;
+  if (typingInComposer()) return;
+  e.preventDefault();
+  PTT.up();
+});
+// releasing while the window is unfocused would otherwise leave it stuck open
+window.addEventListener('blur', ()=> PTT.up());
+function syncMic(){ syncTalk(); }
+
+talkBtn.addEventListener('click', async ()=>{
+  if (Mic.active || Listen.on){ Listen.stop(); Mic.stop(); return; }
+  Speech.stop();
+  await Mic.start();
+  if (Mic.active) Listen.start(Mic.stream);
+});
+
+// rig: mic without transcription
+document.getElementById('b_cal').addEventListener('click', calibrate);
+document.getElementById('b_mic').addEventListener('click', ()=>{
+  if (Mic.active) Mic.stop(); else { Speech.stop(); Mic.start(); }
+});
+
+if (!window.isSecureContext || !Mic.ok){
+  talkBtn.disabled = true;
+  document.getElementById('b_mic').disabled = true;
+  micNote(!Mic.ok ? 'no getUserMedia in this browser'
+                  : 'insecure origin (' + location.protocol + ') — mic is blocked here. ' +
+                    'Open the https:// URL on port 9701 instead.');
+} else if (!Listen.supported()){
+  micNote('mic available, but this browser has no MediaRecorder — visual only');
+}
+bindField('wakealiases','wakealiases');
+document.getElementById('b_learn').addEventListener('click', ()=> Learn.start('wake'));
+document.getElementById('b_learnsleep').addEventListener('click', ()=> Learn.start('sleep'));
+
+const sleepIn = document.getElementById('sleepword');
+FIELDS.push(()=>{ sleepIn.value = S.sleepword; });
+sleepIn.value = S.sleepword;
+sleepIn.addEventListener('input', ()=>{ S.sleepword = sleepIn.value.trim(); syncWake(); });
+
+bindField('sleepaliases','sleepaliases');
+
+bindField('farewells','farewells');
+document.getElementById('b_bye').addEventListener('click', ()=> farewell());
+
+bindField('greetings','greetings');
+document.getElementById('b_greet').addEventListener('click', ()=> greet());
+
+const wakeIn = document.getElementById('wakeword');
+FIELDS.push(()=>{ wakeIn.value = S.wakeword; });
+wakeIn.value = S.wakeword;
+wakeIn.addEventListener('input', ()=>{
+  S.wakeword = wakeIn.value.trim();
+  Wake.awake = false;                       // new word means start over
+  syncTalk(); syncWake();
+});
+slider('wakewindow','wakewindow', v=>v+'s');
+
+syncPtt();
+syncTalk();
+syncWake();
+
+/* ---- mute: the one audio control ordinary users get ---- */
+const muteBtn = document.getElementById('mute');
+function setMuted(v){
+  muted = v;
+  if (muted) Speech.stop();
+  muteBtn.textContent = muted ? '🔇 MUTED' : '🔊 AUDIO';
+  muteBtn.classList.toggle('on', !muted);
+  muteBtn.title = muted ? 'unmute its voice' : 'mute its voice';
+}
+muteBtn.addEventListener('click', ()=> setMuted(!muted));
+if (!Speech.supported){ setMuted(true); muteBtn.disabled = true; }
+
+if (Speech.supported){
+  voiceSel.addEventListener('change', ()=>{
+    Speech.voice = Speech.voices[voiceSel.value|0] || null;
+    Speech.stop(); Drive.phase='idle';
+  });
+  window.speechSynthesis.onvoiceschanged = loadVoices;
+  loadVoices();
+  setTimeout(loadVoices, 400);        // Safari populates late
+  setTimeout(()=>{                    // some Linux boxes ship none at all
+    if (!Speech.voices.length)
+      note('speechSynthesis exists but reports ZERO voices — no engine installed on this machine.');
+  }, 1500);
+} else {
+  S.src = 'token';
+  document.querySelectorAll('.seg[data-set="src"] button[data-v="tts"]')
+          .forEach(b=> b.disabled = true);
+  voiceSel.disabled = true;
+  note('this browser has no speechSynthesis — TTS unavailable');
+}
+syncSeg('src');
+
+/* ================================================ SHARED SETTINGS
+   One document on the server defines the interface for everyone who opens
+   the URL. Viewers read it; only a holder of the admin key can write it.
+   This is the mockup's stand-in for the admin-section requirement: users
+   get the interface, not the controls. */
+const ADMIN_KEY_STORE = 'resonance.adminkey';
+const Settings = {
+  key: null,
+  dirty: false,
+
+  init(){
+    const q = new URLSearchParams(location.search).get('admin');
+    if (q){
+      sessionStorage.setItem(ADMIN_KEY_STORE, q);
+      history.replaceState({}, '', location.pathname);   // keep it out of the bar
+    }
+    this.key = sessionStorage.getItem(ADMIN_KEY_STORE);
+  },
+
+  /* Ask the server, don't take the URL's word for it. */
+  async verify(){
+    if (!this.key) return false;
+    try{
+      const r = await fetch('settings/whoami', {
+        headers:{'X-Admin-Key': this.key}, cache:'no-store'
+      });
+      const j = await r.json();
+      this.isAdmin = !!(j && j.admin);
+      return this.isAdmin;
+    }catch(e){ this.isAdmin = false; return false; }
+  },
+
+  forget(){
+    sessionStorage.removeItem(ADMIN_KEY_STORE);
+    this.key = null; this.isAdmin = false;
+  },
+
+  exit(){
+    this.forget();
+    location.replace(location.pathname);     // come back as an ordinary viewer
+  },
+
+  async load(){
+    try{
+      const r = await fetch('settings', {cache:'no-store'});
+      const j = await r.json();
+      const got = j && j.settings || {};
+      let n = 0;
+      Object.keys(got).forEach(k=>{ if (k in S){ S[k] = got[k]; n++; } });
+      if (n) repaintAll();
+      return n;
+    }catch(e){ return -1; }
+  },
+
+  async save(){
+    if (!this.key){ this.status('no admin key', true); return; }
+    this.status('saving…');
+    try{
+      const r = await fetch('settings', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Admin-Key':this.key},
+        body: JSON.stringify(S)
+      });
+      const j = await r.json();
+      if (j.error) this.status(j.error, true);
+      else { this.dirty = false; this.status('saved for everyone · ' + j.keys + ' settings'); }
+    }catch(e){ this.status('save failed: ' + e.message, true); }
+  },
+
+  async revert(){
+    const n = await this.load();
+    this.status(n >= 0 ? 'reloaded from server' : 'could not reach server', n < 0);
+  },
+
+  status(m, bad){
+    const el = document.getElementById('savestate');
+    if (el){ el.textContent = m; el.style.color = bad ? '#ff8a8a' : ''; }
+  }
+};
+
+/* Rebuild every control from S — used after settings load. */
+function repaintAll(){
+  SLIDERS.forEach(f=>f());
+  FIELDS.forEach(f=>f());
+  ['mode','palette','layout','tmode','src','ptt','wake','micdsp','sttmodel','byeontimeout','backend','ttsengine']
+    .forEach(syncSeg);
+  setPalette(S.palette);
+  document.body.dataset.layout = S.layout;
+  if (typeof syncPtt === 'function') syncPtt();
+  if (typeof syncTalk === 'function') syncTalk();
+  if (typeof syncWake === 'function') syncWake();
+  if (typeof syncEngine === 'function') syncEngine();
+  setTimeout(resize, 0);
+}
+
+/* The panel starts hidden for EVERYONE and is only revealed once the server
+   confirms the key. Two bugs this fixes:
+     - the gate was client-side only, so ?admin=anything showed the panel
+       even though the server would reject every write
+     - the key lives in sessionStorage, so once unlocked the plain URL kept
+       showing the rig in that same tab, with no way back to a user's view */
+document.getElementById('rigbtn').style.display = 'none';
+rig.style.display = 'none';
+
+Settings.init();
+Settings.verify().then(ok=>{
+  if (ok){
+    document.getElementById('rigbtn').style.display = '';
+    rig.style.display = '';
+  } else if (Settings.key){
+    Settings.forget();                       // stale or wrong key — drop it
+  }
+});
+Settings.load();
+
+setPalette('blue');
+addMsg('ai', "Surface online. Type below, or press TALK and speak to me — transcription runs locally on this server, not in the cloud. I answer aloud; AUDIO mutes me. RIG, top right, has form, palette, glass, voice and mic.");
+</script>
+</body>
+</html>
