@@ -52,9 +52,34 @@
   #wrap{position:fixed;inset:0;display:none;grid-template-columns:340px 1fr}
   #wrap.on{display:grid}
   #panel{
-    position:relative;height:100%;overflow-y:auto;padding:12px 14px 30px;
+    position:relative;height:100%;min-height:0;display:flex;flex-direction:column;
     border-right:1px solid rgba(var(--glass),.12);background:rgba(0,0,0,.35);
   }
+  /* the settings scroll; the identity below stays put */
+  #panelscroll{flex:1 1 auto;min-height:0;overflow-y:auto;padding:12px 14px 24px}
+  #panelfoot{
+    flex:0 0 auto;padding:10px 14px 12px;
+    border-top:1px solid rgba(var(--glass),.14);background:rgba(0,0,0,.5);
+  }
+  #tab_accounts{
+    width:100%;font:inherit;font-size:9.5px;letter-spacing:.14em;padding:7px 8px;
+    cursor:pointer;text-align:left;background:none;color:rgba(var(--paper),.88);
+    border:1px solid rgba(var(--glass),.22);
+  }
+  #tab_accounts:hover{border-color:var(--hue);color:var(--hue)}
+  #tab_accounts.on{border-color:var(--hue-dim);color:var(--hue);
+                   background:rgba(var(--glass),.06)}
+  #whobox{display:flex;align-items:center;gap:8px;margin-top:9px}
+  #whoname{font-size:10px;letter-spacing:.08em;color:rgba(var(--paper),.92);
+           overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #whorole{font-size:8px;letter-spacing:.14em;padding:2px 5px;
+           border:1px solid rgba(var(--glass),.25);color:rgba(var(--paper),.8)}
+  #b_signout{
+    margin-left:auto;font:inherit;font-size:8.5px;letter-spacing:.12em;
+    padding:3px 7px;cursor:pointer;background:none;
+    color:rgba(var(--paper),.8);border:1px solid rgba(var(--glass),.22);
+  }
+  #b_signout:hover{border-color:var(--hue);color:var(--hue)}
   #stage{position:relative;display:flex;flex-direction:column;min-width:0}
   #stagebar{display:flex;align-items:center;gap:12px;padding:8px 14px;
             border-bottom:1px solid rgba(var(--glass),.1);
@@ -202,16 +227,15 @@
 
 <div id="wrap">
 <div id="panel">
+  <div id="panelscroll">
   <div class="tabs">
     <button data-tab="look"   class="on">LOOK</button>
     <button data-tab="motion">MOTION</button>
     <button data-tab="voice">VOICE</button>
-    <button data-tab="accounts">ACCOUNTS</button>
   </div>
   <div class="seg" style="margin-bottom:8px">
     <button id="b_save">SAVE FOR EVERYONE</button>
     <button id="b_revert">REVERT</button>
-    <button id="b_signout" title="end this session">SIGN OUT</button>
   </div>
   <div id="savestate" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.88);margin:0 0 8px;line-height:1.5"></div>
 
@@ -447,12 +471,21 @@
   <div class="note" id="usernote"></div>
     </div>
   </section>
+  </div><!-- /panelscroll -->
+
+  <div id="panelfoot">
+    <button id="tab_accounts" data-tab="accounts">ACCOUNTS</button>
+    <div id="whobox">
+      <div id="whoname">—</div>
+      <div id="whorole"></div>
+      <button id="b_signout" title="end this session">SIGN OUT</button>
+    </div>
+  </div>
 </div>
 
-  <div id="stage">
+<div id="stage">
     <div id="stagebar">
       <span>LIVE PREVIEW</span>
-      <span id="rolebadge"></span>
       <span class="right">
         <button id="b_reload" title="reload the preview from the saved settings">RELOAD</button>
         <button id="b_open" title="open the real display in a new tab">OPEN DISPLAY</button>
@@ -813,15 +846,17 @@ function panelNav(){
       g.classList.toggle('shut', q ? false : !!shut.get(g));
     });
   }
-  document.querySelector('#panel .tabs').addEventListener('click', e=>{
-    const b = e.target.closest('button'); if (!b) return;
+  /* Two homes now: the row at the top and the pinned entry at the foot.
+     Treat them as one set so exactly one is ever lit. */
+  const tabButtons = [...document.querySelectorAll('#panel button[data-tab]')];
+  function selectTab(b){
     tab = b.dataset.tab;
-    document.querySelectorAll('#panel .tabs button')
-            .forEach(x=> x.classList.toggle('on', x === b));
+    tabButtons.forEach(x=> x.classList.toggle('on', x === b));
     render();
-    document.getElementById('panel').scrollTop = 0;
+    $('panelscroll').scrollTop = 0;
     if (tab === 'accounts') refreshUsers();
-  });
+  }
+  tabButtons.forEach(b=> b.addEventListener('click', ()=> selectTab(b)));
   groups.forEach(g=> g.querySelector('h4').addEventListener('click', ()=>{
     shut.set(g, !shut.get(g)); render();
   }));
@@ -841,7 +876,8 @@ function panelNav(){
 function start(){
   gate.classList.remove('on');
   wrap.classList.add('on');
-  $('rolebadge').textContent = ME.user + ' · ' + ME.role;
+  $('whoname').textContent = ME.user;
+  $('whorole').textContent = ME.role;
   $('whoami').textContent = 'Signed in as ' + ME.user + ' (' + ME.role + ').';
   if (ME.role !== 'admin'){
     document.body.classList.add('ro');
