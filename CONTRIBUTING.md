@@ -82,8 +82,9 @@ Deliberately flat — this is a single page plus a single server file.
 
 | File | Purpose |
 |---|---|
-| `index.html` | the whole front-end: visualiser, chat surface, settings panel |
-| `serve.py` | static serving, `/stt`, `/tts`, `/settings` |
+| `index.html` | the display: visualiser and chat surface. No controls. |
+| `admin.html` | the configuration interface, served only on the admin port |
+| `serve.py` | static serving, `/stt`, `/tts`, `/settings`, accounts and sessions |
 | `serve.sh` | start/stop, resolving the PID from the port |
 | `make-cert.sh` | self-signed certificate for the HTTPS listener |
 
@@ -104,6 +105,11 @@ those two, that is a design smell worth discussing first.
 **The demo backend stays forever.** It is how you tell whether a fault is the
 front-end or the model behind it. Don't remove it when a real assistant is
 connected.
+
+**Nothing privileged is reachable from the public listeners.** Not gated —
+absent. If you add a route that writes, it goes behind `_require('admin')` and
+returns 404 when `self.admin_port` is false. The display page must never
+regain a control that writes.
 
 **Settings are admin-only by design.** Ordinary users get the microphone, mute,
 and the push-to-talk/hands-free choice. Nothing else. A visibility gate must be

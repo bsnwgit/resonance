@@ -143,28 +143,86 @@ The microphone requires a secure origin, so generate a certificate first:
 ./serve.sh start
 ```
 
-- `http://<host>:9700` — everything except the microphone
-- `https://<host>:9701` — full function, including the mic
+| listener | purpose |
+| --- | --- |
+| `http://<host>:9700` | the display, everything except the microphone |
+| `https://<host>:9701` | the display in full, including the mic |
+| `https://<host>:9702` | **administration**, behind a sign-in |
 
 The certificate is self-signed, so expect one browser warning.
 
 ## Settings and the admin model
 
 One settings document on the server defines the interface for **everyone** who
-opens the URL. Viewers read it; only a holder of the admin key can write it.
+opens the display. The display only ever *reads* it. Writing happens on a
+separate listener, on a separate port, behind a username and password.
 
-The admin key is printed at startup and stored in `admin.key`; override it with
-the `ADMIN_KEY` environment variable.
+**The public listeners have no route that accepts a write.** Not a guarded
+route — no route. `admin.html` is not served on them either, and returns 404.
+Users keep exactly three controls: microphone, mute, and push-to-talk vs
+hands-free.
 
-- Admin: `https://<host>:9701/?admin=<key>`
-- Everyone else: `https://<host>:9701/`
+### The admin interface
 
-Without a valid key the settings panel **is not rendered at all**. The key is
-confirmed by the server, so it cannot be bypassed from the browser. Users keep
-exactly three controls: microphone, mute, and push-to-talk vs hands-free.
+`https://<host>:9702` — sign in, and you get the full control panel with a
+**live preview** beside it. The preview is the display page itself in an
+iframe, driven over `postMessage`, so you are tuning the real renderer rather
+than a mock-up of it. Changes show immediately in the preview and reach
+everyone else only when you press SAVE.
 
-> This shared-secret-in-a-URL scheme is prototype-grade. In a host application
-> it should ride that application's existing session and roles.
+On first run an `admin` account is created and its password printed **once**
+in the startup output. Change it after signing in.
+
+Two roles:
+
+| role | can |
+| --- | --- |
+| `admin` | change every setting, manage accounts |
+| `viewer` | read the configuration, change nothing |
+
+### App settings
+
+**APP SETTINGS**, at the foot of the panel, covers how the server is wired
+rather than how the interface looks: the port each of the three listeners
+answers on, and how long an idle sign-in survives. It is stored in `app.json`.
+
+Nothing here takes effect until the process restarts — you cannot move the
+floor you are standing on. The panel shows what is configured against what is
+actually bound, and says plainly when a restart is owed:
+
+```bash
+./serve.sh stop
+./serve.sh start
+```
+
+Ports are checked before they are accepted: 1024–65535, all three different,
+and **not already in use by something else on the machine**. A port that fails
+to bind would otherwise only reveal itself at the next restart, with the admin
+interface gone and the fix being to edit JSON on the box by hand.
+
+`serve.sh` reads `app.json` too, and records the pid it started. Without that
+pid, changing the display port would leave `stop` looking at the new port while
+the old process was still running on the old one.
+
+The `PORT` environment variable still overrides everything and still shifts all
+three listeners together, so a second instance can be run without touching the
+stored configuration.
+
+Accounts live in `users.json` next to the server, mode `600`, passwords stored
+as PBKDF2-SHA256 with 600,000 rounds and a per-account salt. Sessions are
+in-memory, cookie-based, `HttpOnly` + `Secure` + `SameSite=Strict`, and expire
+after 8 hours of inactivity. Failed sign-ins back off geometrically per client
+address. Changing a password or a role drops that account's live sessions.
+
+**HTTPS only, by design.** The admin listener does not start without a
+certificate, because it accepts a password and a password over plain HTTP
+crosses the network in the clear. If it is missing from the startup banner,
+run `make-cert.sh` and restart.
+
+> This is local-account authentication, deliberately: no directory, no third
+> party, nothing leaves the machine to log in — the same principle as the
+> speech pipeline. Inside a host application it should ride that
+> application's existing session and roles instead.
 
 ## Connecting a real assistant
 
@@ -185,6 +243,8 @@ is how you tell whether a fault is the front-end or the model behind it.
 
 ## HTTP API
 
+On every listener:
+
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `POST` | `/stt` | audio in, `{"text": …}` out. `?model=`, `?hint=` |
@@ -192,8 +252,25 @@ is how you tell whether a fault is the front-end or the model behind it.
 | `POST` | `/tts` | text in, WAV out. `?voice=`, `?rate=` |
 | `GET` | `/tts/voices` | installed neural voices |
 | `GET` | `/settings` | the shared interface configuration |
-| `POST` | `/settings` | replace it — requires `X-Admin-Key` |
-| `GET` | `/settings/whoami` | is this key an admin? |
+
+Admin listener only — everything below returns 404 on the public ports:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/auth/login` | username and password in, session cookie out |
+| `POST` | `/auth/logout` | end the session |
+| `GET` | `/auth/me` | who am I, and with what role |
+| `POST` | `/auth/password` | change a password; your own needs the current one |
+| `POST` | `/settings` | replace the configuration — `admin` role |
+| `GET` | `/app` | ports and session length, plus what is actually running |
+| `POST` | `/app` | change them — `admin` role, restart to apply |
+| `GET` | `/users` | list accounts — `admin` role |
+| `POST` | `/users` | create an account — `admin` role |
+| `POST` | `/users/role` | change a role — `admin` role |
+| `POST` | `/users/delete` | remove an account — `admin` role |
+
+The last admin account cannot be deleted or demoted; an interface nobody can
+administer is a brick.
 
 ## Driving the visualiser directly
 
@@ -250,6 +327,19 @@ transcribed.** Auto-gain and noise suppression were disabled to preserve the
 dynamics the visualiser feeds on; the result was quiet audio and constant
 mishearing. There is now a toggle, defaulting to clean.
 
+**A control panel hidden by CSS is still shipped.** The settings panel used to
+live in the display page and be revealed once an admin key checked out. Every
+viewer was still sent the whole thing — 105 elements of it — and the gate was
+one bug away from being the only thing standing between them and it. It is a
+separate page on a separate port now, and the public listeners do not serve it
+at all.
+
+**A top-level `const` is not a property of `window`.** The admin page tried to
+read the display's settings out of the iframe with `frame.contentWindow.S` and
+got `undefined`, so every slider silently fell back to the browser's default
+midpoint — a page full of plausible wrong numbers, with nothing logged. The
+display now sends its settings in the message that announces it is ready.
+
 **A visibility gate must be confirmed by the server.** An early version checked
 only that an admin key was *present*, not that it was *correct* — so
 `?admin=anything` opened the settings panel. Writes still failed, but the
@@ -302,6 +392,22 @@ Roughly in order of value:
 ## Progress log
 
 Newest first.
+
+### 2026-08-12 — administration moved to its own port
+
+The configuration panel left the display page. It is now `admin.html` on a
+separate HTTPS listener (9702) behind local accounts with roles, and the panel
+carries a live preview of the real display rather than a copy of it.
+
+- **Local accounts**, PBKDF2-SHA256, admin and viewer roles, first-run password
+  printed once at startup.
+- **Sessions**, HttpOnly + Secure + SameSite cookies, sliding 8-hour expiry,
+  geometric back-off on failed sign-ins.
+- **The shared key is gone.** `?admin=` means nothing, `X-Admin-Key` no longer
+  exists, and the public listeners have no write route at all.
+- **`serve.sh` and `make-cert.sh` are executable in git** — they were mode 644,
+  so `rsync -a` stripped the bit the server had been given by hand and the
+  service would not start after a deploy.
 
 ### 2026-08-12 — established as Resonance
 
