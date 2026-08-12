@@ -792,7 +792,12 @@ window.addEventListener('message', e=>{
     S = Object.assign({}, m.settings || {});
     if (!built){ buildControls(); built = true; } else { repaintControls(); }
     isDirty = false;
-    status(Object.keys(S).length + ' settings loaded');
+    /* The line stays empty until it has something worth saying. A count of
+       loaded settings is not news — it is the same number every time, and a
+       status line that always says something trains you to stop reading it,
+       which is exactly the habit the unsaved warning needs you not to have. */
+    status(reverting ? 'reloaded from the server' : '');
+    reverting = false;
   } else if (m.kind === 'status'){
     const el = $(m.slot);
     if (el){ el.textContent = m.text; el.classList.toggle('live', !!m.live); }
@@ -800,7 +805,7 @@ window.addEventListener('message', e=>{
 });
 
 /* ------------------------------------------------------------- controls */
-let built = false, isDirty = false;
+let built = false, isDirty = false, reverting = false;
 const SLIDERS = [], FIELDS = [];
 function repaintControls(){
   SLIDERS.forEach(f=>f());
@@ -952,6 +957,7 @@ $('b_save').addEventListener('click', async ()=>{
    version worth trusting. */
 $('b_revert').addEventListener('click', ()=>{
   status('reloading from the server…');
+  reverting = true;
   ready = false;
   frame.src = '/index.html?preview=1';
 });
