@@ -29,6 +29,9 @@
   /* ---------- sign-in ---------- */
   #gate{position:fixed;inset:0;display:none;place-items:center;z-index:50;background:var(--ink)}
   #gate.on{display:grid}
+  /* the mark sits above the card, not inside it, so the card stays a form */
+  #gatestack{display:flex;flex-direction:column;align-items:center;gap:20px}
+  #gatemark{display:block;width:72px;height:72px}
   #gatecard{width:320px;padding:26px 24px;border:1px solid rgba(var(--glass),.14);
             background:rgba(255,255,255,.02)}
   #gatecard h1{font-size:12px;letter-spacing:.34em;font-weight:400;
@@ -279,6 +282,8 @@
 <body>
 
 <div id="gate">
+  <div id="gatestack">
+  <img id="gatemark" src="icon.svg" alt="" width="72" height="72">
   <div id="gatecard">
     <h1>RESONANCE</h1>
     <div class="sub">ADMINISTRATION</div>
@@ -290,6 +295,7 @@
       <button id="gatebtn" type="submit">SIGN IN</button>
     </form>
     <div id="gateerr"></div>
+  </div>
   </div>
 </div>
 
