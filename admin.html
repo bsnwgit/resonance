@@ -52,28 +52,47 @@
 
 
   /* ---------- scrollbars ----------
-     Part of the furniture, not the operating system's idea of a control:
-     square like every other edge here, hairline-thin, no track, and a thumb
-     that lifts on hover the same way the buttons do. The inset comes from a
-     transparent border clipped to the content box, which is the only way to
-     get breathing room around a webkit thumb. */
-  ::-webkit-scrollbar{width:9px;height:9px}
-  ::-webkit-scrollbar-track{background:transparent}
+     Part of the furniture rather than the operating system's idea of a
+     control: square, hairline-weight, no track, lifting on hover the way the
+     buttons do. The inset is a transparent border clipped to the content box,
+     which is the only way to get breathing room around a webkit thumb.
+
+     Colours are written out rather than taken from --glass, and that is not
+     an oversight: ::-webkit-scrollbar pseudo-elements do not inherit custom
+     properties, so a var() here never resolves, the whole declaration is
+     dropped as invalid, and the thumb silently falls back to the browser's
+     own pale rounded bar. Every other symptom followed from that — the width
+     applied, because 9px is a literal, so it measured as styled while looking
+     like the default. --glass is 255,255,255 and --hue-dim is #7d93a8; if
+     those change, change these too. */
+  ::-webkit-scrollbar{width:9px;height:9px;background:transparent}
+  ::-webkit-scrollbar-track{background:transparent;border:0}
   ::-webkit-scrollbar-thumb{
-    background:rgba(var(--glass),.24);
-    border:2px solid transparent;background-clip:content-box;
+    border-radius:0;
+    background:rgba(255,255,255,.16);
+    border:2px solid transparent;
+    background-clip:content-box;
   }
   ::-webkit-scrollbar-thumb:hover{
-    background:rgba(var(--glass),.46);
-    border:2px solid transparent;background-clip:content-box;
+    border-radius:0;
+    background:rgba(255,255,255,.38);
+    border:2px solid transparent;
+    background-clip:content-box;
   }
+  ::-webkit-scrollbar-thumb:active{
+    border-radius:0;
+    background:#7d93a8;
+    border:2px solid transparent;
+    background-clip:content-box;
+  }
+  ::-webkit-scrollbar-button{display:none;width:0;height:0}
   ::-webkit-scrollbar-corner{background:transparent}
-  /* Firefox has no ::-webkit-scrollbar, so it gets the standard properties.
-     They are scoped behind @supports on purpose: setting them unconditionally
-     makes Chrome ignore every rule above and fall back to the operating
-     system's overlay bar, and Safari ignores these properties outright. */
+  /* Firefox has no ::-webkit-scrollbar and gets the standard properties. They
+     are scoped behind @supports on purpose: set unconditionally, Chrome
+     ignores every rule above and falls back to an overlay bar. Literal
+     colours here too, for one less thing that has to resolve. */
   @supports not selector(::-webkit-scrollbar){
-    *{scrollbar-width:thin;scrollbar-color:rgba(var(--glass),.24) transparent}
+    *{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
   }
 
   /* ---------- admin shell ---------- */
@@ -1124,6 +1143,14 @@ function bkPaint(){
   });
   document.querySelectorAll('#bk_provider button').forEach(b=>
     b.classList.toggle('on', b.dataset.v === BK.provider));
+  /* Light the preset the current base URL actually corresponds to, rather
+     than whichever was last pressed — after a reload nothing was pressed,
+     and the honest answer is which one you are on. */
+  const url = (BK.base_url || '').replace(/\/+$/, '');
+  document.querySelectorAll('#bk_preset button').forEach(b=>{
+    const p = BK_PRESETS[b.dataset.v];
+    b.classList.toggle('on', !!p && p.base_url.replace(/\/+$/, '') === url);
+  });
   $('bk_key').placeholder = BK.has_key ? 'unchanged — a key is stored' : 'none stored';
   bkSyncProvider();
 }
@@ -1178,6 +1205,7 @@ document.querySelector('#bk_provider').addEventListener('click', e=>{
 document.querySelector('#bk_preset').addEventListener('click', e=>{
   const b = e.target.closest('button'); if (!b) return;
   const p = BK_PRESETS[b.dataset.v]; if (!p) return;
+  document.querySelectorAll('#bk_preset button').forEach(x=> x.classList.toggle('on', x===b));
   $('bk_url').value = p.base_url;
   $('bk_keepalive').value = p.keep_alive;
   if (p.hint) $('bk_model').placeholder = p.hint;
