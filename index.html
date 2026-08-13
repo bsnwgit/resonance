@@ -174,12 +174,50 @@
     background:none;border:1px solid rgba(var(--glass),.16);
     color:rgba(var(--paper),.85);cursor:pointer;
   }
+  .src button .ico{margin-right:.5em}
   .src button.on{border-color:var(--hue-dim);color:var(--hue)}
   /* same hover feedback the admin page gives, for the three controls a
      viewer actually has */
   .src button:hover:not([disabled]){border-color:var(--hue);color:var(--hue)}
   .src button.rec{border-color:#ff5a5a;color:#ff8a8a}
+  /* after .on deliberately: asleep is a sub-state of live and must win */
+  .src button.asleep{border-color:rgba(var(--glass),.16);color:rgba(var(--paper),.42)}
   .src button[disabled]{opacity:.35;cursor:not-allowed}
+
+  /* ---------- narrow: the word goes, the button stays ----------
+     Measured on the shipped layout: the four labelled buttons, the prompt and
+     the flex gaps come to 366px of fixed furniture before the field gets a
+     pixel. At 375px the field cannot shrink below its intrinsic width, so it
+     held its ground and pushed TEXT clean off the right edge — a control that
+     is not merely cramped but unreachable.
+
+     Dropping to icons is the usual answer and it fits, but shrinking is the
+     wrong instinct: a 28px target is below every touch guideline going, so
+     they grow to 44px square here rather than getting smaller.
+
+     Inside an iframe this keys off the FRAME's width, not the device, so one
+     breakpoint covers a phone and a narrow embed in a desktop page. */
+  @media (max-width: 560px){
+    #bar{padding:10px 14px;gap:10px;flex-wrap:wrap}
+    /* an input will not go below its intrinsic width without this, which is
+       what pushed the buttons out rather than yielding to them */
+    #q{min-width:0}
+    .src{gap:8px}
+    .src button{
+      min-width:44px;min-height:44px;padding:0;
+      display:inline-flex;align-items:center;justify-content:center;
+      font-size:15px;letter-spacing:0;
+    }
+    .src button .ico{margin-right:0}
+    .src button .lbl{
+      /* removed from view, kept for anyone reading the page aloud — the
+         aria-label set alongside it carries the same word */
+      position:absolute;width:1px;height:1px;overflow:hidden;
+      clip-path:inset(50%);white-space:nowrap;
+    }
+    #log{padding:16px 14px 8px}
+    body[data-layout="bleed"] #log{padding:40px 14px 14px}
+  }
 
   #fps{position:fixed;left:12px;top:10px;z-index:20;font-size:9px;letter-spacing:.14em;
        color:rgba(var(--paper),.76)}
@@ -205,11 +243,15 @@
     <input id="q" autocomplete="off" spellcheck="false" placeholder="ask Resonance…">
     <!-- user-facing control. The TOKEN/TTS source switch is a rig/admin
          thing and lives in the panel; this is the one users get. -->
+    <!-- icon and word are separate elements so a narrow viewport can drop the
+         word and keep the button. They were one string, which meant the label
+         could only be shortened in JS — and JS deciding layout from a width is
+         the wrong place for it. -->
     <span class="src">
-      <button id="pttbtn" title="how Resonance decides when you have finished speaking">⌨ SPACE</button>
-      <button id="talkbtn" title="speak to Resonance — mic drives the geometry and your words are transcribed">🎤 TALK</button>
-      <button id="mute" class="on" title="mute its voice">🔊 AUDIO</button>
-      <button id="textbtn" class="on" title="hide the transcript and give the space to the field">▤ TEXT</button>
+      <button id="pttbtn" title="how Resonance decides when you have finished speaking"><span class="ico">⌨</span><span class="lbl">SPACE</span></button>
+      <button id="talkbtn" title="speak to Resonance — mic drives the geometry and your words are transcribed"><span class="ico">🎤</span><span class="lbl">TALK</span></button>
+      <button id="mute" class="on" title="mute its voice"><span class="ico">🔊</span><span class="lbl">AUDIO</span></button>
+      <button id="textbtn" class="on" title="hide the transcript and give the space to the field"><span class="ico">▤</span><span class="lbl">TEXT</span></button>
     </span>
   </div>
 </div>
@@ -1997,20 +2039,38 @@ CMD.diagnose = ()=>{
 /* ---- TALK: the user-facing conversational control. Turns on the mic
    (so the geometry reacts to your voice) AND transcription (so it
    answers). The rig keeps a mic-only toggle for visual work.        ---- */
+/* Write both halves of a control. The word is hidden on a narrow viewport,
+   so it cannot be the only place the state is expressed — aria-label carries
+   it for anyone not reading the screen, and the icon plus the button's own
+   classes have to carry it for everyone else. */
+function setBtn(btn, ico, lbl){
+  if (!btn) return;
+  const i = btn.querySelector('.ico'), l = btn.querySelector('.lbl');
+  if (i) i.textContent = ico;
+  if (l) l.textContent = lbl;
+  btn.setAttribute('aria-label', lbl);
+}
+
 const talkBtn = document.getElementById('talkbtn');
 function syncTalk(){
   const live = Mic.active || Listen.on;
   const gated = live && Wake.armed();
-  talkBtn.textContent =
-      Listen.busy      ? '🎤 …'
-    : PTT.held         ? '🔴 REC'
-    : live && S.ptt    ? '🎤 HOLD SPACE'
-    : gated && Wake.awake ? '🎤 AWAKE'
-    : gated            ? '🎤 ASLEEP'
-    : live             ? '🎤 LISTENING'
-    :                    '🎤 TALK';
+  const asleep = gated && !Wake.awake;
+  const [ico, lbl] =
+      Listen.busy      ? ['🎤', '…']
+    : PTT.held         ? ['🔴', 'REC']
+    : live && S.ptt    ? ['🎤', 'HOLD SPACE']
+    : gated && Wake.awake ? ['🎤', 'AWAKE']
+    : asleep           ? ['🎤', 'ASLEEP']
+    : live             ? ['🎤', 'LISTENING']
+    :                    ['🎤', 'TALK'];
+  setBtn(talkBtn, ico, lbl);
   talkBtn.classList.toggle('on', live);
   talkBtn.classList.toggle('rec', PTT.held);
+  /* Asleep and awake are the same microphone glyph, so with the word hidden
+     the button would look identical in the one state where the difference
+     decides whether it can hear you at all. The class dims it instead. */
+  talkBtn.classList.toggle('asleep', asleep);
 }
 
 /* ---- push to talk ----
@@ -2299,7 +2359,7 @@ function farewell(){ respond(farewellText()); }
    AUTO  = the mic listens and sends when you stop speaking. */
 const pttBtn = document.getElementById('pttbtn');
 function syncPtt(){
-  pttBtn.textContent = S.ptt ? '⌨ SPACE' : '🎙 AUTO';
+  setBtn(pttBtn, S.ptt ? '⌨' : '🎙', S.ptt ? 'SPACE' : 'AUTO');
   pttBtn.title = S.ptt
     ? 'push to talk — hold SPACE while speaking (click for hands-free)'
     : 'hands-free — sends when you stop speaking (click for push-to-talk)';
@@ -2418,7 +2478,7 @@ function setMuted(v, remember){
   muted = v;
   if (remember) Prefs.set('muted', !!v);
   if (muted) Speech.stop();
-  muteBtn.textContent = muted ? '🔇 MUTED' : '🔊 AUDIO';
+  setBtn(muteBtn, muted ? '🔇' : '🔊', muted ? 'MUTED' : 'AUDIO');
   muteBtn.classList.toggle('on', !muted);
   muteBtn.title = muted ? 'unmute its voice' : 'mute its voice';
 }
