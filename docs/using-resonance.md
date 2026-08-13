@@ -1,0 +1,123 @@
+# Using Resonance
+
+This is for anyone standing in front of the display. You do not need an
+account and there is nothing to install — the screen is the whole interface.
+
+## What you are looking at
+
+A figure in the middle of the screen that moves while it listens and while it
+speaks. It is not decoration: the shape is driven by what the microphone hears
+and by what the assistant is saying, so you can tell at a glance whether the
+system heard you, is thinking, or has started to answer. When nothing is
+happening it idles quietly.
+
+Below it is the transcript, and below that a single input row.
+
+## The four controls
+
+They sit along the bottom right. Each one is a toggle — press it and it stays
+that way.
+
+| Control | What it does |
+|---|---|
+| SPACE / AUTO | How it decides you have finished speaking |
+| TALK | Opens the microphone |
+| AUDIO | Mutes or unmutes its voice |
+| TEXT | Shows or hides the transcript |
+
+### SPACE and AUTO
+
+**SPACE** is push-to-talk. Hold the space bar while you speak and release when
+you are done. Nothing is sent until you release, so a cough or a colleague
+talking behind you costs nothing.
+
+**AUTO** is hands-free. It listens for you to stop and sends when you do. This
+is the right mode for a screen on a wall that people walk up to; SPACE is the
+right mode at a desk in a noisy room.
+
+Click the control to switch between them.
+
+### TALK
+
+Opens the microphone. Nothing is transcribed until you press it, and the
+button reports what state it is in — TALK, HOLD SPACE, or listening.
+
+The browser will ask permission the first time. If it never asks, see
+**When the microphone will not open** below.
+
+### AUDIO
+
+Mutes the spoken reply. The answer still arrives and still appears in the
+transcript; it simply is not read out. Useful in a shared room.
+
+### TEXT
+
+Hides the transcript and gives the space to the figure. The conversation still
+happens — this only affects what is on screen. Turn it off for a display that
+is mostly being looked at rather than read.
+
+## Typing instead of talking
+
+The field along the bottom takes typed questions. Press Enter to send. Talking
+and typing are the same conversation, so you can start with your voice and
+finish with the keyboard.
+
+## Wake and sleep words
+
+An administrator may have set a wake word. If so, the display ignores what it
+hears until it hears that word — which is what makes it usable in a room where
+people are talking to each other rather than to it.
+
+Once woken it stays awake for a set period and then goes quiet on its own. You
+can also end the conversation deliberately with the sleep word, if one is
+configured. Ask your administrator which words are set.
+
+**Going to sleep clears the conversation.** This is deliberate — see below.
+
+## What it remembers
+
+Two different things, and it is worth knowing which is which.
+
+**The conversation** is held for as long as the session lasts, so you can say
+"and what about the other one?" and be understood. It is discarded when the
+display goes to sleep. Nothing about the conversation is written to disk.
+
+**Your four control settings** are remembered in your own browser, so the
+display comes back the way you left it. They stay until you clear your browser
+data. They are yours alone — they do not change what anyone else sees, and
+they are not sent to the server.
+
+## When the microphone will not open
+
+Browsers only allow microphone access on a secure origin. If you reached the
+display over plain `http://`, the microphone is blocked by the browser and no
+setting in Resonance can unblock it — the fault is in the address, not the
+app.
+
+Use the `https://` address instead. Everything else on the page works either
+way; only the microphone is affected. If you do not know the secure address,
+ask your administrator.
+
+If you are on `https://` and it still does not work:
+
+- Check the browser has not remembered a "block" decision for this site. In
+  most browsers this is the padlock or shield in the address bar.
+- Check no other application has the microphone open.
+- On a shared machine, check the operating system's own microphone permission.
+
+## If it mishears you
+
+- Speak at a normal pace. Slowing down unnaturally makes transcription worse,
+  not better.
+- In SPACE mode, start speaking after you press, not as you press.
+- If it consistently mishears one particular word, tell your administrator —
+  there is an accuracy setting they can change.
+
+## Getting a better answer
+
+The assistant is told to keep replies short, because they are read aloud and a
+long spoken answer is hard to follow. If you want more, ask for it directly:
+"explain that in more detail" works.
+
+If it says something that looks like a formatting error — reading out asterisks
+or hyphens — that is worth reporting. The reply should be plain prose.
