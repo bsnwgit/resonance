@@ -155,11 +155,25 @@ The microphone requires a secure origin, so generate a certificate first:
 
 | listener | purpose |
 | --- | --- |
-| `http://<host>:9700` | the display, everything except the microphone |
+| `http://<host>:9700` | redirects to 9701 — see below |
 | `https://<host>:9701` | the display in full, including the mic |
 | `https://<host>:9702` | **administration**, behind a sign-in |
 
 The certificate is self-signed, so expect one browser warning.
+
+**On your own machine, none of that applies.** Set *reachable at* to **this
+machine only** in APP SETTINGS and restart, and there is no certificate to
+make, no browser warning, and no first-run password to fish out of a log:
+
+| listener | purpose |
+| --- | --- |
+| `http://localhost:9700` | the display in full — the mic works here |
+| `http://localhost:9702` | **administration**, no sign-in |
+
+Browsers already treat `http://localhost` as a secure origin, so `getUserMedia`
+runs and nothing crosses a network for TLS to protect. Two settings decide
+which of these you get — what it is reachable at, and what it takes to get in —
+and they are independent. See *App settings & accounts* in the manual.
 
 ## Settings and the admin model
 
@@ -261,10 +275,18 @@ in-memory, cookie-based, `HttpOnly` + `Secure` + `SameSite=Strict`, and expire
 after 8 hours of inactivity. Failed sign-ins back off geometrically per client
 address. Changing a password or a role drops that account's live sessions.
 
-**HTTPS only, by design.** The admin listener does not start without a
-certificate, because it accepts a password and a password over plain HTTP
-crosses the network in the clear. If it is missing from the startup banner,
-run `make-cert.sh` and restart.
+**HTTPS only wherever a network is involved.** The admin listener does not
+start without a certificate, because it accepts a password and holds the
+assistant's API key, and neither may cross the network in the clear. If it is
+missing from the startup banner, run `make-cert.sh` and restart.
+
+The one exception is loopback, where the reason does not apply: nothing
+crosses a network at all, `http://localhost` is a secure origin in its own
+right, and the certificate ceremony is pure obstruction in front of the
+install that setting exists to make possible. With sign-in set to nothing
+there is no password either — everyone who can reach that listener is an
+admin, which is the whole of the setting and why it is only defensible when
+the network is already the boundary.
 
 > This is local-account authentication, deliberately: no directory, no third
 > party, nothing leaves the machine to log in — the same principle as the
@@ -599,61 +621,6 @@ twin-lobe silhouette at favicon size and stays legible to 16px.
 
 Roughly in order of value:
 
-- **Backend adapter.** Replace `askBackend()` with a real assistant, keeping
-  demo mode as the fallback.
-- **Two separate settings: what it binds to, and what it takes to get in.**
-  Everything else here assumes a server several people can reach. One person
-  running this on their own machine is a different product, and making them
-  fish a generated password out of a log to configure their own laptop is
-  absurd.
-
-  These are deliberately not one "mode". Binding and authentication are
-  independent, and collapsing them into a single label produces a label that
-  lies the moment someone changes the binding. The interface should report the
-  actual pair — what it is reachable at, and what it takes to get in — rather
-  than a name.
-
-  | bound to | to get in | fits |
-  | --- | --- | --- |
-  | loopback | nothing | your own machine; nothing else can reach it |
-  | one address | nothing | your own home network, your call, stated plainly |
-  | one address | a single PIN, no accounts | a home network you would rather not leave open |
-  | everything | accounts and roles | anywhere other people are |
-
-  At **loopback with no authentication** the network is already the boundary,
-  so accounts add nothing. This install also needs no certificate at all:
-  browsers treat `http://localhost` as a secure context, so the microphone
-  works unprompted. Start it, open localhost, talk to it — none of the setup
-  ceremony below applies. Memory simply works, because one machine is one
-  identity and there is nothing to scope it against or authenticate.
-
-  **Beyond loopback with no authentication** is a genuine choice somebody may
-  want on their own network, and it is not dressed up as anything else: the
-  structural argument for skipping accounts is gone, and what is left is the
-  owner accepting a risk on a network they control. It warns loudly at startup
-  and banners in the interface. Not refused — but a laptop configured this way
-  that later joins an office network must not be quiet about it.
-
-  **A single PIN with no accounts** is the middle rung and costs nothing new —
-  the PIN machinery below, applied to the whole display rather than to a named
-  identity. No account management, no admin sign-in, just a number at the
-  door. For a home server it is probably the right answer: it keeps a guest's
-  phone or a smart television out without turning a house into an enterprise.
-
-  **Accounts and roles** stay the default, because the safe default is the one
-  that assumes it can be reached.
-
-  Two things worth stating even where none of this applies: binding to one
-  specific address rather than every interface is worth doing regardless, so a
-  laptop that later joins another network does not follow you onto it — and a
-  firewall rule, which is outside this application entirely, does more than
-  anything inside it.
-
-- **HTTPS only.** Retire the plain listener. The microphone already refuses to
-  work on it, so today it mostly generates confusion about why half the
-  interface is dead. Make it a permanent redirect to the HTTPS port rather
-  than deleting it, or every bookmark and kiosk startup URL dies silently on
-  the day it changes. Lets cookies carry `Secure` unconditionally.
 - **Identity, in three strengths.** How a device or person identifies itself
   decides what may be kept, because the strength of the claim and the
   durability of the memory should move together.
@@ -740,6 +707,14 @@ Roughly in order of value:
 
   Devices and identities are listed in the admin page with when they were last
   seen, and deletable there.
+
+  **This work now also owes the middle rung of the sign-in axis** — a single
+  PIN for the whole display, no accounts. Binding and authentication shipped
+  with their outer two rungs only, because that rung is this machinery pointed
+  at a display rather than at a named person, and building it twice would be
+  the waste. The setting is present and disabled until then, so the gap is
+  visible rather than silent, and the server names it specifically if
+  something asks for it over the API.
 
 - **Memory.** Give conversations meaning across sessions — derived, not
   verbatim. A rolling summary or a small set of retained facts, not a
@@ -835,6 +810,32 @@ Roughly in order of value:
 ## Progress log
 
 Newest first.
+
+### 2026-08-13 — what it is reachable at, and what it takes to get in
+
+- **Two settings, not one mode.** Binding and authentication are independent,
+  and a single label covering both starts lying the moment somebody changes
+  half of it. The panel shows the pair and states the arrangement underneath
+  in the words it means.
+- **A personal install exists.** Bound to loopback there is no certificate to
+  make, no first-run password to fish out of a log, and the microphone works
+  unprompted — `http://localhost` is already a secure origin, so the rule that
+  kept the admin page off plain HTTP has nothing left to protect there.
+- **Binding to one address** rather than every interface, chosen from the
+  addresses the machine actually has. An address it does not have is a server
+  that will not start, and it would take the admin page with it.
+- **Beyond loopback with no sign-in is allowed and never quiet** — a banner in
+  the panel before saving, a warning on save, a loud one at every startup, and
+  a banner across the display itself. A machine set up this way on a network
+  its owner controls may later join one they do not.
+- **The plain listener redirects to HTTPS**, keeping bookmarks, kiosk URLs and
+  QR codes alive with path and query intact. **307, not a permanent redirect**
+  — the target is configuration an admin can change, and a cached permanent
+  one would strand every browser that ever visited on a dead port.
+- **Not built: the middle rung**, a single PIN for the whole display. It is
+  identity's PIN machinery pointed at a display, so it lands there rather than
+  twice. Present and disabled, and named specifically if the API is asked for
+  it.
 
 ### 2026-08-13 — another application can put this in its own page
 

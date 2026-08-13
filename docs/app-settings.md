@@ -3,6 +3,74 @@
 Everything in this document is about how the server itself is wired, as
 opposed to how the interface looks.
 
+## Reach and sign-in
+
+Two settings, deliberately not one "mode": **what it is reachable at**, and
+**what it takes to get in**. They are independent, and a single label covering
+both starts lying the moment somebody changes half of it — "personal" would
+still read personal after the binding moved to every interface on the machine.
+The panel shows the pair and states the arrangement underneath in the words it
+actually means.
+
+| Reachable at | To get in | Fits |
+|---|---|---|
+| this machine only | nothing | your own machine; nothing else can reach it |
+| one address | nothing | your own home network, your call, stated plainly |
+| one address | a single PIN | a home network you would rather not leave open |
+| everything | accounts and roles | anywhere other people are |
+
+### This machine only
+
+Loopback. The network is already the boundary, so accounts add nothing — and
+**no certificate is needed**: browsers treat `http://localhost` as a secure
+origin, so the microphone works unprompted and nothing crosses a network for
+TLS to protect. Start it, open localhost, talk to it. None of the certificate
+ceremony applies, and the admin page is served over plain HTTP here for the
+same reason.
+
+This is the install that makes fishing a generated password out of a log
+unnecessary on your own laptop.
+
+### One address
+
+Worth doing regardless of anything else on this page. A machine bound to one
+specific address rather than every interface does not follow you onto the next
+network it joins. The panel offers the addresses this machine actually has
+rather than a box to type one into — an address this machine does not have is
+a server that will not start, and it would take the admin page with it.
+
+If a stored address later disappears — a DHCP lease that moved, an interface
+that is down — it is still shown, flagged, rather than some other address
+being silently selected in its place.
+
+### Beyond loopback with no sign-in
+
+Allowed, and not dressed up as anything else. The structural argument for
+skipping accounts is gone and what is left is you accepting a risk on a
+network you control. It is not refused, because you may want exactly that —
+but it **warns at every startup and banners in the display itself**, because a
+laptop configured this way that later joins an office network will not have
+changed on the day that matters.
+
+A firewall rule, which is outside this application entirely, does more than
+anything inside it.
+
+### A single PIN — not built yet
+
+One number for the whole display, no accounts, no admin sign-in. The middle
+rung, and the right answer for a home server: it keeps a guest's phone or a
+smart television out without turning a house into an enterprise. It is the PIN
+machinery from identity pointed at a display rather than at a named person, so
+it arrives with that work rather than being built twice. The button is present
+and disabled so the omission is visible rather than silent.
+
+### Accounts and roles
+
+The default, because the safe default is the one that assumes it can be
+reached. With sign-in set to nothing there are no accounts to manage: the
+ACCOUNTS tab is not offered, and the account routes refuse rather than quietly
+writing to a file nothing consults.
+
 ## Ports
 
 Three listeners, each with a job:
@@ -19,6 +87,35 @@ The admin port serves this page and requires a sign-in.
 The admin routes are not merely hidden on the display ports — they **do not
 exist** there. Asking for one returns "not found", not "unauthorised", because
 answering "unauthorised" would confirm the route is there for anyone probing.
+
+### The plain HTTP port redirects
+
+Wherever HTTPS exists and the server is reachable beyond this machine, the
+plain port stops serving and **redirects to the HTTPS port** instead. The
+microphone already refuses to work on an insecure origin, so a display served
+there was half dead and mostly generated confusion about why.
+
+It redirects rather than being deleted, so every bookmark, kiosk startup URL
+and printed QR code pointing at it keeps working — with its path and query
+intact, which is what matters for a `?display=` URL taped to the back of a
+screen.
+
+The redirect is **temporary (307), not permanent**. A permanent one is cached
+by the browser indefinitely, and the target here is configuration you can
+change: move the HTTPS port, or switch the machine to loopback, and every
+browser that had ever visited would go on redirecting to a port nothing
+answers on — unfixable from the server, and curable only by each person
+clearing their site data by hand. A temporary redirect keeps the bookmark
+working, which was the entire point, and costs one extra request per visit.
+
+Two cases where the plain port keeps serving normally:
+
+- **Bound to this machine only**, where it is the whole product and
+  `http://localhost` is already a secure origin.
+- **Beyond loopback with no certificate**, where there is no HTTPS to redirect
+  *to*. Sending every visitor to a dead port would take the product off the
+  air to enforce a rule it cannot satisfy, so it keeps serving and says so at
+  startup.
 
 Ports must be between 1024 and 65535 and all three different. Below 1024
 requires root, and this server deliberately runs as an ordinary user.

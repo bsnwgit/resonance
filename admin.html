@@ -626,12 +626,13 @@
   .sl input::-webkit-slider-thumb{-webkit-appearance:none;width:9px;height:9px;background:var(--hue);cursor:pointer}
   .sl input::-moz-range-thumb{width:9px;height:9px;border:0;background:var(--hue);cursor:pointer}
   #voicesel,#neuralvoice,#wakeword,#sleepword,#greetings,#wakealiases,#sleepaliases,#farewells,
-  #opname,#ainame{
+  #opname,#ainame,#ap_bindaddr{
     width:100%;margin:9px 0 4px;font:inherit;font-size:calc(9.5px * var(--fs));padding:5px 6px;
     background:rgba(0,0,0,.6);color:var(--text);
     border:1px solid rgba(var(--glass),.16);outline:0;
   }
-  #voicesel option,#neuralvoice option{background:#0a0d14;color:#dfe9f2}
+  #voicesel option,#neuralvoice option,#ap_bindaddr option{background:#0a0d14;color:#dfe9f2}
+  #ap_bindaddr:focus{border-color:var(--hue-dim)}
   /* engine-specific blocks: exactly one is ever shown, and both start at the
      SAME y so switching engines doesn't move the voice list. The margin has
      to sit on the wrapper, not on the select inside it, or the wrapped list
@@ -1114,6 +1115,54 @@ reply is read aloud, so this asks for plain prose.</div>
     <h4>Noise floor</h4>
     <div class="grpbody">  <div class="sl"><label>static level</label><output id="o_floor"></output><input id="s_floor" type="range" min="0" max="2" step=".01"></div>
   <div class="sl"><label>crackle</label><output id="o_crackle"></output><input id="s_crackle" type="range" min="0" max="1.5" step=".01"></div></div>
+  </section>
+
+  <!-- Two settings, not one mode. A single label covering both starts lying
+       the moment somebody changes half of it, so the panel shows the pair and
+       states the arrangement underneath in the words it actually means. -->
+  <section class="grp" data-tab="app">
+    <h4>Reach &amp; sign-in</h4>
+    <div class="grpbody">
+  <div class="pending" id="posturewarn" hidden></div>
+
+  <label class="bklab">reachable at</label>
+  <div class="seg" id="ap_bind">
+    <button data-v="loopback">THIS MACHINE ONLY</button>
+    <button data-v="address">ONE ADDRESS</button>
+    <button data-v="everything">EVERYTHING</button>
+  </div>
+  <div id="row_bindaddr" hidden>
+    <label class="bklab">which address</label>
+    <select id="ap_bindaddr"></select>
+  </div>
+  <div class="note help">Which addresses the server answers on. Binding one
+address rather than every interface is worth doing on its own account: a
+laptop that later joins another network does not follow you onto it.
+
+<b>This machine only</b> needs no certificate — browsers already treat
+http://localhost as a secure origin, so the microphone works unprompted and
+nothing crosses a network. Start it, open localhost, talk to it.</div>
+
+  <label class="bklab" style="margin-top:12px">to get in</label>
+  <div class="seg" id="ap_auth">
+    <button data-v="none">NOTHING</button>
+    <button data-v="pin" disabled title="arrives with identity">A SINGLE PIN</button>
+    <button data-v="accounts">ACCOUNTS &amp; ROLES</button>
+  </div>
+  <div class="note help">What it takes to reach this configuration page.
+
+<b>Nothing</b> is for a machine only you can reach, where the network is
+already the boundary and accounts add nothing — and it is what makes a
+personal install possible without fishing a generated password out of a log.
+<b>Accounts &amp; roles</b> is the default, because the safe default is the one
+that assumes it can be reached.
+
+<b>A single PIN</b> — one number for the whole display, no account management —
+is the middle rung and is not built yet. It is the PIN machinery from identity
+pointed at a display rather than a person, so it lands with that.</div>
+
+  <div class="note" id="posturenow"></div>
+    </div>
   </section>
 
   <section class="grp" data-tab="app">
@@ -1776,10 +1825,47 @@ window.addEventListener('beforeunload', e=>{
 const APP_FIELDS = {ap_http:'http_port', ap_https:'https_port',
                     ap_admin:'admin_port', ap_session:'session_idle_minutes'};
 
+/* The two axes are a segmented control each, so they read as one choice from
+   a closed set rather than a value you could mistype. */
+const segValue = id => ((document.querySelector('#' + id + ' button.on') || {}).dataset || {}).v;
+function segSet(id, v){
+  document.querySelectorAll('#' + id + ' button').forEach(
+    b => b.classList.toggle('on', b.dataset.v === v));
+}
+
+/* The pair, in the words it actually means — never a name for the
+   combination. "Personal" would still read personal after somebody moved the
+   binding, which is the failure that looks like success. */
+function postureSync(){
+  const bind = segValue('ap_bind'), auth = segValue('ap_auth');
+  $('row_bindaddr').hidden = bind !== 'address';
+  const where = bind === 'loopback' ? 'this machine only'
+              : bind === 'address'  ? ($('ap_bindaddr').value || 'one address')
+              : 'every interface on this machine';
+  const door = auth === 'none' ? 'no sign-in' : 'accounts and roles';
+  $('posturenow').textContent = 'Reachable at ' + where + ' · ' + door + '.' +
+    (bind === 'loopback' ? ' No certificate needed.' : '');
+  /* Warn against what is being CHOSEN, before it is saved — the server warns
+     again on save and again at every restart. Three times is not too many for
+     the one arrangement that is wide open. */
+  const w = $('posturewarn');
+  if (auth === 'none' && bind !== 'loopback'){
+    w.textContent = 'NO SIGN-IN, AND REACHABLE FROM THE NETWORK\n' +
+      'Anyone who can reach this machine could change its configuration, ' +
+      'including the assistant’s API key.\n\n' +
+      'Allowed — you may want exactly this on a network you control. But a ' +
+      'machine set up this way that later joins an office network will not ' +
+      'have changed on the day that matters.';
+    w.hidden = false;
+  } else w.hidden = true;
+}
+
 function showPending(j){
   const box = $('apppending');
   const names = {http_port:'display · plain HTTP', https_port:'display · HTTPS',
-                 admin_port:'administration', session_idle_minutes:'session length'};
+                 admin_port:'administration', session_idle_minutes:'session length',
+                 bind:'reachable at', bind_address:'which address',
+                 auth:'to get in'};
   const run = j.running || {};
   ['http','https','admin'].forEach(k=>{
     const el = $('now_' + k), p = run[k + '_port'];
@@ -1807,6 +1893,28 @@ async function loadApp(){
     Object.keys(APP_FIELDS).forEach(id=>{
       const el = $(id); if (el) el.value = j.app[APP_FIELDS[id]];
     });
+    /* Offer the addresses this machine actually has. Typing one by hand is a
+       way to configure a server that will not start — and the one place you
+       cannot recover from is the one that takes the admin page with it. */
+    const sel = $('ap_bindaddr');
+    sel.innerHTML = '';
+    (j.addresses || []).forEach(a=>{
+      const o = document.createElement('option');
+      o.value = a; o.textContent = a; sel.appendChild(o);
+    });
+    if (j.app.bind_address && !(j.addresses || []).includes(j.app.bind_address)){
+      // Stored, but gone since — a DHCP lease that moved, or an interface that
+      // is down. Keep showing it, flagged, rather than silently selecting some
+      // other address and reporting a binding nobody chose.
+      const o = document.createElement('option');
+      o.value = j.app.bind_address;
+      o.textContent = j.app.bind_address + ' — not on this machine now';
+      sel.appendChild(o);
+    }
+    sel.value = j.app.bind_address || '';
+    segSet('ap_bind', j.app.bind);
+    segSet('ap_auth', j.app.auth);
+    postureSync();
     showPending(j);
   }catch(e){ $('appnote').className = 'note bad'; $('appnote').textContent = e.message; }
 }
@@ -1824,6 +1932,16 @@ $('b_apprevert').addEventListener('click', async ()=>{
   if (!note.classList.contains('bad')) note.textContent = 'back to what is saved';
 });
 
+['ap_bind', 'ap_auth'].forEach(id=>{
+  document.querySelector('#' + id).addEventListener('click', e=>{
+    const b = e.target.closest('button');
+    if (!b || b.disabled) return;      // the PIN rung is not built yet
+    segSet(id, b.dataset.v);
+    postureSync();
+  });
+});
+$('ap_bindaddr').addEventListener('change', postureSync);
+
 $('b_appsave').addEventListener('click', async ()=>{
   const note = $('appnote');
   note.className = 'note';
@@ -1833,6 +1951,9 @@ $('b_appsave').addEventListener('click', async ()=>{
     const el = $(id);
     if (el && el.value !== '') body[APP_FIELDS[id]] = parseInt(el.value, 10);
   });
+  body.bind = segValue('ap_bind');
+  body.bind_address = body.bind === 'address' ? ($('ap_bindaddr').value || '') : '';
+  body.auth = segValue('ap_auth');
   try{
     const j = await api('/app', {method:'POST', body: JSON.stringify(body)});
     note.textContent = (j.pending && j.pending.length)
@@ -2687,10 +2808,15 @@ function start(){
   // both ways in land here — a fresh sign-in and a page opened with a live
   // cookie — so the heartbeat is started in one place
   signedOut = false;
-  startBeat();
+  // Nothing to expire when there is no sign-in, so nothing to poll for.
+  if (!ME.no_auth) startBeat();
   $('whoname').textContent = ME.user;
   $('whorole').textContent = ME.role;
-  $('whoami').textContent = 'Signed in as ' + ME.user + ' (' + ME.role + ').';
+  /* With no sign-in there is nobody to name, and "Signed in as (no sign-in)"
+     is worse than saying plainly what is going on. */
+  $('whoami').textContent = ME.no_auth
+    ? 'No sign-in on this server — everyone who can reach it is an admin.'
+    : 'Signed in as ' + ME.user + ' (' + ME.role + ').';
   /* Set both ways round rather than only hiding. A session can now end and
      be replaced in the same tab, so an admin signing in after a viewer must
      get their controls back — this used to be a one-way trip because the
@@ -2703,6 +2829,11 @@ function start(){
   // are credentials rather than configuration.
   $('tab_app').style.display = admin ? '' : 'none';
   $('tab_embeds').style.display = admin ? '' : 'none';
+  // Same argument for accounts when there is no sign-in: the tab manages a
+  // set of people who cannot sign in and are keeping nobody out. The server
+  // refuses those routes outright; the panel should not offer them either.
+  $('tab_accounts').style.display = ME.no_auth ? 'none' : '';
+  $('b_signout').style.display = ME.no_auth ? 'none' : '';
   if (!admin) status('read-only account — you can look, not change');
   // the create form opens on the preset its first button is already lit for
   if (ME.role === 'admin') emApplyPreset('full');
