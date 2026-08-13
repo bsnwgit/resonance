@@ -9,6 +9,8 @@ app.json.tmp
 server.pid
 users.json
 users.json.tmp
+embeds.json
+embeds.json.tmp
 server.log
 voices/
 stt-venv/

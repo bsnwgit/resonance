@@ -20,13 +20,32 @@
     --text:#f2f6fa;
     --ui:#c3cedb;
     --ui-bright:#dfe9f2;
+
+    /* Typography — the same three faces and three sizes the display has,
+       kept identical to the block in index.html on purpose: the panel is
+       setting this FOR the display, so the two must mean the same thing by
+       the same name. All installed faces; a webfont would be this project's
+       first runtime dependency and it is not worth taking for this. */
+    --fs:1;
+    --face-mono: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --face-sans: ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,
+                 "Helvetica Neue",Arial,sans-serif;
+    --face-wide: Verdana,"DejaVu Sans",Tahoma,Geneva,Arial,sans-serif;
+    --face: var(--face-mono);
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
   body{
     background:var(--ink);
     color:var(--ui);
-    font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    /* Split out of the `font:` shorthand so the family and the scale can be
+       set independently. The panel adopts the same typography it is setting
+       for everyone else — an admin choosing a face for a wall display should
+       be reading the result while they choose it, not guessing at it from a
+       600px preview. */
+    font-family:var(--face);
+    font-size:calc(13px * var(--fs));
+    line-height:1.5;
     overflow:hidden;
     -webkit-font-smoothing:antialiased;
   }
@@ -40,19 +59,19 @@
   #gatemark{display:block;width:248px;height:73px}
   #gatecard{width:320px;padding:26px 24px;border:1px solid rgba(var(--glass),.14);
             background:rgba(255,255,255,.02)}
-  #gatecard .sub{font-size:9px;letter-spacing:.24em;color:rgba(var(--paper),.8);
+  #gatecard .sub{font-size:calc(9px * var(--fs));letter-spacing:.24em;color:rgba(var(--paper),.8);
                  margin-bottom:18px}
-  #gatecard label{display:block;font-size:9px;letter-spacing:.14em;
+  #gatecard label{display:block;font-size:calc(9px * var(--fs));letter-spacing:.14em;
                   color:rgba(var(--paper),.8);margin:12px 0 4px}
-  #gatecard input{width:100%;font:inherit;font-size:12px;padding:7px 8px;
+  #gatecard input{width:100%;font:inherit;font-size:calc(12px * var(--fs));padding:7px 8px;
                   background:rgba(0,0,0,.55);color:var(--text);
                   border:1px solid rgba(var(--glass),.16);outline:0}
   #gatecard input:focus{border-color:var(--hue-dim)}
-  #gatebtn{width:100%;margin-top:18px;font:inherit;font-size:9.5px;letter-spacing:.16em;
+  #gatebtn{width:100%;margin-top:18px;font:inherit;font-size:calc(9.5px * var(--fs));letter-spacing:.16em;
            padding:9px;cursor:pointer;background:none;color:rgba(var(--paper),.94);
            border:1px solid rgba(var(--glass),.3)}
   #gatebtn:hover{border-color:var(--hue);color:var(--hue)}
-  #gateerr{font-size:9px;letter-spacing:.06em;color:#ff8a8a;margin-top:12px;min-height:14px;
+  #gateerr{font-size:calc(9px * var(--fs));letter-spacing:.06em;color:#ff8a8a;margin-top:12px;min-height:14px;
            line-height:1.5}
 
 
@@ -127,10 +146,10 @@
     padding:8px 10px;margin:6px 0 0;
   }
   .docitem:hover{border-color:var(--hue)}
-  .docitem .t{font-size:10px;letter-spacing:.12em;color:var(--text)}
-  .docitem .s{font-size:9px;letter-spacing:.04em;line-height:1.5;
+  .docitem .t{font-size:calc(10px * var(--fs));letter-spacing:.12em;color:var(--text)}
+  .docitem .s{font-size:calc(9px * var(--fs));letter-spacing:.04em;line-height:1.5;
               color:rgba(var(--paper),.7);margin-top:3px}
-  .docitem .a{font-size:8px;letter-spacing:.16em;color:var(--hue-dim);
+  .docitem .a{font-size:calc(8px * var(--fs));letter-spacing:.16em;color:var(--hue-dim);
               border:1px solid rgba(var(--glass),.22);padding:1px 4px;
               margin-left:6px;vertical-align:1px}
 
@@ -149,44 +168,44 @@
   }
   #dochead .right{margin-left:auto;display:flex;gap:6px;flex:0 0 auto}
   #dochead button{
-    font:inherit;font-size:9.5px;letter-spacing:.12em;padding:6px 10px;
+    font:inherit;font-size:calc(9.5px * var(--fs));letter-spacing:.12em;padding:6px 10px;
     cursor:pointer;background:none;color:var(--text);
     border:2px solid rgba(var(--glass),.45);
   }
   #dochead button:hover{border-color:var(--hue);color:var(--hue)}
-  #doctitle{font-size:12px;letter-spacing:.16em;color:var(--text)}
-  #docsub{font-size:9px;letter-spacing:.05em;color:rgba(var(--paper),.7);
+  #doctitle{font-size:calc(12px * var(--fs));letter-spacing:.16em;color:var(--text)}
+  #docsub{font-size:calc(9px * var(--fs));letter-spacing:.05em;color:rgba(var(--paper),.7);
           margin-top:4px;line-height:1.5}
   /* The reading column. Prose wants a measure — a 1000px line of 9px text is
      a chore to track back along — so the body is capped and the window can be
      as wide as it likes. */
   #docbody{
     flex:1 1 auto;min-height:0;overflow-y:auto;padding:20px 26px 40px;
-    font-size:11px;line-height:1.72;color:rgba(var(--paper),.92);
+    font-size:calc(11px * var(--fs));line-height:1.72;color:rgba(var(--paper),.92);
     letter-spacing:.02em;
   }
   #docbody > *{max-width:78ch}
-  #docbody h1{font-size:15px;letter-spacing:.14em;color:var(--text);
+  #docbody h1{font-size:calc(15px * var(--fs));letter-spacing:.14em;color:var(--text);
               margin:0 0 4px;font-weight:400}
-  #docbody h2{font-size:12px;letter-spacing:.14em;color:var(--text);
+  #docbody h2{font-size:calc(12px * var(--fs));letter-spacing:.14em;color:var(--text);
               margin:26px 0 8px;font-weight:400;
               border-bottom:1px solid rgba(var(--glass),.28);padding-bottom:5px}
-  #docbody h3{font-size:10.5px;letter-spacing:.12em;color:var(--ui-bright);
+  #docbody h3{font-size:calc(10.5px * var(--fs));letter-spacing:.12em;color:var(--ui-bright);
               margin:18px 0 5px;font-weight:400}
   #docbody p{margin:0 0 11px}
   #docbody ul,#docbody ol{margin:0 0 11px;padding-left:20px}
   #docbody li{margin:0 0 4px}
-  #docbody code{font-size:10px;background:rgba(var(--glass),.08);
+  #docbody code{font-size:calc(10px * var(--fs));background:rgba(var(--glass),.08);
                 padding:1px 4px;color:var(--ui-bright)}
   #docbody pre{background:rgba(var(--glass),.06);
                border-left:2px solid rgba(var(--glass),.28);
                padding:9px 12px;margin:0 0 12px;overflow-x:auto}
-  #docbody pre code{background:none;padding:0;font-size:10px;line-height:1.6}
+  #docbody pre code{background:none;padding:0;font-size:calc(10px * var(--fs));line-height:1.6}
   #docbody hr{border:0;border-top:1px solid rgba(var(--glass),.28);margin:18px 0}
   #docbody blockquote{margin:0 0 11px;padding-left:12px;
                       border-left:2px solid rgba(var(--glass),.28);
                       color:rgba(var(--paper),.78)}
-  #docbody table{border-collapse:collapse;margin:0 0 13px;font-size:10px;
+  #docbody table{border-collapse:collapse;margin:0 0 13px;font-size:calc(10px * var(--fs));
                  max-width:100%}
   #docbody th,#docbody td{border:1px solid rgba(var(--glass),.22);
                           padding:5px 9px;text-align:left;vertical-align:top}
@@ -199,15 +218,52 @@
   #docbody strong{color:var(--text);font-weight:400}
   #docbody a{color:var(--hue);text-decoration:underline}
 
-  /* ---------- admin shell ---------- */
-  #wrap{position:fixed;inset:0;display:none;grid-template-columns:425px 1fr}
+  /* ---------- admin shell ----------
+     The split started as a big preview with a 425px column of settings beside
+     it, which was right when there were forty controls. There are rather more
+     than that now and more coming, so the proportions are the other way round:
+     the panel takes the window and the preview keeps a fixed strip.
+
+     The preview is a fixed width rather than a fraction because it is a
+     REPRESENTATION — it has to be wide enough to show the display as a viewer
+     on a desktop sees it. Below 560px the display collapses to its narrow
+     layout, icons instead of words, so a preview allowed to shrink past that
+     would quietly start previewing a phone. The strip stays clear of it. */
+  :root{--stage:600px}
+  #wrap{position:fixed;inset:0;display:none;grid-template-columns:1fr var(--stage)}
   #wrap.on{display:grid}
+  /* A laptop cannot afford 600px of preview and a usable panel at once. Take
+     it down to something still above the display's own breakpoint first, and
+     only stack when there is genuinely no width left to split. */
+  @media (max-width:1280px){ :root{--stage:480px} }
+  @media (max-width:1000px){
+    #wrap{grid-template-columns:1fr;grid-template-rows:1fr 320px}
+    #panel{border-right:0;border-bottom:1px solid rgba(var(--glass),.12)}
+  }
   #panel{
     position:relative;height:100%;min-height:0;display:flex;flex-direction:column;
     border-right:1px solid rgba(var(--glass),.12);background:rgba(0,0,0,.35);
   }
   /* the settings scroll; the identity below stays put */
-  #panelscroll{flex:1 1 auto;min-height:0;overflow-y:auto;padding:12px 14px 24px}
+  #panelscroll{
+    flex:1 1 auto;min-height:0;overflow-y:auto;padding:12px 14px 24px;
+    /* the topics tile against THIS width, not the window's — the panel is one
+       column of a grid and the two are not the same number */
+    container-type:inline-size;
+  }
+  /* Everything above the topics stays a column at a readable measure. A
+     search field and a row of tabs stretched to 1300px is not more usable
+     for being wider, and the space is better spent on the topics.
+
+     The measure is put on the CONTROLS rather than on the block holding
+     them, so the dividers between them are not caught by it. A rule is not
+     a control — it is the edge of a region, and it has to reach as far as
+     the region does or it reads as an underline on the column above it
+     instead of a division of the panel. */
+  #panelhead > .findrow,
+  #panelhead > .tabs,
+  #panelhead > #savestate,
+  #panelhead > #saverow{max-width:560px}
   #panelfoot{
     flex:0 0 auto;padding:10px 14px 12px;
     /* same strength as the rules bracketing the save row: this separates the
@@ -215,8 +271,13 @@
        worth seeing at the same weight */
     border-top:1px solid rgba(var(--glass),.55);background:rgba(0,0,0,.5);
   }
+  /* Same measure as the header, so the pinned entries and the identity stay
+     in one column down the left rather than a row of buttons a metre wide. */
+  #panelfoot > *{max-width:560px}
+  /* nothing but the tab row lives here now — the identity moved to the bar
+     at the top of the panel, where it does not scroll away */
   #savestate{
-    font-size:9px;letter-spacing:.06em;line-height:1.5;
+    font-size:calc(9px * var(--fs));letter-spacing:.06em;line-height:1.5;
     color:rgba(var(--paper),.88);margin:8px 0 0;min-height:0;
   }
   /* the one state where the admin's view and everyone else's disagree */
@@ -241,6 +302,47 @@
   /* the first topic's own top rule would double up with the box edge */
   #grpbox .grp:first-of-type{border-top:0;margin-top:6px}
 
+  /* An OPEN topic gets a box of its own. Closed, a topic is one line and a
+     hairline between neighbours is enough to separate it; open, it is a
+     block of controls that belongs to a heading, and without an edge those
+     controls read as loose on the panel — particularly once the topics tile
+     and the thing below an open one is a different topic entirely rather
+     than more of the same column.
+
+     Listed after the :first-of-type exception above, which it ties with on
+     specificity: an open first topic wants its box like any other. */
+  #grpbox .grp:not(.shut){
+    border:1px solid rgba(var(--glass),.42);
+    background:rgba(var(--glass),.035);
+    padding:0 11px 10px;
+  }
+  /* The heading keeps its own underline inside the box, separating the
+     title from the controls. Left where it is rather than pulled out to the
+     box edges — the caret is absolutely positioned against this element, and
+     moving the element moves the caret off the text it belongs to. */
+
+  /* Once the panel is wide enough to hold two of them side by side, the
+     topics tile instead of running down one long column. This is the point
+     of the extra width: a tab's worth of topics is meant to be taken in at a
+     glance, and a wide single column is a worse wall to scroll than a narrow
+     one, not a better one.
+
+     Keyed to the PANEL's width with a container query. A viewport query
+     would be guessing at the same number through two layers of grid. */
+  @container (min-width:700px){
+    #grpbox{
+      display:grid;align-items:start;
+      grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+      column-gap:20px;
+    }
+    /* Tiled, the first topic is a cell like any other and its rule caps the
+       cell rather than doubling up with the box edge — so it comes back, and
+       every column starts the same way. */
+    #grpbox .grp:first-of-type{
+      border-top:1px solid rgba(var(--glass),.20);margin-top:14px;
+    }
+  }
+
   /* One hover treatment for every control on the page. The panel is dense,
      and a button that does not answer the pointer reads as inert — the tab
      row and the segmented controls had no hover at all. Disabled controls
@@ -250,10 +352,8 @@
   .seg button:hover:not(:disabled),
   .urow button:hover:not(:disabled),
   #stagebar button:hover:not(:disabled),
-  #tab_ai:hover:not(:disabled),
-  #tab_app:hover:not(:disabled),
-  #tab_accounts:hover:not(:disabled),
-  #tab_docs:hover:not(:disabled),
+  /* the five that used to be listed here individually are all `.tabs`
+     buttons now, covered by the first selector */
   #b_signout:hover:not(:disabled),
   #gatebtn:hover:not(:disabled){
     border-color:var(--hue);color:var(--hue);
@@ -268,65 +368,92 @@
     color:var(--text);padding:6px 10px;letter-spacing:.12em;
   }
   #saverow button:hover:not(:disabled){border-color:var(--hue);color:var(--hue)}
+  /* Colour on the two that change something, and only on those two. Muted
+     and translucent like the rest of this palette — a saturated pair would
+     sit on top of the page rather than in it — but far enough apart that
+     writing to everyone and throwing your edits away cannot be confused at
+     a glance.
+
+     Selected THROUGH #saverow, not as bare ids. `#saverow button` is an id
+     plus an element and beats a bare `#b_save`, so the plain version of
+     these rules lost the cascade outright and neither button changed
+     colour. Coming later in the file does nothing when the other selector
+     is the more specific one. */
+  #saverow #b_save{
+    border-color:rgba(122,201,160,.75);color:#a8e3c4;
+    background:rgba(122,201,160,.10);
+  }
+  #saverow #b_save:hover:not(:disabled){
+    border-color:rgba(122,201,160,1);color:#d2f2e2;
+    background:rgba(122,201,160,.20);
+  }
+  #saverow #b_revert{
+    border-color:rgba(224,132,132,.7);color:#eaa8a8;
+    background:rgba(224,132,132,.09);
+  }
+  #saverow #b_revert:hover:not(:disabled){
+    border-color:rgba(224,132,132,1);color:#f6cdcd;
+    background:rgba(224,132,132,.18);
+  }
   #saverule{margin:10px 0 2px}
-  #tab_ai,#tab_app,#tab_accounts,#tab_docs{
-    width:100%;font:inherit;font-size:9.5px;letter-spacing:.14em;padding:7px 8px;
-    cursor:pointer;text-align:left;background:none;color:rgba(var(--paper),.88);
-    border:1px solid rgba(var(--glass),.22);
-  }
-  #tab_app,#tab_accounts{margin-bottom:5px}
-  /* One tab wide and sitting under the last of them: the row is three
-     flex:1 buttons with two 4px gaps, so a third of what is left after the
-     gaps matches exactly. Centred and right-aligned like the tab it follows,
-     rather than left-aligned like the full-width entries in the foot. */
-  #tab_ai{
-    /* display:block is load-bearing — a button is inline-block by default and
-       margin-left:auto does nothing to one, so it stayed on the left. */
-    display:block;
-    width:calc((100% - 8px) / 3);
-    margin:0 0 4px auto;
-    text-align:center;
-  }
-  #tab_ai:hover,#tab_app:hover,#tab_accounts:hover,#tab_docs:hover{
-    border-color:var(--hue);color:var(--hue)}
-  #tab_ai.on,#tab_app.on,#tab_accounts.on,#tab_docs.on{
-    border-color:var(--hue-dim);color:var(--hue);background:rgba(var(--glass),.06)}
+  /* AI sits in the tab row itself now, and the four pinned entries are a row
+     of their own in the foot. Both are `.tabs`, so the hover and selected
+     treatments come from there and none of them needs a rule of its own —
+     the width arithmetic that used to place AI under the third tab, and the
+     full-width stacked entries in the foot, both went with the 425px column
+     they were sized for. */
+  #foottabs{margin-bottom:0}
+  /* Grow from their own label rather than from a zero basis, so on a panel
+     too narrow to hold four they wrap to a second line instead of squeezing
+     DOCUMENTATION out through its own border. */
+  #foottabs button{flex:1 1 auto;white-space:nowrap}
   /* a change here does nothing until the process restarts, so say so loudly */
   .pending{
     border-left:2px solid #e8b04a;padding-left:8px;margin-top:10px;
-    font-size:9px;letter-spacing:.06em;line-height:1.6;color:#f0cf94;
+    font-size:calc(9px * var(--fs));letter-spacing:.06em;line-height:1.6;color:#f0cf94;
     white-space:pre-line;
   }
   #portgrid{display:grid;grid-template-columns:1fr auto;gap:6px 10px;
             align-items:center;margin-top:8px}
-  #portgrid label{font-size:9.5px;letter-spacing:.08em;color:rgba(var(--paper),.9)}
+  #portgrid label{font-size:calc(9.5px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.9)}
   /* the session field is the same kind of thing as a port — a small number
      you type, not prose — so it takes the same treatment */
-  #portgrid input,#ap_session{
-    width:88px;font:inherit;font-size:10px;padding:4px 6px;
+  #portgrid input,#ap_session,#em_ttl{
+    width:88px;font:inherit;font-size:calc(10px * var(--fs));padding:4px 6px;
     background:rgba(0,0,0,.6);color:var(--text);
     border:1px solid rgba(var(--glass),.16);outline:0;text-align:right;
   }
-  #portgrid input:focus,#ap_session:focus{border-color:var(--hue-dim)}
-  #ap_session{display:block;margin:4px 0}
+  #portgrid input:focus,#ap_session:focus,#em_ttl:focus{border-color:var(--hue-dim)}
+  #ap_session,#em_ttl{display:block;margin:4px 0}
   /* the spinner arrows are the operating system's, and look it */
   #portgrid input::-webkit-outer-spin-button,
   #portgrid input::-webkit-inner-spin-button,
   #ap_session::-webkit-outer-spin-button,
   #ap_session::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
-  #portgrid input,#ap_session{-moz-appearance:textfield;appearance:textfield}
+  #portgrid input,#ap_session,#em_ttl{-moz-appearance:textfield;appearance:textfield}
+  #em_ttl::-webkit-outer-spin-button,
+  #em_ttl::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   #pw_cur:focus,#pw_new:focus,#nu_name:focus,#nu_pw:focus,
   #bk_url:focus,#bk_model:focus,#bk_key:focus,#bk_keepalive:focus,
-  #bk_system:focus{border-color:var(--hue-dim)}
-  #portgrid .now{grid-column:1/-1;font-size:8.5px;letter-spacing:.06em;
+  #bk_system:focus,#em_name:focus,#em_origins:focus{border-color:var(--hue-dim)}
+  #portgrid .now{grid-column:1/-1;font-size:calc(8.5px * var(--fs));letter-spacing:.06em;
                  color:rgba(var(--paper),.7);margin:-2px 0 4px}
-  #whobox{display:flex;align-items:center;gap:8px;margin-top:9px}
-  #whoname{font-size:10px;letter-spacing:.08em;color:rgba(var(--paper),.92);
+  /* The panel's own bar, matching #stagebar across the window so the two
+     read as one line rather than as a header on one side and a heading on
+     the other. */
+  #panelbar{
+    flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:8px 14px;
+    border-bottom:1px solid rgba(var(--glass),.1);
+    font-size:calc(9px * var(--fs));letter-spacing:.16em;color:rgba(var(--paper),.75);
+  }
+  #panelbar .right{margin-left:auto}
+  #whobox{display:flex;align-items:center;gap:8px;min-width:0}
+  #whoname{font-size:calc(10px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.92);
            overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  #whorole{font-size:8px;letter-spacing:.14em;padding:2px 5px;
+  #whorole{font-size:calc(8px * var(--fs));letter-spacing:.14em;padding:2px 5px;white-space:nowrap;
            border:1px solid rgba(var(--glass),.25);color:rgba(var(--paper),.8)}
   #b_signout{
-    margin-left:auto;font:inherit;font-size:8.5px;letter-spacing:.12em;
+    font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.12em;white-space:nowrap;
     padding:3px 7px;cursor:pointer;background:none;
     color:rgba(var(--paper),.8);border:1px solid rgba(var(--glass),.22);
   }
@@ -334,10 +461,10 @@
   #stage{position:relative;display:flex;flex-direction:column;min-width:0}
   #stagebar{display:flex;align-items:center;gap:12px;padding:8px 14px;
             border-bottom:1px solid rgba(var(--glass),.1);
-            font-size:9px;letter-spacing:.16em;color:rgba(var(--paper),.75)}
+            font-size:calc(9px * var(--fs));letter-spacing:.16em;color:rgba(var(--paper),.75)}
   #stagebar b{color:rgba(var(--paper),.94);font-weight:400}
   #stagebar .right{margin-left:auto;display:flex;gap:8px}
-  #stagebar button{font:inherit;font-size:9px;letter-spacing:.12em;padding:4px 8px;
+  #stagebar button{font:inherit;font-size:calc(9px * var(--fs));letter-spacing:.12em;padding:4px 8px;
                    cursor:pointer;background:none;color:rgba(var(--paper),.87);
                    border:1px solid rgba(var(--glass),.2)}
   #stagebar button:hover{border-color:var(--hue);color:var(--hue)}
@@ -347,41 +474,75 @@
   }
   .ro #panel .grp[data-tab="accounts"] .seg button,
   .ro #panel .grp[data-tab="accounts"] input{pointer-events:auto;opacity:1}
-  #rolebadge{font-size:8.5px;letter-spacing:.14em;padding:2px 6px;
+  #rolebadge{font-size:calc(8.5px * var(--fs));letter-spacing:.14em;padding:2px 6px;
              border:1px solid rgba(var(--glass),.25);color:rgba(var(--paper),.87)}
-  .note{font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.88);
+  .note{font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);
         margin-top:8px;line-height:1.6;white-space:pre-line}
   .note.bad{color:#ff8a8a}
-  .whoami{font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.92);
+  .whoami{font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.92);
           padding-bottom:6px}
-  .bklab{display:block;font-size:9.5px;letter-spacing:.1em;
+  .bklab{display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;
          color:rgba(var(--paper),.9);margin-top:10px}
   #pw_cur,#pw_new,#nu_name,#nu_pw,
-  #bk_url,#bk_model,#bk_key,#bk_keepalive,#bk_system{
-    width:100%;margin:4px 0;font:inherit;font-size:9.5px;padding:5px 6px;
+  #bk_url,#bk_model,#bk_key,#bk_keepalive,#bk_system,
+  #em_name,#em_origins{
+    width:100%;margin:4px 0;font:inherit;font-size:calc(9.5px * var(--fs));padding:5px 6px;
     background:rgba(0,0,0,.6);color:var(--text);
     border:1px solid rgba(var(--glass),.16);outline:0;
   }
+  #em_origins{resize:vertical;line-height:1.6}
   .urow{display:flex;align-items:center;gap:8px;padding:6px 0;
-        border-bottom:1px solid rgba(var(--glass),.08);font-size:9.5px;
+        border-bottom:1px solid rgba(var(--glass),.08);font-size:calc(9.5px * var(--fs));
         letter-spacing:.06em;color:rgba(var(--paper),.94)}
   .urow .r{margin-left:auto;display:flex;gap:4px}
-  .urow button{font:inherit;font-size:8.5px;letter-spacing:.1em;padding:3px 6px;
+  .urow button{font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.1em;padding:3px 6px;
                cursor:pointer;background:none;color:rgba(var(--paper),.87);
                border:1px solid rgba(var(--glass),.2)}
   .urow button:hover{border-color:var(--hue);color:var(--hue)}
-  .urow .tag{font-size:8px;letter-spacing:.12em;color:rgba(var(--paper),.75)}
-  
+  .urow .tag{font-size:calc(8px * var(--fs));letter-spacing:.12em;color:rgba(var(--paper),.75)}
+
+  /* ---- embeds ----
+     Two axes, two blocks, never merged into one list of checkboxes: what it
+     may DO and what it DRAWS are different questions, and a panel that shows
+     them as one teaches the operator the wrong model. */
+  .erow{display:block;padding:8px 0;
+        border-bottom:1px solid rgba(var(--glass),.08)}
+  .erow .top{display:flex;align-items:center;gap:8px}
+  .erow .nm{font-size:calc(10px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.96)}
+  .erow .r{margin-left:auto;display:flex;gap:4px}
+  .erow button{font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.1em;padding:3px 6px;
+               cursor:pointer;background:none;color:rgba(var(--paper),.87);
+               border:1px solid rgba(var(--glass),.2)}
+  .erow button:hover{border-color:var(--hue);color:var(--hue)}
+  .erow .meta{font-size:calc(8.5px * var(--fs));letter-spacing:.06em;line-height:1.7;
+              color:rgba(var(--paper),.72);margin-top:4px}
+  .erow .meta b{color:rgba(var(--paper),.9);font-weight:400}
+  .erow.off{opacity:.5}
+  .erow .badge{font-size:calc(7.5px * var(--fs));letter-spacing:.14em;padding:1px 5px;
+               border:1px solid rgba(var(--glass),.25);color:rgba(var(--paper),.8)}
+  .cks{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;margin:6px 0 2px}
+  .cks label{display:flex;align-items:center;gap:6px;font-size:calc(9px * var(--fs));
+             letter-spacing:.08em;color:rgba(var(--paper),.9);cursor:pointer}
+  .cks input{accent-color:var(--hue);margin:0}
+  /* the key, shown once and never again — it must look like a thing to copy
+     rather than a line of prose to skim past */
+  #em_key{
+    display:none;margin-top:8px;padding:8px;word-break:break-all;
+    font-size:calc(9.5px * var(--fs));line-height:1.6;color:var(--hue);
+    background:rgba(0,0,0,.6);border:1px solid var(--hue-dim);
+  }
+  #em_key.on{display:block}
+
   /* ---- rig: tabs > collapsible sections ---- */
   .tabs{display:flex;gap:4px;margin-bottom:10px}
   .tabs button{
-    flex:1;font:inherit;font-size:9px;letter-spacing:.18em;padding:6px 4px;cursor:pointer;
+    flex:1;font:inherit;font-size:calc(9px * var(--fs));letter-spacing:.18em;padding:6px 4px;cursor:pointer;
     background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.85);
   }
   .tabs button.on{border-color:var(--hue-dim);color:var(--hue);background:rgba(var(--glass),.08)}
   .findrow{display:flex;margin:0 0 4px}
   #rigfind{
-    flex:1;min-width:0;margin:0;font:inherit;font-size:9.5px;padding:5px 7px;
+    flex:1;min-width:0;margin:0;font:inherit;font-size:calc(9.5px * var(--fs));padding:5px 7px;
     background:rgba(0,0,0,.5);color:var(--text);
     border:1px solid rgba(var(--glass),.18);outline:0;-webkit-appearance:none;appearance:none;
   }
@@ -395,7 +556,7 @@
   .grp:first-of-type{border-top:0;margin-top:8px}
   .grp[hidden]{display:none}
   #panel h4{
-    font-size:9px;letter-spacing:.24em;text-transform:uppercase;font-weight:400;
+    font-size:calc(9px * var(--fs));letter-spacing:.24em;text-transform:uppercase;font-weight:400;
     color:rgba(var(--paper),.9);margin:10px 0 8px;padding:0 0 6px 12px;
     border-bottom:1px solid rgba(var(--glass),.10);
     cursor:pointer;position:relative;user-select:none;
@@ -412,19 +573,19 @@
   .grpbody{padding-bottom:4px}
   .seg{display:flex;flex-wrap:wrap;gap:4px}
   .seg button{
-    font:inherit;font-size:9.5px;letter-spacing:.1em;padding:5px 8px;cursor:pointer;
+    font:inherit;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;padding:5px 8px;cursor:pointer;
     background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.9);
   }
   .seg button.on{border-color:var(--hue-dim);color:var(--hue);background:rgba(var(--glass),.06)}
   .sl{display:grid;grid-template-columns:1fr auto;gap:2px 8px;margin:9px 0;align-items:center}
-  .sl label{font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.9)}
-  .sl output{font-size:9.5px;color:var(--text)}
+  .sl label{font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9)}
+  .sl output{font-size:calc(9.5px * var(--fs));color:var(--text)}
   .sl input{grid-column:1/-1;width:100%;height:2px;-webkit-appearance:none;appearance:none;
             background:rgba(var(--glass),.18);outline:0}
   .sl input::-webkit-slider-thumb{-webkit-appearance:none;width:9px;height:9px;background:var(--hue);cursor:pointer}
   .sl input::-moz-range-thumb{width:9px;height:9px;border:0;background:var(--hue);cursor:pointer}
   #voicesel,#neuralvoice,#wakeword,#sleepword,#greetings,#wakealiases,#sleepaliases,#farewells{
-    width:100%;margin:9px 0 4px;font:inherit;font-size:9.5px;padding:5px 6px;
+    width:100%;margin:9px 0 4px;font:inherit;font-size:calc(9.5px * var(--fs));padding:5px 6px;
     background:rgba(0,0,0,.6);color:var(--text);
     border:1px solid rgba(var(--glass),.16);outline:0;
   }
@@ -444,11 +605,42 @@
      they used to go to the mic section's note, which is invisible when that
      topic is folded, so the user never saw "say it now". */
   .learnnote{
-    font-size:9px;letter-spacing:.06em;line-height:1.5;margin-top:6px;
+    font-size:calc(9px * var(--fs));letter-spacing:.06em;line-height:1.5;margin-top:6px;
     color:rgba(var(--paper),.88);min-height:0;
   }
   .learnnote.live{
     color:var(--hue);border-left:2px solid var(--hue-dim);padding-left:7px;
+  }
+
+  /* ---------- password manager overlays ----------
+     Every field in this panel already carries the opt-out attribute for all
+     four major managers (see leaveFieldsAlone). LastPass observably ignores
+     its own on some of these — verified in the inspector: the input has
+     data-lpignore="true" and the extension appends its icon root next to it
+     regardless. So the field cannot refuse it, and the container has to.
+
+     This is hiding another program's interface, which is not a thing to do
+     lightly, so it is scoped as narrowly as it can be: only inside the
+     settings panel, and NOT inside the accounts section, where the password
+     fields are and where a manager is exactly what you want.
+
+     `visibility` rather than `display`: the injected element sets
+     `display: initial !important` inline, and an inline important beats a
+     stylesheet important, so a display rule would simply lose. Visibility is
+     not set inline, and — the part that matters — it inherits, so it reaches
+     the icon even when the extension has put it inside a shadow root that no
+     selector of ours could otherwise touch. */
+  #panel [data-lastpass-icon-root],
+  #panel [data-lastpass-root],
+  #panel [data-lastpass-infield]{
+    visibility:hidden !important;
+    pointer-events:none !important;
+  }
+  #panel .grp[data-tab="accounts"] [data-lastpass-icon-root],
+  #panel .grp[data-tab="accounts"] [data-lastpass-root],
+  #panel .grp[data-tab="accounts"] [data-lastpass-infield]{
+    visibility:visible !important;
+    pointer-events:auto !important;
   }
 </style>
 </head>
@@ -473,7 +665,22 @@
 
 <div id="wrap">
 <div id="panel">
+  <!-- The identity sits at the top right of the panel, opposite the stage's
+       own bar across the window. It is outside #panelscroll on purpose: who
+       you are signed in as, and the way out, should not scroll away under a
+       tab's worth of settings. -->
+  <div id="panelbar">
+    <span>SETTINGS</span>
+    <span class="right" id="whobox">
+      <span id="whoname">—</span>
+      <span id="whorole"></span>
+      <button id="b_signout" title="end this session">SIGN OUT</button>
+    </span>
+  </div>
   <div id="panelscroll">
+  <!-- Wrapped so the header keeps a readable measure while the topics below
+       take the full width of a wide panel. -->
+  <div id="panelhead">
   <div class="findrow">
     <input id="rigfind" type="search" placeholder="filter settings…" spellcheck="false">
   </div>
@@ -482,8 +689,8 @@
     <button data-tab="look"   class="on">LOOK</button>
     <button data-tab="motion">MOTION</button>
     <button data-tab="speech">SPEECH</button>
+    <button id="tab_ai" data-tab="ai">AI</button>
   </div>
-  <button id="tab_ai" data-tab="ai">AI</button>
   <div id="savestate"></div>
   <div class="rule"></div>
 
@@ -492,6 +699,7 @@
     <button id="b_revert">REVERT</button>
   </div>
   <div class="rule" id="saverule"></div>
+  </div><!-- /panelhead -->
 
   <div id="grpbox">
   <section class="grp" data-tab="look">
@@ -519,6 +727,35 @@
     <button data-v="hero" class="on">HERO</button>
     <button data-v="bleed">FULL BLEED</button>
   </div></div>
+  </section>
+  <section class="grp" data-tab="look">
+    <h4>Typography</h4>
+    <div class="grpbody">
+  <label class="bklab">face</label>
+  <div class="seg" data-set="face">
+    <button data-v="mono" class="on">MONO</button>
+    <button data-v="sans">SANS</button>
+    <button data-v="wide">WIDE</button>
+  </div>
+  <label class="bklab">size</label>
+  <div class="seg" data-set="fs">
+    <button data-v="1" class="on">NORMAL</button>
+    <button data-v="1.12">LARGE</button>
+    <button data-v="1.25">LARGER</button>
+  </div>
+  <div class="note">
+    <b>MONO</b> is the original. <b>SANS</b> is whatever this machine calls
+    its interface font. <b>WIDE</b> has the most open letterforms of the
+    three and is usually the easiest of them to read as light text on black.
+
+    Three sizes and no more: this is a dense layout measured in pixels, and a
+    range wide enough to be interesting is wide enough to push a label
+    through the side of its button.
+
+    This panel takes the same face and size it is setting, so what you are
+    reading while you choose is the choice.
+  </div>
+    </div>
   </section>
   <section class="grp" data-tab="look">
     <h4>Form &amp; size</h4>
@@ -637,12 +874,12 @@ reply is read aloud, so this asks for plain prose.</div>
     <button data-v="demo" class="on">DEMO REPLIES</button>
     <button data-v="api">CONNECTED AI</button>
   </div>
-  <div style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5">
+  <div style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5">
     DEMO answers from built-in text, so you can prove the whole chain works
     before connecting anything. Keep it here during setup.
   </div>
   <div class="seg" style="margin-top:8px"><button id="b_selftest">RUN SELF-TEST</button></div>
-  <div id="selftest" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.6;white-space:pre-line"></div>
+  <div id="selftest" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.6;white-space:pre-line"></div>
     </div>
   </section>
 
@@ -658,7 +895,7 @@ reply is read aloud, so this asks for plain prose.</div>
   <div class="sl"><label>pitch</label><output id="o_vpitch"></output><input id="s_vpitch" type="range" min=".5" max="2" step=".05"></div>
   </div>
   <div class="sl"><label>speech rate</label><output id="o_vrate"></output><input id="s_vrate" type="range" min=".5" max="2" step=".05"></div>
-  <div id="voicenote" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.88);margin:2px 0 8px;line-height:1.5"></div>
+  <div id="voicenote" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin:2px 0 8px;line-height:1.5"></div>
   <div class="seg" data-set="src">
     <button data-v="token">TOKEN</button>
     <button data-v="tts" class="on">TTS</button>
@@ -668,7 +905,7 @@ reply is read aloud, so this asks for plain prose.</div>
     <button id="b_test">TEST VOICE</button>
     <button id="b_diag">DIAGNOSE</button>
   </div>
-  <div id="ttsnote" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:8px;line-height:1.5"></div></div>
+  <div id="ttsnote" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:8px;line-height:1.5"></div></div>
   </section>
   <section class="grp" data-tab="speech">
     <h4>Speech in (mic)</h4>
@@ -689,8 +926,8 @@ reply is read aloud, so this asks for plain prose.</div>
     <button data-v="raw">RAW (best visuals)</button>
   </div>
   <div class="seg" style="margin-top:6px"><button id="b_cal">CALIBRATE (stay quiet 2s)</button></div>
-  <div id="miclevel" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5">level —</div>
-  <div id="micnote" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:8px;line-height:1.5">off</div></div>
+  <div id="miclevel" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5">level —</div>
+  <div id="micnote" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:8px;line-height:1.5">off</div></div>
   </section>
   <section class="grp" data-tab="speech">
     <h4>Wake word</h4>
@@ -702,36 +939,36 @@ reply is read aloud, so this asks for plain prose.</div>
   <input id="wakeword" type="text" spellcheck="false" autocomplete="off" placeholder="trigger word">
   <div class="seg" style="margin-top:6px"><button id="b_learn">LEARN HOW I SAY IT (3x)</button></div>
   <div id="learnwakenote" class="learnnote"></div>
-  <label style="display:block;font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:10px">also accept (learned)</label>
+  <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:10px">also accept (learned)</label>
   <textarea id="wakealiases" rows="3" spellcheck="false" placeholder="one per line"></textarea>
 
 <div class="sl"><label>stays awake for</label><output id="o_wakewindow"></output><input id="s_wakewindow" type="range" min="3" max="60" step="1"></div>
-  <label style="display:block;font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:8px">when that time runs out</label>
+  <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:8px">when that time runs out</label>
   <div class="seg" data-set="byeontimeout">
     <button data-v="1" class="on">SAY FAREWELL</button>
     <button data-v="0">GO QUIET</button>
   </div>
-  <label style="display:block;font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:10px">greeting phrases</label>
+  <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:10px">greeting phrases</label>
   <textarea id="greetings" rows="4" spellcheck="false" placeholder="one per line — {name} inserts the wake word"></textarea>
   <div class="seg"><button id="b_greet">TEST GREETING</button></div>
-  <div id="wakestate" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5"></div></div>
+  <div id="wakestate" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5"></div></div>
     </section>
 
   <section class="grp" data-tab="speech">
     <h4>Sleep word</h4>
     <div class="grpbody">
-  <label style="display:block;font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:0">word that ends the conversation at once</label>
+  <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:0">word that ends the conversation at once</label>
   <input id="sleepword" type="text" spellcheck="false" autocomplete="off" placeholder="e.g. goodbye">
   <div class="seg" style="margin-top:6px"><button id="b_learnsleep">LEARN HOW I SAY IT (3x)</button></div>
   <div id="learnsleepnote" class="learnnote"></div>
-  <label style="display:block;font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:10px">also accept (learned)</label>
+  <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:10px">also accept (learned)</label>
   <textarea id="sleepaliases" rows="2" spellcheck="false" placeholder="one per line"></textarea>
 
-  <label style="display:block;font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:10px">farewell phrases</label>
+  <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:10px">farewell phrases</label>
   <textarea id="farewells" rows="3" spellcheck="false" placeholder="one per line — {name} inserts the wake word"></textarea>
   <div class="seg"><button id="b_bye">TEST FAREWELL</button></div>
   
-    <div id="sleepstate" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5"></div>
+    <div id="sleepstate" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5"></div>
     </div>
 </section>
 <section class="grp" data-tab="speech">
@@ -781,10 +1018,17 @@ root, and the server runs as an ordinary user.</div>
   <section class="grp" data-tab="app">
     <h4>Sessions</h4>
     <div class="grpbody">
-  <label class="bklab">sign-in lasts (hours of inactivity)</label>
-  <input id="ap_session" type="number" inputmode="numeric">
+  <label class="bklab">sign-in lasts (minutes of inactivity)</label>
+  <input id="ap_session" type="number" inputmode="numeric" min="5" max="480">
   <div class="note">How long an idle admin session survives before it has to
-sign in again. Activity pushes the deadline out.</div>
+sign in again. Activity pushes the deadline out; the panel checks every 45
+seconds and returns you to the sign-in as soon as it lapses, so a forgotten
+tab is a sign-in screen rather than a live panel.
+
+Minutes, and short by default. This session configures what everyone else is
+looking at — it should last a piece of work, not a working day. Signing back
+in costs a password and keeps your username, which is what makes a short one
+bearable.</div>
     </div>
   </section>
 
@@ -837,6 +1081,99 @@ sign in again. Activity pushes the deadline out.</div>
   <div class="note" id="usernote"></div>
     </div>
   </section>
+  <section class="grp" data-tab="embeds">
+    <h4>Embed keys</h4>
+    <div class="grpbody">
+  <div id="emblist"></div>
+  <div class="note" style="margin-top:10px">
+    A key lets another application's <b>server</b> ask this one for a
+    short-lived session and put the result in an iframe. What it may do and
+    what it draws are fixed when you create it: to change either, create a
+    new key and retire this one.
+  </div>
+    </div>
+  </section>
+
+  <section class="grp" data-tab="embeds">
+    <h4>Create an embed key</h4>
+    <div class="grpbody">
+  <label class="bklab">name</label>
+  <input id="em_name" type="text" spellcheck="false" autocomplete="off"
+         placeholder="lobby kiosk">
+
+  <label class="bklab">start from</label>
+  <div class="seg" id="em_preset">
+    <button data-v="full" class="on">FULL</button>
+    <button data-v="console">CONSOLE</button>
+    <button data-v="voice">VOICE</button>
+    <button data-v="chat">CHAT</button>
+    <button data-v="kiosk">KIOSK</button>
+    <button data-v="signage">SIGNAGE</button>
+  </div>
+
+  <label class="bklab">what it may do</label>
+  <div class="cks" id="em_cap">
+    <label><input type="checkbox" data-c="ask"> ask</label>
+    <label><input type="checkbox" data-c="mic"> microphone</label>
+    <label><input type="checkbox" data-c="speak"> speak</label>
+  </div>
+  <div class="note">Permission, not furniture. Hiding the TALK button below
+does not withdraw the microphone.</div>
+
+  <label class="bklab">what it draws</label>
+  <div class="cks" id="em_parts">
+    <label><input type="checkbox" data-p="visual"> figure</label>
+    <label><input type="checkbox" data-p="transcript"> transcript</label>
+    <label><input type="checkbox" data-p="input"> input field</label>
+    <label><input type="checkbox" data-p="mode"> SPACE/AUTO</label>
+    <label><input type="checkbox" data-p="talk"> TALK</label>
+    <label><input type="checkbox" data-p="audio"> AUDIO</label>
+    <label><input type="checkbox" data-p="text"> TEXT</label>
+  </div>
+
+  <label class="bklab">allowed to frame it — one origin a line</label>
+  <textarea id="em_origins" rows="3" spellcheck="false"
+            placeholder="https://app.example.com"></textarea>
+
+  <label class="bklab">session length, minutes</label>
+  <input id="em_ttl" type="number" min="5" max="1440" value="60">
+
+  <div class="seg" style="margin-top:8px"><button id="b_addembed">CREATE</button></div>
+  <div class="note" id="embnote"></div>
+  <div id="em_key"></div>
+    </div>
+  </section>
+
+  <section class="grp" data-tab="embeds">
+    <h4>How a host uses it</h4>
+    <div class="grpbody">
+  <div class="note">Their server exchanges the key for a session, then their
+page frames what comes back. The key never reaches a browser.
+
+<b>1 — on their server</b>
+POST https://this-server:9701/embed/session
+{"key": "e0123….the-secret"}
+→ {"token": "…", "src": "/embed?t=…", "expires_in": 3600}
+
+<b>2 — in their page</b>
+&lt;iframe src="https://this-server:9701/embed?t=…"
+        allow="microphone"&gt;&lt;/iframe&gt;
+
+<b>3 — to show less than the key grants</b>
+frame.contentWindow.postMessage(
+  {rsn:1, kind:'narrow', parts:['visual'], cap:{mic:false}}, origin)
+
+A host can only ever narrow. Anything they ask for beyond the key is
+dropped by the embed itself, not refused by agreement.</div>
+  <div class="note" style="border-left:2px solid #e8b04a;padding-left:8px">
+    <b>The one everybody hits:</b> a microphone inside an iframe needs
+    <b>allow="microphone"</b> on the iframe, the host page itself on HTTPS,
+    and the permission granted on their origin. Miss any one and the embed
+    looks broken for reasons that have nothing to do with this server.
+  </div>
+    </div>
+  </section>
+
   <section class="grp" data-tab="docs">
     <h4>Manual</h4>
     <div class="grpbody">
@@ -850,13 +1187,15 @@ button to download it as a PDF.</div>
   </div><!-- /panelscroll -->
 
   <div id="panelfoot">
-    <button id="tab_app" data-tab="app">APP SETTINGS</button>
-    <button id="tab_accounts" data-tab="accounts">ACCOUNTS</button>
-    <button id="tab_docs" data-tab="docs">DOCUMENTATION</button>
-    <div id="whobox">
-      <div id="whoname">—</div>
-      <div id="whorole"></div>
-      <button id="b_signout" title="end this session">SIGN OUT</button>
+    <!-- The same row treatment as the tabs at the top. They were full-width
+         stacked entries because a 425px column had no room to put four
+         side by side; it does now, and four buttons that behave like tabs
+         should look like the tabs. -->
+    <div class="tabs" id="foottabs">
+      <button id="tab_app" data-tab="app">APP SETTINGS</button>
+      <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
+      <button id="tab_accounts" data-tab="accounts">ACCOUNTS</button>
+      <button id="tab_docs" data-tab="docs">DOCUMENTATION</button>
     </div>
   </div>
 </div>
@@ -873,7 +1212,7 @@ button to download it as a PDF.</div>
   </div>
 </div>
 
-<!-- The manual, read over the whole window rather than in the 425px column.
+<!-- The manual, read over the whole window rather than inside the panel.
      Outside #wrap on purpose: it is not part of the panel and must not be
      clipped by it. -->
 <div id="docmodal" role="dialog" aria-modal="true" aria-labelledby="doctitle">
@@ -906,15 +1245,112 @@ let ME = null;                 // {user, role}
 let S  = null;                 // the settings document being edited
 let ready = false;             // has the preview announced itself?
 
+/* -------------------------------------------------- password managers
+   A password manager decides what a field is by guessing, and this panel
+   gives it plenty to guess wrong about: a box labelled "name", a "word that
+   wakes it", a key. So it plants its icon in the corner of a setting, offers
+   to fill a site password into it, and offers to save whatever you type as a
+   new credential.
+
+   Every major one publishes an opt-out attribute and they are all different,
+   so all four go on. `autocomplete="off"` is set alongside them but is not
+   load-bearing — managers have ignored it for years, which is exactly why
+   the vendor attributes exist.
+
+   Done in one pass over the panel rather than by hand on each field, because
+   the alternative is remembering an attribute quartet every time a setting
+   is added, and the failure mode of forgetting is invisible until somebody
+   with an extension installed opens the page.
+
+   The ALLOW list is the point of the exercise: these are the fields where a
+   manager is genuinely wanted, and it must keep working there. The sign-in
+   form is not listed because it is not inside #panel at all.
+
+   Not listed either, deliberately: the assistant's API key. It is a
+   credential, but it is not a credential for THIS site, and the only thing a
+   manager can usefully offer there is to fill in the admin password — which
+   is precisely the wrong string in precisely the wrong box. */
+const PM_ALLOW = new Set(['pw_cur', 'pw_new', 'nu_name', 'nu_pw']);
+function leaveFieldsAlone(){
+  document.querySelectorAll('#panel input, #panel textarea, #panel select')
+    .forEach(el=>{
+      if (PM_ALLOW.has(el.id)) return;
+      if (el.type === 'range' || el.type === 'checkbox') return;
+      el.setAttribute('data-lpignore', 'true');      // LastPass
+      el.setAttribute('data-1p-ignore', '');         // 1Password
+      el.setAttribute('data-bwignore', '');          // Bitwarden
+      el.setAttribute('data-form-type', 'other');    // Dashlane
+      if (!el.getAttribute('autocomplete')) el.setAttribute('autocomplete', 'off');
+    });
+}
+leaveFieldsAlone();
+
 /* ------------------------------------------------------------- session */
+/* An expired session is not an error to report in the corner of whichever
+   panel happened to ask. It is a state change: this page is no longer
+   signed in, and the only thing to do about it is sign in again. So a 401
+   anywhere puts the gate back up, rather than leaving somebody looking at a
+   full interface with "not signed in" in nine-point type under one button.
+
+   Two ways in, deliberately, because one of them is not enough on its own.
+   The 401 catches it the moment anything is asked of the server — but a 401
+   can only arrive if a request is made, and most of this panel is client
+   side. Dragging a slider, switching between LOOK and MOTION, reading a
+   value: none of that touches the server, so a dead session stays invisible
+   for as long as somebody sticks to those. That was the actual hole: the
+   page had already been told nothing, so it reported nothing.
+
+   Hence the heartbeat. It asks a route that exists for this and nothing
+   else, and which deliberately does NOT slide the session — a poll that
+   renewed what it was checking would mean an open tab never expired. */
+const BEAT_MS = 45000;
+let beatTimer = null;
+let signedOut = false;                 // do not race two of these
+
 async function api(path, opts){
   const r = await fetch(path, Object.assign({
     cache:'no-store', headers:{'Content-Type':'application/json'}
   }, opts||{}));
   let j = {};
   try{ j = await r.json(); }catch(e){}
-  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  if (!r.ok){
+    /* /auth/login answers 401 for a wrong password, which is a message on
+       the gate that is already up — not a session ending. */
+    if (r.status === 401 && path !== '/auth/login' && ME) endSession();
+    throw new Error(j.error || ('HTTP ' + r.status));
+  }
   return j;
+}
+
+function startBeat(){
+  clearInterval(beatTimer);
+  beatTimer = setInterval(async ()=>{
+    if (signedOut || !ME) return;
+    try{
+      const r = await fetch('/auth/check', {cache:'no-store'});
+      if (r.status === 401) endSession();
+    }catch(e){}                        // unreachable is not expired
+  }, BEAT_MS);
+}
+
+/* Back to the gate, with the username kept: it is the same person coming
+   back to the same tab, and making them retype it is a small insult at the
+   end of a long day. */
+function endSession(){
+  if (signedOut) return;
+  signedOut = true;
+  clearInterval(beatTimer);
+  const who = ME && ME.user;
+  ME = null;
+  // the reading room sits at z-index 60, above the gate — leaving it open
+  // would put a document on top of a sign-in screen
+  if (typeof closeDoc === 'function') closeDoc();
+  wrap.classList.remove('on');
+  gate.classList.add('on');
+  document.body.classList.remove('ro');
+  $('gateerr').textContent = 'your session ended — sign in again';
+  if (who) $('u').value = who;
+  ($('u').value ? $('p') : $('u')).focus();
 }
 
 async function whoami(){
@@ -970,7 +1406,27 @@ $('b_signout').addEventListener('click', async ()=>{
 });
 
 /* --------------------------------------------------------- preview link */
+/* Typography is the one shared setting this panel applies to ITSELF as well
+   as pushing to the preview. Everything else on the LOOK tab describes the
+   figure, which the panel does not draw; a face and a size describe reading,
+   which is exactly what the panel is for. Choosing a face for a wall display
+   from a 600px preview while the panel stays in something else would be
+   choosing it blind.
+
+   Both values are checked against the lists rather than written through. The
+   settings document is a file somebody can edit by hand, and an unknown face
+   would otherwise land in font-family as a raw string. */
+const FACES = {mono:'--face-mono', sans:'--face-sans', wide:'--face-wide'};
+const SIZES = ['1', '1.12', '1.25'];
+function applyType(){
+  if (!S) return;
+  const r = document.documentElement.style;
+  r.setProperty('--face', 'var(' + (FACES[S.face] || FACES.mono) + ')');
+  r.setProperty('--fs', SIZES.indexOf(String(S.fs)) >= 0 ? String(S.fs) : '1');
+}
+
 function push(){
+  applyType();
   if (ready && S) frame.contentWindow.postMessage(
     {rsn:1, kind:'settings', settings:S}, location.origin);
 }
@@ -988,6 +1444,7 @@ window.addEventListener('message', e=>{
     // so this page never restates them and cannot drift from them
     S = Object.assign({}, m.settings || {});
     if (!built){ buildControls(); built = true; } else { repaintControls(); }
+    applyType();          // the panel adopts the typography it is setting
     isDirty = false;
     /* The line stays empty until it has something worth saying. A count of
        loaded settings is not news — it is the same number every time, and a
@@ -1171,12 +1628,12 @@ window.addEventListener('beforeunload', e=>{
    can take effect while the process is running, so the page's real job is to
    be honest about what is configured versus what is actually bound. */
 const APP_FIELDS = {ap_http:'http_port', ap_https:'https_port',
-                    ap_admin:'admin_port', ap_session:'session_idle_hours'};
+                    ap_admin:'admin_port', ap_session:'session_idle_minutes'};
 
 function showPending(j){
   const box = $('apppending');
   const names = {http_port:'display · plain HTTP', https_port:'display · HTTPS',
-                 admin_port:'administration', session_idle_hours:'session length'};
+                 admin_port:'administration', session_idle_minutes:'session length'};
   const run = j.running || {};
   ['http','https','admin'].forEach(k=>{
     const el = $('now_' + k), p = run[k + '_port'];
@@ -1545,6 +2002,214 @@ $('b_pw').addEventListener('click', async ()=>{
   }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
 });
 
+/* ------------------------------------------------------------- embeds */
+/* Two axes, held apart everywhere: CAP is what the key is permitted to do,
+   PARTS is what it draws. The panel refuses an arrangement where one has a
+   control the other cannot honour — and it refuses it here, naming the
+   orphan, rather than leaving a host developer to read it out of a 400.
+   The server checks the same rules again; this copy is the one a human
+   meets. */
+const EM_PRESETS = {
+  full:    {parts:['visual','transcript','input','mode','talk','audio','text'],
+            cap:{ask:true, mic:true, speak:true}},
+  console: {parts:['visual','transcript','input','mode','talk','audio'],
+            cap:{ask:true, mic:true, speak:true}},
+  voice:   {parts:['visual','mode','talk','audio'],
+            cap:{ask:true, mic:true, speak:true}},
+  chat:    {parts:['transcript','input','text'],
+            cap:{ask:true, mic:false, speak:false}},
+  kiosk:   {parts:['visual'], cap:{ask:true, mic:true, speak:true}},
+  signage: {parts:['visual'], cap:{ask:false, mic:false, speak:true}},
+};
+
+const emParts = ()=> [...document.querySelectorAll('#em_parts input:checked')]
+                       .map(i=> i.dataset.p);
+const emCap = ()=>{
+  const c = {};
+  document.querySelectorAll('#em_cap input').forEach(i=> c[i.dataset.c] = i.checked);
+  return c;
+};
+
+function emApplyPreset(name){
+  const p = EM_PRESETS[name];
+  if (!p) return;
+  document.querySelectorAll('#em_parts input').forEach(i=>
+    i.checked = p.parts.indexOf(i.dataset.p) >= 0);
+  document.querySelectorAll('#em_cap input').forEach(i=>
+    i.checked = !!p.cap[i.dataset.c]);
+  emCheck();
+}
+
+/* The same orphan rules as the server, in the same order and the same
+   words. Two copies of a rule is a real cost; the alternative is an admin
+   pressing CREATE to find out, which is worse for a decision this fiddly. */
+function emIncoherent(parts, cap){
+  const has = p => parts.indexOf(p) >= 0;
+  if (has('text') && !has('transcript'))
+    return "'text' toggles the transcript, and there is no transcript here for it to toggle";
+  if (has('mode') && !has('talk'))
+    return "'mode' configures how a microphone decides you have finished speaking, and this arrangement has no microphone control";
+  if ((has('talk') || has('mode')) && !cap.mic)
+    return "'talk' is a microphone button on a token that is not allowed a microphone — grant the microphone or drop the control";
+  if (has('audio') && !cap.speak)
+    return "'audio' mutes a voice, and this token is not allowed to speak";
+  if ((has('input') || has('talk')) && !cap.ask)
+    return "there is a way to ask here, on a token that is not allowed to ask — grant it, or drop 'input' and 'talk'";
+  if (has('input') && !has('transcript') && !cap.speak)
+    return "'input' types into a void: nothing here reads the answer out and there is no transcript to read it in";
+  if (!parts.length && !cap.speak)
+    return 'this draws nothing and says nothing';
+  return null;
+}
+
+function emCheck(){
+  const note = $('embnote'), btn = $('b_addembed');
+  const err = emIncoherent(emParts(), emCap());
+  note.className = err ? 'note bad' : 'note';
+  note.textContent = err || '';
+  btn.disabled = !!err;
+  return !err;
+}
+
+async function refreshEmbeds(){
+  const box = $('emblist');
+  if (!box || ME.role !== 'admin'){ if (box) box.textContent = ''; return; }
+  try{
+    const j = await api('/embeds');
+    box.innerHTML = '';
+    if (!j.embeds.length){
+      box.className = 'note';
+      box.textContent = 'No embed keys yet. Nothing can frame this interface.';
+      return;
+    }
+    box.className = '';
+    j.embeds.forEach(e=>{
+      const row = document.createElement('div');
+      row.className = 'erow' + (e.enabled === false ? ' off' : '');
+
+      const top = document.createElement('div'); top.className = 'top';
+      const nm = document.createElement('span');
+      nm.className = 'nm'; nm.textContent = e.name;
+      top.appendChild(nm);
+      if (e.enabled === false){
+        const b = document.createElement('span');
+        b.className = 'badge'; b.textContent = 'DISABLED';
+        top.appendChild(b);
+      }
+      if (e.sessions){
+        const b = document.createElement('span');
+        b.className = 'badge';
+        b.textContent = e.sessions + (e.sessions === 1 ? ' SESSION' : ' SESSIONS');
+        top.appendChild(b);
+      }
+      const r = document.createElement('span'); r.className = 'r';
+      const flip = document.createElement('button');
+      flip.textContent = e.enabled === false ? 'ENABLE' : 'DISABLE';
+      flip.onclick = ()=> embedAction('/embeds/enable',
+                                      {id:e.id, enabled: e.enabled === false});
+      const del = document.createElement('button');
+      del.textContent = 'DELETE';
+      del.onclick = ()=>{
+        if (confirm('Delete the embed key "' + e.name + '"? Any page using it '
+                    + 'stops working immediately.'))
+          embedAction('/embeds/delete', {id:e.id});
+      };
+      r.appendChild(flip); r.appendChild(del);
+      top.appendChild(r);
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      const cap = ['ask','mic','speak'].filter(k=> e.cap && e.cap[k]);
+      const lines = [
+        ['may', cap.length ? cap.join(', ') : 'nothing'],
+        ['draws', (e.parts || []).join(', ') || 'nothing'],
+        ['frames', (e.origins || []).join('  ')],
+        ['session', e.ttl_minutes + ' min · ' + (e.cap && e.cap.rate_per_min)
+                    + '/min · id ' + e.id],
+        ['last used', e.last_used
+          ? new Date(e.last_used * 1000).toLocaleString() : 'never'],
+      ];
+      lines.forEach(([k, v])=>{
+        const d = document.createElement('div');
+        const b = document.createElement('b');
+        b.textContent = k + ' ';
+        d.appendChild(b);
+        d.appendChild(document.createTextNode(v));
+        meta.appendChild(d);
+      });
+
+      row.appendChild(top); row.appendChild(meta);
+      box.appendChild(row);
+    });
+  }catch(e){ box.className = 'note bad'; box.textContent = e.message; }
+}
+
+async function embedAction(path, body){
+  const note = $('embnote');
+  note.className = 'note';
+  try{
+    await api(path, {method:'POST', body: JSON.stringify(body)});
+    note.textContent = 'done';
+    refreshEmbeds();
+  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+}
+
+document.querySelector('#em_preset').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#em_preset button')
+          .forEach(x=> x.classList.toggle('on', x === b));
+  emApplyPreset(b.dataset.v);
+});
+/* Editing a box after choosing a preset does not stop it being that
+   arrangement in spirit, but it does stop the name being true — so the
+   preset lights out and the key is recorded as custom. */
+['#em_parts', '#em_cap'].forEach(sel=>
+  document.querySelector(sel).addEventListener('change', ()=>{
+    const lit = document.querySelector('#em_preset button.on');
+    if (lit){
+      const p = EM_PRESETS[lit.dataset.v];
+      const same = p && p.parts.slice().sort().join() === emParts().sort().join()
+                     && ['ask','mic','speak'].every(k=> !!p.cap[k] === emCap()[k]);
+      if (!same) lit.classList.remove('on');
+    }
+    emCheck();
+  }));
+
+/* Shown once, so make taking it one gesture rather than a careful drag
+   across a wrapped string. */
+$('em_key').addEventListener('click', function(){
+  const r = document.createRange();
+  r.selectNodeContents(this);
+  const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+  if (navigator.clipboard) navigator.clipboard.writeText(this.textContent)
+    .then(()=>{ $('embnote').textContent = 'key copied to the clipboard'; })
+    .catch(()=>{});
+});
+
+$('b_addembed').addEventListener('click', async ()=>{
+  if (!emCheck()) return;
+  const note = $('embnote'), out = $('em_key');
+  const lit = document.querySelector('#em_preset button.on');
+  note.className = 'note';
+  out.classList.remove('on');
+  try{
+    const j = await api('/embeds', {method:'POST', body: JSON.stringify({
+      name: $('em_name').value.trim(),
+      preset: lit ? lit.dataset.v : 'custom',
+      parts: emParts(),
+      cap: emCap(),
+      origins: $('em_origins').value.split('\n').map(s=> s.trim()).filter(Boolean),
+      ttl_minutes: Number($('em_ttl').value) || 60,
+    })});
+    out.textContent = j.key;
+    out.classList.add('on');
+    note.textContent = 'Created. Copy the key now — it is stored hashed and '
+                     + 'this server cannot show it again.';
+    $('em_name').value = ''; $('em_origins').value = '';
+    refreshEmbeds();
+  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+});
+
 /* ----------------------------------------------------------- the manual */
 /* The documents are markdown on the server, rendered here for reading and
    rendered again — independently, in Python — for the PDF. Two renderers for
@@ -1724,6 +2389,9 @@ $('b_docpdf').addEventListener('click', async ()=>{
     const r = await fetch('/docs/' + encodeURIComponent(DOC_OPEN) + '.pdf',
                           {cache:'no-store'});
     if (!r.ok){
+      // not an api() call — it returns a blob — so the session check that
+      // lives in there has to be repeated here
+      if (r.status === 401 && ME) endSession();
       const j = await r.json().catch(()=>({}));
       throw new Error(j.error || ('HTTP ' + r.status));
     }
@@ -1747,7 +2415,14 @@ $('b_docpdf').addEventListener('click', async ()=>{
 });
 
 /* ------------------------------------------------------ panel navigation */
+/* Built once per page, not once per sign-in. A session can now end and be
+   replaced in the same tab, and calling this twice would stack a second set
+   of listeners on every tab button and heading — so each click would toggle
+   twice and appear to do nothing. */
+let navBuilt = false;
 function panelNav(){
+  if (navBuilt) return;
+  navBuilt = true;
   const groups = [...document.querySelectorAll('#panel .grp')];
   const shut = new Map();
   let tab = 'look';
@@ -1790,6 +2465,7 @@ function panelNav(){
     syncSaveRow();
     $('panelscroll').scrollTop = 0;
     if (tab === 'accounts') refreshUsers();
+    if (tab === 'embeds') refreshEmbeds();
     if (tab === 'app') loadApp();
     if (tab === 'ai') loadBackend();
     if (tab === 'docs') loadDocs();
@@ -1816,17 +2492,36 @@ function panelNav(){
 function start(){
   gate.classList.remove('on');
   wrap.classList.add('on');
+  /* Again, now the panel is actually visible. The pass at load already
+     covered these, but an extension that scans on visibility rather than on
+     load would have looked at a display:none subtree and may be working from
+     that. Setting an attribute that is already set costs nothing; being
+     wrong about when somebody else's code runs costs an icon in the corner
+     of a port number. */
+  leaveFieldsAlone();
+  $('gateerr').textContent = '';
+  // both ways in land here — a fresh sign-in and a page opened with a live
+  // cookie — so the heartbeat is started in one place
+  signedOut = false;
+  startBeat();
   $('whoname').textContent = ME.user;
   $('whorole').textContent = ME.role;
   $('whoami').textContent = 'Signed in as ' + ME.user + ' (' + ME.role + ').';
-  if (ME.role !== 'admin'){
-    document.body.classList.add('ro');
-    $('b_save').style.display = 'none';
-    // /app is admin-only on the server, so a viewer would open an empty
-    // panel and be left wondering. Don't offer it.
-    $('tab_app').style.display = 'none';
-    status('read-only account — you can look, not change');
-  }
+  /* Set both ways round rather than only hiding. A session can now end and
+     be replaced in the same tab, so an admin signing in after a viewer must
+     get their controls back — this used to be a one-way trip because the
+     only way to change account was a reload. */
+  const admin = ME.role === 'admin';
+  document.body.classList.toggle('ro', !admin);
+  $('b_save').style.display = admin ? '' : 'none';
+  // /app is admin-only on the server, so a viewer would open an empty panel
+  // and be left wondering. Don't offer it. Same for the embed keys, which
+  // are credentials rather than configuration.
+  $('tab_app').style.display = admin ? '' : 'none';
+  $('tab_embeds').style.display = admin ? '' : 'none';
+  if (!admin) status('read-only account — you can look, not change');
+  // the create form opens on the preset its first button is already lit for
+  if (ME.role === 'admin') emApplyPreset('full');
   panelNav();
   // controls are built when the preview announces itself and hands over the
   // settings; nothing to do here but wait for that message

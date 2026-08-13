@@ -88,9 +88,14 @@ APP_DEFAULTS = {
     "http_port": 9700,               # the display, no microphone
     "https_port": 9701,              # the display in full
     "admin_port": 9702,              # this interface
-    "session_idle_hours": 8,
+    # Minutes, and a short default on purpose. An admin session is a window
+    # onto a configuration everyone else is looking at the results of; it
+    # should last a piece of work, not a working day. The panel signs you
+    # back in without ceremony, which is what makes a short one bearable.
+    "session_idle_minutes": 30,
 }
 PORT_MIN, PORT_MAX = 1024, 65535     # below 1024 needs root; this runs as you
+SESSION_MIN, SESSION_MAX = 5, 480    # minutes: below 5 is unusable, above 8h absurd
 
 
 def read_app():
@@ -99,6 +104,18 @@ def read_app():
         with open(APP_PATH) as fh:
             stored = json.load(fh)
         if isinstance(stored, dict):
+            # This was `session_idle_hours` until the unit changed. Carry the
+            # stored value across rather than dropping it: silently shortening
+            # somebody's session is the safe direction, but silently REWRITING
+            # a security setting they chose is not something to do quietly —
+            # the migrated number shows up in the panel for them to lower.
+            if "session_idle_minutes" not in stored and "session_idle_hours" in stored:
+                try:
+                    cfg["session_idle_minutes"] = min(
+                        SESSION_MAX, max(SESSION_MIN,
+                                         int(float(stored["session_idle_hours"]) * 60)))
+                except (TypeError, ValueError):
+                    pass
             cfg.update({k: v for k, v in stored.items() if k in APP_DEFAULTS})
     except (OSError, ValueError):
         pass
@@ -379,14 +396,15 @@ def validate_app(obj, current):
             return None, ("port %d is already in use by something else on this "
                           "machine — the server would fail to start on it"
                           % cfg[k])
-    if "session_idle_hours" in obj:
+    if "session_idle_minutes" in obj:
         try:
-            h = int(obj["session_idle_hours"])
+            m = int(obj["session_idle_minutes"])
         except (TypeError, ValueError):
-            return None, "session length must be a whole number of hours"
-        if not (1 <= h <= 168):
-            return None, "session length must be between 1 and 168 hours"
-        cfg["session_idle_hours"] = h
+            return None, "session length must be a whole number of minutes"
+        if not (SESSION_MIN <= m <= SESSION_MAX):
+            return None, ("session length must be between %d and %d minutes"
+                          % (SESSION_MIN, SESSION_MAX))
+        cfg["session_idle_minutes"] = m
     return cfg, None
 
 # ------------------------------------------------------------------ accounts
@@ -396,7 +414,7 @@ def validate_app(obj, current):
 #   viewer  read the configuration, change nothing
 ROLES = ("admin", "viewer")
 PBKDF2_ROUNDS = 600_000          # ~0.3s per attempt: cheap once, costly to grind
-SESSION_IDLE = 8 * 3600          # inactivity before a session dies; set at startup
+SESSION_IDLE = 30 * 60           # inactivity before a session dies; set at startup
 RUNNING = {}                     # the ports actually bound, to compare against config
 MIN_PASSWORD = 10
 _users_lock = threading.Lock()
@@ -464,9 +482,14 @@ def new_session(username, role):
     return token
 
 
-def get_session(token):
+def get_session(token, slide=True):
     """Sliding expiry: every authenticated request pushes the deadline out, so
-    a session dies from inactivity rather than mid-edit."""
+    a session dies from inactivity rather than mid-edit.
+
+    `slide=False` is for the panel's heartbeat, and the distinction is the
+    whole reason that route exists. A poll that renewed what it was checking
+    would mean an open tab never expired at all — the check would be the
+    activity keeping it alive."""
     if not token:
         return None
     now = time.time()
@@ -477,7 +500,8 @@ def get_session(token):
         if s["expires"] < now:
             _sessions.pop(token, None)
             return None
-        s["expires"] = now + SESSION_IDLE
+        if slide:
+            s["expires"] = now + SESSION_IDLE
         return dict(s)
 
 
@@ -535,6 +559,264 @@ def note_login_failure(ip):
 
 def clear_login_failures(ip):
     _login_fails.pop(ip, None)
+
+
+# -------------------------------------------------------------------- embeds
+# Another application pulls this interface into itself. Its SERVER calls this
+# server with a key and is given a short-lived session token; it then drops an
+# iframe pointing at /embed?t=<token> into its page. Server to server, so the
+# right to ask and what it may draw are settled in one call, before a browser
+# is involved at all.
+#
+# Two things are fixed when the admin creates the key and can never be widened
+# afterwards: the CAPABILITY envelope — may this application ask at all, open a
+# microphone, speak, and how often — and the CHROME it renders. They are
+# separate axes on purpose. Hiding the TALK button is not the same as denying
+# the microphone: hide the control while the capability stands and a host page
+# can open a microphone with nothing on screen to say so. The proof that one
+# field cannot serve both is `kiosk` and `signage` — identical chrome, the
+# figure alone, and opposite permissions.
+EMBEDS_PATH = os.path.join(ROOT, "embeds.json")
+_embeds_lock = threading.Lock()
+
+#: The seven components the interface is made of. A list of parts rather than
+#: an enumeration of layouts, because seven parts make 128 arrangements and an
+#: enumeration needs extending the day somebody wants the 129th.
+PARTS = ("visual", "transcript", "input", "mode", "talk", "audio", "text")
+
+#: First-class names over the common arrangements. A preset is a starting
+#: point the admin can edit, not a separate kind of token.
+PRESETS = {
+    "full":    {"parts": list(PARTS),
+                "cap": {"ask": True, "mic": True, "speak": True}},
+    "console": {"parts": ["visual", "transcript", "input", "mode", "talk", "audio"],
+                "cap": {"ask": True, "mic": True, "speak": True}},
+    "voice":   {"parts": ["visual", "mode", "talk", "audio"],
+                "cap": {"ask": True, "mic": True, "speak": True}},
+    "chat":    {"parts": ["transcript", "input", "text"],
+                "cap": {"ask": True, "mic": False, "speak": False}},
+    "kiosk":   {"parts": ["visual"],
+                "cap": {"ask": True, "mic": True, "speak": True}},
+    # Identical chrome to kiosk, opposite permissions: it must never open a
+    # microphone. It speaks only when the host pushes text at it.
+    "signage": {"parts": ["visual"],
+                "cap": {"ask": False, "mic": False, "speak": True}},
+}
+CAP_DEFAULTS = {"ask": True, "mic": False, "speak": True, "rate_per_min": 20}
+EMBED_TTL_MIN, EMBED_TTL_MAX = 5, 1440       # minutes a session token lives
+EMBED_TTL_DEFAULT = 60
+
+_embed_sessions = {}             # token -> {"id","parts","cap","origins","expires"}
+_embed_sessions_lock = threading.Lock()
+_embed_hits = {}                 # embed id -> [timestamps], its own rate window
+_embed_fails = {}                # client ip -> [count, blocked_until]
+
+
+def read_embeds():
+    try:
+        with open(EMBEDS_PATH) as fh:
+            doc = json.load(fh)
+        return doc.get("embeds", {}) if isinstance(doc, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def write_embeds(embeds):
+    with _embeds_lock:
+        tmp = EMBEDS_PATH + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump({"version": 1, "embeds": embeds}, fh, indent=2, sort_keys=True)
+        os.chmod(tmp, 0o600)                     # key hashes
+        os.replace(tmp, EMBEDS_PATH)
+
+
+def hash_key(secret, salt=None):
+    """Plain SHA-256 over a salt, not the PBKDF2 the passwords get. This
+    secret is 32 bytes from the system generator rather than something a human
+    chose, so there is no dictionary to run and stretching would only buy a
+    third of a second of latency on every session a host mints."""
+    salt = salt or secrets.token_bytes(16)
+    dk = hashlib.sha256(salt + secret.encode()).hexdigest()
+    return salt.hex(), dk
+
+
+def embed_key_blocked(ip):
+    rec = _embed_fails.get(ip)
+    return bool(rec and rec[1] > time.time())
+
+
+def note_embed_failure(ip):
+    """Same geometric back-off as the sign-in, kept in its own ledger: a host
+    server fumbling its key must not lock an admin out of the panel."""
+    rec = _embed_fails.setdefault(ip, [0, 0])
+    rec[0] += 1
+    if rec[0] >= 5:
+        rec[1] = time.time() + min(300, 15 * (2 ** (rec[0] - 5)))
+
+
+def normalise_origin(raw):
+    """scheme://host[:port], nothing else. An origin with a path or a trailing
+    slash silently fails to match `e.origin` in a browser, and the failure
+    looks like a broken embed rather than a typo in a text box."""
+    # Lowercased before matching, not after: a scheme and a host are
+    # case-insensitive, and somebody pasting from an address bar should not
+    # have their own origin rejected for a capital letter.
+    s = (raw or "").strip().rstrip("/").lower()
+    if not s:
+        return None
+    m = re.fullmatch(r"https?://([a-z0-9.\-]+|\[[0-9a-f:]+\])(:\d{1,5})?", s)
+    return m.group(0) if m else None
+
+
+def validate_embed(obj):
+    """Returns (record, error). Incoherent arrangements are refused HERE, in
+    front of the admin creating them, naming the orphaned part — rather than
+    left for a host developer to read out of a 400 three weeks later."""
+    name = str(obj.get("name") or "").strip()[:64]
+    if not name:
+        return None, "give it a name — the admin list is unreadable without one"
+
+    preset = str(obj.get("preset") or "custom")
+    if preset != "custom" and preset not in PRESETS:
+        return None, "no preset called '%s'" % preset
+
+    raw_parts = obj.get("parts")
+    if raw_parts is None and preset in PRESETS:
+        raw_parts = PRESETS[preset]["parts"]
+    if not isinstance(raw_parts, list):
+        return None, "parts must be a list"
+    parts = [p for p in PARTS if p in raw_parts]          # canonical order
+    unknown = sorted(set(map(str, raw_parts)) - set(PARTS))
+    if unknown:
+        return None, "no such part: %s" % ", ".join(unknown)
+
+    cap = dict(CAP_DEFAULTS)
+    if preset in PRESETS:
+        cap.update(PRESETS[preset]["cap"])
+    given = obj.get("cap")
+    if given is not None:
+        if not isinstance(given, dict):
+            return None, "cap must be an object"
+        for k in ("ask", "mic", "speak"):
+            if k in given:
+                cap[k] = bool(given[k])
+        if "rate_per_min" in given:
+            try:
+                cap["rate_per_min"] = int(given["rate_per_min"])
+            except (TypeError, ValueError):
+                return None, "the rate limit must be a whole number"
+    if not (1 <= cap["rate_per_min"] <= 600):
+        return None, "the rate limit must be between 1 and 600 a minute"
+
+    err = incoherent(parts, cap)
+    if err:
+        return None, err
+
+    origins = []
+    for raw in (obj.get("origins") or []):
+        o = normalise_origin(raw)
+        if not o:
+            return None, ("'%s' is not an origin — it wants scheme://host, "
+                          "optionally a port, and nothing after that" % raw)
+        if o not in origins:
+            origins.append(o)
+    if not origins:
+        return None, ("list at least one origin allowed to frame this — an "
+                      "embed with no allow-list is one any site can frame")
+
+    try:
+        ttl = int(obj.get("ttl_minutes") or EMBED_TTL_DEFAULT)
+    except (TypeError, ValueError):
+        return None, "the session length must be a whole number of minutes"
+    if not (EMBED_TTL_MIN <= ttl <= EMBED_TTL_MAX):
+        return None, ("the session length must be between %d and %d minutes"
+                      % (EMBED_TTL_MIN, EMBED_TTL_MAX))
+
+    return {"name": name, "preset": preset, "parts": parts, "cap": cap,
+            "origins": origins, "ttl_minutes": ttl}, None
+
+
+def incoherent(parts, cap):
+    """The orphaned-part rules, named one at a time. Each of these is a
+    control that cannot do anything, or a permission with no way to exercise
+    it — and every one of them looks like a bug to whoever meets it."""
+    has = set(parts)
+    if "text" in has and "transcript" not in has:
+        return ("'text' toggles the transcript, and there is no transcript "
+                "here for it to toggle")
+    if "mode" in has and "talk" not in has:
+        return ("'mode' configures how a microphone decides you have finished "
+                "speaking, and this arrangement has no microphone control")
+    if ("talk" in has or "mode" in has) and not cap["mic"]:
+        return ("'talk' is a microphone button on a token that is not allowed "
+                "a microphone — grant the microphone or drop the control")
+    if "audio" in has and not cap["speak"]:
+        return ("'audio' mutes a voice, and this token is not allowed to "
+                "speak")
+    if ("input" in has or "talk" in has) and not cap["ask"]:
+        return ("there is a way to ask here, on a token that is not allowed "
+                "to ask — grant it, or drop 'input' and 'talk'")
+    if "input" in has and "transcript" not in has and not cap["speak"]:
+        return ("'input' types into a void: nothing here reads the answer out "
+                "and there is no transcript to read it in")
+    if not parts and not cap["speak"]:
+        return "this draws nothing and says nothing"
+    return None
+
+
+def embed_allowed(embed_id, per_min):
+    """Per token rather than per address, because one host application behind
+    one address is exactly the case the address-based window gets wrong."""
+    now_ = time.time()
+    with _ask_lock:
+        hits = [t for t in _embed_hits.get(embed_id, []) if now_ - t < 60]
+        if len(hits) >= per_min:
+            _embed_hits[embed_id] = hits
+            return False
+        hits.append(now_)
+        _embed_hits[embed_id] = hits
+        return True
+
+
+def new_embed_session(embed_id, rec):
+    """The grant is COPIED into the session, so editing or deleting the token
+    cannot retroactively widen a session already running — and a narrowing
+    takes effect on the next mint rather than mid-conversation."""
+    token = secrets.token_urlsafe(32)
+    with _embed_sessions_lock:
+        now_ = time.time()
+        for t in [t for t, s in _embed_sessions.items() if s["expires"] < now_]:
+            _embed_sessions.pop(t, None)         # sweep, so it cannot grow forever
+        _embed_sessions[token] = {
+            "id": embed_id, "name": rec["name"],
+            "parts": list(rec["parts"]), "cap": dict(rec["cap"]),
+            "origins": list(rec["origins"]),
+            "expires": now_ + rec["ttl_minutes"] * 60,
+        }
+    return token
+
+
+def get_embed_session(token):
+    """Fixed expiry, not the sliding one a sign-in gets: this is a bearer
+    token sitting in a URL inside somebody else's page, and it should stop
+    working at a time the admin chose rather than for as long as it is used."""
+    if not token:
+        return None
+    with _embed_sessions_lock:
+        s = _embed_sessions.get(token)
+        if not s:
+            return None
+        if s["expires"] < time.time():
+            _embed_sessions.pop(token, None)
+            return None
+        return dict(s)
+
+
+def drop_embed_sessions(embed_id):
+    """Revoking a key must not leave live sessions carrying its grant."""
+    with _embed_sessions_lock:
+        for t in [t for t, s in _embed_sessions.items() if s["id"] == embed_id]:
+            _embed_sessions.pop(t, None)
 
 
 def read_settings():
@@ -706,7 +988,10 @@ SESSION_COOKIE = "rsn_sid"
 ADMIN_ONLY_FILES = ("/admin.html",)
 #: exist only on the admin listener; anywhere else they are simply not there
 ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
-                     "/backend")
+                     "/backend", "/embeds", "/embeds/delete", "/embeds/enable")
+#: the other half of the embed API: reachable from the display listeners,
+#: because that is where a host server and a host browser can actually get to
+EMBED_ROUTES = ("/embed", "/embed/session")
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -719,11 +1004,20 @@ class Handler(SimpleHTTPRequestHandler):
         self.admin_port = admin_port
         super().__init__(*args, **kw)
 
+    #: set for one response by the /embed route, so the file the base class
+    #: serves carries the frame-ancestors line without rewriting its HTML
+    _csp = None
+
     # ---------- no-cache ----------
     def end_headers(self):
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
         self.send_header("Pragma", "no-cache")
         self.send_header("Expires", "0")
+        if self._csp:
+            self.send_header("Content-Security-Policy", self._csp)
+            # X-Frame-Options cannot express a list, and where both are present
+            # frame-ancestors wins in every browser that implements it. Sending
+            # a lying DENY beside it only confuses whoever reads the headers.
         super().end_headers()
 
     def send_header(self, keyword, value):
@@ -733,7 +1027,12 @@ class Handler(SimpleHTTPRequestHandler):
         super().send_header(keyword, value)
 
     def log_message(self, fmt, *args):
-        sys.stderr.write("%s %s\n" % (self.address_string(), fmt % args))
+        line = fmt % args
+        # An embed session token is a bearer credential, and it rides in the
+        # URL. Anything with read access to the log would otherwise be able to
+        # take over a live embed session by pasting one line of it.
+        line = re.sub(r"([?&]t=)[^&\s\"]+", r"\1…", line)
+        sys.stderr.write("%s %s\n" % (self.address_string(), line))
 
     # ---------- json helper ----------
     def _json(self, code, payload):
@@ -745,7 +1044,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     # ---------- identity ----------
-    def _session(self):
+    def _session(self, slide=True):
         """Who is calling, or None. Only ever consulted on the admin port —
         a cookie replayed at the public listeners buys nothing, because those
         listeners have no privileged route to reach."""
@@ -759,7 +1058,7 @@ class Handler(SimpleHTTPRequestHandler):
         except http.cookies.CookieError:
             return None
         morsel = jar.get(SESSION_COOKIE)
-        return get_session(morsel.value) if morsel else None
+        return get_session(morsel.value, slide) if morsel else None
 
     def _require(self, role=None):
         """Returns the session, or answers 401/403 and returns None. `role`
@@ -772,6 +1071,33 @@ class Handler(SimpleHTTPRequestHandler):
             self._json(403, {"error": "this account is read-only"})
             return None
         return s
+
+    def _embed(self):
+        """The embed session this call carries, or None. A bearer header
+        rather than a cookie, deliberately: a cookie set by an iframe is a
+        third-party cookie, and browsers block or partition those — an embed
+        that works in one browser and silently fails in the next is the worst
+        possible shape for this. It also leaves nothing ambient to forge, so
+        there is no CSRF question to answer."""
+        raw = self.headers.get("Authorization") or ""
+        if not raw.lower().startswith("bearer "):
+            return None
+        return get_embed_session(raw[7:].strip())
+
+    def _cap(self, want):
+        """Returns (session_or_None, refused). A call with no embed session is
+        an ordinary visitor at the display and is not this method's business —
+        the capability envelope narrows an embed, it does not gate the URL
+        anyone can already open."""
+        s = self._embed()
+        if not s:
+            return None, False
+        if not s["cap"].get(want):
+            self._json(403, {"error": "this embed is not permitted to %s"
+                                      % {"ask": "ask", "mic": "use a microphone",
+                                         "speak": "speak"}[want]})
+            return s, True
+        return s, False
 
     def _same_origin(self):
         """Every state-changing call must come from this interface itself.
@@ -793,6 +1119,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     # ---------- routes ----------
     def do_GET(self):
+        from urllib.parse import urlparse, parse_qs
+        self._csp = None            # one connection can serve several requests
         route = self.path.split("?")[0]
         # The configuration interface does not exist as far as the public
         # listeners are concerned — not hidden by CSS, not gated in JS, absent.
@@ -842,6 +1170,39 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             return self.wfile.write(blob)
+        # The embed exists on the display listeners only. On the admin port it
+        # is genuinely absent — that listener serves one page to one signed-in
+        # operator, and framing it anywhere is not a thing to support.
+        if route in EMBED_ROUTES and self.admin_port:
+            return self._json(404, {"error": "not found"})
+
+        if route == "/embed/session":
+            # What the frame asks for itself, holding the token its host
+            # server was given. The grant, never the key.
+            s = self._embed()
+            if not s:
+                return self._json(401, {"error": "no valid embed session"})
+            return self._json(200, {"embed": {
+                "name": s["name"], "parts": s["parts"], "cap": s["cap"],
+                "origins": s["origins"],
+                "expires_in": max(0, int(s["expires"] - time.time())),
+            }})
+
+        if route == "/embed":
+            token = (parse_qs(urlparse(self.path).query).get("t") or [""])[0]
+            s = get_embed_session(token)
+            if not s:
+                # 403 rather than 404: the route is real, and an integrator
+                # staring at a 404 goes looking for a deployment problem
+                # instead of at the token they minted twenty minutes ago.
+                return self._json(403, {"error": "this embed token is expired "
+                                                 "or was never issued"})
+            # The allow-list, enforced by the browser at the only moment it
+            # can be: refusing to render inside a page nobody authorised.
+            self._csp = "frame-ancestors " + " ".join(s["origins"])
+            self.path = "/index.html"
+            return super().do_GET()
+
         if route == "/settings":
             # public: this is what every viewer's interface is built from
             return self._json(200, {"settings": read_settings()})
@@ -850,6 +1211,17 @@ class Handler(SimpleHTTPRequestHandler):
             if not s:
                 return self._json(401, {"error": "not signed in"})
             return self._json(200, {"user": s["user"], "role": s["role"]})
+        if route == "/auth/check":
+            # The panel's heartbeat. Deliberately does NOT slide the session:
+            # a poll that renewed what it was checking would mean an open tab
+            # never expired, because the check itself would be the activity.
+            # It exists because a 401 on a real request only tells you the
+            # session died at the moment you happen to make one, and somebody
+            # reading the panel or dragging a slider makes none at all.
+            s = self._session(slide=False)
+            if not s:
+                return self._json(401, {"error": "not signed in"})
+            return self._json(200, {"alive": True})
         if route == "/backend":
             if not self._require("admin"):
                 return
@@ -867,12 +1239,14 @@ class Handler(SimpleHTTPRequestHandler):
             # whether a restart is owed. The page should never have to guess.
             pending = sorted(k for k in ("http_port", "https_port", "admin_port")
                              if RUNNING.get(k) is not None and RUNNING[k] != cfg[k])
-            if RUNNING.get("session_idle_hours") not in (None, cfg["session_idle_hours"]):
-                pending.append("session_idle_hours")
+            if RUNNING.get("session_idle_minutes") not in (None, cfg["session_idle_minutes"]):
+                pending.append("session_idle_minutes")
             return self._json(200, {"app": cfg, "running": RUNNING,
                                     "pending": pending,
                                     "limits": {"port_min": PORT_MIN,
-                                               "port_max": PORT_MAX}})
+                                               "port_max": PORT_MAX,
+                                               "session_min": SESSION_MIN,
+                                               "session_max": SESSION_MAX}})
         if route == "/users":
             if not self._require("admin"):
                 return
@@ -880,6 +1254,29 @@ class Handler(SimpleHTTPRequestHandler):
                 {"username": n, "role": u.get("role", "viewer"),
                  "created": u.get("created")}
                 for n, u in sorted(read_users().items())]})
+        if route == "/embeds":
+            if not self._require("admin"):
+                return
+            live = {}
+            with _embed_sessions_lock:
+                now_ = time.time()
+                for s in _embed_sessions.values():
+                    if s["expires"] > now_:
+                        live[s["id"]] = live.get(s["id"], 0) + 1
+            out = []
+            for eid, rec in sorted(read_embeds().items(),
+                                   key=lambda kv: kv[1].get("created", 0)):
+                row = {k: rec.get(k) for k in
+                       ("name", "preset", "parts", "cap", "origins",
+                        "ttl_minutes", "created", "created_by",
+                        "last_used", "enabled")}
+                row.update(id=eid, sessions=live.get(eid, 0))
+                out.append(row)
+            return self._json(200, {"embeds": out, "parts": list(PARTS),
+                                    "presets": PRESETS,
+                                    "ttl": {"min": EMBED_TTL_MIN,
+                                            "max": EMBED_TTL_MAX,
+                                            "default": EMBED_TTL_DEFAULT}})
         if route == "/tts/voices":
             return self._json(200, {"voices": voice_list(),
                                     "loaded": sorted(_voices.keys())})
@@ -1098,9 +1495,126 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"ok": True, "backend": out,
                                     "has_key": has_key})
 
+        if parsed.path == "/embed/session":
+            # A host application's SERVER calling this one. No cookie, no
+            # origin check: this is not a browser and there is nothing
+            # ambient to abuse. The key is the whole of the authentication.
+            if self.admin_port:
+                return self._json(404, {"error": "not found"})
+            ip = self.address_string()
+            if embed_key_blocked(ip):
+                return self._json(429, {"error": "too many attempts — wait a moment"})
+            obj = self._json_body()
+            if obj is None:
+                return
+            key = str(obj.get("key") or "").strip()
+            eid, _, secret = key.partition(".")
+            rec = read_embeds().get(eid) if (eid and secret) else None
+            try:
+                ok = bool(rec) and hmac.compare_digest(
+                    hash_key(secret, bytes.fromhex(rec["salt"]))[1], rec["hash"])
+            except (KeyError, TypeError, ValueError):
+                ok = False                        # a record edited by hand
+            if not ok:
+                note_embed_failure(ip)
+                # One message for a bad id and a bad secret alike: telling a
+                # caller which half it got right is telling it which half to
+                # keep guessing at.
+                return self._json(401, {"error": "that key is not recognised"})
+            if not rec.get("enabled", True):
+                return self._json(403, {"error": "this embed key is disabled"})
+            _embed_fails.pop(ip, None)
+            token = new_embed_session(eid, rec)
+            rec["last_used"] = int(time.time())
+            embeds = read_embeds()
+            if eid in embeds:                     # re-read: another thread may have written
+                embeds[eid]["last_used"] = rec["last_used"]
+                write_embeds(embeds)
+            print("embed session for %s (%s) — %d min" % (eid, rec["name"],
+                  rec["ttl_minutes"]), flush=True)
+            return self._json(200, {
+                "token": token,
+                "src": "/embed?t=" + token,
+                "expires_in": rec["ttl_minutes"] * 60,
+                "parts": rec["parts"], "cap": rec["cap"],
+            })
+
+        if parsed.path == "/embeds":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            rec, err = validate_embed(obj)
+            if err:
+                return self._json(400, {"error": err})
+            eid = "e" + secrets.token_hex(6)
+            secret = secrets.token_urlsafe(32)
+            salt, dk = hash_key(secret)
+            rec.update(salt=salt, hash=dk, enabled=True, last_used=None,
+                       created=int(time.time()), created_by=s["user"])
+            embeds = read_embeds()
+            embeds[eid] = rec
+            write_embeds(embeds)
+            print("embed key %s (%s) created by %s: parts=%s cap=%s"
+                  % (eid, rec["name"], s["user"], ",".join(rec["parts"]) or "none",
+                     ",".join(k for k in ("ask", "mic", "speak") if rec["cap"][k])
+                     or "none"), flush=True)
+            # The only time the secret exists anywhere but in the caller's
+            # hands. Nothing on this server can show it again, which is the
+            # point of storing a hash — say so in the panel, loudly.
+            return self._json(200, {"ok": True, "id": eid,
+                                    "key": eid + "." + secret})
+
+        if parsed.path == "/embeds/delete":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            eid = str(obj.get("id") or "")
+            embeds = read_embeds()
+            if eid not in embeds:
+                return self._json(404, {"error": "no such embed"})
+            name = embeds.pop(eid).get("name")
+            write_embeds(embeds)
+            drop_embed_sessions(eid)
+            print("embed key %s (%s) deleted by %s" % (eid, name, s["user"]),
+                  flush=True)
+            return self._json(200, {"ok": True})
+
+        if parsed.path == "/embeds/enable":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            eid = str(obj.get("id") or "")
+            embeds = read_embeds()
+            if eid not in embeds:
+                return self._json(404, {"error": "no such embed"})
+            on = bool(obj.get("enabled"))
+            embeds[eid]["enabled"] = on
+            write_embeds(embeds)
+            if not on:
+                drop_embed_sessions(eid)     # disabled means now, not at expiry
+            print("embed key %s %s by %s"
+                  % (eid, "enabled" if on else "disabled", s["user"]), flush=True)
+            return self._json(200, {"ok": True})
+
         if parsed.path == "/ask":
             # Reachable from the display, which has no sign-in by design.
-            if not ask_allowed(self.address_string()):
+            emb, refused = self._cap("ask")
+            if refused:
+                return
+            if emb:
+                if not embed_allowed(emb["id"], emb["cap"]["rate_per_min"]):
+                    return self._json(429, {"error": "this embed is over its "
+                                                     "rate limit — slow down"})
+            elif not ask_allowed(self.address_string()):
                 return self._json(429, {"error": "too many requests — slow down"})
             obj = self._json_body()
             if obj is None:
@@ -1145,11 +1659,11 @@ class Handler(SimpleHTTPRequestHandler):
             write_app(cfg)
             print("app settings saved by %s: http=%d https=%d admin=%d session=%dh"
                   % (s["user"], cfg["http_port"], cfg["https_port"],
-                     cfg["admin_port"], cfg["session_idle_hours"]), flush=True)
+                     cfg["admin_port"], cfg["session_idle_minutes"]), flush=True)
             pending = sorted(k for k in ("http_port", "https_port", "admin_port")
                              if RUNNING.get(k) is not None and RUNNING[k] != cfg[k])
-            if RUNNING.get("session_idle_hours") not in (None, cfg["session_idle_hours"]):
-                pending.append("session_idle_hours")
+            if RUNNING.get("session_idle_minutes") not in (None, cfg["session_idle_minutes"]):
+                pending.append("session_idle_minutes")
             return self._json(200, {"ok": True, "app": cfg, "pending": pending,
                                     "running": RUNNING})
 
@@ -1165,6 +1679,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"ok": True, "keys": len(obj)})
 
         if parsed.path == "/tts":
+            if self._cap("speak")[1]:
+                return
             raw = self._body(64 * 1024)
             if raw is None:
                 return self._json(400, {"error": "empty or oversized body"})
@@ -1190,6 +1706,8 @@ class Handler(SimpleHTTPRequestHandler):
 
         if parsed.path != "/stt":
             return self._json(404, {"error": "not found"})
+        if self._cap("mic")[1]:
+            return
         q = parse_qs(parsed.query)
         hint = (q.get("hint") or [None])[0]
         want = (q.get("model") or [None])[0]
@@ -1248,9 +1766,9 @@ def main():
     shifted = _env("PORT") is not None
     tls_port = _env("HTTPS_PORT") or (port + 1 if shifted else app["https_port"])
     adm_port = _env("ADMIN_PORT") or (port + 2 if shifted else app["admin_port"])
-    SESSION_IDLE = app["session_idle_hours"] * 3600
+    SESSION_IDLE = app["session_idle_minutes"] * 60
     RUNNING.update({"http_port": port, "https_port": None, "admin_port": None,
-                    "session_idle_hours": app["session_idle_hours"]})
+                    "session_idle_minutes": app["session_idle_minutes"]})
 
     cert, key = os.path.join(ROOT, "cert.pem"), os.path.join(ROOT, "key.pem")
     have_tls = os.path.exists(cert) and os.path.exists(key)

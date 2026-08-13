@@ -24,13 +24,38 @@
     --text:#f2f6fa;
     --ui:#c3cedb;
     --ui-bright:#dfe9f2;
+
+    /* ---- typography, set from the shared settings ----
+       Three faces and three sizes, and no more. Every one of them is
+       already on the machine: a webfont would be the first runtime
+       dependency this project has ever taken, and it would be taken for
+       something a stack of installed faces does perfectly well.
+
+       The scale is deliberately shallow. This is a dense layout measured in
+       pixels, and a size control wide enough to be interesting is a size
+       control wide enough to push a label through the side of its button. */
+    --fs:1;
+    --face-mono: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --face-sans: ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,
+                 "Helvetica Neue",Arial,sans-serif;
+    /* Wide, open apertures and a tall x-height — drawn for screens, and the
+       easiest of the three to read as light text on a black ground, where a
+       tight face fills its own counters in with glare. */
+    --face-wide: Verdana,"DejaVu Sans",Tahoma,Geneva,Arial,sans-serif;
+    --face: var(--face-mono);
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
   body{
     background:var(--ink);
     color:var(--ui);
-    font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    /* Split out of the `font:` shorthand so the family and the scale can be
+       set independently from the shared settings. Every font-size on this
+       page is a multiple of --fs, so one number moves all of them together
+       and nothing can drift out of proportion with the rest. */
+    font-family:var(--face);
+    font-size:calc(13px * var(--fs));
+    line-height:1.5;
     overflow:hidden;
     -webkit-font-smoothing:antialiased;
   }
@@ -126,7 +151,7 @@
   }
   .msg{max-width:76ch;white-space:pre-wrap;word-break:break-word}
   .msg .who{
-    display:block;font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;
+    display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.22em;text-transform:uppercase;
     color:rgba(var(--paper),.8);margin-bottom:5px;
   }
   .msg.you .body{color:rgba(var(--paper),.82)}
@@ -156,21 +181,48 @@
   body[data-text="off"] #screen{flex:1 1 auto}
   body[data-text="off"] #bar{justify-content:flex-end}
 
+  /* ---------- the embed's chrome ----------
+     An embedded copy draws only the parts its token grants. data-noparts
+     lists what is ABSENT rather than what is present, so an ordinary display
+     — which has no such attribute — is untouched by every rule here and none
+     of this can affect the page anybody opens directly.
+
+     Hiding is the whole of the chrome axis and none of the capability axis:
+     a part hidden here has had its CONTROL removed, not its permission. What
+     the token is allowed to do is enforced on the server. */
+  body[data-noparts~="visual"]     #screen{display:none}
+  body[data-noparts~="transcript"] #log{display:none}
+  body[data-noparts~="input"]      #bar .pr,
+  body[data-noparts~="input"]      #q{display:none}
+  body[data-noparts~="mode"]       #pttbtn{display:none}
+  body[data-noparts~="talk"]       #talkbtn{display:none}
+  body[data-noparts~="audio"]      #mute{display:none}
+  body[data-noparts~="text"]       #textbtn{display:none}
+  /* whatever is left takes the space the missing part was holding */
+  body[data-noparts~="transcript"] #screen{flex:1 1 auto}
+  body[data-noparts~="visual"]     #log{flex:1 1 auto}
+  body[data-noparts~="input"]      #bar{justify-content:flex-end}
+  /* a composer with nothing in it is a strip of furniture, not a control */
+  body[data-nobar] #bar{display:none}
+  /* the frame rate counter is a rig instrument; it has no business in
+     somebody else's product */
+  body[data-embed] #fps{display:none}
+
   /* ---------- composer ---------- */
   #bar{
     position:relative;z-index:4;flex:0 0 auto;display:flex;align-items:center;gap:12px;
     padding:12px 26px;border-top:1px solid rgba(var(--glass),.12);
     background:linear-gradient(to top,rgba(0,0,0,.6),rgba(0,0,0,.15));
   }
-  #bar .pr{color:rgba(var(--paper),.78);letter-spacing:.2em;font-size:10px}
+  #bar .pr{color:rgba(var(--paper),.78);letter-spacing:.2em;font-size:calc(10px * var(--fs))}
   #q{
     flex:1;background:none;border:0;outline:0;color:var(--text);
-    font:inherit;font-size:13px;caret-color:var(--text);
+    font:inherit;font-size:calc(13px * var(--fs));caret-color:var(--text);
   }
   #q::placeholder{color:rgba(var(--paper),.5)}
   .src{display:flex;gap:6px}
   .src button{
-    font:inherit;font-weight:400;font-size:9px;letter-spacing:.18em;padding:3px 8px;
+    font:inherit;font-weight:400;font-size:calc(9px * var(--fs));letter-spacing:.18em;padding:3px 8px;
     background:none;border:1px solid rgba(var(--glass),.16);
     color:rgba(var(--paper),.85);cursor:pointer;
   }
@@ -206,7 +258,7 @@
     .src button{
       min-width:44px;min-height:44px;padding:0;
       display:inline-flex;align-items:center;justify-content:center;
-      font-size:15px;letter-spacing:0;
+      font-size:calc(15px * var(--fs));letter-spacing:0;
     }
     .src button .ico{margin-right:0}
     .src button .lbl{
@@ -219,7 +271,7 @@
     body[data-layout="bleed"] #log{padding:40px 14px 14px}
   }
 
-  #fps{position:fixed;left:12px;top:10px;z-index:20;font-size:9px;letter-spacing:.14em;
+  #fps{position:fixed;left:12px;top:10px;z-index:20;font-size:calc(9px * var(--fs));letter-spacing:.14em;
        color:rgba(var(--paper),.76)}
 </style>
 </head>
@@ -279,6 +331,66 @@ function relay(slot, text, live){
     window.parent.postMessage({rsn:1, kind:'status', slot, text, live:!!live}, '*');
 }
 
+/* EMBED: this same page, served at /embed to another application's browser,
+   carrying a short-lived session token its SERVER was given in exchange for a
+   key. Same page again rather than a cut-down copy, for the reason the
+   preview is: a second implementation is a second thing to keep correct.
+
+   The token rides in the URL and goes back out as a bearer header. Not a
+   cookie — a cookie set by an iframe is a third-party cookie, and browsers
+   block or partition those, so an embed authenticated that way works in one
+   browser and silently fails in the next. Nothing ambient also means nothing
+   to forge. */
+const EMBED = (()=>{
+  const t = new URLSearchParams(location.search).get('t');
+  return (t && /\/embed\/?$/.test(location.pathname)) ? t : null;
+})();
+
+if (EMBED){
+  document.body.dataset.embed = '1';
+  /* Draw nothing until the grant arrives. A frame that shows the full
+     interface for a moment and then takes six parts away is worse than one
+     that arrives already correct — and on a token that draws the figure
+     alone, that flash is the whole of somebody else's product. */
+  document.body.dataset.noparts = 'visual transcript input mode talk audio text';
+  document.body.dataset.nobar = '1';
+  /* Every call this page makes is same-origin and relative, so wrapping
+     fetch once cannot send the token anywhere but back here. The
+     alternative — threading a header through eight call sites — is eight
+     places for the next one to be forgotten. */
+  const rawFetch = window.fetch.bind(window);
+  window.fetch = (input, init)=>{
+    const url = new URL(typeof input === 'string' ? input : input.url,
+                        location.href);
+    if (url.origin !== location.origin) return rawFetch(input, init);
+    const opts = Object.assign({}, init);
+    const h = new Headers((init && init.headers) ||
+                          (typeof input === 'object' && input.headers) || {});
+    h.set('Authorization', 'Bearer ' + EMBED);
+    opts.headers = h;
+    return rawFetch(input, opts);
+  };
+}
+
+/* What this embed was granted, and what the host has narrowed it to. Two
+   objects on purpose: `grant` is the ceiling the admin set when the key was
+   created and never moves, `live` is what is in force now. A host may lower
+   `live` on either axis at runtime and can never raise it — the refusal is
+   code that ships from here, because the host page is untrusted by
+   definition and a rule they promise to keep is not a control. */
+const Embed = {
+  grant: null,
+  /* Closed until the grant arrives, and only under EMBED — a page nobody
+     framed has no grant to wait for and must not be gated by one. The wake
+     word can reach the microphone before a fetch resolves, so the gap
+     between the frame loading and the server answering has to deny rather
+     than default to the ordinary display's permissions. */
+  live:  EMBED ? {parts: [], cap: {ask:false, mic:false, speak:false}}
+               : {parts: null, cap: null},
+  has(part){ return !this.live.parts || this.live.parts.indexOf(part) >= 0; },
+  can(what){ return !this.live.cap || !!this.live.cap[what]; },
+};
+
 /* ------------------------------------------------------- viewer prefs
    The three controls a viewer actually has, remembered in this browser
    until its data is cleared, so a display stays how they left it.
@@ -316,6 +428,7 @@ Prefs.load();
 /* ---------------------------------------------------------------- state */
 const S = {
   mode:'stack', palette:'blue', layout:'hero',
+  face:'mono', fs:'1',                 // typography — see setType()
   amp:1.0, lines:16, lag:3, depth:230, spread:620, persp:1100,
   tumble:1.0, reorient:12,
   tmode:'turntable', spin:1.0, tilt:0.187, wobble:1.0, roll:1.0,
@@ -931,7 +1044,11 @@ function frame(t){
   stepVoice(dt);          // decays the bins…
   Mic.step();             // …so the mic must overwrite them after, not before
   Drive.step(dt);
-  render();
+  /* An embed that does not draw the figure should not pay for it. Everything
+     above this line still runs — the mic, the voice and the wake word are
+     not the visualiser, and a `chat` embed that stopped listening because it
+     has no canvas would be a baffling bug. */
+  if (!EMBED || Embed.has('visual')) render();
 
   frames++; if (t-fpsT > 500){ fpsEl.textContent = Math.round(frames*1000/(t-fpsT))+' FPS';
                                frames=0; fpsT=t; }
@@ -976,6 +1093,15 @@ const Mic = {
 
   async start(){
     if (this.active) return;
+    /* The capability gate, at the one place a microphone can open. It sits
+       above the secure-context check deliberately: an embed denied a mic
+       should never reach a prompt, whatever else is true of the page. The
+       wake word reaches this method too, which is exactly why the gate is
+       here rather than on the TALK button. */
+    if (EMBED && !Embed.can('mic')){
+      micNote('this embed is not permitted to use a microphone');
+      return;
+    }
     if (!window.isSecureContext){
       micNote('BLOCKED: mic needs a secure origin. Use the https:// URL (port 9701).');
       return;
@@ -1723,6 +1849,7 @@ async function askBackend(text, bare){
 }
 
 function submit(text){
+  if (EMBED && !Embed.can('ask')) return;
   addMsg('you', text);
   remember('user', text);
   qEl.value = '';
@@ -1797,6 +1924,23 @@ function setPalette(p){
   const c = PALETTES[p]; const r = document.documentElement.style;
   r.setProperty('--hue',c.hue); r.setProperty('--hue-dim',c.dim);
   r.setProperty('--glass',c.glass); r.setProperty('--ink',c.ink);
+}
+
+/* Typography. Two variables and nothing else: every font-size on the page is
+   a multiple of --fs, and every element inherits its family, so these two
+   move the whole interface together and cannot leave one part of it behind.
+
+   Both are validated against the lists rather than written through — the
+   value arrives from a settings document, and a settings document is a file
+   somebody can edit by hand. An unknown face would otherwise become a raw
+   font-family string, and an unknown size a raw multiplier. */
+const FACES = {mono:'--face-mono', sans:'--face-sans', wide:'--face-wide'};
+const SIZES = ['1', '1.12', '1.25'];
+function setType(){
+  const r = document.documentElement.style;
+  const v = FACES[S.face] || FACES.mono;
+  r.setProperty('--face', 'var(' + v + ')');
+  r.setProperty('--fs', SIZES.indexOf(String(S.fs)) >= 0 ? String(S.fs) : '1');
 }
 
 // `src` appears both in the composer chips and in the rig, so a click has
@@ -2547,15 +2691,130 @@ const Settings = {
 function repaintAll(){
   SLIDERS.forEach(f=>f());
   FIELDS.forEach(f=>f());
-  ['mode','palette','layout','tmode','src','ptt','wake','micdsp','sttmodel','byeontimeout','backend','ttsengine']
+  ['mode','palette','layout','tmode','src','ptt','wake','micdsp','sttmodel','byeontimeout','backend','ttsengine','face','fs']
     .forEach(syncSeg);
   setPalette(S.palette);
+  setType();
   document.body.dataset.layout = S.layout;
   if (typeof syncPtt === 'function') syncPtt();
   if (typeof syncTalk === 'function') syncTalk();
   if (typeof syncWake === 'function') syncWake();
   if (typeof syncEngine === 'function') syncEngine();
   setTimeout(resize, 0);
+}
+
+/* ================================================== THE EMBED'S CHROME
+   Applying a grant is two separate things, and conflating them is the
+   security bug this design exists to avoid: PARTS decide what is drawn,
+   CAP decides what may happen. Hiding TALK does not close the microphone
+   and closing the microphone does not hide TALK — `kiosk` and `signage`
+   draw exactly the same thing and have opposite permissions. */
+const EMBED_PARTS = ['visual','transcript','input','mode','talk','audio','text'];
+
+function applyEmbed(){
+  if (!EMBED || !Embed.grant) return;
+  const parts = Embed.live.parts, cap = Embed.live.cap;
+  const b = document.body;
+  b.dataset.noparts = EMBED_PARTS.filter(p=> parts.indexOf(p) < 0).join(' ');
+  // an empty composer is furniture, not a control
+  const anyBar = ['input','mode','talk','audio','text'].some(p=> parts.indexOf(p) >= 0);
+  if (anyBar) b.removeAttribute('data-nobar'); else b.dataset.nobar = '1';
+
+  /* A viewer preference is only meaningful where the viewer has the control
+     it belongs to. Stored prefs are per top-level site in every browser that
+     partitions storage, so a host page inherits whatever was chosen there —
+     including a transcript hidden by a TEXT button this token does not draw,
+     which would leave a permanently blank frame nobody can recover. */
+  if (parts.indexOf('text') < 0 && typeof setTextVisible === 'function')
+    setTextVisible(parts.indexOf('transcript') >= 0);
+
+  /* The capability half. The server refuses these too — this is so the
+     interface never offers something that will come back a 403, not the
+     enforcement itself. */
+  if (!cap.speak && typeof setMuted === 'function') setMuted(true);
+  if (!cap.mic && Mic.active) Mic.stop();
+  const q = $('q');
+  if (q){
+    q.disabled = !cap.ask;
+    if (!cap.ask) q.placeholder = '';
+  }
+  setTimeout(resize, 0);
+}
+
+/* A narrowing from the host page. Intersected with the grant in both
+   directions, so anything not already permitted is simply dropped rather
+   than refused loudly — a host that asks for more than it has is a bug in
+   their integration, not an attack to alarm the person in front of it. */
+function narrowEmbed(msg){
+  if (!Embed.grant) return;
+  if (Array.isArray(msg.parts))
+    Embed.live.parts = Embed.grant.parts.filter(p=> msg.parts.indexOf(p) >= 0);
+  if (msg.cap && typeof msg.cap === 'object'){
+    const cap = {};
+    Object.keys(Embed.grant.cap).forEach(k=>{
+      cap[k] = (k in msg.cap)
+        ? (typeof Embed.grant.cap[k] === 'boolean'
+            ? (Embed.grant.cap[k] && !!msg.cap[k])
+            : Math.min(Embed.grant.cap[k], Number(msg.cap[k]) || 0))
+        : Embed.grant.cap[k];
+    });
+    Embed.live.cap = cap;
+  }
+  applyEmbed();
+  tellHost('narrowed');
+}
+
+/* Post to the host's origin, never '*': the allow-list is the set of pages
+   allowed to frame this, so it is also the only set worth talking to. */
+function hostOrigin(){
+  const o = Embed.grant && Embed.grant.origins || [];
+  let ref = '';
+  try{ ref = document.referrer ? new URL(document.referrer).origin : ''; }
+  catch(e){}
+  return o.indexOf(ref) >= 0 ? ref : (o[0] || null);
+}
+
+function tellHost(kind){
+  const target = hostOrigin();
+  if (!target || window.parent === window) return;
+  window.parent.postMessage({rsn:1, kind, name: Embed.grant.name,
+                             parts: Embed.live.parts, cap: Embed.live.cap},
+                            target);
+}
+
+async function loadEmbed(){
+  if (!EMBED) return;
+  try{
+    const r = await fetch('embed/session', {cache:'no-store'});
+    const j = await r.json();
+    if (!r.ok || !j.embed) throw new Error(j.error || ('HTTP ' + r.status));
+    Embed.grant = j.embed;
+    Embed.live = {parts: j.embed.parts.slice(), cap: Object.assign({}, j.embed.cap)};
+    applyEmbed();
+    /* Written from the grant rather than from a constant, so it never names
+       a control this token does not draw. */
+    if (Embed.live.parts.indexOf('transcript') >= 0){
+      const ways = [];
+      if (Embed.has('input')) ways.push('type below');
+      if (Embed.has('talk') && Embed.can('mic')) ways.push('press TALK and speak');
+      addMsg('ai', ways.length
+        ? 'Surface online — ' + ways.join(', or ') + '.'
+        : 'Surface online.');
+    }
+    window.addEventListener('message', e=>{
+      if (e.source !== window.parent) return;
+      if ((Embed.grant.origins || []).indexOf(e.origin) < 0) return;
+      const m = e.data;
+      if (m && m.rsn === 1 && m.kind === 'narrow') narrowEmbed(m);
+    });
+    tellHost('ready');
+  }catch(e){
+    /* The frame is up and the session is not. Say so in the frame — an
+       integrator looking at a blank rectangle has nothing to go on. */
+    document.body.dataset.noparts = 'visual input mode talk audio text';
+    document.body.dataset.nobar = '1';
+    addMsg('ai', 'This embed could not start its session: ' + e.message);
+  }
 }
 
 /* ------------------------------------------------------ preview channel
@@ -2603,12 +2862,20 @@ applyPrefs();
 
 Settings.load().then(()=>{
   applyPrefs();
+  /* After the prefs, always: the grant decides what this surface is, and a
+     preference stored against another page on the same site does not get to
+     argue with it. */
+  loadEmbed();
   if (PREVIEW && window.parent !== window)
     window.parent.postMessage({rsn:1, kind:'ready', settings:S}, '*');
 });
 
 setPalette('blue');
-addMsg('ai', PREVIEW
+setType();
+/* An embed's opening line is written once the grant is known: telling
+   somebody to "press TALK" in a frame with no TALK button is the surest way
+   to look broken. See loadEmbed(). */
+if (!EMBED) addMsg('ai', PREVIEW
   ? "Preview. This is the display exactly as it is served — every control on the left drives this frame live."
   : "Surface online. Type below, or press TALK and speak to me — transcription runs locally on this server, not in the cloud. I answer aloud; AUDIO mutes me.");
 </script>

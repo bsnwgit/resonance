@@ -47,6 +47,10 @@ DOCS = [
     {"id": "app",     "file": "app-settings.md",
      "title": "App settings & accounts", "audience": "admin",
      "summary": "Ports, restarts, session lifetime, and the two roles."},
+    {"id": "embed",   "file": "embedding.md",
+     "title": "Embedding it elsewhere", "audience": "admin",
+     "summary": "Embed keys, the two axes an integrator has to keep apart, "
+                "and the three steps a host application takes."},
 ]
 DOC_BY_ID = {d["id"]: d for d in DOCS}
 
