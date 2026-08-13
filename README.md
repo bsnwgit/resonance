@@ -26,6 +26,7 @@ front of one.
 - [Run](#run)
 - [Settings and the admin model](#settings-and-the-admin-model)
 - [Connecting a real assistant](#connecting-a-real-assistant)
+- [Embedding it in another application](#embedding-it-in-another-application)
 - [HTTP API](#http-api)
 - [Driving the visualiser directly](#driving-the-visualiser-directly)
 - [Engineering notes](#engineering-notes)
@@ -65,16 +66,16 @@ dependency on any of them. It will be adopted back into those applications once
 it is ready to be — as a consumer of this project, not as a part of it.
 
 **Settled:** the look, the interaction model, the local voice pipeline, the
-shared-settings model, and administration — its own HTTPS listener behind
-local accounts with roles, with a live preview of the real display.
+shared-settings model, administration — its own HTTPS listener behind local
+accounts with roles, with a live preview of the real display — the backend
+adapter that puts a real assistant behind it, and the embed API that lets
+another application put this interface inside its own page.
 
-**Not done, in the order it matters:** the adapter for a real assistant
-backend — today it answers from built-in text, which is the one thing standing
-between this and doing its actual job. Then the deployment shapes, because a
-single person running this on their own laptop should not have to configure
-accounts to talk to it. Then identity and memory, so a conversation can mean
-something an hour later. Then packaging it as a library other projects can
-install.
+**Not done, in the order it matters:** the deployment shapes, because a single
+person running this on their own laptop should not have to configure accounts
+to talk to it. Then identity and memory, so a conversation can mean something
+an hour later — the embed is deliberately memoryless until that lands. Then
+packaging it as a library other projects can install.
 
 The [Roadmap](#roadmap) carries the reasoning for each, including the
 decisions already taken about how identity and memory should work.
@@ -368,6 +369,61 @@ Measured round-trips on the reference box, cold then warm:
 `qwen2.5:1.5b` 1.4s / 1.6s, `qwen2.5:3b` 10.1s / 3.6s, `qwen2.5:7b` 28.2s /
 11.1s. Choose accordingly — for a voice front-end the wait is the product.
 
+## Embedding it in another application
+
+An admin creates an **embed key** on the EMBEDS tab. The host application's
+*server* exchanges it for a short-lived session; the host's page frames the
+result. Server to server, so the layout it asked for and its right to ask are
+settled in one call, before a browser is involved.
+
+`docs/embedding.md` — also in the panel, and downloadable as a PDF — is the
+integration guide. What is worth having here is the reasoning.
+
+**Parts, not combinations.** Seven components — `visual`, `transcript`,
+`input`, `mode` (SPACE/AUTO), `talk`, `audio`, `text` — make 128
+arrangements, so a key carries a list of parts rather than the name of a
+layout, and never needs extending when somebody wants the 129th. Presets
+(`full`, `console`, `voice`, `chat`, `kiosk`, `signage`) are first-class names
+over the common ones, and a starting point rather than a separate kind of key.
+
+**Capability and chrome are separate axes, and conflating them is a security
+bug.** Hiding the TALK button is not the same as denying the microphone: hide
+it while the capability stands and a host page can open a microphone with no
+control on screen and no way for the person in front of it to know. The proof
+that one field could not serve is `kiosk` and `signage` — identical chrome,
+the figure alone, and opposite permissions.
+
+**Both are fixed when the key is created.** One key is one surface: a lobby
+kiosk and a support widget are two keys, separately revocable and separately
+rate-limited, and the admin list says exactly what each one draws. Fixing the
+chrome also means it is signed into the key rather than riding in query
+parameters — plain parameters mean any user appends `&talk=1` and grants
+themselves a microphone the host never authorised.
+
+**Two admins, and grants only ever travel one way.** This admin sets the
+ceiling. The host's own admin may narrow what their users get, on either axis,
+over `postMessage` — and can never widen it. The refusal lives in the embed
+rather than in an agreement: the host page is untrusted by definition, so
+"cannot add" has to be code that ships from here.
+
+**Incoherent arrangements are refused at creation**, in the admin page, naming
+the orphaned part — a human sees the mistake immediately rather than a host
+developer reading it out of a 400 three weeks later.
+
+**Responsiveness belongs to the embed, not the API.** Desktop console and
+phone voice-only is a breakpoint problem, and the narrow-viewport rules key
+off the *frame's* width rather than the device's. Solving it by issuing a
+different key after sniffing a user agent would be the wrong layer.
+
+**The embed is memoryless**, and that is the sequencing rather than an
+omission — see the roadmap.
+
+**The gotcha that catches everybody:** a microphone inside an iframe needs
+`allow="microphone"` from the host, the host page itself on HTTPS, and
+permissions-policy delegated down. Miss any one and the embed looks broken in
+a way that has nothing to do with this server. The admin preview has no
+microphone for precisely this reason.
+
 ## HTTP API
 
 On every listener:
@@ -379,6 +435,15 @@ On every listener:
 | `POST` | `/tts` | text in, WAV out. `?voice=`, `?rate=` |
 | `GET` | `/tts/voices` | installed neural voices |
 | `GET` | `/settings` | the shared interface configuration |
+| `POST` | `/ask` | a question to the connected assistant |
+
+Display listeners only — the embed does not exist on the admin port:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/embed/session` | an embed key in, a short-lived session token out |
+| `GET` | `/embed?t=` | the display, framed, drawing only what the key grants |
+| `GET` | `/embed/session` | what this session was granted — bearer token |
 
 Admin listener only — everything below returns 404 on the public ports:
 
@@ -395,6 +460,10 @@ Admin listener only — everything below returns 404 on the public ports:
 | `POST` | `/users` | create an account — `admin` role |
 | `POST` | `/users/role` | change a role — `admin` role |
 | `POST` | `/users/delete` | remove an account — `admin` role |
+| `GET` | `/embeds` | list embed keys — `admin` role |
+| `POST` | `/embeds` | create one; the key is returned once — `admin` role |
+| `POST` | `/embeds/enable` | enable or disable one — `admin` role |
+| `POST` | `/embeds/delete` | revoke one — `admin` role |
 
 The last admin account cannot be deleted or demoted; an interface nobody can
 administer is a brick.
@@ -633,6 +702,17 @@ Roughly in order of value:
   anything shared it must end at the conversation boundary, or the next person
   inherits the identity along with the screen.
 
+  **A PIN session is measured in hours, and it is admin-configurable in its
+  own right rather than sharing the admin session's setting.** The two are
+  different jobs and the numbers should not be able to drift into each other:
+  an admin holds the configuration everyone else is looking at the results of
+  and is measured in minutes, while somebody who has unlocked a display is
+  standing in front of a screen doing their work, and being asked to key a PIN
+  in again every half hour would end with the PIN switched off entirely. It is
+  the same reasoning that put binding and authentication on separate settings
+  above — one label covering two independent things is a label that lies as
+  soon as somebody changes one of them.
+
   Recorded plainly: a PIN is not a password, and this is a lightweight account
   system rather than a small feature. Six digits is a low bar that rate
   limiting carries. It suits an internal tool and a number keyed into a
@@ -690,97 +770,22 @@ Roughly in order of value:
   this browser has no recorder. No conversation content. A health view per
   device in the admin page, so a failing screen can be found without anyone
   standing in front of it.
-- **Embed API — another application pulls this interface into itself.** The
-  host's *server* calls this server, is given a short-lived token, and drops
-  an iframe into its page. Server to server, so the layout it asked for and
-  its right to ask can be checked in the same call.
+- **The embed, once there is an identity to attach to it.** The memoryless
+  embed shipped first, deliberately: it is exactly the `named, no PIN → no
+  memory` row above, so it needs no notion of a person at all. What remains
+  arrives for free when identity lands — **an embed carries two identities at
+  once** and they compose rather than compete: the application is
+  authenticated by its key, and the person in front of it still has one of
+  the three strengths above. Settings hang off the application, memory off
+  the person. That is also the answer to whether three host applications must
+  share one look — they do not. What to avoid is the middle: an embed with
+  its own private idea of who the user is.
 
-  **Parts, not combinations.** Seven components — `visual`, `transcript`,
-  `input`, `mode` (SPACE/AUTO), `talk`, `audio`, `text` — make 128
-  arrangements, so the API takes a list of parts rather than an enumeration
-  of layouts, and never needs extending when somebody wants the 129th.
-  Presets are first-class names over the common ones: `full`, `console`
-  (no transcript toggle), `voice` (figure and voice controls, nothing to
-  read or type), `chat` (transcript and field, no figure), `kiosk` (figure
-  alone, hands-free), `signage` (figure alone, no microphone at all, spoken
-  only when the host pushes text — see *Unprompted speech*).
-
-  **Both are fixed when the admin creates the token** — the capability
-  envelope (may this application use the microphone, speak, ask at all, and
-  at what rate) and the chrome it renders. One token is one surface: a lobby
-  kiosk and a support widget are two tokens, separately revocable and
-  separately rate-limited, and the admin list says exactly what each one
-  draws. Fixed is also the reversible decision — per-request layout can be
-  added later without breaking an integrator, and cannot be withdrawn once
-  they depend on it.
-
-  **Two admins, and grants only ever travel one way.** This admin creates the
-  token and sets the ceiling — capability and chrome. The host application's
-  own admin holds it and may narrow what their users get, on either axis:
-  hide the field for anonymous visitors and show it to staff, reveal it after
-  the first exchange, run a session with the microphone off. They can never
-  widen it. Wanting *less* than the token grants therefore needs no new key,
-  which is the point — a narrowing is the host's business, a widening is a
-  conversation with this admin.
-
-  Hiding the TALK button is **not** the same as withdrawing microphone
-  capability; the control goes, the permission stands. An integrator will
-  assume otherwise unless the documentation says so plainly, so both are
-  narrowable and they are narrowed separately.
-
-  The refusal lives in the embed, not in an agreement. `postMessage` accepts
-  narrowing instructions for parts inside the token and ignores everything
-  else, because the host page is untrusted by definition — anything running
-  in that browser is under their control, so "cannot add" has to be code that
-  ships from here rather than a rule they promise to keep.
-
-  That covers progressive disclosure and per-user variation, which are the
-  only real arguments for per-request layout, while the audit story stays
-  intact: the token is the ceiling and the admin list shows it.
-
-  **Capability and chrome remain separate axes even though both are fixed at
-  creation, and conflating them is a security bug.** Hiding the TALK button
-  is not the same as denying the microphone: hide it while the capability
-  stands and a host page can open the mic with no control on screen and no
-  way for the person to know. The proof that one field cannot serve is
-  `kiosk` and `signage` — identical chrome, the figure alone, and opposite
-  permissions: one listens hands-free, the other must never open a
-  microphone.
-
-  Chrome is fixed at creation, so the layout is signed into the token rather
-  than riding in query parameters. Plain parameters mean any user appends
-  `&talk=1` and grants themselves a microphone the host never authorised.
-
-  **Incoherent arrangements are refused at token creation**, in the admin
-  page, naming the orphaned part — a human sees the mistake immediately
-  rather than a host developer reading it out of a 400 later: `text` without
-  `transcript` is a button that toggles nothing; `mode` without `talk`
-  configures how a microphone ends a turn when there is no microphone;
-  `input` with neither `transcript` nor audio types into a void.
-
-  **Responsiveness belongs to the embed, not the API.** Desktop console and
-  phone voice-only is a breakpoint problem; solving it by issuing a different
-  token after sniffing a user agent would be the wrong layer.
-
-  **An embed carries two identities at once** and they compose rather than
-  compete: the application is authenticated by its key, and the person in
-  front of it still has one of the three strengths above. Settings hang off
-  the application, memory off the person. That is also the answer to whether
-  three host applications must share one look — they do not.
-
-  **Sequence: the memoryless embed can ship first.** It is exactly the
-  `named, no PIN → no memory` row, so it needs no notion of a person at all —
-  origin allow-list, `frame-ancestors`, a documented `postMessage` contract,
-  and the iframe seam the admin preview already proves. Memory arrives for
-  free when identity lands. What to avoid is the middle: an embed with its
-  own private idea of who the user is.
-
-  **The gotcha to lead the integration docs with**, because everyone hits it:
-  a microphone inside an iframe needs `allow="microphone"` from the host, the
-  host page itself on HTTPS, and permissions-policy delegated down. Miss any
-  one and the embed looks broken in a way that has nothing to do with this.
-  The admin preview has no microphone for precisely this reason.
-
+  Also deferred, and reversibly so: **per-request layout**. Chrome is fixed
+  when the key is created, which can be relaxed later without breaking an
+  integrator and could not be withdrawn once they depended on it. The two
+  real arguments for it — progressive disclosure and per-user variation —
+  are already covered by the host's ability to narrow at runtime.
 - **Package for reuse.** Separate the visualiser core from the demo chat shell,
   give it an instance API, ship ESM + UMD. Still zero dependencies.
 - **Separable speech service.** Run faster-whisper and Piper as their own
@@ -805,11 +810,38 @@ Roughly in order of value:
   application knows its own hostnames and interfaces.
 - **Unprompted speech.** Let a host application make it speak — an alert
   arrives, the geometry wakes, it tells you. That is a different product from
-  a chat box.
+  a chat box. The `signage` embed preset is already the shape that wants it:
+  the figure alone, no microphone, speaking only what the host pushes — and
+  until this lands there is nothing for the host to push with.
 
 ## Progress log
 
 Newest first.
+
+### 2026-08-13 — another application can put this in its own page
+
+- **Embed keys.** An admin creates one on the new EMBEDS tab; a host
+  application's server exchanges it for a short-lived session and frames the
+  result. The key never reaches a browser, is stored hashed, and is shown
+  once.
+- **Capability and chrome are separate axes**, fixed at creation and never
+  widenable. Hiding a control is not withdrawing a permission, and the panel
+  is laid out to teach that rather than blur it.
+- **Incoherent arrangements are refused where they are made**, naming the
+  orphaned part — the same six rules on the server and in the panel, in the
+  same words.
+- **The host can narrow at runtime** over `postMessage`, on either axis, and
+  cannot widen: anything asked for beyond the key is dropped by the embed
+  itself rather than refused by agreement.
+- **Bearer token, not a cookie.** A cookie set by an iframe is a third-party
+  cookie, and browsers block or partition those — an embed authenticated that
+  way works in one browser and silently fails in the next.
+- **`frame-ancestors` from the key's origin allow-list**, so a page nobody
+  authorised cannot render it at all.
+- **Revocation is immediate.** Disabling or deleting a key ends its live
+  sessions rather than letting them run to expiry.
+- **`docs/embedding.md`** joins the manual, leading with the iframe
+  microphone gotcha because everyone hits it.
 
 ### 2026-08-12 — identity, and the interface reads better
 

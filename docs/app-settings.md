@@ -45,11 +45,32 @@ and the new address is the one you just saved.
 
 ## Sessions
 
-**session idle hours** is how long an idle admin session survives before it
+**session idle minutes** is how long an idle admin session survives before it
 has to sign in again. It slides: activity pushes the deadline out, so a
 working admin is not signed out mid-task, while a forgotten tab expires.
 
-Eight hours suits a workday. A shared machine wants considerably less.
+**Minutes, and thirty of them by default.** An admin session is a window onto
+a configuration everybody else is looking at the results of, and it should
+last a piece of work rather than a working day. Five minutes to eight hours is
+the accepted range; the long end exists for someone who needs it, not as a
+suggestion.
+
+When a session does end, the panel puts the sign-in back up rather than
+reporting "not signed in" under whichever control you happened to touch. It
+does not wait to be clicked either: the page asks the server every 45 seconds
+whether the session is still alive, so a forgotten tab becomes a sign-in
+screen rather than a live-looking panel that has quietly stopped working.
+Your username is kept; only the password is asked for again.
+
+That check deliberately does **not** renew the session it is checking. A poll
+that refreshed what it was polling would mean an open tab never expired at
+all, because the check itself would be the activity keeping it alive.
+
+A viewer's session is a different question with a different answer, and it
+does not exist yet — see *Identity* in the README roadmap. When it does, a
+viewer who has unlocked a display with a PIN is measured in **hours**: they
+are standing in front of a screen doing their job, not holding the keys to
+everyone else's configuration.
 
 Changing a role or a password drops that account's existing sessions, so the
 new rights or the new password take effect at the next sign-in rather than
@@ -95,12 +116,13 @@ impractical quickly without ever locking a legitimate user out permanently.
 | `settings.json` | shared interface settings | world-readable by design |
 | `backend.json` | assistant configuration and API key | 600 |
 | `users.json` | accounts and password hashes | 600 |
+| `embeds.json` | embed keys, hashed | 600 |
 | `app.json` | ports and session lifetime | ordinary |
 | `server.pid` | the running process id | ordinary |
 
 `settings.json` has to be readable — every viewer's browser fetches it to
-build the interface. That is precisely why the key and the accounts live
-somewhere else. None of the first four should ever be committed to a
+build the interface. That is precisely why the key, the accounts and the embed
+keys live somewhere else. None of the first four should ever be committed to a
 repository.
 
 ## The service, or the deliberate lack of one
