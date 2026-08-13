@@ -189,6 +189,24 @@ Two roles:
 | `admin` | change every setting, manage accounts |
 | `viewer` | read the configuration, change nothing |
 
+### The built-in manual
+
+**DOCUMENTATION** at the foot of the panel opens six documents covering the
+display and every tab of the admin interface. They live as markdown in
+`docs/`, are read in a modal over the whole window rather than in the 425px
+column, and each has a **DOWNLOAD PDF** button.
+
+Available to any signed-in account, not just admins: a viewer can read the
+configuration, so a viewer should be able to read what it means. *Using
+Resonance* is written for people with no account at all — print it and put it
+next to the screen.
+
+The PDF is generated on the server with no dependency of any kind. It is set
+in Courier throughout, which is a decision rather than an aesthetic accident:
+the base-14 fonts need no embedding, and a monospaced face makes string width
+exactly `len(s) × 0.6 × size`, so line wrapping is correct by construction
+instead of needing font-metric tables. See `manual.py`.
+
 ### What a viewer keeps
 
 The controls a viewer has — mute, push-to-talk versus hands-free, and
@@ -258,16 +276,97 @@ Out of the box it answers from built-in text, so the whole chain can be
 commissioned before any backend exists. **RUN SELF-TEST** in the settings panel
 walks each link — secure origin, settings store, transcription service, voices,
 microphone, recorder, backend, render-and-speak — and names whichever one is
-broken.
+broken. Keep demo mode permanently: it is how you tell whether a fault is the
+front-end or the model behind it.
 
-There is a single seam to replace:
+Configure the rest in the admin page under **AI → Assistant**. The panel is
+deliberately terse; the reasoning behind each field is here.
 
-```js
-async function askBackend(text) { /* index.html */ }
-```
+### The three providers
 
-Everything else is already backend-agnostic. Keep the demo mode permanently: it
-is how you tell whether a fault is the front-end or the model behind it.
+**DEMO** answers from the display's own built-in text. Nothing is sent
+anywhere, no key is needed, and the system prompt is ignored.
+
+**OPENAI-COMPATIBLE** is a *dialect, not a vendor*. Ollama, OpenClaw, LM Studio
+and vLLM all speak it, so one adapter reaches all of them and the only
+difference between them is the base URL — which is what the preset buttons
+fill in. Pick a preset, set the model, save.
+
+| Preset | Base URL | Model field |
+|---|---|---|
+| Ollama | `http://127.0.0.1:11434/v1` | the tag, e.g. `qwen2.5:3b` |
+| OpenClaw | `http://127.0.0.1:18789/v1` | an agent id, e.g. `openclaw:main` |
+| LM Studio | `http://127.0.0.1:1234/v1` | whatever is loaded |
+| OpenAI | `https://api.openai.com/v1` | e.g. `gpt-4o-mini` |
+
+**ANTHROPIC** is a shape of its own rather than another preset, because the
+wire format genuinely differs: the key rides an `x-api-key` header instead of
+`Authorization: Bearer`, an `anthropic-version` header is required, the system
+prompt is a top-level field rather than a message in the list, `max_tokens` is
+mandatory, and the reply arrives as a list of content blocks rather than a
+single string. Base URL is `https://api.anthropic.com` and there is only one,
+so it has no preset — the provider button fills it. A key is required, and
+saving without one is refused rather than discovered later by whoever is
+standing in front of the screen.
+
+### Fields that do not apply everywhere
+
+**temperature** is not sent to Anthropic at all. The current Claude models
+reject the sampling parameters outright with a 400, and the older ones stop at
+1.0 where this panel's slider goes to 1.5 — a control that quietly breaks half
+the models is worse than no control. Steer those with the system prompt
+instead. The slider hides itself when Anthropic is selected.
+
+**keep model loaded** (`keep_alive`) is an Ollama extension accepted on its
+OpenAI-compatible path. Without it the model unloads after a few minutes idle
+and the next question waits for it to load again — measured at 28s for a 7b on
+the reference hardware. It means nothing to a hosted provider, and is never
+sent to Anthropic.
+
+**installed there:** under the model field is an Ollama trick — it asks
+`/api/tags` on the same host and lists what is actually there, so a model name
+is chosen rather than typed from memory. Nothing else answers that path, so
+the line stays empty for everyone else.
+
+### What the model knows
+
+The server appends the current date and time to the system prompt on every
+request, because a model's sense of "now" is frozen at its training cutoff and
+it will otherwise answer that question confidently and wrongly. The time is
+the **display's** local time: the browser reports its IANA zone with each
+question and the server formats accordingly, so a box running on UTC does not
+tell somebody in New York at 8pm that it is already tomorrow.
+
+The zone name is validated against the tz database and then discarded — what
+reaches the prompt is formatted server-side, never a string the client sent.
+An unrecognised zone falls back to the server clock.
+
+Recency is a different matter and is not fixable this way: the model has no
+internet, so the prompt asks it to say it does not know rather than guess.
+Live information would need a search or tool integration, which does not
+exist yet.
+
+### The system prompt
+
+What the assistant is told before every question. This one matters more here
+than in a chat box: the reply is **read aloud**, and markdown, bullets, code
+fences and emoji are all noise when spoken. The shipped prompt asks for one or
+two sentences of plain prose, and **RESET** returns to it. That single
+instruction is the largest difference between a voice interface and a text
+one.
+
+### Where the key lives
+
+Never in `settings.json`. That document is world-readable by design — every
+viewer's interface is built from it — so a credential there would be handed to
+anyone who opened the page. The assistant configuration lives in its own
+`backend.json` at mode 600, admin-only, and the key is never returned to a
+browser: the field shows whether one is stored, not what it is. **FORGET KEY**
+clears it.
+
+Measured round-trips on the reference box, cold then warm:
+`qwen2.5:1.5b` 1.4s / 1.6s, `qwen2.5:3b` 10.1s / 3.6s, `qwen2.5:7b` 28.2s /
+11.1s. Choose accordingly — for a voice front-end the wait is the product.
 
 ## HTTP API
 

@@ -7,6 +7,11 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <style>
   :root{
+    /* Tell the browser this is a dark document. Without it Firefox draws its
+       own furniture — scrollbars above all — in LIGHT colours over a black
+       page, which is most of why the bar looked like somebody else's. It also
+       darkens select dropdowns and form controls for free. */
+    color-scheme: dark;
     --ink:#05060a;
     --hue:#dfe9f2;
     --hue-dim:#7d93a8;
@@ -52,32 +57,150 @@
 
 
   /* ---------- scrollbars ----------
-     Part of the furniture, not the operating system's idea of a control:
-     square like every other edge here, hairline-thin, no track, and a thumb
-     that lifts on hover the same way the buttons do. The inset comes from a
-     transparent border clipped to the content box, which is the only way to
-     get breathing room around a webkit thumb. */
-  ::-webkit-scrollbar{width:9px;height:9px}
-  ::-webkit-scrollbar-track{background:transparent}
+     Part of the furniture rather than the operating system's idea of a
+     control: square, hairline-weight, no track, lifting on hover the way the
+     buttons do. The inset is a transparent border clipped to the content box,
+     which is the only way to get breathing room around a webkit thumb.
+
+     Colours are written out rather than taken from --glass, and that is not
+     an oversight: ::-webkit-scrollbar pseudo-elements do not inherit custom
+     properties, so a var() here never resolves, the whole declaration is
+     dropped as invalid, and the thumb silently falls back to the browser's
+     own pale rounded bar.
+
+     The weights are the panel's own, not a generic grey. This theme is bright
+     — hairline borders are rgba(255,255,255,.22), --ui is #c3cedb, --hue is
+     #dfe9f2 — so a thumb dimmer than the borders around it reads as somebody
+     else's scrollbar sitting in the panel, however square it is. Idle matches
+     the border hairline exactly, and it lifts to --ui then --hue the way the
+     buttons do. Keep these in step with :root if that changes. */
+  ::-webkit-scrollbar{width:9px;height:9px;background:transparent}
+  ::-webkit-scrollbar-track{background:transparent;border:0}
   ::-webkit-scrollbar-thumb{
-    background:rgba(var(--glass),.24);
-    border:2px solid transparent;background-clip:content-box;
+    border-radius:0;
+    background:rgba(255,255,255,.22);      /* = the hairline border weight */
+    border:2px solid transparent;
+    background-clip:content-box;
   }
   ::-webkit-scrollbar-thumb:hover{
-    background:rgba(var(--glass),.46);
-    border:2px solid transparent;background-clip:content-box;
+    border-radius:0;
+    background:#c3cedb;                    /* --ui */
+    border:2px solid transparent;
+    background-clip:content-box;
   }
+  ::-webkit-scrollbar-thumb:active{
+    border-radius:0;
+    background:#dfe9f2;                    /* --hue / --ui-bright */
+    border:2px solid transparent;
+    background-clip:content-box;
+  }
+  ::-webkit-scrollbar-button{display:none;width:0;height:0}
   ::-webkit-scrollbar-corner{background:transparent}
-  /* Firefox has no ::-webkit-scrollbar, so it gets the standard properties.
-     They are scoped behind @supports on purpose: setting them unconditionally
-     makes Chrome ignore every rule above and fall back to the operating
-     system's overlay bar, and Safari ignores these properties outright. */
-  @supports not selector(::-webkit-scrollbar){
-    *{scrollbar-width:thin;scrollbar-color:rgba(var(--glass),.24) transparent}
+  /* Firefox has no working ::-webkit-scrollbar and needs the standard
+     properties instead. They cannot be set unconditionally — Chrome supports
+     scrollbar-color too, and the moment it sees one it throws away every rule
+     above and draws its own overlay bar — so this has to be scoped.
+
+     It is scoped on -moz-appearance, which is true only in Firefox. The
+     obvious-looking `@supports not selector(::-webkit-scrollbar)` is WRONG
+     and was the regression: Firefox parses that selector for web-compat and
+     reports it as supported, so `not` came out false, the block never
+     applied, and Firefox fell all the way back to its default bar. Testing
+     for the engine is uglier than testing for the feature, and it is the only
+     one of the two that is true.
+
+     Firefox draws a rounded thumb and offers no hover state, so it gets one
+     solid tone rather than the hairline-then-lift the webkit path uses:
+     --hue-dim, which is a palette colour and legible without a hover to
+     rescue it. */
+  @supports (-moz-appearance: none){
+    *{scrollbar-width:thin;scrollbar-color:#7d93a8 transparent}
   }
 
+  /* ---------- the manual ----------
+     A list of documents in the column, and the document itself over the whole
+     window. The panel is 425px wide; prose is unreadable in it, and the
+     reason for a modal rather than a fifth tab is exactly that. */
+  .docitem{
+    display:block;width:100%;text-align:left;font:inherit;cursor:pointer;
+    background:none;color:inherit;border:1px solid rgba(var(--glass),.22);
+    padding:8px 10px;margin:6px 0 0;
+  }
+  .docitem:hover{border-color:var(--hue)}
+  .docitem .t{font-size:10px;letter-spacing:.12em;color:var(--text)}
+  .docitem .s{font-size:9px;letter-spacing:.04em;line-height:1.5;
+              color:rgba(var(--paper),.7);margin-top:3px}
+  .docitem .a{font-size:8px;letter-spacing:.16em;color:var(--hue-dim);
+              border:1px solid rgba(var(--glass),.22);padding:1px 4px;
+              margin-left:6px;vertical-align:1px}
+
+  #docmodal{
+    position:fixed;inset:0;z-index:60;display:none;
+    background:rgba(0,0,0,.72);padding:28px;
+  }
+  #docmodal.on{display:block}
+  #docsheet{
+    height:100%;max-width:1000px;margin:0 auto;display:flex;flex-direction:column;
+    background:var(--ink);border:1px solid rgba(var(--glass),.55);
+  }
+  #dochead{
+    flex:0 0 auto;display:flex;align-items:flex-start;gap:12px;
+    padding:12px 16px;border-bottom:1px solid rgba(var(--glass),.55);
+  }
+  #dochead .right{margin-left:auto;display:flex;gap:6px;flex:0 0 auto}
+  #dochead button{
+    font:inherit;font-size:9.5px;letter-spacing:.12em;padding:6px 10px;
+    cursor:pointer;background:none;color:var(--text);
+    border:2px solid rgba(var(--glass),.45);
+  }
+  #dochead button:hover{border-color:var(--hue);color:var(--hue)}
+  #doctitle{font-size:12px;letter-spacing:.16em;color:var(--text)}
+  #docsub{font-size:9px;letter-spacing:.05em;color:rgba(var(--paper),.7);
+          margin-top:4px;line-height:1.5}
+  /* The reading column. Prose wants a measure — a 1000px line of 9px text is
+     a chore to track back along — so the body is capped and the window can be
+     as wide as it likes. */
+  #docbody{
+    flex:1 1 auto;min-height:0;overflow-y:auto;padding:20px 26px 40px;
+    font-size:11px;line-height:1.72;color:rgba(var(--paper),.92);
+    letter-spacing:.02em;
+  }
+  #docbody > *{max-width:78ch}
+  #docbody h1{font-size:15px;letter-spacing:.14em;color:var(--text);
+              margin:0 0 4px;font-weight:400}
+  #docbody h2{font-size:12px;letter-spacing:.14em;color:var(--text);
+              margin:26px 0 8px;font-weight:400;
+              border-bottom:1px solid rgba(var(--glass),.28);padding-bottom:5px}
+  #docbody h3{font-size:10.5px;letter-spacing:.12em;color:var(--ui-bright);
+              margin:18px 0 5px;font-weight:400}
+  #docbody p{margin:0 0 11px}
+  #docbody ul,#docbody ol{margin:0 0 11px;padding-left:20px}
+  #docbody li{margin:0 0 4px}
+  #docbody code{font-size:10px;background:rgba(var(--glass),.08);
+                padding:1px 4px;color:var(--ui-bright)}
+  #docbody pre{background:rgba(var(--glass),.06);
+               border-left:2px solid rgba(var(--glass),.28);
+               padding:9px 12px;margin:0 0 12px;overflow-x:auto}
+  #docbody pre code{background:none;padding:0;font-size:10px;line-height:1.6}
+  #docbody hr{border:0;border-top:1px solid rgba(var(--glass),.28);margin:18px 0}
+  #docbody blockquote{margin:0 0 11px;padding-left:12px;
+                      border-left:2px solid rgba(var(--glass),.28);
+                      color:rgba(var(--paper),.78)}
+  #docbody table{border-collapse:collapse;margin:0 0 13px;font-size:10px;
+                 max-width:100%}
+  #docbody th,#docbody td{border:1px solid rgba(var(--glass),.22);
+                          padding:5px 9px;text-align:left;vertical-align:top}
+  #docbody th{color:var(--text);letter-spacing:.06em;font-weight:400;
+              background:rgba(var(--glass),.05)}
+  /* No underline on strong: the face has no bold weight to lean on, but an
+     underline reads as a link, and the document has real links in it. The
+     palette differentiates by brightness instead — emphasis is the same
+     white the headings use, against body text set below it. */
+  #docbody strong{color:var(--text);font-weight:400}
+  #docbody a{color:var(--hue);text-decoration:underline}
+
   /* ---------- admin shell ---------- */
-  #wrap{position:fixed;inset:0;display:none;grid-template-columns:340px 1fr}
+  #wrap{position:fixed;inset:0;display:none;grid-template-columns:425px 1fr}
   #wrap.on{display:grid}
   #panel{
     position:relative;height:100%;min-height:0;display:flex;flex-direction:column;
@@ -87,17 +210,36 @@
   #panelscroll{flex:1 1 auto;min-height:0;overflow-y:auto;padding:12px 14px 24px}
   #panelfoot{
     flex:0 0 auto;padding:10px 14px 12px;
-    border-top:1px solid rgba(var(--glass),.14);background:rgba(0,0,0,.5);
+    /* same strength as the rules bracketing the save row: this separates the
+       settings from the things that are not settings, which is a division
+       worth seeing at the same weight */
+    border-top:1px solid rgba(var(--glass),.55);background:rgba(0,0,0,.5);
   }
   #savestate{
     font-size:9px;letter-spacing:.06em;line-height:1.5;
     color:rgba(var(--paper),.88);margin:8px 0 0;min-height:0;
+  }
+  /* the one state where the admin's view and everyone else's disagree */
+  #savestate.alert{
+    color:#ff6b6b;letter-spacing:.1em;
+    border-left:2px solid #ff6b6b;padding-left:7px;
   }
   /* Both dividers read at the same strength: one closes the panel header,
      the other separates saving the interface from configuring the server.
      Brighter than the hairline between topics, so they group rather than
      merge into the section rules. */
   .rule{height:1px;margin:9px 0 2px;background:rgba(var(--glass),.55)}
+
+  /* The topics are bounded, so it is obvious where the list of them starts
+     and stops rather than the column running on into the foot. Same strength
+     as the rules above it. */
+  #grpbox{
+    border:1px solid rgba(var(--glass),.55);
+    padding:2px 10px 12px;
+    margin-top:10px;
+  }
+  /* the first topic's own top rule would double up with the box edge */
+  #grpbox .grp:first-of-type{border-top:0;margin-top:6px}
 
   /* One hover treatment for every control on the page. The panel is dense,
      and a button that does not answer the pointer reads as inert — the tab
@@ -106,30 +248,49 @@
      :not() carries the specificity needed to beat the .on selected state. */
   .tabs button:hover:not(:disabled),
   .seg button:hover:not(:disabled),
-  .findrow button:hover:not(:disabled),
   .urow button:hover:not(:disabled),
   #stagebar button:hover:not(:disabled),
+  #tab_ai:hover:not(:disabled),
   #tab_app:hover:not(:disabled),
   #tab_accounts:hover:not(:disabled),
+  #tab_docs:hover:not(:disabled),
   #b_signout:hover:not(:disabled),
   #gatebtn:hover:not(:disabled){
     border-color:var(--hue);color:var(--hue);
   }
   button:disabled{cursor:not-allowed}
-  /* Same strength as .rule above — only the spacing differs, because this one
-     separates saving the interface from configuring the server. */
-  .footrule{
-    height:1px;margin:11px 0;background:rgba(var(--glass),.55);
+  /* Saving is the consequential act on this page — everything else previews,
+     this is what reaches other people. Heavier border and brighter text so it
+     does not read as one more control in a column of them. */
+  #saverow{margin:10px 0 0}
+  #saverow button{
+    border:2px solid rgba(var(--glass),.45);
+    color:var(--text);padding:6px 10px;letter-spacing:.12em;
   }
-  #tab_app,#tab_accounts{
+  #saverow button:hover:not(:disabled){border-color:var(--hue);color:var(--hue)}
+  #saverule{margin:10px 0 2px}
+  #tab_ai,#tab_app,#tab_accounts,#tab_docs{
     width:100%;font:inherit;font-size:9.5px;letter-spacing:.14em;padding:7px 8px;
     cursor:pointer;text-align:left;background:none;color:rgba(var(--paper),.88);
     border:1px solid rgba(var(--glass),.22);
   }
-  #tab_app{margin-bottom:5px}
-  #tab_app:hover,#tab_accounts:hover{border-color:var(--hue);color:var(--hue)}
-  #tab_app.on,#tab_accounts.on{border-color:var(--hue-dim);color:var(--hue);
-                               background:rgba(var(--glass),.06)}
+  #tab_app,#tab_accounts{margin-bottom:5px}
+  /* One tab wide and sitting under the last of them: the row is three
+     flex:1 buttons with two 4px gaps, so a third of what is left after the
+     gaps matches exactly. Centred and right-aligned like the tab it follows,
+     rather than left-aligned like the full-width entries in the foot. */
+  #tab_ai{
+    /* display:block is load-bearing — a button is inline-block by default and
+       margin-left:auto does nothing to one, so it stayed on the left. */
+    display:block;
+    width:calc((100% - 8px) / 3);
+    margin:0 0 4px auto;
+    text-align:center;
+  }
+  #tab_ai:hover,#tab_app:hover,#tab_accounts:hover,#tab_docs:hover{
+    border-color:var(--hue);color:var(--hue)}
+  #tab_ai.on,#tab_app.on,#tab_accounts.on,#tab_docs.on{
+    border-color:var(--hue-dim);color:var(--hue);background:rgba(var(--glass),.06)}
   /* a change here does nothing until the process restarts, so say so loudly */
   .pending{
     border-left:2px solid #e8b04a;padding-left:8px;margin-top:10px;
@@ -139,10 +300,24 @@
   #portgrid{display:grid;grid-template-columns:1fr auto;gap:6px 10px;
             align-items:center;margin-top:8px}
   #portgrid label{font-size:9.5px;letter-spacing:.08em;color:rgba(var(--paper),.9)}
-  #portgrid input{width:88px;font:inherit;font-size:10px;padding:4px 6px;
-                  background:rgba(0,0,0,.6);color:var(--text);
-                  border:1px solid rgba(var(--glass),.16);outline:0;text-align:right}
-  #portgrid input:focus{border-color:var(--hue-dim)}
+  /* the session field is the same kind of thing as a port — a small number
+     you type, not prose — so it takes the same treatment */
+  #portgrid input,#ap_session{
+    width:88px;font:inherit;font-size:10px;padding:4px 6px;
+    background:rgba(0,0,0,.6);color:var(--text);
+    border:1px solid rgba(var(--glass),.16);outline:0;text-align:right;
+  }
+  #portgrid input:focus,#ap_session:focus{border-color:var(--hue-dim)}
+  #ap_session{display:block;margin:4px 0}
+  /* the spinner arrows are the operating system's, and look it */
+  #portgrid input::-webkit-outer-spin-button,
+  #portgrid input::-webkit-inner-spin-button,
+  #ap_session::-webkit-outer-spin-button,
+  #ap_session::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  #portgrid input,#ap_session{-moz-appearance:textfield;appearance:textfield}
+  #pw_cur:focus,#pw_new:focus,#nu_name:focus,#nu_pw:focus,
+  #bk_url:focus,#bk_model:focus,#bk_key:focus,#bk_keepalive:focus,
+  #bk_system:focus{border-color:var(--hue-dim)}
   #portgrid .now{grid-column:1/-1;font-size:8.5px;letter-spacing:.06em;
                  color:rgba(var(--paper),.7);margin:-2px 0 4px}
   #whobox{display:flex;align-items:center;gap:8px;margin-top:9px}
@@ -181,7 +356,8 @@
           padding-bottom:6px}
   .bklab{display:block;font-size:9.5px;letter-spacing:.1em;
          color:rgba(var(--paper),.9);margin-top:10px}
-  #pw_cur,#pw_new,#nu_name,#nu_pw{
+  #pw_cur,#pw_new,#nu_name,#nu_pw,
+  #bk_url,#bk_model,#bk_key,#bk_keepalive,#bk_system{
     width:100%;margin:4px 0;font:inherit;font-size:9.5px;padding:5px 6px;
     background:rgba(0,0,0,.6);color:var(--text);
     border:1px solid rgba(var(--glass),.16);outline:0;
@@ -203,12 +379,7 @@
     background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.85);
   }
   .tabs button.on{border-color:var(--hue-dim);color:var(--hue);background:rgba(var(--glass),.08)}
-  .findrow{display:flex;gap:4px;margin:0 0 4px}
-  .findrow button{
-    font:inherit;font-size:12px;line-height:1;width:24px;cursor:pointer;
-    background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.88);
-  }
-  .findrow button:hover{color:var(--hue);border-color:var(--hue-dim)}
+  .findrow{display:flex;margin:0 0 4px}
   #rigfind{
     flex:1;min-width:0;margin:0;font:inherit;font-size:9.5px;padding:5px 7px;
     background:rgba(0,0,0,.5);color:var(--text);
@@ -265,7 +436,10 @@
   #browservoice{display:none;margin:9px 0 0}
   #browservoice > #voicesel{margin-top:0}
   #wakeword,#sleepword{letter-spacing:.12em;text-transform:lowercase}
-  #greetings,#wakealiases,#sleepaliases,#farewells{resize:vertical;line-height:1.6;min-height:44px}
+  #bk_key{letter-spacing:.18em}
+  #bk_url,#bk_model,#bk_keepalive{letter-spacing:.04em}
+  #greetings,#wakealiases,#sleepaliases,#farewells,
+  #bk_system{resize:vertical;line-height:1.6;min-height:44px}
   /* LEARN prompts must sit next to the button that starts the training —
      they used to go to the mic section's note, which is invisible when that
      topic is folded, so the user never saw "say it now". */
@@ -302,17 +476,24 @@
   <div id="panelscroll">
   <div class="findrow">
     <input id="rigfind" type="search" placeholder="filter settings…" spellcheck="false">
-    <button id="b_expand" title="expand all in this tab">+</button>
-    <button id="b_collapse" title="collapse all in this tab">−</button>
   </div>
 
   <div class="tabs">
     <button data-tab="look"   class="on">LOOK</button>
     <button data-tab="motion">MOTION</button>
-    <button data-tab="voice">VOICE</button>
+    <button data-tab="speech">SPEECH</button>
   </div>
+  <button id="tab_ai" data-tab="ai">AI</button>
   <div id="savestate"></div>
   <div class="rule"></div>
+
+  <div class="seg" id="saverow">
+    <button id="b_save">SAVE FOR EVERYONE</button>
+    <button id="b_revert">REVERT</button>
+  </div>
+  <div class="rule" id="saverule"></div>
+
+  <div id="grpbox">
   <section class="grp" data-tab="look">
     <h4>Geometry</h4>
     <div class="grpbody">  <div class="seg" data-set="mode">
@@ -373,12 +554,88 @@
   <div class="sl"><label>scanlines</label><output id="o_scan"></output><input id="s_scan" type="range" min="0" max="1" step=".01"></div>
   <div class="sl"><label>line weight</label><output id="o_lw"></output><input id="s_lw" type="range" min=".3" max="3" step=".05"></div></div>
   </section>
-  <section class="grp" data-tab="voice">
+  <section class="grp" data-tab="ai">
+    <h4>Assistant</h4>
+    <div class="grpbody">
+  <div class="note">Which assistant answers. OPENAI-COMPATIBLE covers Ollama,
+OpenClaw, LM Studio and vLLM — they differ only by base URL.</div>
+  <div class="seg" id="bk_provider" style="margin-top:8px">
+    <button data-v="demo" class="on">DEMO</button>
+    <button data-v="openai">OPENAI-COMPATIBLE</button>
+    <button data-v="anthropic">ANTHROPIC</button>
+  </div>
+
+  <div id="bk_conn">
+  <div id="row_preset">
+  <label class="bklab">preset</label>
+  <div class="seg" id="bk_preset">
+    <button data-v="ollama">OLLAMA</button>
+    <button data-v="openclaw">OPENCLAW</button>
+    <button data-v="lmstudio">LM STUDIO</button>
+    <button data-v="openai">OPENAI</button>
+  </div>
+  </div>
+
+  <label class="bklab">base URL</label>
+  <input id="bk_url" type="text" spellcheck="false" autocomplete="off"
+         placeholder="http://127.0.0.1:11434/v1">
+  <label class="bklab">model</label>
+  <input id="bk_model" type="text" spellcheck="false" autocomplete="off"
+         placeholder="qwen2.5:3b">
+  <div class="note" id="bk_models"></div>
+
+  <label class="bklab">API key</label>
+  <input id="bk_key" type="password" spellcheck="false" autocomplete="off"
+         placeholder="unchanged">
+  <div class="note" id="keynote">Held on the server and never sent back to a
+browser. Leave blank to keep the stored one; a local model needs none.</div>
+
+  <div class="sl"><label>reply limit (tokens)</label><output id="o_bkmax"></output><input id="s_bkmax" type="range" min="16" max="2000" step="16"></div>
+  <div class="sl" id="row_temp"><label>temperature</label><output id="o_bktemp"></output><input id="s_bktemp" type="range" min="0" max="1.5" step=".05"></div>
+  <div class="sl"><label>turns of context</label><output id="o_bkhist"></output><input id="s_bkhist" type="range" min="0" max="24" step="1"></div>
+  <div class="sl"><label>timeout</label><output id="o_bktimeout"></output><input id="s_bktimeout" type="range" min="5" max="600" step="5"></div>
+
+  <div id="row_keepalive">
+  <label class="bklab">keep model loaded</label>
+  <input id="bk_keepalive" type="text" spellcheck="false" autocomplete="off"
+         placeholder="30m">
+  <div class="note">An Ollama extension: holds the model in memory so the next
+question isn't the slow one. Blank it for a hosted provider.</div>
+  </div>
+
+  <div class="note" id="anthnote" style="display:none">Temperature and
+keep-alive are not sent to Anthropic — steer it with the system prompt.</div>
+  </div><!-- /bk_conn -->
+
+  <div class="seg" style="margin-top:10px">
+    <button id="b_bksave">SAVE ASSISTANT</button>
+    <button id="b_bktest">TEST</button>
+    <button id="b_bkforget">FORGET KEY</button>
+  </div>
+  <div class="note" id="bknote"></div>
+    </div>
+  </section>
+
+  <section class="grp" data-tab="ai" id="grp_prompt">
+    <h4>System prompt</h4>
+    <div class="grpbody">
+  <div class="note">What the assistant is told before every question. The
+reply is read aloud, so this asks for plain prose.</div>
+  <textarea id="bk_system" rows="8" spellcheck="false"></textarea>
+  <div class="seg" style="margin-top:8px">
+    <button id="b_bksaveprompt">SAVE PROMPT</button>
+    <button id="b_bkresetprompt" title="back to the wording this ships with">RESET</button>
+  </div>
+  <div class="note" id="promptnote"></div>
+    </div>
+  </section>
+
+  <section class="grp" data-tab="ai">
     <h4>Setup &amp; self-test</h4>
     <div class="grpbody">
   <div class="seg" data-set="backend">
     <button data-v="demo" class="on">DEMO REPLIES</button>
-    <button data-v="api" disabled>CONNECTED AI</button>
+    <button data-v="api">CONNECTED AI</button>
   </div>
   <div style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5">
     DEMO answers from built-in text, so you can prove the whole chain works
@@ -389,16 +646,7 @@
     </div>
   </section>
 
-  <section class="grp" data-tab="voice">
-    <h4>Test drive</h4>
-    <div class="grpbody">  <div class="seg">
-    <button id="b_idle">IDLE</button>
-    <button id="b_think">THINKING</button>
-    <button id="b_speak">SPEAK SAMPLE</button>
-  </div>
-  <div class="sl" style="margin-top:10px"><label>token rate ms</label><output id="o_rate"></output><input id="s_rate" type="range" min="15" max="180" step="5"></div></div>
-  </section>
-  <section class="grp" data-tab="voice">
+    <section class="grp" data-tab="speech">
     <h4>Speech out (TTS)</h4>
     <div class="grpbody">  <div class="seg" data-set="ttsengine">
     <button data-v="local" class="on">NEURAL (server)</button>
@@ -422,7 +670,7 @@
   </div>
   <div id="ttsnote" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:8px;line-height:1.5"></div></div>
   </section>
-  <section class="grp" data-tab="voice">
+  <section class="grp" data-tab="speech">
     <h4>Speech in (mic)</h4>
     <div class="grpbody">  <div class="seg" data-set="ptt">
     <button data-v="1" class="on">PUSH TO TALK</button>
@@ -444,7 +692,7 @@
   <div id="miclevel" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5">level —</div>
   <div id="micnote" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:8px;line-height:1.5">off</div></div>
   </section>
-  <section class="grp" data-tab="voice">
+  <section class="grp" data-tab="speech">
     <h4>Wake word</h4>
     <div class="grpbody">  <div class="seg" data-set="wake">
     <button data-v="off">OFF</button>
@@ -469,7 +717,7 @@
   <div id="wakestate" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5"></div></div>
     </section>
 
-  <section class="grp" data-tab="voice">
+  <section class="grp" data-tab="speech">
     <h4>Sleep word</h4>
     <div class="grpbody">
   <label style="display:block;font-size:9.5px;letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:0">word that ends the conversation at once</label>
@@ -486,6 +734,15 @@
     <div id="sleepstate" style="font-size:9px;letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5"></div>
     </div>
 </section>
+<section class="grp" data-tab="speech">
+    <h4>Test drive</h4>
+    <div class="grpbody">  <div class="seg">
+    <button id="b_idle">IDLE</button>
+    <button id="b_think">THINKING</button>
+    <button id="b_speak">SPEAK SAMPLE</button>
+  </div>
+  <div class="sl" style="margin-top:10px"><label>token rate ms</label><output id="o_rate"></output><input id="s_rate" type="range" min="15" max="180" step="5"></div></div>
+  </section>
   <section class="grp" data-tab="motion">
     <h4>Spectrum</h4>
     <div class="grpbody">  <div class="sl"><label>spike width</label><output id="o_spike"></output><input id="s_spike" type="range" min=".004" max=".09" step=".001"></div>
@@ -580,18 +837,22 @@ sign in again. Activity pushes the deadline out.</div>
   <div class="note" id="usernote"></div>
     </div>
   </section>
+  <section class="grp" data-tab="docs">
+    <h4>Manual</h4>
+    <div class="grpbody">
+  <div class="note">Select one to read it. Each opens in a window with a
+button to download it as a PDF.</div>
+  <div id="doclist"></div>
+  <div class="note" id="docnote"></div>
+    </div>
+  </section>
+  </div><!-- /grpbox -->
   </div><!-- /panelscroll -->
 
   <div id="panelfoot">
-    <div class="seg">
-      <button id="b_save">SAVE FOR EVERYONE</button>
-      <button id="b_revert">REVERT</button>
-    </div>
-
-    <div class="footrule"></div>
-
     <button id="tab_app" data-tab="app">APP SETTINGS</button>
     <button id="tab_accounts" data-tab="accounts">ACCOUNTS</button>
+    <button id="tab_docs" data-tab="docs">DOCUMENTATION</button>
     <div id="whobox">
       <div id="whoname">—</div>
       <div id="whorole"></div>
@@ -611,6 +872,26 @@ sign in again. Activity pushes the deadline out.</div>
     <iframe id="frame" src="/index.html?preview=1" title="display preview"></iframe>
   </div>
 </div>
+
+<!-- The manual, read over the whole window rather than in the 425px column.
+     Outside #wrap on purpose: it is not part of the panel and must not be
+     clipped by it. -->
+<div id="docmodal" role="dialog" aria-modal="true" aria-labelledby="doctitle">
+  <div id="docsheet">
+    <div id="dochead">
+      <div>
+        <div id="doctitle">—</div>
+        <div id="docsub"></div>
+      </div>
+      <span class="right">
+        <button id="b_docpdf" title="save this document as a PDF">DOWNLOAD PDF</button>
+        <button id="b_docclose" title="close (Esc)">CLOSE</button>
+      </span>
+    </div>
+    <div id="docbody"></div>
+  </div>
+</div>
+
 <script>
 "use strict";
 /* =====================================================================
@@ -708,7 +989,12 @@ window.addEventListener('message', e=>{
     S = Object.assign({}, m.settings || {});
     if (!built){ buildControls(); built = true; } else { repaintControls(); }
     isDirty = false;
-    status(Object.keys(S).length + ' settings loaded');
+    /* The line stays empty until it has something worth saying. A count of
+       loaded settings is not news — it is the same number every time, and a
+       status line that always says something trains you to stop reading it,
+       which is exactly the habit the unsaved warning needs you not to have. */
+    status(reverting ? 'reloaded from the server' : '');
+    reverting = false;
   } else if (m.kind === 'status'){
     const el = $(m.slot);
     if (el){ el.textContent = m.text; el.classList.toggle('live', !!m.live); }
@@ -716,7 +1002,7 @@ window.addEventListener('message', e=>{
 });
 
 /* ------------------------------------------------------------- controls */
-let built = false, isDirty = false;
+let built = false, isDirty = false, reverting = false;
 const SLIDERS = [], FIELDS = [];
 function repaintControls(){
   SLIDERS.forEach(f=>f());
@@ -840,11 +1126,17 @@ async function voiceLists(){
 /* -------------------------------------------------------------- saving */
 function dirty(){
   isDirty = true;
-  status('unsaved changes — the preview is showing them, viewers are not');
+  /* Red, because this is the one state where what the admin is looking at
+     and what everyone else is looking at have come apart. It is easy to tune
+     something, be satisfied by the preview, and walk away having changed
+     nothing for anybody. */
+  status('UNSAVED — the preview shows these changes, viewers do not', true);
 }
 function status(m, bad){
   const el = $('savestate');
-  if (el){ el.textContent = m; el.style.color = bad ? '#ff8a8a' : ''; }
+  if (!el) return;
+  el.textContent = m;
+  el.classList.toggle('alert', !!bad);
 }
 
 $('b_save').addEventListener('click', async ()=>{
@@ -862,6 +1154,7 @@ $('b_save').addEventListener('click', async ()=>{
    version worth trusting. */
 $('b_revert').addEventListener('click', ()=>{
   status('reloading from the server…');
+  reverting = true;
   ready = false;
   frame.src = '/index.html?preview=1';
 });
@@ -931,6 +1224,255 @@ $('b_appsave').addEventListener('click', async ()=>{
       : 'saved — nothing here differs from what is running';
     showPending(j);
   }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+});
+
+/* ------------------------------------------------------------ assistant */
+/* Which model answers. Kept apart from the shared settings because it holds
+   a credential and that document is world-readable — the same reason the
+   accounts live in their own file. The key is never sent back to a browser,
+   so the field shows a placeholder rather than a value. */
+const BK_FIELDS = {bk_url:'base_url', bk_model:'model', bk_system:'system',
+                   bk_keepalive:'keep_alive'};
+const BK_SLIDERS = {s_bkmax:['max_tokens', v=>v],
+                    s_bktemp:['temperature', v=>(+v).toFixed(2)],
+                    s_bkhist:['history_turns', v=> v==0 ? 'none' : v],
+                    s_bktimeout:['timeout', v=> v+'s']};
+/* A preset is only a base URL and a hint at the model format. It exists so
+   nobody has to remember that OpenClaw listens on 18789 and routes by putting
+   an agent id in the model field. */
+const BK_PRESETS = {
+  ollama:   {base_url:'http://127.0.0.1:11434/v1', hint:'qwen2.5:3b',   keep_alive:'30m', provider:'openai'},
+  openclaw: {base_url:'http://127.0.0.1:18789/v1', hint:'openclaw:main', keep_alive:'',   provider:'openai'},
+  lmstudio: {base_url:'http://127.0.0.1:1234/v1',  hint:'',             keep_alive:'',    provider:'openai'},
+  openai:   {base_url:'https://api.openai.com/v1', hint:'gpt-4o-mini',  keep_alive:'',    provider:'openai'}
+  /* No Anthropic preset. A preset exists to fill in a base URL you would
+     otherwise have to remember, and Anthropic has exactly one — the provider
+     button already fills it. A sixth button here only wrapped the row onto a
+     second line and gave the panel two buttons with the same name. */
+};
+let BK = null;
+
+function bkNote(m, bad){
+  const el = $('bknote');
+  el.className = 'note' + (bad ? ' bad' : '');
+  el.textContent = m;
+}
+
+/* Nothing below the provider choice applies to DEMO: there is no connection
+   to configure and the built-in replies ignore the prompt. Leaving the fields
+   on screen would be a panel full of controls wired to nothing, which is
+   worse than a short panel. */
+function bkSyncProvider(){
+  const p = (document.querySelector('#bk_provider button.on') || {}).dataset;
+  const v = p ? p.v : 'demo';
+  const connected = v !== 'demo';
+  const anth = v === 'anthropic';
+  const conn = $('bk_conn');
+  if (conn) conn.style.display = connected ? '' : 'none';
+  // inline display beats the tab renderer's hidden attribute, so it has to be
+  // cleared rather than left for render() to undo
+  const prompt = $('grp_prompt');
+  if (prompt) prompt.style.display = connected ? '' : 'none';
+  const test = $('b_bktest');
+  if (test) test.disabled = !connected;
+  /* Anthropic takes neither of these — see the note that replaces them. A
+     slider wired to a field the adapter deliberately never sends is the same
+     defect as a toggle nothing reads. */
+  const show = (id, on)=>{ const el = $(id); if (el) el.style.display = on ? '' : 'none'; };
+  show('row_temp', !anth);
+  show('row_keepalive', !anth);
+  show('anthnote', anth);
+  show('row_preset', !anth);          // one endpoint; nothing to pick between
+  show('bk_models', !anth);           // that listing is an Ollama trick
+  const url = $('bk_url');
+  if (url) url.placeholder = anth ? 'https://api.anthropic.com'
+                                  : 'http://127.0.0.1:11434/v1';
+  const model = $('bk_model');
+  if (model && anth && !model.placeholder.startsWith('claude'))
+    model.placeholder = 'claude-opus-5';
+  const kn = $('keynote');
+  if (kn) kn.textContent = anth
+    ? 'Required. Held on the server, never sent back to a browser. Blank keeps the stored one.'
+    : 'Held on the server, never sent back to a browser. Blank keeps the stored one; a local model needs none.';
+}
+
+/* What each field held the last time this function wrote to it. Anything
+   that differs now was typed by the admin and not yet saved. */
+let BK_PAINTED = {};
+
+function bkPaint(){
+  if (!BK) return;
+  /* Do NOT clobber a field somebody is part-way through editing. loadBackend()
+     runs on every entry to this tab, so without this, typing a system prompt,
+     glancing at another tab and coming back silently threw the work away —
+     no warning, no trace, and the panel looked as though the save had failed.
+     An unsaved edit survives and is called out instead. */
+  let kept = 0;
+  Object.keys(BK_FIELDS).forEach(id=>{
+    const el = $(id); if (!el) return;
+    const stored = BK[BK_FIELDS[id]] == null ? '' : String(BK[BK_FIELDS[id]]);
+    const dirty = BK_PAINTED[id] !== undefined && el.value !== BK_PAINTED[id];
+    if (dirty && el.value !== stored){ kept++; return; }
+    el.value = stored;
+    BK_PAINTED[id] = stored;
+  });
+  BK.unsaved = kept > 0;
+  Object.keys(BK_SLIDERS).forEach(id=>{
+    const [key, fmt] = BK_SLIDERS[id];
+    const el = $(id), out = $('o_' + id.slice(2));
+    if (el){ el.value = BK[key]; if (out) out.textContent = fmt(BK[key]); }
+  });
+  document.querySelectorAll('#bk_provider button').forEach(b=>
+    b.classList.toggle('on', b.dataset.v === BK.provider));
+  /* Light the preset the current base URL actually corresponds to, rather
+     than whichever was last pressed — after a reload nothing was pressed,
+     and the honest answer is which one you are on. */
+  const url = (BK.base_url || '').replace(/\/+$/, '');
+  document.querySelectorAll('#bk_preset button').forEach(b=>{
+    const p = BK_PRESETS[b.dataset.v];
+    b.classList.toggle('on', !!p && p.provider === BK.provider
+                                 && p.base_url.replace(/\/+$/, '') === url);
+  });
+  $('bk_key').placeholder = BK.has_key ? 'unchanged — a key is stored' : 'none stored';
+  bkSyncProvider();
+}
+
+async function loadBackend(){
+  if (!ME || ME.role !== 'admin') return;
+  try{
+    const j = await api('/backend');
+    BK = Object.assign({}, j.backend, {has_key: j.has_key});
+    bkPaint();
+    if (BK.unsaved)
+      bkNote('you have unsaved changes here — they were kept, but nothing is '
+             + 'live until you press SAVE', true);
+    else
+      bkNote(BK.provider === 'demo'
+        ? 'answering from built-in text — pick a provider to connect one'
+        : BK.model + ' at ' + BK.base_url);
+    listModels();
+  }catch(e){ bkNote(e.message, true); }
+}
+
+/* Ollama will tell us what it has. Saves typing a model name from memory and
+   getting it subtly wrong, which returns a 404 that reads like a dead server. */
+async function listModels(){
+  const el = $('bk_models');
+  // Anthropic has no equivalent of /api/tags on this path, and asking it
+  // anyway just puts a CORS failure in the console for nothing.
+  if (!BK || BK.provider !== 'openai' || !BK.base_url){ el.textContent = ''; return; }
+  /* Just ask. Ollama answers /api/tags; anything else 404s and we say
+     nothing. Sniffing for port 11434 was wrong — it misses Ollama on another
+     port or behind a tunnel, which is exactly when you most want the list. */
+  try{
+    const base = BK.base_url.replace(/\/v1\/?$/, '');
+    const r = await fetch(base + '/api/tags', {cache:'no-store'});
+    const j = await r.json();
+    const names = (j.models || []).map(m=>m.name);
+    el.textContent = names.length ? 'installed there: ' + names.join(', ') : '';
+  }catch(e){ el.textContent = ''; }
+}
+
+function bkCollect(){
+  const body = {provider: (document.querySelector('#bk_provider button.on')||{}).dataset.v || 'demo'};
+  Object.keys(BK_FIELDS).forEach(id=>{ const el=$(id); if (el) body[BK_FIELDS[id]] = el.value; });
+  Object.keys(BK_SLIDERS).forEach(id=>{
+    const el=$(id); if (el) body[BK_SLIDERS[id][0]] = parseFloat(el.value);
+  });
+  const k = $('bk_key').value;
+  if (k) body.api_key = k;
+  return body;
+}
+
+document.querySelector('#bk_provider').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#bk_provider button').forEach(x=> x.classList.toggle('on', x===b));
+  bkSyncProvider();
+});
+
+document.querySelector('#bk_preset').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if (!b) return;
+  const p = BK_PRESETS[b.dataset.v]; if (!p) return;
+  document.querySelectorAll('#bk_preset button').forEach(x=> x.classList.toggle('on', x===b));
+  $('bk_url').value = p.base_url;
+  $('bk_keepalive').value = p.keep_alive;
+  if (p.hint) $('bk_model').placeholder = p.hint;
+  document.querySelectorAll('#bk_provider button')
+          .forEach(x=> x.classList.toggle('on', x.dataset.v === p.provider));
+  bkSyncProvider();
+  bkNote('preset filled in — set the model, then save');
+});
+
+$('b_bksave').addEventListener('click', async ()=>{
+  bkNote('saving…');
+  try{
+    const j = await api('/backend', {method:'POST', body: JSON.stringify(bkCollect())});
+    BK = Object.assign({}, j.backend, {has_key: j.has_key});
+    $('bk_key').value = '';
+    BK_PAINTED = {};              // saved: the stored values are truth again
+    bkPaint();
+    bkNote('saved · ' + (BK.provider === 'demo' ? 'built-in replies'
+                                                : BK.model + ' at ' + BK.base_url));
+    listModels();
+  }catch(e){ bkNote(e.message, true); }
+});
+
+/* The prompt has its own save because it has its own section, and with one
+   section open at a time it would otherwise mean opening a different one to
+   commit what you just typed. Both write the whole assistant document — the
+   field keeps its value while collapsed, so either button captures it. */
+const SHIPPED_PROMPT = 'You are a spoken assistant. Answer in one or two ' +
+  'short sentences unless asked for more. Write plain prose only — no ' +
+  'markdown, lists, headings, or emoji — because your reply is read aloud.';
+
+$('b_bksaveprompt').addEventListener('click', async ()=>{
+  const note = $('promptnote');
+  note.className = 'note'; note.textContent = 'saving…';
+  try{
+    const j = await api('/backend', {method:'POST', body: JSON.stringify(bkCollect())});
+    BK = Object.assign({}, j.backend, {has_key: j.has_key});
+    BK_PAINTED = {};              // saved: the stored values are truth again
+    bkPaint();
+    note.textContent = 'saved';
+  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+});
+
+$('b_bkresetprompt').addEventListener('click', ()=>{
+  $('bk_system').value = SHIPPED_PROMPT;
+  const note = $('promptnote');
+  note.className = 'note';
+  note.textContent = 'back to the shipped wording — not saved yet';
+});
+
+$('b_bkforget').addEventListener('click', async ()=>{
+  try{
+    const j = await api('/backend', {method:'POST', body: JSON.stringify({clear_key:true})});
+    BK.has_key = j.has_key; bkPaint();
+    bkNote('key cleared');
+  }catch(e){ bkNote(e.message, true); }
+});
+
+/* A real round trip, not a reachability ping. A base URL that answers and a
+   model name that does not exist look identical until something asks. */
+$('b_bktest').addEventListener('click', async ()=>{
+  bkNote('asking it something…');
+  const t0 = Date.now();
+  try{
+    const r = await fetch('/ask', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        text: 'Reply with one short sentence confirming you are reachable.',
+        // same zone the display sends, so TEST exercises the real path
+        tz: (()=>{ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; }
+                   catch(e){ return ''; } })()
+      })
+    });
+    const j = await r.json().catch(()=>({}));
+    if (j.demo) return bkNote('still on DEMO — nothing was asked of a model');
+    if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
+    bkNote('replied in ' + (j.ms || (Date.now()-t0)) + 'ms via ' + j.model +
+           '\n\n' + j.reply);
+  }catch(e){ bkNote(e.message, true); }
 });
 
 /* ------------------------------------------------------------ accounts */
@@ -1003,17 +1545,216 @@ $('b_pw').addEventListener('click', async ()=>{
   }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
 });
 
+/* ----------------------------------------------------------- the manual */
+/* The documents are markdown on the server, rendered here for reading and
+   rendered again — independently, in Python — for the PDF. Two renderers for
+   one source is a real cost, but the alternative is either shipping a
+   markdown library into a page that has no dependencies, or making the PDF a
+   screenshot of the DOM, and both are worse trades than this one. */
+
+const DOC_ESC = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+const esc = s => String(s).replace(/[&<>"']/g, c => DOC_ESC[c]);
+
+/* Inline runs, applied only to text that has already been escaped, so a
+   document can never inject markup no matter what it contains. */
+function mdInline(s){
+  return esc(s)
+    .replace(/`([^`]+)`/g, (m,c)=> '<code>' + c + '</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,
+             (m,t,u)=> /^(https?:|\/)/.test(u)
+               ? '<a href="'+u+'" target="_blank" rel="noopener">'+t+'</a>' : t);
+}
+
+function mdRender(md){
+  const lines = md.replace(/\r\n/g,'\n').split('\n');
+  const out = [];
+  let i = 0, seenH1 = false;
+  const listOpen = [];                       // stack of 'ul' | 'ol'
+  function closeLists(toDepth){
+    while (listOpen.length > toDepth) out.push('</' + listOpen.pop() + '>');
+  }
+  while (i < lines.length){
+    const raw = lines[i], line = raw.trim();
+
+    if (line.startsWith('```')){             // fenced code
+      closeLists(0);
+      const buf = [];
+      for (i++; i < lines.length && !lines[i].trim().startsWith('```'); i++)
+        buf.push(lines[i]);
+      i++;
+      out.push('<pre><code>' + esc(buf.join('\n')) + '</code></pre>');
+      continue;
+    }
+    if (!line){ closeLists(0); i++; continue; }
+
+    if (line.startsWith('|') && line.endsWith('|')){   // table
+      closeLists(0);
+      const rows = [];
+      for (; i < lines.length; i++){
+        const t = lines[i].trim();
+        if (!t.startsWith('|') || !t.endsWith('|')) break;
+        const cells = t.slice(1,-1).split('|').map(c=> c.trim());
+        if (cells.every(c=> c && /^:?-+:?$/.test(c))) continue;  // separator
+        rows.push(cells);
+      }
+      if (rows.length){
+        out.push('<table><thead><tr>' +
+          rows[0].map(c=> '<th>' + mdInline(c) + '</th>').join('') +
+          '</tr></thead><tbody>' +
+          rows.slice(1).map(r=> '<tr>' +
+            r.map(c=> '<td>' + mdInline(c) + '</td>').join('') + '</tr>').join('') +
+          '</tbody></table>');
+      }
+      continue;
+    }
+
+    let m = line.match(/^(#{1,6})\s+(.*)$/);
+    if (m){
+      closeLists(0); i++;
+      const lvl = Math.min(3, m[1].length);
+      // the modal header already shows the title; printing it again as the
+      // first line of the body is the same duplication the PDF had
+      if (lvl === 1 && !seenH1){ seenH1 = true; continue; }
+      out.push('<h'+lvl+'>' + mdInline(m[2]) + '</h'+lvl+'>');
+      continue;
+    }
+    if (/^([-*_])\1{2,}$/.test(line)){ closeLists(0); out.push('<hr>'); i++; continue; }
+    if (line.startsWith('> ')){
+      closeLists(0);
+      out.push('<blockquote>' + mdInline(line.slice(2)) + '</blockquote>');
+      i++; continue;
+    }
+
+    m = raw.match(/^(\s*)([-*]|\d+[.)])\s+(.*)$/);
+    if (m){
+      const depth = Math.floor(m[1].length / 2) + 1;
+      const kind = /^\d/.test(m[2]) ? 'ol' : 'ul';
+      while (listOpen.length > depth) out.push('</' + listOpen.pop() + '>');
+      while (listOpen.length < depth){ out.push('<'+kind+'>'); listOpen.push(kind); }
+      out.push('<li>' + mdInline(m[3]) + '</li>');
+      i++; continue;
+    }
+
+    closeLists(0);                            // paragraph: gather until blank
+    const para = [];
+    for (; i < lines.length && lines[i].trim()
+           && !/^(\s*)([-*]|\d+[.)])\s/.test(lines[i])
+           && !lines[i].trim().startsWith('|')
+           && !lines[i].trim().startsWith('#')
+           && !lines[i].trim().startsWith('```'); i++)
+      para.push(lines[i].trim());
+    if (para.length) out.push('<p>' + mdInline(para.join(' ')) + '</p>');
+  }
+  closeLists(0);
+  return out.join('\n');
+}
+
+let DOC_OPEN = null;                          // the id currently on screen
+
+async function loadDocs(){
+  const box = $('doclist'), note = $('docnote');
+  if (!box) return;
+  note.className = 'note'; note.textContent = '';
+  try{
+    const j = await api('/docs');
+    box.innerHTML = '';
+    (j.docs || []).forEach(d=>{
+      const b = document.createElement('button');
+      b.className = 'docitem';
+      b.type = 'button';
+      const t = document.createElement('div');
+      t.className = 't';
+      t.textContent = d.title;
+      const tag = document.createElement('span');
+      tag.className = 'a';
+      tag.textContent = d.audience.toUpperCase();
+      t.appendChild(tag);
+      const s = document.createElement('div');
+      s.className = 's';
+      s.textContent = d.summary;
+      b.appendChild(t); b.appendChild(s);
+      b.addEventListener('click', ()=> openDoc(d.id));
+      box.appendChild(b);
+    });
+    if (!(j.docs || []).length) note.textContent = 'no documents installed';
+  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+}
+
+async function openDoc(id){
+  const modal = $('docmodal');
+  $('doctitle').textContent = 'loading…';
+  $('docsub').textContent = '';
+  $('docbody').innerHTML = '';
+  modal.classList.add('on');
+  try{
+    const j = await api('/docs/' + encodeURIComponent(id));
+    DOC_OPEN = j.doc.id;
+    $('doctitle').textContent = j.doc.title;
+    $('docsub').textContent = j.doc.summary;
+    $('docbody').innerHTML = mdRender(j.doc.body);
+    $('docbody').scrollTop = 0;
+    $('b_docclose').focus();
+  }catch(e){
+    $('doctitle').textContent = 'could not open it';
+    $('docsub').textContent = e.message;
+  }
+}
+
+function closeDoc(){
+  $('docmodal').classList.remove('on');
+  DOC_OPEN = null;
+}
+
+$('b_docclose').addEventListener('click', closeDoc);
+/* Clicking the backdrop closes; clicking inside the sheet must not. */
+$('docmodal').addEventListener('mousedown', e=>{ if (e.target === $('docmodal')) closeDoc(); });
+document.addEventListener('keydown', e=>{
+  if (e.key === 'Escape' && $('docmodal').classList.contains('on')) closeDoc();
+});
+
+/* Fetched rather than linked, for two reasons: the error is reportable in
+   place instead of replacing the page with a JSON blob, and the session
+   cookie rides a fetch the same way it rides a navigation. */
+$('b_docpdf').addEventListener('click', async ()=>{
+  if (!DOC_OPEN) return;
+  const btn = $('b_docpdf'), was = btn.textContent;
+  btn.disabled = true; btn.textContent = 'BUILDING…';
+  try{
+    const r = await fetch('/docs/' + encodeURIComponent(DOC_OPEN) + '.pdf',
+                          {cache:'no-store'});
+    if (!r.ok){
+      const j = await r.json().catch(()=>({}));
+      throw new Error(j.error || ('HTTP ' + r.status));
+    }
+    const blob = await r.blob();
+    const name = (r.headers.get('Content-Disposition') || '')
+                   .match(/filename="([^"]+)"/);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name ? name[1] : (DOC_OPEN + '.pdf');
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=> URL.revokeObjectURL(a.href), 10000);
+    btn.textContent = 'DOWNLOADED';
+    setTimeout(()=>{ btn.textContent = was; }, 1800);
+  }catch(e){
+    btn.textContent = 'FAILED';
+    $('docsub').textContent = e.message;
+    setTimeout(()=>{ btn.textContent = was; }, 2200);
+  }finally{ btn.disabled = false; }
+});
+
 /* ------------------------------------------------------ panel navigation */
 function panelNav(){
   const groups = [...document.querySelectorAll('#panel .grp')];
   const shut = new Map();
   let tab = 'look';
-  const seen = new Set();
-  groups.forEach(g=>{
-    const first = !seen.has(g.dataset.tab);
-    seen.add(g.dataset.tab);
-    shut.set(g, !first);
-  });
+  /* Everything starts closed, so a tab opens as a list of topics rather
+     than as one topic and a list. With one section open at a time, an
+     already-expanded section is a choice made on the reader's behalf. */
+  groups.forEach(g=> shut.set(g, true));
   const findEl = $('rigfind');
   function render(){
     const q = (findEl.value || '').trim().toLowerCase();
@@ -1026,28 +1767,49 @@ function panelNav(){
   /* Two homes now: the row at the top and the pinned entry at the foot.
      Treat them as one set so exactly one is ever lit. */
   const tabButtons = [...document.querySelectorAll('#panel button[data-tab]')];
+  /* SAVE FOR EVERYONE writes the shared settings document, so it only
+     belongs on the tabs that edit it. App settings and accounts each save
+     their own thing with their own button, and offering a second save that
+     means something else is how somebody presses the wrong one. */
+  /* AI is a settings tab too: the DEMO / CONNECTED AI choice lives in the
+     shared document, so it needs the same save button the others use. The
+     assistant's own connection details save separately, with their own. */
+  const SETTINGS_TABS = new Set(['look', 'motion', 'speech', 'ai']);
+  function syncSaveRow(){
+    const show = SETTINGS_TABS.has(tab) ? '' : 'none';
+    ['saverow', 'savestate', 'saverule'].forEach(id=>{
+      const el = $(id); if (el) el.style.display = show;
+    });
+  }
   function selectTab(b){
     tab = b.dataset.tab;
     tabButtons.forEach(x=> x.classList.toggle('on', x === b));
+    // arriving at a tab shows its topics closed, not whatever was left open
+    groups.forEach(g=>{ if (g.dataset.tab === tab) shut.set(g, true); });
     render();
+    syncSaveRow();
     $('panelscroll').scrollTop = 0;
     if (tab === 'accounts') refreshUsers();
     if (tab === 'app') loadApp();
+    if (tab === 'ai') loadBackend();
+    if (tab === 'docs') loadDocs();
   }
   tabButtons.forEach(b=> b.addEventListener('click', ()=> selectTab(b)));
+  /* One section open at a time. Opening another closes the one before it,
+     so the column stays short enough to take in at a glance rather than
+     becoming a wall you scroll through hunting for a control. Clicking the
+     open one closes it, leaving none open, which is a legitimate state. */
   groups.forEach(g=> g.querySelector('h4').addEventListener('click', ()=>{
-    shut.set(g, !shut.get(g)); render();
+    const wasOpen = !shut.get(g);
+    groups.forEach(x=>{ if (x.dataset.tab === g.dataset.tab) shut.set(x, true); });
+    shut.set(g, wasOpen);
+    render();
+    // opening a section further down should not leave its heading off-screen
+    if (!wasOpen) g.scrollIntoView({block:'nearest'});
   }));
-  $('b_expand').addEventListener('click', ()=>{
-    groups.forEach(g=>{ if (g.dataset.tab === tab) shut.set(g,false); });
-    findEl.value=''; render();
-  });
-  $('b_collapse').addEventListener('click', ()=>{
-    groups.forEach(g=>{ if (g.dataset.tab === tab) shut.set(g,true); });
-    findEl.value=''; render();
-  });
   findEl.addEventListener('input', render);
   render();
+  syncSaveRow();
 }
 
 /* ----------------------------------------------------------------- boot */
