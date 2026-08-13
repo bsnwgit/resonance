@@ -261,9 +261,32 @@
      the region does or it reads as an underline on the column above it
      instead of a division of the panel. */
   #panelhead > .findrow,
+  #panelhead > .tabgroup,
   #panelhead > .tabs,
   #panelhead > #savestate,
   #panelhead > #saverow{max-width:560px}
+
+  /* The app tab's own commit row, at the foot of the box. Hidden outright
+     on every other tab: a save button that belongs to settings you cannot
+     currently see is a save button somebody will eventually press. */
+  #approw{display:none;margin-top:14px;padding-top:10px;
+          border-top:1px solid rgba(var(--glass),.30)}
+  #approw.on{display:block}
+  #approw .seg{justify-content:flex-end;margin-top:8px}
+  #approw .seg button{border-width:2px;border-style:solid;padding:6px 10px}
+  /* Spans every column once the topics tile, so it reads as the foot of the
+     whole box rather than the tail of whichever column it landed in. */
+  @container (min-width:700px){ #approw{grid-column:1/-1} }
+
+  /* The caption over a row of tabs. Quieter than anything it labels — it is
+     there to be read once and then ignored, not to compete with the tabs
+     underneath it. */
+  .tabgroup{
+    font-size:calc(8px * var(--fs));letter-spacing:.22em;
+    text-transform:uppercase;color:rgba(var(--paper),.55);
+    margin:0 0 5px;
+  }
+  #panelfoot .tabgroup{margin-top:2px}
   #panelfoot{
     flex:0 0 auto;padding:10px 14px 12px;
     /* same strength as the rules bracketing the save row: this separates the
@@ -369,38 +392,16 @@
      this is what reaches other people. Heavier border and brighter text so it
      does not read as one more control in a column of them. */
   #saverow{margin:10px 0 0}
+  /* The weight, not the colour. Saving is the consequential act on this page
+     — everything else previews, this is what reaches other people — so the
+     pair keeps its heavier border. What colour that border is now comes from
+     the .act-save / .act-undo classes below, so this rule must not name one
+     or it would override them from a more specific selector. */
   #saverow button{
-    border:2px solid rgba(var(--glass),.45);
-    color:var(--text);padding:6px 10px;letter-spacing:.12em;
+    border-width:2px;border-style:solid;
+    padding:6px 10px;letter-spacing:.12em;
   }
-  #saverow button:hover:not(:disabled){border-color:var(--hue);color:var(--hue)}
-  /* Colour on the two that change something, and only on those two. Muted
-     and translucent like the rest of this palette — a saturated pair would
-     sit on top of the page rather than in it — but far enough apart that
-     writing to everyone and throwing your edits away cannot be confused at
-     a glance.
 
-     Selected THROUGH #saverow, not as bare ids. `#saverow button` is an id
-     plus an element and beats a bare `#b_save`, so the plain version of
-     these rules lost the cascade outright and neither button changed
-     colour. Coming later in the file does nothing when the other selector
-     is the more specific one. */
-  #saverow #b_save{
-    border-color:rgba(122,201,160,.75);color:#a8e3c4;
-    background:rgba(122,201,160,.10);
-  }
-  #saverow #b_save:hover:not(:disabled){
-    border-color:rgba(122,201,160,1);color:#d2f2e2;
-    background:rgba(122,201,160,.20);
-  }
-  #saverow #b_revert{
-    border-color:rgba(224,132,132,.7);color:#eaa8a8;
-    background:rgba(224,132,132,.09);
-  }
-  #saverow #b_revert:hover:not(:disabled){
-    border-color:rgba(224,132,132,1);color:#f6cdcd;
-    background:rgba(224,132,132,.18);
-  }
   #saverule{margin:10px 0 2px}
   /* AI sits in the tab row itself now, and the four pinned entries are a row
      of their own in the foot. Both are `.tabs`, so the hover and selected
@@ -687,6 +688,56 @@
     visibility:visible !important;
     pointer-events:auto !important;
   }
+  /* ---------- committing and undoing, everywhere ----------
+     Green writes, red throws away, and it means the same thing in every
+     corner of the app: the shared settings, the assistant, the prompt, the
+     server wiring, a password, a new account, a new embed key. A colour that
+     means "save" in one panel and nothing in the next is worse than no
+     colour, because it is a habit that fails silently exactly where somebody
+     has stopped reading the label.
+
+     Classes rather than a list of ids. Anything added later gets the
+     treatment by being marked as what it is, and nobody has to remember to
+     extend a selector in the stylesheet.
+
+     Muted and translucent like the rest of this palette — a saturated pair
+     would sit on top of the page rather than in it — but far enough apart
+     that committing and discarding cannot be confused at a glance.
+
+     `button.act-save` ties with `.seg button` and beats `.urow button` and
+     `.erow button`; it sits after all of them, so the tie goes this way on
+     source order. The earlier version of these rules was written as bare ids
+     and lost outright to `#saverow button`, which is an id plus an element —
+     hence the shape here, and hence the rule above giving up its colour. */
+  button.act-save{
+    border-color:rgba(122,201,160,.75);color:#a8e3c4;
+    background:rgba(122,201,160,.10);
+  }
+  button.act-save:hover:not(:disabled){
+    border-color:rgba(122,201,160,1);color:#d2f2e2;
+    background:rgba(122,201,160,.20);
+  }
+  /* Two names, one treatment, on purpose. act-undo throws away an edit you
+     have not committed; act-danger destroys something already saved. They
+     are not the same act and the class names say so, but to the eye they are
+     the same warning and there is nothing to gain from inventing a second
+     red for it. Keeping the names apart means a later decision to separate
+     them visually is a stylesheet change and not a hunt through the markup. */
+  button.act-undo,button.act-danger{
+    border-color:rgba(224,132,132,.7);color:#eaa8a8;
+    background:rgba(224,132,132,.09);
+  }
+  button.act-undo:hover:not(:disabled),
+  button.act-danger:hover:not(:disabled){
+    border-color:rgba(224,132,132,1);color:#f6cdcd;
+    background:rgba(224,132,132,.18);
+  }
+  /* A disabled commit must not still look like an invitation. */
+  button.act-save:disabled,button.act-undo:disabled,button.act-danger:disabled{
+    border-color:rgba(var(--glass),.20);color:rgba(var(--paper),.35);
+    background:none;
+  }
+
 </style>
 </head>
 <body>
@@ -730,6 +781,11 @@
     <input id="rigfind" type="search" placeholder="filter settings…" spellcheck="false">
   </div>
 
+  <!-- The two rows configure different things at different scopes: what
+       every viewer sees, and how the server itself is run. Saying so is
+       cheaper than leaving somebody to infer it from which tabs happen to
+       carry the SAVE FOR EVERYONE button. -->
+  <div class="tabgroup">User interface settings</div>
   <div class="tabs">
     <button data-tab="look"   class="on">LOOK</button>
     <button data-tab="motion">MOTION</button>
@@ -740,8 +796,8 @@
   <div class="rule"></div>
 
   <div class="seg" id="saverow">
-    <button id="b_save">SAVE FOR EVERYONE</button>
-    <button id="b_revert">REVERT</button>
+    <button id="b_save" class="act-save">SAVE FOR EVERYONE</button>
+    <button id="b_revert" class="act-undo">REVERT</button>
   </div>
   <div class="rule" id="saverule"></div>
   </div><!-- /panelhead -->
@@ -911,9 +967,9 @@ keep-alive are not sent to Anthropic — steer it with the system prompt.</div>
   </div><!-- /bk_conn -->
 
   <div class="seg" style="margin-top:10px">
-    <button id="b_bksave">SAVE ASSISTANT</button>
+    <button id="b_bksave" class="act-save">SAVE ASSISTANT</button>
     <button id="b_bktest">TEST</button>
-    <button id="b_bkforget">FORGET KEY</button>
+    <button id="b_bkforget" class="act-undo">FORGET KEY</button>
   </div>
   <div class="note" id="bknote"></div>
     </div>
@@ -926,8 +982,8 @@ keep-alive are not sent to Anthropic — steer it with the system prompt.</div>
 reply is read aloud, so this asks for plain prose.</div>
   <textarea id="bk_system" rows="8" spellcheck="false"></textarea>
   <div class="seg" style="margin-top:8px">
-    <button id="b_bksaveprompt">SAVE PROMPT</button>
-    <button id="b_bkresetprompt" title="back to the wording this ships with">RESET</button>
+    <button id="b_bksaveprompt" class="act-save">SAVE PROMPT</button>
+    <button id="b_bkresetprompt" class="act-undo" title="back to the wording this ships with">RESET</button>
   </div>
   <div class="note" id="promptnote"></div>
     </div>
@@ -1095,15 +1151,6 @@ Short by default — this session configures what everyone else is looking at.
     </div>
   </section>
 
-  <section class="grp" data-tab="app">
-    <h4>Apply</h4>
-    <div class="grpbody">
-  <div class="seg"><button id="b_appsave">SAVE APP SETTINGS</button></div>
-  <div class="note" id="appnote"></div>
-  <div class="pending" id="apppending" hidden></div>
-    </div>
-  </section>
-
   <section class="grp" data-tab="accounts">
     <h4>Your account</h4>
     <div class="grpbody">
@@ -1112,7 +1159,7 @@ Short by default — this session configures what everyone else is looking at.
   <input id="pw_cur" type="password" autocomplete="current-password">
   <label class="bklab">new password</label>
   <input id="pw_new" type="password" autocomplete="new-password">
-  <div class="seg" style="margin-top:8px"><button id="b_pw">CHANGE PASSWORD</button></div>
+  <div class="seg" style="margin-top:8px"><button id="b_pw" class="act-save">CHANGE PASSWORD</button></div>
   <div class="note" id="pwnote"></div>
     </div>
   </section>
@@ -1140,7 +1187,7 @@ Short by default — this session configures what everyone else is looking at.
     <button data-v="viewer" class="on">VIEWER</button>
     <button data-v="admin">ADMIN</button>
   </div>
-  <div class="seg" style="margin-top:8px"><button id="b_adduser">CREATE</button></div>
+  <div class="seg" style="margin-top:8px"><button id="b_adduser" class="act-save">CREATE</button></div>
   <div class="note" id="usernote"></div>
     </div>
   </section>
@@ -1211,7 +1258,7 @@ does not withdraw the microphone.</div>
   <label class="bklab">session length, minutes</label>
   <input id="em_ttl" type="number" min="5" max="1440" value="60">
 
-  <div class="seg" style="margin-top:8px"><button id="b_addembed">CREATE</button></div>
+  <div class="seg" style="margin-top:8px"><button id="b_addembed" class="act-save">CREATE</button></div>
   <div class="note" id="embnote"></div>
   <div id="em_key"></div>
     </div>
@@ -1231,6 +1278,20 @@ button to download it as a PDF.</div>
   <div class="note" id="docnote"></div>
     </div>
   </section>
+  <!-- App settings save their own thing, so they get their own commit row
+       rather than a topic called "Apply" whose only content was a button.
+       It sits at the foot of the box across the full width, so it reads as
+       belonging to everything above it rather than to the last topic — and
+       so it does not become one more collapsible section you have to open
+       to find out how to save. -->
+  <div id="approw">
+    <div class="note" id="appnote"></div>
+    <div class="pending" id="apppending" hidden></div>
+    <div class="seg">
+      <button id="b_appsave" class="act-save">SAVE APP SETTINGS</button>
+      <button id="b_apprevert" class="act-undo">REVERT</button>
+    </div>
+  </div>
   </div><!-- /grpbox -->
   </div><!-- /panelscroll -->
 
@@ -1239,6 +1300,7 @@ button to download it as a PDF.</div>
          stacked entries because a 425px column had no room to put four
          side by side; it does now, and four buttons that behave like tabs
          should look like the tabs. -->
+    <div class="tabgroup">Admin settings</div>
     <div class="tabs" id="foottabs">
       <button id="tab_app" data-tab="app">APP SETTINGS</button>
       <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
@@ -1749,6 +1811,19 @@ async function loadApp(){
   }catch(e){ $('appnote').className = 'note bad'; $('appnote').textContent = e.message; }
 }
 
+/* Revert here means the SERVER's values, not a snapshot taken when the tab
+   was opened. Nothing on this tab takes effect until a restart, so what is
+   stored is the only other version that exists — and re-reading it also
+   refreshes the "saved but not yet in effect" warning, which a local undo
+   would have left stale and lying. */
+$('b_apprevert').addEventListener('click', async ()=>{
+  const note = $('appnote');
+  note.className = 'note';
+  note.textContent = 'reloading from the server…';
+  await loadApp();
+  if (!note.classList.contains('bad')) note.textContent = 'back to what is saved';
+});
+
 $('b_appsave').addEventListener('click', async ()=>{
   const note = $('appnote');
   note.className = 'note';
@@ -2038,6 +2113,7 @@ async function refreshUsers(){
         {username:u.username, role: u.role === 'admin' ? 'viewer' : 'admin'});
       const del = document.createElement('button');
       del.textContent = 'DELETE';
+      del.className = 'act-danger';   // destroys something already saved
       del.onclick = ()=>{
         if (confirm('Delete the account "' + u.username + '"?'))
           userAction('/users/delete', {username:u.username});
@@ -2193,6 +2269,7 @@ async function refreshEmbeds(){
                                       {id:e.id, enabled: e.enabled === false});
       const del = document.createElement('button');
       del.textContent = 'DELETE';
+      del.className = 'act-danger';   // destroys something already saved
       del.onclick = ()=>{
         if (confirm('Delete the embed key "' + e.name + '"? Any page using it '
                     + 'stops working immediately.'))
@@ -2553,6 +2630,13 @@ function panelNav(){
     ['saverow', 'savestate', 'saverule'].forEach(id=>{
       const el = $(id); if (el) el.style.display = show;
     });
+    /* The app tab's own commit row. Only on that tab, and only when nothing
+       is being filtered — a filter mixes sections from every tab, so a row
+       labelled SAVE APP SETTINGS sitting under a match from SPEECH would be
+       offering to save something that is not on screen. */
+    const ar = $('approw');
+    if (ar) ar.classList.toggle('on',
+      tab === 'app' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
   }
   function selectTab(b){
     tab = b.dataset.tab;
@@ -2581,7 +2665,9 @@ function panelNav(){
     // opening a section further down should not leave its heading off-screen
     if (!wasOpen) g.scrollIntoView({block:'nearest'});
   }));
-  findEl.addEventListener('input', render);
+  // the commit row depends on the filter as well as the tab, so both paths
+  // have to re-run it
+  findEl.addEventListener('input', ()=>{ render(); syncSaveRow(); });
   render();
   syncSaveRow();
 }
