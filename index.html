@@ -391,6 +391,49 @@ const Embed = {
   can(what){ return !this.live.cap || !!this.live.cap[what]; },
 };
 
+/* -------------------------------------------------- the display's name
+   `?display=workshop` is the declared name from the identity design: a name
+   survives a browser wipe where a token does not. None of the rest of that
+   design is built, so today this is the URL parameter and nothing more — but
+   it is the same identifier the admin-set label will hang off when it lands,
+   so a `{display}` written into a setting now keeps meaning the same thing.
+
+   Capped and stripped of markup characters: it is somebody else's string
+   arriving from a URL, and it ends up rendered as a name. */
+const DISPLAY_NAME = (new URLSearchParams(location.search).get('display') || '')
+  .replace(/[<>{}]/g, '').trim().slice(0, 40);
+
+/* ---------------------------------------------------------- variables
+   One expander for every setting that names something — the greeting, the
+   farewell, and the two transcript labels. `{name}` predates this and meant
+   the wake word, so it keeps meaning exactly that rather than being renamed
+   into a tidier scheme that would break every greeting already written.
+
+   An unknown variable is left standing rather than blanked. Somebody typing
+   {displya} should see their typo, not a name that silently vanished. */
+const VARS = {
+  name:    ()=>{
+    const raw = (S.wakeword || 'resonance').trim();
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  },
+  display: ()=> DISPLAY_NAME,
+};
+function expand(s){
+  return String(s == null ? '' : s).replace(/\{(\w+)\}/g, (m, k)=>{
+    const f = VARS[k.toLowerCase()];
+    return f ? f() : m;
+  });
+}
+
+/* The label above a line of transcript. Falls back to the shipped default
+   when a setting expands to nothing — `{display}` on a URL that declared no
+   name would otherwise leave the line attributed to nobody at all. */
+const SPEAKER_FALLBACK = {you: 'operator', ai: 'resonance'};
+function speakerName(who){
+  const raw = who === 'you' ? S.opname : S.ainame;
+  return expand(raw).trim() || SPEAKER_FALLBACK[who] || '';
+}
+
 /* ------------------------------------------------------- viewer prefs
    The three controls a viewer actually has, remembered in this browser
    until its data is cleared, so a display stays how they left it.
@@ -429,6 +472,10 @@ Prefs.load();
 const S = {
   mode:'stack', palette:'blue', layout:'hero',
   face:'mono', fs:'1',                 // typography — see setType()
+  /* Who the transcript says is speaking. Literal defaults, not {name} — the
+     wake word is available as a variable but binding to it is a choice an
+     admin makes, not one made for them. */
+  opname:'operator', ainame:'resonance',
   amp:1.0, lines:16, lag:3, depth:230, spread:620, persp:1100,
   tumble:1.0, reorient:12,
   tmode:'turntable', spin:1.0, tilt:0.187, wobble:1.0, roll:1.0,
@@ -1738,8 +1785,8 @@ function ev(s){
 function addMsg(who, text){
   const el = document.createElement('div');
   el.className = 'msg ' + who;
-  el.innerHTML = '<span class="who">'+(who==='you'?'operator':'resonance')+'</span>'+
-                 '<span class="body"></span>';
+  el.innerHTML = '<span class="who"></span><span class="body"></span>';
+  el.querySelector('.who').textContent = speakerName(who);
   el.querySelector('.body').textContent = text;
   logEl.appendChild(el);
   followLive = true;
@@ -2480,21 +2527,15 @@ const Learn = {
    to, so renaming it renames the greeting. */
 const FALLBACK_GREETING = '{name} here. Go ahead.';
 function greetingText(){
-  const raw  = (S.wakeword || 'resonance').trim();
-  const name = raw.charAt(0).toUpperCase() + raw.slice(1);
   const pool = (S.greetings || '').split('\n').map(x=>x.trim()).filter(Boolean);
-  const pick = pool.length ? pool[(Math.random()*pool.length)|0] : FALLBACK_GREETING;
-  return pick.replace(/\{name\}/gi, name);
+  return expand(pool.length ? pool[(Math.random()*pool.length)|0] : FALLBACK_GREETING);
 }
 function greet(){ respond(greetingText()); }
 
 const FALLBACK_FAREWELL = 'Going quiet.';
 function farewellText(){
-  const raw  = (S.wakeword || 'resonance').trim();
-  const name = raw.charAt(0).toUpperCase() + raw.slice(1);
   const pool = (S.farewells || '').split('\n').map(x=>x.trim()).filter(Boolean);
-  const pick = pool.length ? pool[(Math.random()*pool.length)|0] : FALLBACK_FAREWELL;
-  return pick.replace(/\{name\}/gi, name);
+  return expand(pool.length ? pool[(Math.random()*pool.length)|0] : FALLBACK_FAREWELL);
 }
 function farewell(){ respond(farewellText()); }
 
@@ -2695,6 +2736,13 @@ function repaintAll(){
     .forEach(syncSeg);
   setPalette(S.palette);
   setType();
+  /* Relabel what is already on screen. The admin is tuning this against a
+     live transcript, and a name that only applied to the next line would
+     look like it had not taken. */
+  document.querySelectorAll('#log .msg').forEach(m=>{
+    const w = m.querySelector('.who');
+    if (w) w.textContent = speakerName(m.classList.contains('you') ? 'you' : 'ai');
+  });
   document.body.dataset.layout = S.layout;
   if (typeof syncPtt === 'function') syncPtt();
   if (typeof syncTalk === 'function') syncTalk();

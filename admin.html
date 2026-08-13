@@ -332,6 +332,12 @@
   @container (min-width:700px){
     #grpbox{
       display:grid;align-items:start;
+      /* auto-FILL, not auto-fit. auto-fit collapses the empty tracks so a
+         tab's topics stretch across the whole box, which was tried and was
+         much worse: a section is a column of small controls, and stretching
+         three of them over 1300px leaves each one a wide empty field with a
+         few widgets adrift at the left of it. A settings column has a
+         readable width and it is nearer 300px than 430. */
       grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
       column-gap:20px;
     }
@@ -560,6 +566,40 @@
     color:rgba(var(--paper),.9);margin:10px 0 8px;padding:0 0 6px 12px;
     border-bottom:1px solid rgba(var(--glass),.10);
     cursor:pointer;position:relative;user-select:none;
+    /* flex so the help button can sit at the far end. The caret is absolutely
+       positioned against this element and is unaffected. */
+    display:flex;align-items:center;gap:8px;
+  }
+
+  /* ---------- section help ----------
+     A settings panel is not a manual. Explaining a section in permanent
+     nine-point prose under its controls costs the same column space every
+     time the panel is opened, whether or not anybody needed it that day —
+     and it trains you to skim past exactly the block you will one day need
+     to read.
+
+     So the prose moves behind the ? in the heading. What stays visible is
+     the controls, and anything the SERVER is telling you right now: a
+     validation error, what is actually bound, whether a restart is owed.
+     The rule is mechanical rather than a judgement per section — static
+     prose is help, live feedback stays. */
+  .helpbtn{
+    margin-left:auto;flex:0 0 auto;
+    width:15px;height:15px;padding:0;line-height:1;
+    display:inline-flex;align-items:center;justify-content:center;
+    font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:0;
+    border:1px solid rgba(var(--glass),.28);border-radius:50%;
+    background:none;color:rgba(var(--paper),.7);cursor:pointer;
+  }
+  .helpbtn:hover{border-color:var(--hue);color:var(--hue)}
+  .grp.helpon .helpbtn{
+    border-color:var(--hue-dim);color:var(--hue);
+    background:rgba(var(--glass),.10);
+  }
+  .note.help{display:none}
+  .grp.helpon .note.help{
+    display:block;
+    border-left:2px solid rgba(var(--glass),.35);padding-left:8px;
   }
   #panel h4:hover{color:var(--hue)}
   #panel h4::before{                       /* disclosure caret */
@@ -584,7 +624,8 @@
             background:rgba(var(--glass),.18);outline:0}
   .sl input::-webkit-slider-thumb{-webkit-appearance:none;width:9px;height:9px;background:var(--hue);cursor:pointer}
   .sl input::-moz-range-thumb{width:9px;height:9px;border:0;background:var(--hue);cursor:pointer}
-  #voicesel,#neuralvoice,#wakeword,#sleepword,#greetings,#wakealiases,#sleepaliases,#farewells{
+  #voicesel,#neuralvoice,#wakeword,#sleepword,#greetings,#wakealiases,#sleepaliases,#farewells,
+  #opname,#ainame{
     width:100%;margin:9px 0 4px;font:inherit;font-size:calc(9.5px * var(--fs));padding:5px 6px;
     background:rgba(0,0,0,.6);color:var(--text);
     border:1px solid rgba(var(--glass),.16);outline:0;
@@ -597,6 +638,10 @@
   #browservoice{display:none;margin:9px 0 0}
   #browservoice > #voicesel{margin-top:0}
   #wakeword,#sleepword{letter-spacing:.12em;text-transform:lowercase}
+  /* not lowercased: a name may legitimately be capitalised, and a variable
+     has to read as one — {display} typed into a lowercasing field still
+     works, but it stops looking like the token it is */
+  #opname,#ainame{letter-spacing:.06em}
   #bk_key{letter-spacing:.18em}
   #bk_url,#bk_model,#bk_keepalive{letter-spacing:.04em}
   #greetings,#wakealiases,#sleepaliases,#farewells,
@@ -743,18 +788,39 @@
     <button data-v="1.12">LARGE</button>
     <button data-v="1.25">LARGER</button>
   </div>
-  <div class="note">
-    <b>MONO</b> is the original. <b>SANS</b> is whatever this machine calls
-    its interface font. <b>WIDE</b> has the most open letterforms of the
-    three and is usually the easiest of them to read as light text on black.
+  <div class="note help"><b>MONO</b> is the original. <b>SANS</b> is this
+machine's interface font. <b>WIDE</b> has the most open letterforms and is
+usually the easiest to read as light text on black.
 
-    Three sizes and no more: this is a dense layout measured in pixels, and a
-    range wide enough to be interesting is wide enough to push a label
-    through the side of its button.
+Three sizes only — the layout is measured in pixels, and a wider range would
+push labels through the sides of their buttons. This panel takes the face and
+size it is setting, so you read the choice while making it.</div>
+    </div>
+  </section>
 
-    This panel takes the same face and size it is setting, so what you are
-    reading while you choose is the choice.
-  </div>
+  <section class="grp" data-tab="look">
+    <h4>Who is speaking</h4>
+    <div class="grpbody">
+  <label class="bklab">the person</label>
+  <input id="opname" type="text" spellcheck="false" placeholder="operator">
+  <label class="bklab">the assistant</label>
+  <input id="ainame" type="text" spellcheck="false" placeholder="resonance">
+  <div class="note help">The two labels down the left of the transcript.
+
+Either can be a variable instead of a fixed word:
+
+<b>{name}</b> — the wake word, so renaming what it answers to renames what it
+is called. Already what the greeting and farewell fields use.
+
+<b>{display}</b> — the name of the display this is being viewed at, from
+<b>?display=</b> on the URL. Put it in <i>the person</i> and each dedicated
+display attributes the transcript to itself, without a setting per display.
+An admin-set label per URL arrives with identity; this is the identifier it
+will hang off, so what you write now keeps meaning the same thing.
+
+Mix them with ordinary text — <b>{display} shift lead</b> is fine. A variable
+that resolves to nothing falls back to the default, and one that is not
+recognised is left standing so a typo is visible rather than silent.</div>
     </div>
   </section>
   <section class="grp" data-tab="look">
@@ -794,7 +860,7 @@
   <section class="grp" data-tab="ai">
     <h4>Assistant</h4>
     <div class="grpbody">
-  <div class="note">Which assistant answers. OPENAI-COMPATIBLE covers Ollama,
+  <div class="note help">Which assistant answers. OPENAI-COMPATIBLE covers Ollama,
 OpenClaw, LM Studio and vLLM — they differ only by base URL.</div>
   <div class="seg" id="bk_provider" style="margin-top:8px">
     <button data-v="demo" class="on">DEMO</button>
@@ -836,7 +902,7 @@ browser. Leave blank to keep the stored one; a local model needs none.</div>
   <label class="bklab">keep model loaded</label>
   <input id="bk_keepalive" type="text" spellcheck="false" autocomplete="off"
          placeholder="30m">
-  <div class="note">An Ollama extension: holds the model in memory so the next
+  <div class="note help">An Ollama extension: holds the model in memory so the next
 question isn't the slow one. Blank it for a hosted provider.</div>
   </div>
 
@@ -856,7 +922,7 @@ keep-alive are not sent to Anthropic — steer it with the system prompt.</div>
   <section class="grp" data-tab="ai" id="grp_prompt">
     <h4>System prompt</h4>
     <div class="grpbody">
-  <div class="note">What the assistant is told before every question. The
+  <div class="note help">What the assistant is told before every question. The
 reply is read aloud, so this asks for plain prose.</div>
   <textarea id="bk_system" rows="8" spellcheck="false"></textarea>
   <div class="seg" style="margin-top:8px">
@@ -997,7 +1063,7 @@ reply is read aloud, so this asks for plain prose.</div>
   <section class="grp" data-tab="app">
     <h4>Ports</h4>
     <div class="grpbody">
-  <div class="note">Which port each interface answers on. The two display
+  <div class="note help">Which port each interface answers on. The two display
 ports serve the AI interface people use; the admin port serves this page.</div>
   <div id="portgrid">
     <label for="ap_http">display · plain HTTP</label>
@@ -1010,7 +1076,7 @@ ports serve the AI interface people use; the admin port serves this page.</div>
     <input id="ap_admin" type="number" inputmode="numeric">
     <div class="now" id="now_admin"></div>
   </div>
-  <div class="note">Must be 1024–65535 and all different. Below 1024 needs
+  <div class="note help">Must be 1024–65535 and all different. Below 1024 needs
 root, and the server runs as an ordinary user.</div>
     </div>
   </section>
@@ -1020,15 +1086,12 @@ root, and the server runs as an ordinary user.</div>
     <div class="grpbody">
   <label class="bklab">sign-in lasts (minutes of inactivity)</label>
   <input id="ap_session" type="number" inputmode="numeric" min="5" max="480">
-  <div class="note">How long an idle admin session survives before it has to
-sign in again. Activity pushes the deadline out; the panel checks every 45
-seconds and returns you to the sign-in as soon as it lapses, so a forgotten
-tab is a sign-in screen rather than a live panel.
+  <div class="note help">Idle minutes before an admin has to sign in again.
+Activity pushes the deadline out; the panel checks every 45 seconds and
+returns you to the sign-in as soon as it lapses.
 
-Minutes, and short by default. This session configures what everyone else is
-looking at — it should last a piece of work, not a working day. Signing back
-in costs a password and keeps your username, which is what makes a short one
-bearable.</div>
+Short by default — this session configures what everyone else is looking at.
+5 to 480. Full reasoning in DOCUMENTATION → App settings &amp; accounts.</div>
     </div>
   </section>
 
@@ -1058,7 +1121,7 @@ bearable.</div>
     <h4>Accounts</h4>
     <div class="grpbody">
   <div id="userlist"></div>
-  <div class="note" style="margin-top:10px">
+  <div class="note help" style="margin-top:10px">
     An <b>admin</b> configures everything and manages accounts. A
     <b>viewer</b> can read the configuration and change nothing.
   </div>
@@ -1085,12 +1148,22 @@ bearable.</div>
     <h4>Embed keys</h4>
     <div class="grpbody">
   <div id="emblist"></div>
-  <div class="note" style="margin-top:10px">
-    A key lets another application's <b>server</b> ask this one for a
-    short-lived session and put the result in an iframe. What it may do and
-    what it draws are fixed when you create it: to change either, create a
-    new key and retire this one.
-  </div>
+  <div class="note help" style="margin-top:10px">A key lets another
+application's <b>server</b> ask this one for a short-lived session and put the
+result in an iframe. The key never reaches a browser. What it may do and what
+it draws are fixed at creation — to change either, make a new key and retire
+this one.
+
+<b>1</b> their server POSTs the key to <b>/embed/session</b>
+<b>2</b> their page frames <b>/embed?t=…</b> with <b>allow="microphone"</b>
+<b>3</b> optionally narrows it at runtime over postMessage — never widens
+
+<b>The one everybody hits:</b> a microphone in an iframe needs
+allow="microphone" <i>and</i> the host page on HTTPS <i>and</i> the permission
+granted on their origin. Miss one and it looks broken for reasons that have
+nothing to do with this server.
+
+Worked examples in DOCUMENTATION → Embedding it elsewhere.</div>
     </div>
   </section>
 
@@ -1117,7 +1190,7 @@ bearable.</div>
     <label><input type="checkbox" data-c="mic"> microphone</label>
     <label><input type="checkbox" data-c="speak"> speak</label>
   </div>
-  <div class="note">Permission, not furniture. Hiding the TALK button below
+  <div class="note help">Permission, not furniture. Hiding the TALK button below
 does not withdraw the microphone.</div>
 
   <label class="bklab">what it draws</label>
@@ -1144,40 +1217,15 @@ does not withdraw the microphone.</div>
     </div>
   </section>
 
-  <section class="grp" data-tab="embeds">
-    <h4>How a host uses it</h4>
-    <div class="grpbody">
-  <div class="note">Their server exchanges the key for a session, then their
-page frames what comes back. The key never reaches a browser.
-
-<b>1 — on their server</b>
-POST https://this-server:9701/embed/session
-{"key": "e0123….the-secret"}
-→ {"token": "…", "src": "/embed?t=…", "expires_in": 3600}
-
-<b>2 — in their page</b>
-&lt;iframe src="https://this-server:9701/embed?t=…"
-        allow="microphone"&gt;&lt;/iframe&gt;
-
-<b>3 — to show less than the key grants</b>
-frame.contentWindow.postMessage(
-  {rsn:1, kind:'narrow', parts:['visual'], cap:{mic:false}}, origin)
-
-A host can only ever narrow. Anything they ask for beyond the key is
-dropped by the embed itself, not refused by agreement.</div>
-  <div class="note" style="border-left:2px solid #e8b04a;padding-left:8px">
-    <b>The one everybody hits:</b> a microphone inside an iframe needs
-    <b>allow="microphone"</b> on the iframe, the host page itself on HTTPS,
-    and the permission granted on their origin. Miss any one and the embed
-    looks broken for reasons that have nothing to do with this server.
-  </div>
-    </div>
-  </section>
+  <!-- "How a host uses it" was a whole section of pure documentation sitting
+       permanently open in a settings panel. The three steps and the iframe
+       microphone gotcha are now the help behind Embed keys, and the worked
+       examples belong in the manual, which has room for them. -->
 
   <section class="grp" data-tab="docs">
     <h4>Manual</h4>
     <div class="grpbody">
-  <div class="note">Select one to read it. Each opens in a window with a
+  <div class="note help">Select one to read it. Each opens in a window with a
 button to download it as a PDF.</div>
   <div id="doclist"></div>
   <div class="note" id="docnote"></div>
@@ -1244,6 +1292,41 @@ const gate = $('gate'), wrap = $('wrap'), frame = $('frame');
 let ME = null;                 // {user, role}
 let S  = null;                 // the settings document being edited
 let ready = false;             // has the preview announced itself?
+
+/* ------------------------------------------------------- section help
+   One ? per section that has anything to explain, built from the markup
+   rather than from a list — a section with a `.note.help` in it gets a
+   button, and one without does not. Nothing to keep in step when a section
+   is added, and no way to end up with a button that opens nothing.
+
+   The heading is the control that collapses the section, so the button has
+   to stop its own click from reaching it. And asking for help on a closed
+   section has to open the section too, or the answer appears inside a
+   `display:none` body and the button looks broken. */
+function buildHelp(){
+  document.querySelectorAll('#panel .grp').forEach(g=>{
+    const h4 = g.querySelector('h4');
+    if (!h4 || h4.querySelector('.helpbtn')) return;
+    if (!g.querySelector('.note.help')) return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'helpbtn';
+    b.textContent = '?';
+    b.title = 'what this section is for';
+    b.setAttribute('aria-expanded', 'false');
+    b.addEventListener('click', e=>{
+      e.stopPropagation();
+      const showing = !g.classList.contains('helpon');
+      if (showing && g.classList.contains('shut')) h4.click();
+      g.classList.toggle('helpon', showing);
+      // kept off the class, which the filter overwrites while it is running
+      g.dataset.help = showing ? '1' : '';
+      b.setAttribute('aria-expanded', String(showing));
+    });
+    h4.appendChild(b);
+  });
+}
+buildHelp();
 
 /* -------------------------------------------------- password managers
    A password manager decides what a field is by guessing, and this panel
@@ -1516,7 +1599,8 @@ function syncSeg(key){
 
 function buildControls(){
   document.querySelectorAll('#panel input[type="range"]').forEach(bindSlider);
-  ['wakeword','sleepword','wakealiases','sleepaliases','greetings','farewells']
+  ['wakeword','sleepword','wakealiases','sleepaliases','greetings','farewells',
+   'opname','ainame']
     .forEach(id=>{ const el = $(id); if (el) bindField(el, id); });
 
   document.querySelectorAll('.seg[data-set]').forEach(seg=>{
@@ -2437,6 +2521,20 @@ function panelNav(){
       const show = q ? g.textContent.toLowerCase().includes(q) : g.dataset.tab === tab;
       g.hidden = !show;
       g.classList.toggle('shut', q ? false : !!shut.get(g));
+      /* The filter searches a section's whole text, and since help moved
+         behind the ? that text includes words nobody can see. A section
+         matching only on hidden prose would open looking like it had nothing
+         to do with what was typed, so while filtering, a match inside help
+         shows that help.
+
+         What the ? was set to is kept on the element rather than in the
+         class, because the class is what this line overwrites — read it back
+         when the field is cleared and every section returns to however its
+         own button left it. */
+      g.classList.toggle('helpon', q
+        ? [...g.querySelectorAll('.note.help')]
+            .some(h=> h.textContent.toLowerCase().includes(q))
+        : g.dataset.help === '1');
     });
   }
   /* Two homes now: the row at the top and the pinned entry at the foot.
