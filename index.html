@@ -7,6 +7,10 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <style>
   :root{
+    /* Tell the browser this is a dark document. Without it Firefox draws its
+       own furniture — scrollbars above all — in LIGHT colours over a black
+       page, which is most of why the bar looked like somebody else's. */
+    color-scheme: dark;
     /* palette is swapped at runtime by setPalette() — but ONLY the canvas
        channel. --paper is fixed neutral white and is what all text uses, so
        the transcript stays legible no matter how dark the geometry hue goes
@@ -48,32 +52,50 @@
      those change, change these too. */
   ::-webkit-scrollbar{width:9px;height:9px;background:transparent}
   ::-webkit-scrollbar-track{background:transparent;border:0}
+  /* Weights are the interface's own, not a generic grey: idle matches the
+     hairline border (rgba(255,255,255,.22)) so the bar reads as part of the
+     frame, then lifts to --ui and --hue on hover and drag the way the
+     controls do. A thumb dimmer than the borders around it looks like the
+     browser's, however square it is. These are literals because a var() in a
+     ::-webkit-scrollbar pseudo-element never resolves — see above — so keep
+     them in step with :root by hand. --paper/--ui are fixed even though
+     setPalette() swaps the canvas hue, so they are safe to hard-code. */
   ::-webkit-scrollbar-thumb{
     border-radius:0;
-    background:rgba(255,255,255,.16);
+    background:rgba(255,255,255,.22);      /* = the hairline border weight */
     border:2px solid transparent;
     background-clip:content-box;
   }
   ::-webkit-scrollbar-thumb:hover{
     border-radius:0;
-    background:rgba(255,255,255,.38);
+    background:#c3cedb;                    /* --ui */
     border:2px solid transparent;
     background-clip:content-box;
   }
   ::-webkit-scrollbar-thumb:active{
     border-radius:0;
-    background:#7d93a8;
+    background:#dfe9f2;                    /* --hue / --ui-bright */
     border:2px solid transparent;
     background-clip:content-box;
   }
   ::-webkit-scrollbar-button{display:none;width:0;height:0}
   ::-webkit-scrollbar-corner{background:transparent}
-  /* Firefox has no ::-webkit-scrollbar and gets the standard properties. They
-     are scoped behind @supports on purpose: set unconditionally, Chrome
-     ignores every rule above and falls back to an overlay bar. Literal
-     colours here too, for one less thing that has to resolve. */
-  @supports not selector(::-webkit-scrollbar){
-    *{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
+  /* Firefox has no working ::-webkit-scrollbar and needs the standard
+     properties instead. They cannot be set unconditionally — Chrome supports
+     scrollbar-color too, and the moment it sees one it throws away every rule
+     above and draws its own overlay bar — so this has to be scoped.
+
+     It is scoped on -moz-appearance, which is true only in Firefox. The
+     obvious-looking `@supports not selector(::-webkit-scrollbar)` is WRONG
+     and was the regression: Firefox parses that selector for web-compat and
+     reports it as supported, so `not` came out false, the block never
+     applied, and Firefox fell all the way back to its default bar.
+
+     Firefox draws a rounded thumb and offers no hover state, so it gets one
+     solid palette tone rather than the hairline-then-lift the webkit path
+     uses. */
+  @supports (-moz-appearance: none){
+    *{scrollbar-width:thin;scrollbar-color:#7d93a8 transparent}
   }
 
   /* ---------- shell ---------- */
@@ -1622,12 +1644,27 @@ function remember(role, content){
 }
 function forgetConversation(){ convo.length = 0; }
 
-async function askBackend(text){
+/* Where this display is, so the server can tell the model what day it is
+   here rather than what day it is on the server. Resolved once — it does not
+   change while the page is open, and an older browser that does not answer
+   simply leaves the server on its own clock. */
+const LOCAL_TZ = (()=>{
+  try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; }
+  catch(e){ return ''; }
+})();
+
+/* `bare` sends the question with no conversation behind it. The self-test
+   needs that: a diagnostic that inherits whatever was being discussed is
+   answered in that context, so it stops being a measurement of the backend
+   and becomes a measurement of the backend plus the last ten minutes. */
+async function askBackend(text, bare){
   if (S.backend === 'demo') return REPLIES[replyIx++ % REPLIES.length];
   try{
     const r = await fetch('ask', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({text, history: convo})
+      /* The server runs on UTC and the person is not necessarily standing in
+         UTC. Only the browser knows where they are, so it says. */
+      body: JSON.stringify({text, history: bare ? [] : convo, tz: LOCAL_TZ})
     });
     const j = await r.json().catch(()=>({}));
     // the server still being on demo is not an error, just not wired up yet
@@ -1693,8 +1730,17 @@ async function selfTest(){
   say(typeof MediaRecorder !== 'undefined', 'audio recorder present');
   say(Mic.active, 'microphone open' + (Mic.active ? '' : ' — press TALK to test it'));
 
-  const reply = await askBackend('self test');
-  say(!!reply, 'backend (' + S.backend + ') answered ' + (reply ? reply.length + ' chars' : 'nothing'));
+  /* A real instruction, not the words "self test". A model handed two words
+     with no question in them quite reasonably asks what you mean, and that
+     non-answer then gets spoken aloud and read as a failure — the check
+     passes, the transcript says something baffling. Ask it something it can
+     actually answer, with no conversation behind it. */
+  const reply = await askBackend(
+    'Reply with one short sentence confirming you can hear me.', true);
+  say(!!reply, 'backend (' + S.backend + ') answered ' +
+      (reply ? reply.length + ' chars: "' + reply.trim().slice(0, 60) +
+               (reply.trim().length > 60 ? '…' : '') + '"'
+             : 'nothing'));
 
   const before = document.querySelectorAll('.msg').length;
   respond(reply);

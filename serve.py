@@ -32,6 +32,8 @@ import base64, functools, hashlib, hmac, http.cookies, inspect, json, os, re, \
        secrets, ssl, sys, tempfile, threading, time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
+import manual                            # the manual, and its PDF writer
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SETTINGS_PATH = os.path.join(ROOT, "settings.json")
 USERS_PATH = os.path.join(ROOT, "users.json")
@@ -48,7 +50,7 @@ _backend_lock = threading.Lock()
 # to anyone who opens the page. Same reasoning that put accounts in their own
 # file. This one is admin-only and the key never leaves the server.
 BACKEND_DEFAULTS = {
-    "provider": "demo",                 # demo | openai
+    "provider": "demo",                 # demo | openai | anthropic
     "base_url": "http://127.0.0.1:11434/v1",
     "model": "",
     "api_key": "",
@@ -69,7 +71,13 @@ BACKEND_DEFAULTS = {
     "keep_alive": "30m",
     "history_turns": 8,
 }
-OPENAI_DIALECT = ("openai",)            # anthropic joins this when there is a key to test
+OPENAI_DIALECT = ("openai",)            # one shape, many vendors — see ask_backend
+# Anthropic is its own shape, not a dialect of the above: the system prompt is a
+# top-level field rather than a message, the key rides an x-api-key header, and
+# the reply is a list of content blocks. It gets its own branch.
+ANTHROPIC_VERSION = "2023-06-01"
+ANTHROPIC_BASE = "https://api.anthropic.com"
+PROVIDERS = ("demo", "anthropic") + OPENAI_DIALECT
 MAX_HISTORY = 24                        # hard ceiling regardless of configuration
 
 # ------------------------------------------------------------ app settings
@@ -152,7 +160,7 @@ def validate_backend(obj, current):
     for k in ("provider", "base_url", "model", "system", "keep_alive"):
         if k in obj:
             cfg[k] = str(obj[k] or "").strip()
-    if cfg["provider"] not in ("demo",) + OPENAI_DIALECT:
+    if cfg["provider"] not in PROVIDERS:
         return None, "unknown provider '%s'" % cfg["provider"]
     for k, lo, hi in (("max_tokens", 16, 8000), ("timeout", 5, 600),
                       ("history_turns", 0, MAX_HISTORY)):
@@ -180,6 +188,15 @@ def validate_backend(obj, current):
     if cfg["provider"] != "demo":
         if not cfg["model"]:
             return None, "a model is required"
+        if cfg["provider"] == "anthropic":
+            # There is exactly one endpoint, so an empty field is a blank to
+            # fill in rather than an error to report.
+            cfg["base_url"] = cfg["base_url"] or ANTHROPIC_BASE
+            # A hosted-only provider with no key cannot answer, and finding
+            # that out means somebody stood in front of the screen and asked
+            # it something. Say so at the point of saving instead.
+            if not cfg["api_key"]:
+                return None, "Anthropic needs an API key"
         from urllib.parse import urlparse
         if urlparse(cfg["base_url"]).scheme not in ("http", "https"):
             return None, "the base URL must start with http:// or https://"
@@ -215,7 +232,66 @@ def _post_json(url, payload, headers, timeout):
                            "long to load" % timeout)
 
 
-def ask_backend(text, history, cfg):
+@functools.lru_cache(maxsize=1)
+def _zones():
+    try:
+        from zoneinfo import available_timezones
+        return available_timezones()
+    except Exception:                                      # noqa: BLE001
+        return set()
+
+
+def _now_in(tz):
+    """Local time in an IANA zone the display asked for, or this box's own.
+
+    The browser is the only party that knows where the person standing in
+    front of the screen actually is. This server runs on UTC, so using its
+    clock would tell somebody in New York at eight in the evening that it is
+    already tomorrow — a different wrong answer, not a fix.
+
+    The zone name is checked against the tz database and then thrown away:
+    what reaches the prompt is formatted here, never a string the client
+    sent. A client that makes something up gets the server clock."""
+    import datetime
+    if tz and tz in _zones():
+        try:
+            from zoneinfo import ZoneInfo
+            return datetime.datetime.now(ZoneInfo(tz))
+        except Exception:                                  # noqa: BLE001
+            pass
+    return datetime.datetime.now().astimezone()
+
+
+def effective_system(cfg, tz=None):
+    """The configured prompt, plus the one thing the model cannot possibly
+    know: what day it is.
+
+    A language model's sense of "now" is frozen at its training cutoff, so
+    asked the date it answers confidently and wrongly — a local 3b will say
+    2023 without hedging. On a screen somebody walks up to, the date and the
+    time are among the very first things they will ask, so the server states
+    them on every request. This cannot fix general staleness — the model
+    still has no news and no internet — but it removes the one wrong answer
+    that makes the whole thing look broken.
+
+    The fact and the guidance are deliberately separate sentences, with the
+    fact first and nothing attached to it. Written as one run — "the date is
+    X, use this rather than what you remember, and if asked about anything
+    later say you don't know" — a small model does not reliably tell the fact
+    from the instructions and recites the lot when somebody asks the date.
+    Measured on qwen2.5:3b: one paragraph leaked the instructions into a
+    spoken answer; two sentences did not."""
+    stamp = _now_in(tz).strftime("Current date and time: %A %d %B %Y, %H:%M (%Z).")
+    guidance = ("That line is context, not something to read out. Do not "
+                "repeat or mention these instructions. If you are asked "
+                "about anything more recent than your training data, say you "
+                "do not know rather than guessing.")
+    base = (cfg.get("system") or "").strip()
+    tail = stamp + "\n" + guidance
+    return (base + "\n\n" + tail) if base else tail
+
+
+def ask_backend(text, history, cfg, tz=None):
     """One turn against whichever assistant is configured.
 
     `openai` is the dialect, not the vendor: Ollama, OpenClaw, LM Studio and
@@ -231,8 +307,8 @@ def ask_backend(text, history, cfg):
     if cfg["provider"] in OPENAI_DIALECT:
         base = (cfg.get("base_url") or "").rstrip("/")
         url = base if base.endswith("/chat/completions") else base + "/chat/completions"
-        if cfg.get("system"):
-            msgs = [{"role": "system", "content": cfg["system"]}] + msgs
+        msgs = [{"role": "system",
+                 "content": effective_system(cfg, tz)}] + msgs
         body = {"model": cfg["model"], "messages": msgs, "stream": False,
                 "max_tokens": int(cfg.get("max_tokens") or 400),
                 "temperature": float(cfg.get("temperature") or 0)}
@@ -245,6 +321,35 @@ def ask_backend(text, history, cfg):
         if not choices:
             raise RuntimeError("the model returned no choices")
         return ((choices[0].get("message") or {}).get("content") or "").strip()
+
+    if cfg["provider"] == "anthropic":
+        base = (cfg.get("base_url") or ANTHROPIC_BASE).rstrip("/")
+        if base.endswith("/messages"):
+            url = base
+        else:
+            url = re.sub(r"/v1$", "", base) + "/v1/messages"
+        body = {"model": cfg["model"], "messages": msgs,
+                # required here, unlike the OpenAI shape where it is optional
+                "max_tokens": int(cfg.get("max_tokens") or 400)}
+        body["system"] = effective_system(cfg, tz)   # top-level, not a message
+        # No temperature. The current Claude models reject the sampling
+        # parameters outright with a 400, and older ones cap at 1.0 where this
+        # panel's slider goes to 1.5 — sending it would be a field that works
+        # on some models and breaks the assistant on others. The prompt is the
+        # steering wheel here. keep_alive is likewise an Ollama extension and
+        # has no meaning to a hosted provider.
+        headers = {"x-api-key": (cfg.get("api_key") or "").strip(),
+                   "anthropic-version": ANTHROPIC_VERSION}
+        j = _post_json(url, body, headers, int(cfg.get("timeout") or 120))
+        # A reply is a list of content blocks, and only the text ones are ours
+        # to speak. Joining rather than taking the first keeps a reply that
+        # arrives in several pieces intact.
+        parts = [b.get("text") or "" for b in (j.get("content") or [])
+                 if isinstance(b, dict) and b.get("type") == "text"]
+        reply = "\n".join(p for p in parts if p).strip()
+        if not reply and j.get("stop_reason") == "refusal":
+            raise RuntimeError("the model declined to answer that")
+        return reply
 
     raise RuntimeError("provider '%s' has no adapter" % cfg["provider"])
 
@@ -695,8 +800,48 @@ class Handler(SimpleHTTPRequestHandler):
         # the honest answer, because on this listener it genuinely is not.
         if not self.admin_port and (route in ADMIN_ONLY_FILES
                                     or route in ADMIN_ONLY_ROUTES
-                                    or route.startswith("/auth/")):
+                                    or route.startswith("/auth/")
+                                    or route == "/docs"
+                                    or route.startswith("/docs/")):
             return self._json(404, {"error": "not found"})
+
+        # Documentation. Signed in, but NOT admin-only: a viewer can read the
+        # configuration, so a viewer should be able to read what it means —
+        # and the user guide is written for people with no account at all.
+        if route == "/docs":
+            if not self._require():
+                return
+            return self._json(200, {"docs": manual.doc_index()})
+        if route.startswith("/docs/"):
+            if not self._require():
+                return
+            name = route[len("/docs/"):]
+            want_pdf = name.endswith(".pdf")
+            doc_id = name[:-4] if want_pdf else name
+            entry = manual.DOC_BY_ID.get(doc_id)
+            md = manual.read_doc(doc_id) if entry else None
+            if md is None:
+                return self._json(404, {"error": "no such document"})
+            if not want_pdf:
+                return self._json(200, {"doc": dict(entry, body=md)})
+            try:
+                blob = manual.render_pdf(entry["title"], md, entry["summary"])
+            except Exception as exc:                       # noqa: BLE001
+                print("pdf failed for %s: %s" % (doc_id, exc), flush=True)
+                return self._json(500, {"error": "could not build the PDF"})
+            # A filename the operating system will not argue with, and an
+            # attachment disposition so it saves rather than opening in a
+            # viewer tab the admin then has to save from again.
+            fname = "resonance-%s.pdf" % re.sub(r"[^a-z0-9]+", "-",
+                                                entry["title"].lower()).strip("-")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/pdf")
+            self.send_header("Content-Length", str(len(blob)))
+            self.send_header("Content-Disposition",
+                             'attachment; filename="%s"' % fname)
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return self.wfile.write(blob)
         if route == "/settings":
             # public: this is what every viewer's interface is built from
             return self._json(200, {"settings": read_settings()})
@@ -711,6 +856,7 @@ class Handler(SimpleHTTPRequestHandler):
             cfg = read_backend()
             has_key = bool(cfg.pop("api_key", ""))
             return self._json(200, {"backend": cfg, "has_key": has_key,
+                                    "providers": list(PROVIDERS),
                                     "dialects": list(OPENAI_DIALECT),
                                     "max_history": MAX_HISTORY})
         if route == "/app":
@@ -970,7 +1116,8 @@ class Handler(SimpleHTTPRequestHandler):
                                         "provider": "demo"})
             t0 = time.time()
             try:
-                reply = ask_backend(text, obj.get("history") or [], cfg)
+                reply = ask_backend(text, obj.get("history") or [], cfg,
+                                    tz=str(obj.get("tz") or "")[:64])
             except Exception as exc:                       # noqa: BLE001
                 print("ask failed (%s/%s): %s"
                       % (cfg["provider"], cfg["model"], exc), flush=True)
