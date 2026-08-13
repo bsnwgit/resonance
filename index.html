@@ -168,8 +168,17 @@
   body[data-layout="hero"]  #screen{flex:0 0 52%}
   body[data-layout="hero"]  #log{flex:1 1 auto;border-top:1px solid rgba(var(--glass),.10)}
   body[data-layout="bleed"] #screen{flex:1 1 auto}
+  /* The transcript overlays the field, so it is taken out of flow — which
+     also takes it out of the composer's way, and its bottom edge lands on the
+     viewport's rather than on the composer's top. The composer paints above
+     it, so the last line does not push the bar down, it disappears behind it.
+
+     --barh is the composer's measured height, watched rather than assumed: it
+     moves with the type scale, and goes to zero when the composer is hidden
+     (transcript off, an embed without the input part, no chrome at all), at
+     which point the transcript should have that space back. */
   body[data-layout="bleed"] #log{
-    position:absolute;inset:auto 0 0 0;max-height:62%;z-index:3;
+    position:absolute;inset:auto 0 var(--barh,0px) 0;max-height:62%;z-index:3;
     padding:40px 26px 14px;
     -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 60px);
             mask-image:linear-gradient(to bottom,transparent 0,#000 60px);
@@ -2809,6 +2818,23 @@ function repaintAll(){
   if (typeof syncEngine === 'function') syncEngine();
   setTimeout(resize, 0);
 }
+
+/* Keep --barh honest. In the bleed layout the transcript is out of flow, so
+   nothing makes room for the composer on its behalf — the last line would sit
+   behind it. Measured rather than guessed at, because the composer's height
+   moves with the type scale and drops to zero whenever it is hidden: the
+   transcript toggle, an embed granted no input part, an embed with no chrome
+   at all. A ResizeObserver catches every one of those without any of them
+   having to remember to say so. */
+(function trackBarHeight(){
+  const bar = document.getElementById('bar');
+  if (!bar) return;
+  const set = ()=> document.documentElement.style.setProperty(
+    '--barh', bar.getBoundingClientRect().height + 'px');
+  if (window.ResizeObserver) new ResizeObserver(set).observe(bar);
+  else window.addEventListener('resize', set);   // older browsers: close enough
+  set();
+})();
 
 /* ================================================== THE EMBED'S CHROME
    Applying a grant is two separate things, and conflating them is the
