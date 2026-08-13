@@ -690,6 +690,97 @@ Roughly in order of value:
   this browser has no recorder. No conversation content. A health view per
   device in the admin page, so a failing screen can be found without anyone
   standing in front of it.
+- **Embed API — another application pulls this interface into itself.** The
+  host's *server* calls this server, is given a short-lived token, and drops
+  an iframe into its page. Server to server, so the layout it asked for and
+  its right to ask can be checked in the same call.
+
+  **Parts, not combinations.** Seven components — `visual`, `transcript`,
+  `input`, `mode` (SPACE/AUTO), `talk`, `audio`, `text` — make 128
+  arrangements, so the API takes a list of parts rather than an enumeration
+  of layouts, and never needs extending when somebody wants the 129th.
+  Presets are first-class names over the common ones: `full`, `console`
+  (no transcript toggle), `voice` (figure and voice controls, nothing to
+  read or type), `chat` (transcript and field, no figure), `kiosk` (figure
+  alone, hands-free), `signage` (figure alone, no microphone at all, spoken
+  only when the host pushes text — see *Unprompted speech*).
+
+  **Both are fixed when the admin creates the token** — the capability
+  envelope (may this application use the microphone, speak, ask at all, and
+  at what rate) and the chrome it renders. One token is one surface: a lobby
+  kiosk and a support widget are two tokens, separately revocable and
+  separately rate-limited, and the admin list says exactly what each one
+  draws. Fixed is also the reversible decision — per-request layout can be
+  added later without breaking an integrator, and cannot be withdrawn once
+  they depend on it.
+
+  **Two admins, and grants only ever travel one way.** This admin creates the
+  token and sets the ceiling — capability and chrome. The host application's
+  own admin holds it and may narrow what their users get, on either axis:
+  hide the field for anonymous visitors and show it to staff, reveal it after
+  the first exchange, run a session with the microphone off. They can never
+  widen it. Wanting *less* than the token grants therefore needs no new key,
+  which is the point — a narrowing is the host's business, a widening is a
+  conversation with this admin.
+
+  Hiding the TALK button is **not** the same as withdrawing microphone
+  capability; the control goes, the permission stands. An integrator will
+  assume otherwise unless the documentation says so plainly, so both are
+  narrowable and they are narrowed separately.
+
+  The refusal lives in the embed, not in an agreement. `postMessage` accepts
+  narrowing instructions for parts inside the token and ignores everything
+  else, because the host page is untrusted by definition — anything running
+  in that browser is under their control, so "cannot add" has to be code that
+  ships from here rather than a rule they promise to keep.
+
+  That covers progressive disclosure and per-user variation, which are the
+  only real arguments for per-request layout, while the audit story stays
+  intact: the token is the ceiling and the admin list shows it.
+
+  **Capability and chrome remain separate axes even though both are fixed at
+  creation, and conflating them is a security bug.** Hiding the TALK button
+  is not the same as denying the microphone: hide it while the capability
+  stands and a host page can open the mic with no control on screen and no
+  way for the person to know. The proof that one field cannot serve is
+  `kiosk` and `signage` — identical chrome, the figure alone, and opposite
+  permissions: one listens hands-free, the other must never open a
+  microphone.
+
+  Chrome is fixed at creation, so the layout is signed into the token rather
+  than riding in query parameters. Plain parameters mean any user appends
+  `&talk=1` and grants themselves a microphone the host never authorised.
+
+  **Incoherent arrangements are refused at token creation**, in the admin
+  page, naming the orphaned part — a human sees the mistake immediately
+  rather than a host developer reading it out of a 400 later: `text` without
+  `transcript` is a button that toggles nothing; `mode` without `talk`
+  configures how a microphone ends a turn when there is no microphone;
+  `input` with neither `transcript` nor audio types into a void.
+
+  **Responsiveness belongs to the embed, not the API.** Desktop console and
+  phone voice-only is a breakpoint problem; solving it by issuing a different
+  token after sniffing a user agent would be the wrong layer.
+
+  **An embed carries two identities at once** and they compose rather than
+  compete: the application is authenticated by its key, and the person in
+  front of it still has one of the three strengths above. Settings hang off
+  the application, memory off the person. That is also the answer to whether
+  three host applications must share one look — they do not.
+
+  **Sequence: the memoryless embed can ship first.** It is exactly the
+  `named, no PIN → no memory` row, so it needs no notion of a person at all —
+  origin allow-list, `frame-ancestors`, a documented `postMessage` contract,
+  and the iframe seam the admin preview already proves. Memory arrives for
+  free when identity lands. What to avoid is the middle: an embed with its
+  own private idea of who the user is.
+
+  **The gotcha to lead the integration docs with**, because everyone hits it:
+  a microphone inside an iframe needs `allow="microphone"` from the host, the
+  host page itself on HTTPS, and permissions-policy delegated down. Miss any
+  one and the embed looks broken in a way that has nothing to do with this.
+  The admin preview has no microphone for precisely this reason.
+
 - **Package for reuse.** Separate the visualiser core from the demo chat shell,
   give it an instance API, ship ESM + UMD. Still zero dependencies.
 - **Separable speech service.** Run faster-whisper and Piper as their own
