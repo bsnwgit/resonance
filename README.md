@@ -677,7 +677,9 @@ Roughly in order of value:
   secret: names are guessable, so a name alone can never unlock memory.
 
   A **PIN** turns a name into a portable identity, and is the difference
-  between a place and a person. Hashed server-side with the same PBKDF2 as the
+  between a place and a person — for what may be *remembered*. What may be
+  *reached*, and for how long, stays with the display it was entered at; see
+  the session paragraph below. Hashed server-side with the same PBKDF2 as the
   admin passwords, never compared in the browser. Rate limiting and lockout
   are what make a short PIN viable, reusing the geometric back-off already
   built for admin sign-in, and the obvious sequences are refused. An admin
@@ -702,16 +704,32 @@ Roughly in order of value:
   anything shared it must end at the conversation boundary, or the next person
   inherits the identity along with the screen.
 
-  **A PIN session is measured in hours, and it is admin-configurable in its
-  own right rather than sharing the admin session's setting.** The two are
-  different jobs and the numbers should not be able to drift into each other:
+  **A PIN session is measured in hours, and it belongs to the display URL that
+  triggered it — not to a person, and not to one setting covering all of
+  them.** Each `?display=<name>` carries its own session length, set by an
+  admin alongside that display's other properties.
+
+  The place is what decides how long unlocking should last, because the place
+  is what carries the risk. A workshop screen nobody but the workshop can
+  reach and a reception screen in front of the street are the same person on
+  the same PIN and want opposite answers, and a per-person number gets both
+  of them wrong — too short to be tolerated in the workshop, too long to be
+  defensible at reception. An admin securing a room can reason about that
+  room; nobody can reason usefully about a number that follows a human
+  between the two.
+
+  It also keeps the axes apart, which is the same discipline as capability
+  versus chrome in the embed, and binding versus authentication above:
+  **memory follows the person, session length follows the URL.** They are
+  independent, so they get independent settings. Collapsing them would mean
+  choosing between a display that forgets what it knows about somebody and a
+  display that stays unlocked all night, when those are not the same question.
+
+  Separate from the admin's setting for the same reason, and the units say so:
   an admin holds the configuration everyone else is looking at the results of
   and is measured in minutes, while somebody who has unlocked a display is
-  standing in front of a screen doing their work, and being asked to key a PIN
-  in again every half hour would end with the PIN switched off entirely. It is
-  the same reasoning that put binding and authentication on separate settings
-  above — one label covering two independent things is a label that lies as
-  soon as somebody changes one of them.
+  standing in front of a screen doing their work. Being asked to key a PIN in
+  again every half hour would end with the PIN switched off entirely.
 
   Recorded plainly: a PIN is not a password, and this is a lightweight account
   system rather than a small feature. Six digits is a low bar that rate

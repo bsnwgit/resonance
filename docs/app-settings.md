@@ -68,9 +68,17 @@ all, because the check itself would be the activity keeping it alive.
 
 A viewer's session is a different question with a different answer, and it
 does not exist yet — see *Identity* in the README roadmap. When it does, a
-viewer who has unlocked a display with a PIN is measured in **hours**: they
-are standing in front of a screen doing their job, not holding the keys to
-everyone else's configuration.
+display unlocked with a PIN is measured in **hours** rather than minutes:
+somebody standing in front of a screen doing their job is not holding the keys
+to everyone else's configuration.
+
+That number will belong to **the display URL the PIN was entered at**, not to
+the person who entered it and not to one setting covering every display. The
+place is what carries the risk: a workshop screen only the workshop can reach
+and a reception screen facing the street are the same person on the same PIN
+and want opposite answers. An admin securing a room can reason about that
+room. Nobody can reason usefully about a number that follows a human between
+the two.
 
 Changing a role or a password drops that account's existing sessions, so the
 new rights or the new password take effect at the next sign-in rather than

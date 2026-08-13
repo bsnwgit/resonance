@@ -69,6 +69,34 @@ These are cumulative and easy to overdo. Bloom plus milk plus grain at once
 turns a sharp figure into fog. If the display looks muddy, this is where to
 look first.
 
+### Who is speaking
+
+The two labels down the left of the transcript. They default to **operator**
+and **resonance**, and either can be a fixed word or a variable.
+
+| Variable | Becomes |
+|---|---|
+| `{name}` | the wake word, capitalised |
+| `{display}` | the name of the display being viewed, from `?display=` on the URL |
+
+`{name}` is the same variable the greeting and farewell fields already use, so
+renaming what the assistant answers to can rename what it is called in the
+transcript — put `{name}` in *the assistant* and the two never drift apart.
+
+`{display}` is the useful one for *the person*. A single setting then
+attributes each transcript to the display it is being read at: open
+`?display=workshop` and the operator's lines are labelled **workshop**,
+without a setting per display. Nothing else of the identity design is built
+yet, so today this reads the URL parameter and nothing more — but it is the
+same identifier the admin-set label per URL will hang off when that lands, so
+a `{display}` written in now keeps meaning the same thing.
+
+Variables mix with ordinary text: `{display} shift lead` is fine. A variable
+that resolves to nothing falls back to the default, so `{display}` on a URL
+that declared no name still reads *operator* rather than leaving the line
+attributed to nobody. A variable that is not recognised is left standing
+rather than blanked, so a typo is visible instead of silently disappearing.
+
 ## MOTION
 
 ### Rotation
