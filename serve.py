@@ -2,17 +2,28 @@
 """Static server + local speech-to-text for Resonance.
 
 Listeners:
-  PORT      (default 9700) plain HTTP  — fine for everything except the mic
+  PORT      (default 9700) plain HTTP  — redirects to HTTPS, except where it
+                                         is the whole product (see below)
   PORT + 1  (default 9701) HTTPS       — required for getUserMedia, which the
                                          browser refuses on an insecure origin
-  PORT + 2  (default 9702) HTTPS ADMIN — the configuration interface, behind a
-                                         username and password
+  PORT + 2  (default 9702) ADMIN       — the configuration interface
 
-The admin listener is HTTPS-only and deliberately refuses to start without a
-certificate: it takes a password, and a password over plain HTTP crosses the
-network in the clear. If it is missing from the startup banner, run
+Two independent settings decide what this is: `bind` (loopback | address |
+everything) and `auth` (none | accounts). They are deliberately not one
+"mode" — a single label covering both starts lying the moment somebody
+changes half of it.
+
+Bound to loopback, no certificate is involved: browsers already treat
+http://localhost as a secure origin, so the microphone works, nothing crosses
+a network, and the admin interface is served over plain HTTP. Anywhere else
+the admin listener is HTTPS-only and refuses to start without a certificate —
+it takes a password and holds the assistant's API key, and neither may cross
+a network in the clear. If it is missing from the startup banner, run
 make-cert.sh. There is no way to write settings from the public listeners —
 they serve the display and answer GET /settings, nothing more.
+
+Reachable beyond this machine with no sign-in is permitted and warned about
+loudly, every startup, in the panel and across the display itself.
 
 POST /stt  accepts an audio blob and returns {"text": "..."} transcribed by
 faster-whisper running HERE. Nothing is sent to any third party — this exists
@@ -93,9 +104,59 @@ APP_DEFAULTS = {
     # should last a piece of work, not a working day. The panel signs you
     # back in without ceremony, which is what makes a short one bearable.
     "session_idle_minutes": 30,
+    # ---- what it is reachable at, and what it takes to get in ----
+    # Two settings, deliberately not one "mode". Binding and authentication
+    # are independent, and a single label collapsing them starts lying the
+    # moment somebody changes the binding: "personal" would still read
+    # personal after being pointed at every interface on the machine. The
+    # interface reports the actual pair instead of a name for it.
+    #
+    # Both default to what this server has always done, so an existing
+    # install comes back up unchanged after an upgrade.
+    "bind": "everything",            # loopback | address | everything
+    "bind_address": "",              # the one address, when bind == "address"
+    "auth": "accounts",              # none | accounts
 }
 PORT_MIN, PORT_MAX = 1024, 65535     # below 1024 needs root; this runs as you
 SESSION_MIN, SESSION_MAX = 5, 480    # minutes: below 5 is unusable, above 8h absurd
+BIND_MODES = ("loopback", "address", "everything")
+# "pin" — one number for the whole display, no accounts — is the middle rung
+# and is not here yet. It is the identity work's PIN machinery pointed at the
+# display rather than at a named person, so it lands with that rather than
+# being built twice. Named here so the omission is deliberate and visible.
+AUTH_MODES = ("none", "accounts")
+LOOPBACK = "127.0.0.1"
+
+
+def bind_host(cfg):
+    """The address the listeners actually bind. Binding one address rather
+    than every interface is worth doing on its own account: a laptop that
+    later joins another network does not follow you onto it."""
+    if cfg.get("bind") == "loopback":
+        return LOOPBACK
+    if cfg.get("bind") == "address" and cfg.get("bind_address"):
+        return cfg["bind_address"]
+    return "0.0.0.0"
+
+
+def exposed(cfg):
+    """Can anything other than this machine reach it? The question that
+    decides whether skipping authentication is structural or a risk."""
+    return bind_host(cfg) != LOOPBACK
+
+
+def posture_warning(cfg):
+    """The one arrangement that is allowed but should never be quiet: reachable
+    from the network, and nothing at the door. Not refused — somebody may want
+    exactly this on a network they control — but a laptop configured this way
+    that later joins an office network must say so."""
+    if cfg.get("auth") == "none" and exposed(cfg):
+        where = ("every interface on this machine" if bind_host(cfg) == "0.0.0.0"
+                 else bind_host(cfg))
+        return ("Reachable at %s with no sign-in — anyone who can reach this "
+                "machine can change its configuration, including the "
+                "assistant's API key." % where)
+    return ""
 
 
 def read_app():
@@ -130,18 +191,67 @@ def write_app(cfg):
         os.replace(tmp, APP_PATH)
 
 
-def port_free(p):
+def port_free(p, host="0.0.0.0"):
     """Can we actually bind it? A port already taken by something else would
     otherwise pass validation and only fail at the next restart — by which
     point the admin interface is gone and the fix is editing JSON on the box
-    by hand. Ports this process already holds are its own and count as free."""
+    by hand. Ports this process already holds are its own and count as free.
+
+    Tested against the address that will actually be bound: a port held by
+    something else on a different interface does not collide with loopback,
+    and refusing it would reject a configuration that works."""
     import socket
     if p in (RUNNING.get("http_port"), RUNNING.get("https_port"),
              RUNNING.get("admin_port")):
         return True
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        s.bind(("0.0.0.0", p))
+        s.bind((host, p))
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+
+def local_addresses():
+    """The IPv4 addresses this machine answers on, offered to the panel so an
+    address can be chosen rather than typed. Typing one by hand is a way to
+    configure a server that will not start."""
+    import socket
+    found = {LOOPBACK}
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            found.add(info[4][0])
+    except OSError:
+        pass
+    # gethostname() only finds an address that has a matching line in the
+    # hosts file, which on a plain server install is often none of them.
+    # Asking the routing table which source address an outbound connection
+    # would take finds the real one regardless. Nothing is sent: connect() on
+    # a UDP socket only fixes the route.
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("192.0.2.1", 9))       # TEST-NET-1: reserved, never routed
+        found.add(s.getsockname()[0])
+    except OSError:
+        pass
+    finally:
+        s.close()
+    return sorted(found)
+
+
+def address_bindable(addr):
+    """Is this address one this machine actually has? An address that is not
+    is the same failure as a taken port — it passes validation, and then the
+    server will not start, with the admin interface gone along with it."""
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    except OSError:
+        return False
+    try:
+        s.bind((addr, 0))       # port 0: the kernel picks, we only test the address
         return True
     except OSError:
         return False
@@ -391,11 +501,40 @@ def validate_app(obj, current):
     ports = [cfg["http_port"], cfg["https_port"], cfg["admin_port"]]
     if len(set(ports)) != 3:
         return None, "the three ports must all differ"
+
+    # Binding, before the port check, because which addresses count as taken
+    # depends on what is being bound.
+    if "bind" in obj:
+        v = str(obj["bind"] or "").strip()
+        if v not in BIND_MODES:
+            return None, "binding must be one of: " + ", ".join(BIND_MODES)
+        cfg["bind"] = v
+    if "bind_address" in obj:
+        cfg["bind_address"] = str(obj["bind_address"] or "").strip()
+    if cfg["bind"] == "address":
+        if not cfg["bind_address"]:
+            return None, "choose which address to bind, or bind everything"
+        if not address_bindable(cfg["bind_address"]):
+            return None, ("this machine has no address %s — the server would "
+                          "fail to start on it" % cfg["bind_address"])
+
+    host = bind_host(cfg)
     for k in ("http_port", "https_port", "admin_port"):
-        if cfg[k] != current[k] and not port_free(cfg[k]):
+        if cfg[k] != current[k] and not port_free(cfg[k], host):
             return None, ("port %d is already in use by something else on this "
                           "machine — the server would fail to start on it"
                           % cfg[k])
+
+    if "auth" in obj:
+        v = str(obj["auth"] or "").strip()
+        if v not in AUTH_MODES:
+            # The rung that is specified but not built. Saying so beats a
+            # generic "not one of" that reads like a typo in the request.
+            if v == "pin":
+                return None, ("a single PIN with no accounts is not built yet — "
+                              "it arrives with identity")
+            return None, "sign-in must be one of: " + ", ".join(AUTH_MODES)
+        cfg["auth"] = v
     if "session_idle_minutes" in obj:
         try:
             m = int(obj["session_idle_minutes"])
@@ -415,7 +554,22 @@ def validate_app(obj, current):
 ROLES = ("admin", "viewer")
 PBKDF2_ROUNDS = 600_000          # ~0.3s per attempt: cheap once, costly to grind
 SESSION_IDLE = 30 * 60           # inactivity before a session dies; set at startup
-RUNNING = {}                     # the ports actually bound, to compare against config
+RUNNING = {}                     # what is actually bound, to compare against config
+# Read once at startup rather than per request, for the same reason the ports
+# are: this decides what a listener IS, and a listener cannot be re-founded
+# under the requests already in flight on it.
+AUTH_MODE = "accounts"
+
+
+def app_pending(cfg):
+    """Which stored settings differ from what is actually running, and so are
+    waiting on a restart. One implementation, because this is read by the panel
+    on load and again on save, and two copies would drift into disagreeing
+    about whether a restart is owed."""
+    keys = ("http_port", "https_port", "admin_port", "session_idle_minutes",
+            "bind", "bind_address", "auth")
+    return sorted(k for k in keys
+                  if RUNNING.get(k) is not None and RUNNING[k] != cfg[k])
 MIN_PASSWORD = 10
 _users_lock = threading.Lock()
 _sessions = {}                   # token -> {"user","role","expires"}
@@ -999,10 +1153,40 @@ class Handler(SimpleHTTPRequestHandler):
     #: with different rules, not the same surface with an extra check
     admin_port = False
 
-    def __init__(self, *args, admin_port=False, **kw):
+    #: set per-listener by make_server: the HTTPS port this listener sends
+    #: callers to instead of answering. None means it answers normally.
+    redirect_to = None
+
+    def __init__(self, *args, admin_port=False, redirect_to=None, **kw):
         # must land before super().__init__, which serves the request outright
         self.admin_port = admin_port
+        self.redirect_to = redirect_to
         super().__init__(*args, **kw)
+
+    def _redirected(self):
+        """The plain listener, once HTTPS is the only real way in. Kept as a
+        redirect rather than deleted, or every bookmark, kiosk startup URL and
+        printed QR code pointing at it dies silently on the day it changes.
+
+        307 rather than a permanent 301/308, deliberately and against the
+        original note. The target is configuration an admin can change — the
+        HTTPS port, or the binding itself — and a permanent redirect is cached
+        by the browser indefinitely. Switching a machine back to a personal
+        install would leave every browser that had ever visited redirecting to
+        a port nothing answers on, unfixable from this end and curable only by
+        the user clearing site data by hand. 307 keeps the bookmark working,
+        which is the entire reason for not deleting the listener, and costs one
+        redirect per visit."""
+        if not self.redirect_to:
+            return False
+        host = self.headers.get("Host") or RUNNING.get("bind_host") or LOOPBACK
+        host = re.sub(r":\d+$", "", host)       # its port, not the one we want
+        self.send_response(307)
+        self.send_header("Location", "https://%s:%d%s"
+                                     % (host, self.redirect_to, self.path))
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+        return True
 
     #: set for one response by the /embed route, so the file the base class
     #: serves carries the frame-ancestors line without rewriting its HTML
@@ -1050,6 +1234,13 @@ class Handler(SimpleHTTPRequestHandler):
         listeners have no privileged route to reach."""
         if not self.admin_port:
             return None
+        if AUTH_MODE == "none":
+            # Nothing at the door, by configuration. Everyone who reaches this
+            # listener is an admin — which is the whole of the setting, and why
+            # it is only defensible when the network is the boundary. The name
+            # is not a username: it is what the panel and the log should say
+            # instead of implying somebody signed in as somebody.
+            return {"user": "(no sign-in)", "role": "admin"}
         raw = self.headers.get("Cookie")
         if not raw:
             return None
@@ -1118,9 +1309,16 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Set-Cookie", "; ".join(bits))
 
     # ---------- routes ----------
+    def do_HEAD(self):
+        if self._redirected():
+            return
+        return super().do_HEAD()
+
     def do_GET(self):
         from urllib.parse import urlparse, parse_qs
         self._csp = None            # one connection can serve several requests
+        if self._redirected():
+            return
         route = self.path.split("?")[0]
         # The configuration interface does not exist as far as the public
         # listeners are concerned — not hidden by CSS, not gated in JS, absent.
@@ -1204,13 +1402,24 @@ class Handler(SimpleHTTPRequestHandler):
             return super().do_GET()
 
         if route == "/settings":
-            # public: this is what every viewer's interface is built from
-            return self._json(200, {"settings": read_settings()})
+            # public: this is what every viewer's interface is built from.
+            # The warning rides along because the display has to be able to
+            # say it too — a startup banner is seen by whoever ran the
+            # command, and the person who needs to know a screen is wide open
+            # is usually the person standing in front of it. It discloses
+            # nothing: anyone who can read this can already open the admin
+            # port and find out the same thing by getting in.
+            return self._json(200, {"settings": read_settings(),
+                                    "warning": posture_warning(RUNNING)})
         if route == "/auth/me":
             s = self._session()
             if not s:
                 return self._json(401, {"error": "not signed in"})
-            return self._json(200, {"user": s["user"], "role": s["role"]})
+            # The panel needs to tell "signed in as an admin" from "there is no
+            # sign-in here" — they grant the same access and want different
+            # words, and one of them has no account to offer or to sign out of.
+            return self._json(200, {"user": s["user"], "role": s["role"],
+                                    "no_auth": AUTH_MODE == "none"})
         if route == "/auth/check":
             # The panel's heartbeat. Deliberately does NOT slide the session:
             # a poll that renewed what it was checking would mean an open tab
@@ -1237,19 +1446,27 @@ class Handler(SimpleHTTPRequestHandler):
             cfg = read_app()
             # What is configured, what is actually bound, and therefore
             # whether a restart is owed. The page should never have to guess.
-            pending = sorted(k for k in ("http_port", "https_port", "admin_port")
-                             if RUNNING.get(k) is not None and RUNNING[k] != cfg[k])
-            if RUNNING.get("session_idle_minutes") not in (None, cfg["session_idle_minutes"]):
-                pending.append("session_idle_minutes")
+            # Two warnings, and they are different questions: what is stored
+            # would be unsafe once applied, and what is running is unsafe now.
             return self._json(200, {"app": cfg, "running": RUNNING,
-                                    "pending": pending,
+                                    "pending": app_pending(cfg),
+                                    "warning": posture_warning(cfg),
+                                    "running_warning": posture_warning(RUNNING),
+                                    "addresses": local_addresses(),
                                     "limits": {"port_min": PORT_MIN,
                                                "port_max": PORT_MAX,
                                                "session_min": SESSION_MIN,
-                                               "session_max": SESSION_MAX}})
+                                               "session_max": SESSION_MAX,
+                                               "bind_modes": list(BIND_MODES),
+                                               "auth_modes": list(AUTH_MODES)}})
         if route == "/users":
             if not self._require("admin"):
                 return
+            if AUTH_MODE == "none":
+                # Listing the accounts stored from a previous configuration
+                # would show a set of people who cannot sign in and are not
+                # keeping anybody out. An empty list plus the reason is truer.
+                return self._json(200, {"users": [], "disabled": True})
             return self._json(200, {"users": [
                 {"username": n, "role": u.get("role", "viewer"),
                  "created": u.get("created")}
@@ -1317,6 +1534,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         from urllib.parse import urlparse, parse_qs
+        if self._redirected():
+            return
         parsed = urlparse(self.path)
 
         if parsed.path.startswith("/auth/") \
@@ -1327,6 +1546,17 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(404, {"error": "not found"})
             if not self._same_origin():
                 return self._json(403, {"error": "cross-origin request refused"})
+
+        # With no sign-in there are no accounts to manage, and quietly writing
+        # to users.json would leave an admin believing they had created an
+        # account that nothing consults. Refuse where the mistake is made, and
+        # say which setting is responsible.
+        if AUTH_MODE == "none" and (parsed.path.startswith("/auth/")
+                                    or parsed.path.startswith("/users")):
+            return self._json(409, {"error": "this server is set to no sign-in — "
+                                             "there are no accounts to manage. "
+                                             "Switch sign-in to accounts in APP "
+                                             "SETTINGS and restart."})
 
         if parsed.path == "/auth/login":
             ip = self.address_string()
@@ -1657,14 +1887,19 @@ class Handler(SimpleHTTPRequestHandler):
             if err:
                 return self._json(400, {"error": err})
             write_app(cfg)
-            print("app settings saved by %s: http=%d https=%d admin=%d session=%dh"
+            print("app settings saved by %s: http=%d https=%d admin=%d "
+                  "session=%dm bind=%s%s auth=%s"
                   % (s["user"], cfg["http_port"], cfg["https_port"],
-                     cfg["admin_port"], cfg["session_idle_minutes"]), flush=True)
-            pending = sorted(k for k in ("http_port", "https_port", "admin_port")
-                             if RUNNING.get(k) is not None and RUNNING[k] != cfg[k])
-            if RUNNING.get("session_idle_minutes") not in (None, cfg["session_idle_minutes"]):
-                pending.append("session_idle_minutes")
-            return self._json(200, {"ok": True, "app": cfg, "pending": pending,
+                     cfg["admin_port"], cfg["session_idle_minutes"], cfg["bind"],
+                     (" " + cfg["bind_address"]) if cfg["bind"] == "address" else "",
+                     cfg["auth"]), flush=True)
+            warn = posture_warning(cfg)
+            if warn:
+                print("  WARNING: " + warn, flush=True)
+            return self._json(200, {"ok": True, "app": cfg,
+                                    "pending": app_pending(cfg),
+                                    "warning": warn,
+                                    "running_warning": posture_warning(RUNNING),
                                     "running": RUNNING})
 
         if parsed.path == "/settings":
@@ -1736,13 +1971,14 @@ class Handler(SimpleHTTPRequestHandler):
         })
 
 
-def make_server(port, admin_port=False):
-    handler = functools.partial(Handler, directory=ROOT, admin_port=admin_port)
-    return ThreadingHTTPServer(("0.0.0.0", port), handler)
+def make_server(port, admin_port=False, host="0.0.0.0", redirect_to=None):
+    handler = functools.partial(Handler, directory=ROOT, admin_port=admin_port,
+                                redirect_to=redirect_to)
+    return ThreadingHTTPServer((host, port), handler)
 
 
-def start_tls(port, cert, key, admin_port=False):
-    srv = make_server(port, admin_port=admin_port)
+def start_tls(port, cert, key, admin_port=False, host="0.0.0.0"):
+    srv = make_server(port, admin_port=admin_port, host=host)
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.load_cert_chain(cert, key)
     srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
@@ -1751,7 +1987,7 @@ def start_tls(port, cert, key, admin_port=False):
 
 
 def main():
-    global SESSION_IDLE
+    global SESSION_IDLE, AUTH_MODE
     app = read_app()
     # Environment still wins, so a one-off run on a different port needs no
     # edit to the stored configuration. Setting PORT alone moves all three,
@@ -1767,11 +2003,29 @@ def main():
     tls_port = _env("HTTPS_PORT") or (port + 1 if shifted else app["https_port"])
     adm_port = _env("ADMIN_PORT") or (port + 2 if shifted else app["admin_port"])
     SESSION_IDLE = app["session_idle_minutes"] * 60
+    AUTH_MODE = app["auth"]
+    host = bind_host(app)
     RUNNING.update({"http_port": port, "https_port": None, "admin_port": None,
-                    "session_idle_minutes": app["session_idle_minutes"]})
+                    "session_idle_minutes": app["session_idle_minutes"],
+                    "bind": app["bind"], "bind_address": app["bind_address"],
+                    "auth": app["auth"], "bind_host": host,
+                    "exposed": exposed(app)})
 
     cert, key = os.path.join(ROOT, "cert.pem"), os.path.join(ROOT, "key.pem")
     have_tls = os.path.exists(cert) and os.path.exists(key)
+    # Bound to loopback, a certificate is not part of the product. Browsers
+    # treat http://localhost as a secure context, so the microphone works
+    # unprompted and there is nothing for TLS to protect: the traffic never
+    # leaves the machine. Start it, open localhost, talk to it — none of the
+    # certificate ceremony applies. Anywhere else it is still required, and
+    # the admin interface still refuses to exist without it.
+    personal = not exposed(app)
+    # Retire the plain listener into a redirect — but only where there is
+    # somewhere to redirect TO. Beyond loopback with no certificate, HTTPS
+    # does not exist, and sending every visitor to a dead port would take the
+    # whole product off the air to enforce a rule it cannot satisfy. There it
+    # keeps serving, and says why.
+    redirect_plain = have_tls and not personal
 
     # warm the model in the background so the first utterance isn't slow
     for _n in (MODEL_NAME, "base.en"):      # warm both sides of the trade
@@ -1779,10 +2033,23 @@ def main():
     if voice_list():
         threading.Thread(target=get_voice, args=(voice_list()[0],), daemon=True).start()
 
+    # The pair, reported as a pair. Not a name for the combination — a name
+    # goes stale the moment one half of it changes.
+    print("reachable at %s · %s" % (
+        "this machine only (loopback)" if personal else
+        "every interface on this machine" if host == "0.0.0.0" else host,
+        "no sign-in" if AUTH_MODE == "none" else "accounts and roles"), flush=True)
+
     if have_tls:
-        start_tls(tls_port, cert, key)
+        start_tls(tls_port, cert, key, host=host)
         RUNNING["https_port"] = tls_port
-        print("HTTPS on 0.0.0.0:%d  (mic + local STT work here)" % tls_port, flush=True)
+        print("HTTPS on %s:%d  (mic + local STT work here)" % (host, tls_port),
+              flush=True)
+    elif personal:
+        # Not a degraded install. http://localhost is a secure context, so the
+        # microphone works here with no certificate and no browser warning.
+        print("no cert.pem/key.pem — not needed on loopback, where the browser "
+              "already treats this as a secure origin", flush=True)
     else:
         print("no cert.pem/key.pem — HTTPS disabled, mic will be blocked", flush=True)
 
@@ -1792,14 +2059,32 @@ def main():
         "" if _b["provider"] == "demo" else
         " · %s · %s" % (_b["model"] or "(no model)", _b["base_url"])), flush=True)
 
-    print("HTTP  on 0.0.0.0:%d  (no-store)" % port, flush=True)
+    if redirect_plain:
+        print("HTTP  on %s:%d  → redirects to HTTPS on %d"
+              % (host, port, tls_port), flush=True)
+    else:
+        print("HTTP  on %s:%d  (no-store)%s" % (host, port,
+              "  — mic works, this is a secure origin" if personal else ""),
+              flush=True)
 
-    # ---- admin listener: HTTPS or nothing ----
-    if have_tls:
-        first_pw = ensure_first_admin()
-        start_tls(adm_port, cert, key, admin_port=True)
+    # ---- admin listener ----
+    # HTTPS, or loopback, or nothing. The rule was "HTTPS or nothing" because
+    # this interface takes a password and holds the assistant's API key, and
+    # neither may cross a network in the clear. On loopback nothing crosses a
+    # network at all, so the reason does not apply and the certificate
+    # ceremony it forces is pure obstruction — which is exactly the install
+    # this setting exists to make possible.
+    if have_tls or personal:
+        first_pw = ensure_first_admin() if AUTH_MODE == "accounts" else None
+        if have_tls:
+            start_tls(adm_port, cert, key, admin_port=True, host=host)
+        else:
+            srv = make_server(adm_port, admin_port=True, host=host)
+            threading.Thread(target=srv.serve_forever, daemon=True).start()
         RUNNING["admin_port"] = adm_port
-        print("ADMIN on 0.0.0.0:%d  (HTTPS only, sign-in required)" % adm_port,
+        print("ADMIN on %s:%d  (%s, %s)"
+              % (host, adm_port, "HTTPS" if have_tls else "HTTP on loopback",
+                 "no sign-in" if AUTH_MODE == "none" else "sign-in required"),
               flush=True)
         if first_pw:
             print("", flush=True)
@@ -1808,14 +2093,30 @@ def main():
             print("      password: %s" % first_pw, flush=True)
             print("  change it after signing in.", flush=True)
             print("", flush=True)
-        else:
+        elif AUTH_MODE == "accounts":
             print("       %d account(s) configured" % len(read_users()), flush=True)
     else:
         print("ADMIN disabled — it takes a password and refuses to serve one "
               "over plain HTTP.", flush=True)
-        print("       run ./make-cert.sh <host> and restart.", flush=True)
+        print("       run ./make-cert.sh <host> and restart, or bind to "
+              "loopback, where no certificate is needed.", flush=True)
 
-    make_server(port).serve_forever()
+    warn = posture_warning(app)
+    if warn:
+        # Loud on purpose, and every restart rather than once. A machine set up
+        # this way on a network its owner controls may later join one they do
+        # not, and the setting will not have changed on the day that matters.
+        print("", flush=True)
+        print("  " + "!" * 68, flush=True)
+        print("  NO SIGN-IN, AND REACHABLE FROM THE NETWORK", flush=True)
+        print("  " + warn, flush=True)
+        print("  Bind to loopback, or switch sign-in to accounts, in APP "
+              "SETTINGS.", flush=True)
+        print("  " + "!" * 68, flush=True)
+        print("", flush=True)
+
+    make_server(port, host=host,
+                redirect_to=tls_port if redirect_plain else None).serve_forever()
 
 
 if __name__ == "__main__":

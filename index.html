@@ -24,6 +24,10 @@
     --text:#f2f6fa;
     --ui:#c3cedb;
     --ui-bright:#dfe9f2;
+    /* the only warm colour in the palette, and it appears in exactly one
+       place: the amber the admin panel already uses for "this is not what
+       you think it is" */
+    --warn:#e8b04a;
 
     /* ---- typography, set from the shared settings ----
        Three faces and three sizes, and no more. Every one of them is
@@ -164,8 +168,17 @@
   body[data-layout="hero"]  #screen{flex:0 0 52%}
   body[data-layout="hero"]  #log{flex:1 1 auto;border-top:1px solid rgba(var(--glass),.10)}
   body[data-layout="bleed"] #screen{flex:1 1 auto}
+  /* The transcript overlays the field, so it is taken out of flow — which
+     also takes it out of the composer's way, and its bottom edge lands on the
+     viewport's rather than on the composer's top. The composer paints above
+     it, so the last line does not push the bar down, it disappears behind it.
+
+     --barh is the composer's measured height, watched rather than assumed: it
+     moves with the type scale, and goes to zero when the composer is hidden
+     (transcript off, an embed without the input part, no chrome at all), at
+     which point the transcript should have that space back. */
   body[data-layout="bleed"] #log{
-    position:absolute;inset:auto 0 0 0;max-height:62%;z-index:3;
+    position:absolute;inset:auto 0 var(--barh,0px) 0;max-height:62%;z-index:3;
     padding:40px 26px 14px;
     -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 60px);
             mask-image:linear-gradient(to bottom,transparent 0,#000 60px);
@@ -273,6 +286,25 @@
 
   #fps{position:fixed;left:12px;top:10px;z-index:20;font-size:calc(9px * var(--fs));letter-spacing:.14em;
        color:rgba(var(--paper),.76)}
+  /* Across the top, above everything including the reading room, because a
+     screen that is wide open should not be something you have to close a
+     panel to find out about. It takes the width rather than floating in a
+     corner: this is not a status readout, it is a thing to go and fix. */
+  #posturebanner{
+    position:fixed;left:0;right:0;top:0;z-index:80;
+    display:flex;align-items:center;gap:12px;
+    padding:8px 14px;
+    background:rgba(40,26,4,.94);border-bottom:1px solid var(--warn);
+    color:var(--warn);
+    font-size:calc(9.5px * var(--fs));letter-spacing:.08em;line-height:1.5;
+  }
+  #posturebanner button{
+    margin-left:auto;flex:0 0 auto;
+    background:none;border:0;padding:0 4px;cursor:pointer;
+    color:var(--warn);font:inherit;font-size:calc(14px * var(--fs));line-height:1;
+    opacity:.72;
+  }
+  #posturebanner button:hover{opacity:1}
 </style>
 </head>
 <body data-layout="hero">
@@ -2723,10 +2755,46 @@ const Settings = {
       let n = 0;
       Object.keys(got).forEach(k=>{ if (k in S){ S[k] = got[k]; n++; } });
       if (n) repaintAll();
+      showPostureWarning(j && j.warning);
       return n;
     }catch(e){ return -1; }
   }
 };
+
+/* The one arrangement that is allowed but must never be quiet: reachable from
+   the network with nothing at the door. The startup banner is seen by whoever
+   ran the command, which is not usually the person standing in front of the
+   screen — and on a display left running for weeks, nobody has seen it for
+   weeks. So it is said here too.
+
+   Not shown in an embed. There the host application's own admin authenticated
+   with a key, the person looking at it did not configure this server and
+   cannot act on it, and a warning about somebody else's binding rendered
+   inside somebody else's product is noise they have no move against. */
+let postureEl = null;
+function showPostureWarning(text){
+  if (EMBED) return;
+  if (!text){
+    if (postureEl){ postureEl.remove(); postureEl = null; }
+    return;
+  }
+  if (!postureEl){
+    postureEl = document.createElement('div');
+    postureEl.id = 'posturebanner';
+    /* Dismissible, and deliberately only for this page view — it does not
+       remember. A warning you can permanently silence from the screen it is
+       warning about is a warning that will be silenced on day one and absent
+       on the day the machine changes networks. */
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.textContent = '×';
+    x.title = 'hide until this page is reloaded';
+    x.addEventListener('click', ()=>{ postureEl.remove(); postureEl = null; });
+    postureEl.appendChild(document.createTextNode(text));
+    postureEl.appendChild(x);
+    document.body.appendChild(postureEl);
+  }
+}
 
 /* Rebuild every control from S — used after settings load. */
 function repaintAll(){
@@ -2750,6 +2818,23 @@ function repaintAll(){
   if (typeof syncEngine === 'function') syncEngine();
   setTimeout(resize, 0);
 }
+
+/* Keep --barh honest. In the bleed layout the transcript is out of flow, so
+   nothing makes room for the composer on its behalf — the last line would sit
+   behind it. Measured rather than guessed at, because the composer's height
+   moves with the type scale and drops to zero whenever it is hidden: the
+   transcript toggle, an embed granted no input part, an embed with no chrome
+   at all. A ResizeObserver catches every one of those without any of them
+   having to remember to say so. */
+(function trackBarHeight(){
+  const bar = document.getElementById('bar');
+  if (!bar) return;
+  const set = ()=> document.documentElement.style.setProperty(
+    '--barh', bar.getBoundingClientRect().height + 'px');
+  if (window.ResizeObserver) new ResizeObserver(set).observe(bar);
+  else window.addEventListener('resize', set);   // older browsers: close enough
+  set();
+})();
 
 /* ================================================== THE EMBED'S CHROME
    Applying a grant is two separate things, and conflating them is the
