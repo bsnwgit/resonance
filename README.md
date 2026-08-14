@@ -704,7 +704,7 @@ two people in one room with three listening microphones between them.
 |---|---|---|---|---|
 | 1a | **Routes** | three names reaching three destinations, verifiable with no Home Assistant involved | — | **1** · how much of a route reaches the browser |
 | 1b | **The Home Assistant adapter** | saying the house name switches a light on | 1a | none |
-| 2 | **Displays, and binding a route to one** | only the tablets you approved can actuate the house, whatever anyone's browser is set to | 1b | **1** · what an *unapproved* display may do |
+| 2 | **Displays, and binding a route to one** | only the tablets you approved can actuate the house, whatever anyone's browser is set to | 1b | none |
 | 3 | **What a wall display looks like** | voice only, and a screensaver that is still the product | 2 | none |
 | 4 | **Staying up unattended** | a tablet nobody touches for a year is still working | 3 | **all of it** · not designed |
 | 5 | **Identity and the PIN** | a person, as distinct from a place | 2 | **1** · whether an identity carries its own Home Assistant token |
@@ -926,8 +926,53 @@ it. Each entry below carries its own panel scope.
   **is** allowed the route, hearing its wake word mid-conversation switches to
   it. One person at one tablet changing what they are addressing.
 
+  **An unapproved display renders, and cannot be spoken to.** The appearance
+  settings are public, so a new tablet shows the geometry correctly the moment
+  it is hung; it holds no approved token, so no wake word reaches a route.
+  Hang it, see it appear in the admin list, approve it, and it starts working.
+  Wrong-looking and refused would be a worse first five minutes than
+  right-looking and inert.
+
+  It is also the answer to the obvious attack, and the reason a token exists
+  rather than a URL being treated as secret. Somebody types a wall display's
+  URL into their own phone: that phone has no cookie, so it is issued a *new*
+  token, which nobody approved. The kitchen tablet's token is in the kitchen
+  tablet's cookie jar and was never in the URL. **The URL is a name, not a
+  key** — which is the same point as names being guessable, wearing a
+  different hat.
+
+  **Places and people bind differently, and the difference is cardinality:**
+
+  | | bound by | how many devices |
+  | --- | --- | --- |
+  | a **place** — the tablet in the kitchen | token + an admin approving it | exactly one |
+  | a **person** | their PIN | as many as they like |
+
+  A wall display is one physical object and two things claiming to be it is
+  always wrong, so it is pinned to a single token that an admin blesses. A
+  person is not a physical object — phone, tablet and laptop are all
+  legitimately them — so their credential is something they *carry* rather
+  than something a device *has*. They enter the PIN, that device earns its own
+  token, and they are not asked again.
+
+  One mechanism, two ways of granting it: an admin bestows a place's, a person
+  earns their own.
+
+  **An unapproved request is recorded and shown**, with the display it asked
+  for and when. Not an alarm — a line in the list. It is the enrolment queue
+  when it is your own new tablet, and the early warning when it is somebody
+  trying a URL they overheard.
+
+  A stored device fingerprint may sit beside that entry as a **hint for the
+  person approving** — "this matches your approved kitchen display" — for the
+  one case a token cannot survive, which is a browser wiping its data. It must
+  never become the credential: fingerprints are forgeable by the client,
+  unstable across updates, and identical across two tablets bought together,
+  which is every property you do not want in one.
+
   *Panel:* a displays list — declared name, token, last seen, approve, rename,
-  delete — and an allowed-displays list on each route.
+  delete — unapproved requests with what they asked for, and an
+  allowed-displays list on each route.
 
 - **What a wall display looks like.** The two settings that make a tablet on a
   wall a different object from a browser tab. Both hang off the display the
