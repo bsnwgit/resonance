@@ -68,14 +68,15 @@ it is ready to be — as a consumer of this project, not as a part of it.
 **Settled:** the look, the interaction model, the local voice pipeline, the
 shared-settings model, administration — its own HTTPS listener behind local
 accounts with roles, with a live preview of the real display — the backend
-adapter that puts a real assistant behind it, and the embed API that lets
-another application put this interface inside its own page.
+adapters that put a real assistant behind it, routes, so several names reach
+several destinations from one display, and the embed API that lets another
+application put this interface inside its own page.
 
-**Not done, in the order it matters:** the deployment shapes, because a single
-person running this on their own laptop should not have to configure accounts
-to talk to it. Then identity and memory, so a conversation can mean something
-an hour later — the embed is deliberately memoryless until that lands. Then
-packaging it as a library other projects can install.
+**Not done, in the order it matters:** the Home Assistant adapter, so one of
+those names reaches a house. Then displays the server knows about, which is
+what makes a route binding hold. Then identity and memory, so a conversation
+can mean something an hour later — the embed is deliberately memoryless until
+that lands. Then packaging it as a library other projects can install.
 
 The [Roadmap](#roadmap) carries the reasoning for each, including the
 decisions already taken about how identity and memory should work.
@@ -83,9 +84,9 @@ decisions already taken about how identity and memory should work.
 ## How it works
 
 ```
-  microphone ─→ VAD ─→ /stt (faster-whisper) ─→ wake-word gate ─→ askBackend()
-                                                                      │
-   visualiser ←── Web Audio analyser ←── /tts (Piper) ←── reply ←──────┘
+  microphone ─→ VAD ─→ /stt (faster-whisper) ─→ wake-word gate ─→ /ask + route
+                                            (which word → which route)   │
+   visualiser ←── Web Audio analyser ←── /tts (Piper) ←── reply ←─────────┘
 ```
 
 **Speech in.** Microphone through an adaptive voice-activity detector, then
@@ -193,7 +194,7 @@ Three tiers, and the boundary between them is the whole of the model:
 | tier | contents | who can read it |
 | --- | --- | --- |
 | **never leaves the server** | API keys, the Home Assistant token, adapter base URLs, password hashes | nobody, through any browser |
-| **served to the display** | the settings document: appearance, and — once routes land — wake words and route names | today, anyone who can reach the port |
+| **served to the display** | the settings document: appearance. The routes document: names, greetings, voices, wake words and how strictly each matches | today, anyone who can reach the port |
 | **held by the browser, unreadable by it** | the device token, in an `HttpOnly` cookie | the server, on presentation |
 
 The first row is the one that matters and it is absolute: no credential and no
@@ -292,9 +293,10 @@ admin changes theirs: once someone has muted a display it stays muted for
 them. A browser that has never touched a control follows the admin's document
 exactly.
 
-Nothing else is kept per viewer. Look, geometry, palette, voice and wake word
-remain wholly admin-controlled, because the point of the shared document is
-that one person decides what everyone sees.
+Nothing else is kept per viewer. Look, geometry, palette and voice remain
+wholly admin-controlled, and the wake words are not in that document at all —
+they belong to the routes — because the point of both is that one person
+decides what everyone sees.
 
 The microphone is deliberately not remembered — re-opening it on load would
 raise a permission prompt nobody asked for.
@@ -356,12 +358,65 @@ the network is already the boundary.
 Out of the box it answers from built-in text, so the whole chain can be
 commissioned before any backend exists. **RUN SELF-TEST** in the settings panel
 walks each link — secure origin, settings store, transcription service, voices,
-microphone, recorder, backend, render-and-speak — and names whichever one is
-broken. Keep demo mode permanently: it is how you tell whether a fault is the
-front-end or the model behind it.
+microphone, recorder, routes, the route that would answer, render-and-speak —
+and names whichever one is broken. Keep demo mode permanently: it is how you
+tell whether a fault is the front-end or the model behind it.
 
-Configure the rest in the admin page under **AI → Assistant**. The panel is
+Configure the rest in the admin page under **AI → Routes**. The panel is
 deliberately terse; the reasoning behind each field is here.
+
+### Routes
+
+**A route is a name that reaches a destination.** Say its wake word and
+everything after it goes there until the sleep word or the awake timer — the
+route binds to the *conversation* rather than to the sentence, so a follow-up
+needs no second address. Saying a different route's name mid-conversation
+switches to it, and the conversation does not come along: what was said to
+one assistant is another party's words, and handing them over would pay for
+them twice.
+
+A route is a name, a wake word and its aliases, how strictly it matches, an
+adapter and its configuration, and optionally its own greeting and voice — so
+you can *hear* which one answered, which matters the moment two of them can
+reply to the same room. Each carries its own model, prompt, context length
+and key.
+
+Exactly one is the **default**, and it is where anything with no name in
+front of it goes: typed into the composer, sent through an embed, or spoken
+while the wake gate is off.
+
+**A route is published in two halves, and one of them not at all.**
+
+| | fields | who sees it |
+| --- | --- | --- |
+| **presentation** | name, greeting, voice | anyone who can reach the port |
+| **routing** | wake word, aliases, matching | the same today; behind the device token when displays land |
+| **connection** | adapter kind, base URL, API key, prompt | nobody, through any browser |
+
+The wake words must reach the browser because that is where matching happens.
+The adapter kind must not: nothing needs it, replies come back already
+labelled with the route that gave them, and it is the one field that tells a
+reader what this box fronts. `public_routes()` enumerates what is published
+rather than what is withheld, so a field added to a route later is private
+until somebody decides otherwise.
+
+**Matching strictness belongs to the route.** The matcher wakes on
+near-misses, which is right for an assistant and wrong for a light switch:
+the same false-positive rate costs a few tokens on one route and actuates
+hardware on the other. An **exact hit always beats a fuzzy one**, wherever
+each was found — otherwise a near-miss on one route steals an utterance that
+named another outright, which is the worst failure available here.
+
+Two routes cannot share a word, including through an alias, and it is refused
+at the point of saving. Words that are merely *acoustically* close are not
+checked — that wants the matcher that does the waking rather than a string
+comparison, and it arrives with personal wake words.
+
+**Upgrading is automatic and reversible.** `backend.json` becomes route one
+on first start, taking its wake word from the shared settings so the box
+answers to the same word afterwards as before. Both source documents are left
+on disk: an upgrade that deletes what it read from has no way back if the
+migration was wrong.
 
 ### The three providers
 
@@ -440,10 +495,15 @@ one.
 
 Never in `settings.json`. That document is world-readable by design — every
 viewer's interface is built from it — so a credential there would be handed to
-anyone who opened the page. The assistant configuration lives in its own
-`backend.json` at mode 600, admin-only, and the key is never returned to a
-browser: the field shows whether one is stored, not what it is. **FORGET KEY**
-clears it.
+anyone who opened the page. The routes live in their own `routes.json` at mode
+600, admin-only, one key per route, and a key is never returned to a browser:
+the field shows whether one is stored, not what it is. **FORGET KEY** clears
+it for the selected route.
+
+Changing a route's provider drops its key and its base URL unless new ones
+arrive in the same save. Carrying one provider's endpoint into another would
+send a hosted key to whatever is listening on the old URL — a failure in the
+one direction that looks like success.
 
 Measured round-trips on the reference box, cold then warm:
 `qwen2.5:1.5b` 1.4s / 1.6s, `qwen2.5:3b` 10.1s / 3.6s, `qwen2.5:7b` 28.2s /
@@ -515,7 +575,8 @@ On every listener:
 | `POST` | `/tts` | text in, WAV out. `?voice=`, `?rate=` |
 | `GET` | `/tts/voices` | installed neural voices |
 | `GET` | `/settings` | the shared interface configuration |
-| `POST` | `/ask` | a question to the connected assistant |
+| `GET` | `/routes` | the routes, presentation and routing halves only |
+| `POST` | `/ask` | a question — `{"route": …}` picks one, absent means the default |
 
 Display listeners only — the embed does not exist on the admin port:
 
@@ -540,13 +601,26 @@ Admin listener only — everything below returns 404 on the public ports:
 | `POST` | `/users` | create an account — `admin` role |
 | `POST` | `/users/role` | change a role — `admin` role |
 | `POST` | `/users/delete` | remove an account — `admin` role |
+| `GET` | `/routes/all` | every route in full, less the keys — `admin` role |
+| `POST` | `/routes/new` | create one — `admin` role |
+| `POST` | `/routes/save` | change one — `admin` role |
+| `POST` | `/routes/default` | choose which answers the unaddressed — `admin` role |
+| `POST` | `/routes/enable` | enable or disable one — `admin` role |
+| `POST` | `/routes/delete` | remove one, and its key — `admin` role |
+| `POST` | `/routes/test` | one real round trip against that route — `admin` role |
 | `GET` | `/embeds` | list embed keys — `admin` role |
 | `POST` | `/embeds` | create one; the key is returned once — `admin` role |
 | `POST` | `/embeds/enable` | enable or disable one — `admin` role |
 | `POST` | `/embeds/delete` | revoke one — `admin` role |
 
 The last admin account cannot be deleted or demoted; an interface nobody can
-administer is a brick.
+administer is a brick. The last route cannot be deleted or switched off for
+the same reason: a server with nowhere to send a question is a composer wired
+to nothing, recoverable only by editing JSON on the box.
+
+`/routes` is the one path with a public half and a private half, and every
+privileged operation sits under `/routes/…` precisely so the admin-only list
+can stay a list of paths rather than a list of paths and methods.
 
 ## Driving the visualiser directly
 
@@ -702,7 +776,7 @@ two people in one room with three listening microphones between them.
 
 | | phase | delivers | sits on | open decisions |
 |---|---|---|---|---|
-| 1a | **Routes** | three names reaching three destinations, verifiable with no Home Assistant involved | — | none |
+| 1a | ~~**Routes**~~ **— built** | three names reaching three destinations, verifiable with no Home Assistant involved | — | none |
 | 1b | **The Home Assistant adapter** | saying the house name switches a light on | 1a | none |
 | 2 | **Displays, and binding a route to one** | only the tablets you approved can actuate the house, whatever anyone's browser is set to | 1b | none |
 | 3 | **What a wall display looks like** | voice only, and a screensaver that is still the product | 2 | none |
@@ -727,6 +801,10 @@ a local model and a hosted one are three destinations reachable by three
 names, and wake-word routing can be shaken out on a test box before Home
 Assistant is anywhere near it. If the refactor breaks something, that is when
 you find out, rather than while also debugging a new adapter.
+
+**1a is built** — see the progress log. It was worth splitting: it turned up
+three faults that had nothing to do with Home Assistant and would have been
+debugged through a new adapter otherwise.
 
 **Four is a placeholder, not a specification** — see its entry. Its position
 here is a guess and will move once it has been thought through.
@@ -1348,6 +1426,52 @@ on a desk. A tablet bolted to a wall, answering a household, moves them:
 ## Progress log
 
 Newest first.
+
+### 2026-08-14 — three names, three destinations
+
+Roadmap phase 1a. One assistant configuration became a set of named ones, and
+the assistant tab became a list rather than a form.
+
+- **A route is a name that reaches a destination**, and it binds to the
+  *conversation* rather than to the sentence — the follow-up goes where the
+  first question went. Saying another route's name mid-conversation switches
+  to it and **drops the conversation**: those words were addressed to
+  somebody else, and forwarding them would pay for them twice.
+- **Published in two halves, and one of them not at all.** Presentation and
+  routing reach the browser because that is where matching happens; the
+  adapter kind, base URL and key do not, at any tier. `public_routes()`
+  enumerates what is published rather than what is withheld, so the next
+  field added to a route is private by default.
+- **Exact beats fuzzy, wherever each was found.** Without that rule a
+  near-miss on the first route in the list steals an utterance that named the
+  second one outright — the person said the right word and got the wrong
+  assistant. It is the one thing in the matcher worth a test, and it has one.
+- **Strictness belongs to the route**, because the same false-positive rate
+  costs a few tokens on one and actuates hardware on the other. `hows` no
+  longer reaches a strict `house`.
+- **Per-route greeting and voice**, so a room with three of them can hear
+  which answered rather than read it.
+- **A per-route TEST**, replacing one that asked "does the assistant work".
+  With several routes that stopped being a question with an answer, and a
+  test quietly exercising the default while you looked at another route would
+  be worse than none.
+- **Upgrading is automatic and reversible.** `backend.json` becomes route one
+  and keeps the wake word out of the shared settings, so the box answers to
+  the same word afterwards as before. Both source documents stay on disk.
+- **Three faults found by building this before the adapter**, which is the
+  whole argument for splitting the phase: a route switched to Anthropic kept
+  the local base URL *and* the previous key, so a hosted credential would have
+  gone to a model on this network on an `x-api-key` header — failing in the
+  one direction that looks like success. Disabling the default route left the
+  default pointing at it, so the composer would have gone quiet. And the wake
+  state readouts in the panel had never worked at all: the code that writes
+  them runs in the display, where the elements do not exist. All three fixed.
+- **The wake word left the SPEECH tab**, because with several routes the word
+  is what picks between them and it belongs to the thing it picks. What is
+  left there is the gate's behaviour, which is one thing for the whole
+  display. LEARN went with it and now teaches one named route — it cannot
+  save, so the words it captures come back up the preview channel into the
+  panel's field, unsaved, for an admin to commit.
 
 ### 2026-08-13 — what it is reachable at, and what it takes to get in
 

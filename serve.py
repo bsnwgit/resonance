@@ -52,7 +52,6 @@ APP_PATH = os.path.join(ROOT, "app.json")
 BACKEND_PATH = os.path.join(ROOT, "backend.json")
 _settings_lock = threading.Lock()
 _app_lock = threading.Lock()
-_backend_lock = threading.Lock()
 
 # ------------------------------------------------------------------ backend
 # Which assistant answers, and how to reach it. Deliberately NOT part of
@@ -260,6 +259,10 @@ def address_bindable(addr):
 
 
 def read_backend():
+    """The one-assistant document this server had before routes. Read once,
+    by the migration that turns it into route one, and never written again —
+    but not deleted either, because an upgrade that removes the file it read
+    from leaves nothing to go back to if the migration was wrong."""
     cfg = dict(BACKEND_DEFAULTS)
     try:
         with open(BACKEND_PATH) as fh:
@@ -271,18 +274,14 @@ def read_backend():
     return cfg
 
 
-def write_backend(cfg):
-    with _backend_lock:
-        tmp = BACKEND_PATH + ".tmp"
-        with open(tmp, "w") as fh:
-            json.dump(cfg, fh, indent=2, sort_keys=True)
-        os.chmod(tmp, 0o600)                     # it holds a credential
-        os.replace(tmp, BACKEND_PATH)
-
-
 def validate_backend(obj, current):
     """Returns (config, error). Refuses a configuration that cannot work,
-    rather than accepting it and failing later in front of somebody."""
+    rather than accepting it and failing later in front of somebody.
+
+    Still one function after routes arrived, and deliberately: one adapter
+    configuration is one adapter configuration whether the server holds one
+    of them or six. validate_route calls this for a route's connection half
+    and adds the name and the wake word on top."""
     cfg = dict(current)
     for k in ("provider", "base_url", "model", "system", "keep_alive"):
         if k in obj:
@@ -312,6 +311,19 @@ def validate_backend(obj, current):
         cfg["api_key"] = ""
     elif str(obj.get("api_key") or "").strip():
         cfg["api_key"] = str(obj["api_key"]).strip()
+
+    # A base URL and a key belong to a provider, and neither survives a
+    # change of one. Left alone, a route switched to Anthropic would keep
+    # whatever endpoint it had — so the panel's default local URL would take
+    # an Anthropic key, on an x-api-key header, to a model on this network.
+    # That is worse than any error, because it looks like it worked.
+    if cfg["provider"] != (current.get("provider") or "demo"):
+        if "base_url" not in obj:
+            cfg["base_url"] = (ANTHROPIC_BASE if cfg["provider"] == "anthropic"
+                               else BACKEND_DEFAULTS["base_url"])
+        if not str(obj.get("api_key") or "").strip():
+            cfg["api_key"] = ""
+
     if cfg["provider"] != "demo":
         if not cfg["model"]:
             return None, "a model is required"
@@ -479,6 +491,243 @@ def ask_backend(text, history, cfg, tz=None):
         return reply
 
     raise RuntimeError("provider '%s' has no adapter" % cfg["provider"])
+
+
+# ------------------------------------------------------------------- routes
+# One assistant configuration becomes a set of named ones. A route is a name,
+# a wake word and its aliases, an adapter and its configuration, and
+# optionally its own voice — so you can HEAR which one answered, which turns
+# out to matter the moment two of them can reply to the same room.
+#
+# A route is published in two halves, and one of them is never published at
+# all. Wake-word matching happens in the browser, so some of a route has to
+# reach it; the rest has no business there.
+#
+#   presentation  name, greeting, voice        anyone who can reach the port
+#   routing       wake word, aliases, strict   the same today; behind the
+#                                              device token from phase 2
+#   connection    adapter kind, base URL,      nobody, through any browser
+#                 API key
+#
+# The adapter kind is on the wrong side of that line to publish. Nothing
+# needs it — routing is by wake word and replies come back already labelled —
+# and it is the one field that tells a reader what this box fronts. That is a
+# targeting signal rather than a name.
+ROUTES_PATH = os.path.join(ROOT, "routes.json")
+_routes_lock = threading.Lock()
+
+ROUTE_PRESENTATION = ("name", "greeting", "voice")
+ROUTE_ROUTING = ("wakeword", "aliases", "strict")
+#: everything else is BACKEND_DEFAULTS, and it is the connection half
+ROUTE_PUBLIC = ROUTE_PRESENTATION + ROUTE_ROUTING
+
+ROUTE_DEFAULTS = dict(BACKEND_DEFAULTS)
+ROUTE_DEFAULTS.update({
+    "name": "assistant",
+    # Blank means "use the shared greeting phrases". A route only needs its
+    # own where it should sound different from the rest — which is the point
+    # of a route having a voice as well.
+    "greeting": "",
+    "voice": "",                 # blank = whatever the shared settings chose
+    "wakeword": "resonance",
+    "aliases": [],
+    # Exact matching, for routes that DO things rather than answer. The same
+    # false-positive rate costs a few tokens on one route and actuates
+    # hardware on the other.
+    "strict": False,
+    "enabled": True,
+})
+MAX_ROUTES = 24                  # a household, not a directory service
+
+
+def _norm_word(s):
+    """The matcher's normalisation, in Python. Wake words are compared here
+    only to refuse an outright collision at the point of saving — the waking
+    itself happens in the browser."""
+    s = re.sub(r"[^a-z0-9\s]", " ", str(s or "").lower())
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _blank_routes():
+    return {"default": "", "routes": {}}
+
+
+def _migrate_routes():
+    """The single assistant this server had until now becomes route one.
+
+    Its connection is backend.json verbatim, and its wake word is the one out
+    of the shared settings — which is where the display read it from, so the
+    box answers to exactly the same word after the upgrade as before it. The
+    two source documents are left on disk untouched: an upgrade that deletes
+    the thing it read from has no way back if the migration was wrong."""
+    cfg = read_backend()
+    stored = read_settings()
+    rec = dict(ROUTE_DEFAULTS)
+    rec.update({k: cfg[k] for k in BACKEND_DEFAULTS})
+    rec["wakeword"] = _norm_word(stored.get("wakeword")) or ROUTE_DEFAULTS["wakeword"]
+    rec["aliases"] = [w for w in (_norm_word(a) for a in
+                                  re.split(r"[\n,]", str(stored.get("wakealiases") or "")))
+                      if w]
+    # A name, not a second wake word: this is what the panel and the
+    # transcript call it, and the word it answers to is its own field.
+    rec["name"] = rec["wakeword"] or "assistant"
+    rec.update(created=int(time.time()), created_by="migration")
+    rid = "r" + secrets.token_hex(4)
+    return {"default": rid, "routes": {rid: rec}}
+
+
+def read_routes():
+    """The whole document, migrating the older single-assistant one in on
+    first read. Never returns something with no routes in it: a server with
+    nowhere to send a question is not a state the rest of this file should
+    have to reason about."""
+    doc = None
+    try:
+        with open(ROUTES_PATH) as fh:
+            stored = json.load(fh)
+        if isinstance(stored, dict) and isinstance(stored.get("routes"), dict):
+            doc = {"default": str(stored.get("default") or ""), "routes": {}}
+            for rid, rec in stored["routes"].items():
+                out = dict(ROUTE_DEFAULTS)
+                out.update({k: v for k, v in rec.items() if k in ROUTE_DEFAULTS})
+                out["aliases"] = [w for w in (_norm_word(a) for a in
+                                              (rec.get("aliases") or [])) if w]
+                out["created"] = rec.get("created")
+                out["created_by"] = rec.get("created_by")
+                doc["routes"][str(rid)] = out
+    except (OSError, ValueError):
+        pass
+    if not doc or not doc["routes"]:
+        doc = _migrate_routes()
+        write_routes(doc)
+    _settle_default(doc)
+    return doc
+
+
+def _settle_default(doc):
+    """The default must be a route that can actually answer.
+
+    It is where a question with no wake word behind it goes, so a default
+    pointing at a deleted or switched-off route is a composer that silently
+    does nothing. Applied on both read and write: a hand-edited file gets the
+    same treatment as one this server wrote."""
+    rs = doc["routes"]
+    if doc["default"] in rs and rs[doc["default"]].get("enabled", True):
+        return
+    live = [r for r in rs if rs[r].get("enabled", True)] or list(rs)
+    doc["default"] = sorted(live, key=lambda r: (rs[r].get("created") or 0,
+                                                 rs[r]["name"]))[0] if live else ""
+
+
+def write_routes(doc):
+    _settle_default(doc)
+    with _routes_lock:
+        tmp = ROUTES_PATH + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump(doc, fh, indent=2, sort_keys=True)
+        os.chmod(tmp, 0o600)                     # it holds credentials
+        os.replace(tmp, ROUTES_PATH)
+
+
+def route_order(doc):
+    """Oldest first, and the default first of all. The order decides which
+    route a question with no wake word behind it reaches — typed into the
+    composer, pushed through an embed, or sent by the self-test."""
+    # Name breaks the tie, because several routes added in one sitting share
+    # a timestamp to the second and a list that reshuffles itself between
+    # visits is a list nobody can find anything in.
+    rest = sorted((r for r in doc["routes"] if r != doc["default"]),
+                  key=lambda r: (doc["routes"][r].get("created") or 0,
+                                 doc["routes"][r]["name"]))
+    return ([doc["default"]] if doc["default"] in doc["routes"] else []) + rest
+
+
+def public_routes(doc):
+    """The two halves a browser may see. The connection half is not omitted
+    from the serialisation by accident — it is enumerated the other way
+    round, so a field added to a route later is private until somebody
+    decides otherwise."""
+    return [dict({k: doc["routes"][rid][k] for k in ROUTE_PUBLIC}, id=rid)
+            for rid in route_order(doc)
+            if doc["routes"][rid].get("enabled", True)]
+
+
+def admin_routes(doc):
+    """Everything, less the credential itself. Whether a key is STORED is not
+    the key, and an admin needs to see the difference between a route with
+    one and a route without."""
+    out = []
+    for rid in route_order(doc):
+        rec = dict(doc["routes"][rid])
+        row = {k: rec.get(k) for k in ROUTE_DEFAULTS if k != "api_key"}
+        row.update(id=rid, has_key=bool(rec.get("api_key")),
+                   created=rec.get("created"), created_by=rec.get("created_by"),
+                   is_default=(rid == doc["default"]))
+        out.append(row)
+    return out
+
+
+def resolve_route(doc, rid):
+    """Which route answers. An id nobody recognises falls back to the default
+    rather than failing: a display holding a route that was deleted while it
+    was awake should keep working, and the alternative is a screen that has
+    gone quiet for a reason nobody standing in front of it can see."""
+    if rid and rid in doc["routes"] and doc["routes"][rid].get("enabled", True):
+        return rid, doc["routes"][rid]
+    d = doc["default"]
+    if d in doc["routes"] and doc["routes"][d].get("enabled", True):
+        return d, doc["routes"][d]
+    for r in route_order(doc):
+        if doc["routes"][r].get("enabled", True):
+            return r, doc["routes"][r]
+    return "", None
+
+
+def validate_route(obj, current, doc, rid=None):
+    """Returns (record, error). The connection half is the backend validator
+    unchanged — one adapter configuration is one adapter configuration,
+    whether there is one of them or six."""
+    rec, err = validate_backend(obj, current)
+    if err:
+        return None, err
+    for k in ("name", "greeting", "voice"):
+        if k in obj:
+            rec[k] = str(obj[k] or "").strip()[:200]
+    if not rec["name"]:
+        return None, "a route needs a name"
+    if "strict" in obj:
+        rec["strict"] = bool(obj["strict"])
+    if "enabled" in obj:
+        rec["enabled"] = bool(obj["enabled"])
+    if "wakeword" in obj:
+        rec["wakeword"] = _norm_word(obj["wakeword"])[:40]
+    if not rec["wakeword"]:
+        return None, "a route needs a wake word — it is how anybody reaches it"
+    if "aliases" in obj:
+        raw = obj["aliases"]
+        if not isinstance(raw, (list, tuple)):
+            raw = re.split(r"[\n,]", str(raw or ""))
+        seen, out = set(), []
+        for a in raw:
+            w = _norm_word(a)[:40]
+            if w and w not in seen:
+                seen.add(w)
+                out.append(w)
+        rec["aliases"] = out[:20]
+
+    # Two routes answering to the same word is not a preference, it is a
+    # route nobody can reach. Refused here at the point of entry; words that
+    # are merely CLOSE are the personal-wake-word phase's problem, and want
+    # the matcher that does the waking rather than a string comparison.
+    mine = set([rec["wakeword"]] + list(rec["aliases"]))
+    for other, o in doc["routes"].items():
+        if other == rid:
+            continue
+        clash = mine & set([o["wakeword"]] + list(o.get("aliases") or []))
+        if clash:
+            return None, ("“%s” already reaches %s"
+                          % (sorted(clash)[0], o["name"]))
+    return rec, None
 
 
 def validate_app(obj, current):
@@ -1140,9 +1389,16 @@ def transcribe(raw, suffix, hint=None, model_name=None):
 
 SESSION_COOKIE = "rsn_sid"
 ADMIN_ONLY_FILES = ("/admin.html",)
-#: exist only on the admin listener; anywhere else they are simply not there
+#: exist only on the admin listener; anywhere else they are simply not there.
+#: Note what is NOT here: /routes, the public half of the route document,
+#: which every display must be able to read. Everything privileged about a
+#: route lives under /routes/… precisely so this list can be a list of paths
+#: rather than a list of paths and methods.
 ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
-                     "/backend", "/embeds", "/embeds/delete", "/embeds/enable")
+                     "/routes/all", "/routes/new", "/routes/save",
+                     "/routes/delete", "/routes/enable", "/routes/default",
+                     "/routes/test",
+                     "/embeds", "/embeds/delete", "/embeds/enable")
 #: the other half of the embed API: reachable from the display listeners,
 #: because that is where a host server and a host browser can actually get to
 EMBED_ROUTES = ("/embed", "/embed/session")
@@ -1319,29 +1575,29 @@ class Handler(SimpleHTTPRequestHandler):
         self._csp = None            # one connection can serve several requests
         if self._redirected():
             return
-        route = self.path.split("?")[0]
+        path = self.path.split("?")[0]
         # The configuration interface does not exist as far as the public
         # listeners are concerned — not hidden by CSS, not gated in JS, absent.
         # Answering 401 here would still confirm the route is there; 404 is
         # the honest answer, because on this listener it genuinely is not.
-        if not self.admin_port and (route in ADMIN_ONLY_FILES
-                                    or route in ADMIN_ONLY_ROUTES
-                                    or route.startswith("/auth/")
-                                    or route == "/docs"
-                                    or route.startswith("/docs/")):
+        if not self.admin_port and (path in ADMIN_ONLY_FILES
+                                    or path in ADMIN_ONLY_ROUTES
+                                    or path.startswith("/auth/")
+                                    or path == "/docs"
+                                    or path.startswith("/docs/")):
             return self._json(404, {"error": "not found"})
 
         # Documentation. Signed in, but NOT admin-only: a viewer can read the
         # configuration, so a viewer should be able to read what it means —
         # and the user guide is written for people with no account at all.
-        if route == "/docs":
+        if path == "/docs":
             if not self._require():
                 return
             return self._json(200, {"docs": manual.doc_index()})
-        if route.startswith("/docs/"):
+        if path.startswith("/docs/"):
             if not self._require():
                 return
-            name = route[len("/docs/"):]
+            name = path[len("/docs/"):]
             want_pdf = name.endswith(".pdf")
             doc_id = name[:-4] if want_pdf else name
             entry = manual.DOC_BY_ID.get(doc_id)
@@ -1371,10 +1627,10 @@ class Handler(SimpleHTTPRequestHandler):
         # The embed exists on the display listeners only. On the admin port it
         # is genuinely absent — that listener serves one page to one signed-in
         # operator, and framing it anywhere is not a thing to support.
-        if route in EMBED_ROUTES and self.admin_port:
+        if path in EMBED_ROUTES and self.admin_port:
             return self._json(404, {"error": "not found"})
 
-        if route == "/embed/session":
+        if path == "/embed/session":
             # What the frame asks for itself, holding the token its host
             # server was given. The grant, never the key.
             s = self._embed()
@@ -1386,7 +1642,7 @@ class Handler(SimpleHTTPRequestHandler):
                 "expires_in": max(0, int(s["expires"] - time.time())),
             }})
 
-        if route == "/embed":
+        if path == "/embed":
             token = (parse_qs(urlparse(self.path).query).get("t") or [""])[0]
             s = get_embed_session(token)
             if not s:
@@ -1401,7 +1657,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.path = "/index.html"
             return super().do_GET()
 
-        if route == "/settings":
+        if path == "/settings":
             # public: this is what every viewer's interface is built from.
             # The warning rides along because the display has to be able to
             # say it too — a startup banner is seen by whoever ran the
@@ -1411,7 +1667,7 @@ class Handler(SimpleHTTPRequestHandler):
             # port and find out the same thing by getting in.
             return self._json(200, {"settings": read_settings(),
                                     "warning": posture_warning(RUNNING)})
-        if route == "/auth/me":
+        if path == "/auth/me":
             s = self._session()
             if not s:
                 return self._json(401, {"error": "not signed in"})
@@ -1420,7 +1676,7 @@ class Handler(SimpleHTTPRequestHandler):
             # words, and one of them has no account to offer or to sign out of.
             return self._json(200, {"user": s["user"], "role": s["role"],
                                     "no_auth": AUTH_MODE == "none"})
-        if route == "/auth/check":
+        if path == "/auth/check":
             # The panel's heartbeat. Deliberately does NOT slide the session:
             # a poll that renewed what it was checking would mean an open tab
             # never expired, because the check itself would be the activity.
@@ -1431,16 +1687,26 @@ class Handler(SimpleHTTPRequestHandler):
             if not s:
                 return self._json(401, {"error": "not signed in"})
             return self._json(200, {"alive": True})
-        if route == "/backend":
+        if path == "/routes":
+            # public, and only two thirds of a route. Presentation is what
+            # makes a newly hung display look right; routing is what makes it
+            # usable, and it moves behind the device token when displays land.
+            # The connection half is not here at all, at any tier.
+            doc = read_routes()
+            return self._json(200, {"routes": public_routes(doc),
+                                    "default": doc["default"]})
+        if path == "/routes/all":
             if not self._require("admin"):
                 return
-            cfg = read_backend()
-            has_key = bool(cfg.pop("api_key", ""))
-            return self._json(200, {"backend": cfg, "has_key": has_key,
+            doc = read_routes()
+            return self._json(200, {"routes": admin_routes(doc),
+                                    "default": doc["default"],
                                     "providers": list(PROVIDERS),
                                     "dialects": list(OPENAI_DIALECT),
+                                    "voices": voice_list(),
+                                    "max_routes": MAX_ROUTES,
                                     "max_history": MAX_HISTORY})
-        if route == "/app":
+        if path == "/app":
             if not self._require("admin"):
                 return
             cfg = read_app()
@@ -1459,7 +1725,7 @@ class Handler(SimpleHTTPRequestHandler):
                                                "session_max": SESSION_MAX,
                                                "bind_modes": list(BIND_MODES),
                                                "auth_modes": list(AUTH_MODES)}})
-        if route == "/users":
+        if path == "/users":
             if not self._require("admin"):
                 return
             if AUTH_MODE == "none":
@@ -1471,7 +1737,7 @@ class Handler(SimpleHTTPRequestHandler):
                 {"username": n, "role": u.get("role", "viewer"),
                  "created": u.get("created")}
                 for n, u in sorted(read_users().items())]})
-        if route == "/embeds":
+        if path == "/embeds":
             if not self._require("admin"):
                 return
             live = {}
@@ -1494,17 +1760,17 @@ class Handler(SimpleHTTPRequestHandler):
                                     "ttl": {"min": EMBED_TTL_MIN,
                                             "max": EMBED_TTL_MAX,
                                             "default": EMBED_TTL_DEFAULT}})
-        if route == "/tts/voices":
+        if path == "/tts/voices":
             return self._json(200, {"voices": voice_list(),
                                     "loaded": sorted(_voices.keys())})
-        if route == "/stt/status":
+        if path == "/stt/status":
             return self._json(200, {
                 "model": MODEL_NAME,
                 "loaded": sorted(_models.keys()),
                 "allowed": list(ALLOWED),
                 "error": _model_err,
             })
-        if route == "/" and self.admin_port:
+        if path == "/" and self.admin_port:
             self.path = "/admin.html"        # the admin port opens on admin.html
         return super().do_GET()
 
@@ -1706,24 +1972,148 @@ class Handler(SimpleHTTPRequestHandler):
             print("role of %s set to %s by %s" % (name, role, s["user"]), flush=True)
             return self._json(200, {"ok": True})
 
-        if parsed.path == "/backend":
+        # Creating is /routes/new rather than a POST to /routes, so that every
+        # privileged path sits under a prefix and /routes itself is purely the
+        # public document. One list can then hide the whole admin half from
+        # the display listeners without hiding the half a display must read.
+        if parsed.path in ("/routes/new", "/routes/save"):
             s = self._require("admin")
             if not s:
                 return
             obj = self._json_body()
             if obj is None:
                 return
-            cfg, err = validate_backend(obj, read_backend())
+            doc = read_routes()
+            rid = str(obj.get("id") or "")
+            if parsed.path == "/routes/save":
+                if rid not in doc["routes"]:
+                    return self._json(404, {"error": "no such route"})
+                current = doc["routes"][rid]
+            else:
+                if len(doc["routes"]) >= MAX_ROUTES:
+                    return self._json(409, {"error": "that is %d routes — more "
+                                            "names than a room can tell apart"
+                                            % MAX_ROUTES})
+                rid, current = None, dict(ROUTE_DEFAULTS)
+            rec, err = validate_route(obj, current, doc, rid)
             if err:
                 return self._json(400, {"error": err})
-            write_backend(cfg)
-            print("backend saved by %s: provider=%s model=%s key=%s"
-                  % (s["user"], cfg["provider"], cfg["model"] or "-",
-                     "set" if cfg["api_key"] else "none"), flush=True)
-            out = dict(cfg)
-            has_key = bool(out.pop("api_key", ""))
-            return self._json(200, {"ok": True, "backend": out,
-                                    "has_key": has_key})
+            if rid is None:
+                rid = "r" + secrets.token_hex(4)
+                rec.update(created=int(time.time()), created_by=s["user"])
+            else:
+                rec.update(created=current.get("created"),
+                           created_by=current.get("created_by"))
+            doc["routes"][rid] = rec
+            write_routes(doc)
+            # The wake word and the adapter kind, and never the key or the
+            # URL it points at: a log is read by more people than the panel.
+            print("route %s (%s) saved by %s: wake=%s adapter=%s key=%s"
+                  % (rid, rec["name"], s["user"], rec["wakeword"],
+                     rec["provider"], "set" if rec["api_key"] else "none"),
+                  flush=True)
+            return self._json(200, {"ok": True, "id": rid,
+                                    "routes": admin_routes(doc),
+                                    "default": doc["default"]})
+
+        if parsed.path == "/routes/delete":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            doc = read_routes()
+            rid = str(obj.get("id") or "")
+            if rid not in doc["routes"]:
+                return self._json(404, {"error": "no such route"})
+            if len(doc["routes"]) <= 1:
+                # Same reasoning as the last admin account. A server with no
+                # route has nowhere to send a question, and the only way back
+                # would be editing JSON on the box.
+                return self._json(409, {"error": "this is the only route — "
+                                        "make another before removing it"})
+            name = doc["routes"].pop(rid)["name"]
+            write_routes(doc)             # which settles the default, if it was this one
+            print("route %s (%s) deleted by %s" % (rid, name, s["user"]), flush=True)
+            return self._json(200, {"ok": True, "routes": admin_routes(doc),
+                                    "default": doc["default"]})
+
+        if parsed.path == "/routes/enable":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            doc = read_routes()
+            rid = str(obj.get("id") or "")
+            if rid not in doc["routes"]:
+                return self._json(404, {"error": "no such route"})
+            on = bool(obj.get("enabled"))
+            if not on and not [r for r in doc["routes"]
+                               if r != rid and doc["routes"][r].get("enabled", True)]:
+                return self._json(409, {"error": "this is the only route still "
+                                        "answering — the display would have "
+                                        "nowhere to send anything"})
+            doc["routes"][rid]["enabled"] = on
+            write_routes(doc)
+            print("route %s %s by %s" % (rid, "enabled" if on else "disabled",
+                                         s["user"]), flush=True)
+            return self._json(200, {"ok": True, "routes": admin_routes(doc),
+                                    "default": doc["default"]})
+
+        if parsed.path == "/routes/default":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            doc = read_routes()
+            rid = str(obj.get("id") or "")
+            if rid not in doc["routes"]:
+                return self._json(404, {"error": "no such route"})
+            if not doc["routes"][rid].get("enabled", True):
+                return self._json(409, {"error": "a route that is not "
+                                        "answering cannot be the default"})
+            doc["default"] = rid
+            write_routes(doc)
+            print("default route is now %s (%s), set by %s"
+                  % (rid, doc["routes"][rid]["name"], s["user"]), flush=True)
+            return self._json(200, {"ok": True, "routes": admin_routes(doc),
+                                    "default": doc["default"]})
+
+        if parsed.path == "/routes/test":
+            # A real round trip against one route's own connection. With
+            # several of them the per-route test stops being a convenience:
+            # "the assistant works" is no longer a thing that can be true or
+            # false about this server as a whole.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            doc = read_routes()
+            rid = str(obj.get("id") or "")
+            if rid not in doc["routes"]:
+                return self._json(404, {"error": "no such route"})
+            rec = doc["routes"][rid]
+            if rec["provider"] == "demo":
+                return self._json(200, {"demo": True, "name": rec["name"],
+                                        "reply": "", "ms": 0})
+            text = (str(obj.get("text") or "").strip()
+                    or "Reply with one short sentence confirming you can hear me.")
+            t0 = time.time()
+            try:
+                reply = ask_backend(text[:500], [], rec)
+            except Exception as exc:                       # noqa: BLE001
+                print("route test failed (%s %s/%s): %s"
+                      % (rid, rec["provider"], rec["model"], exc), flush=True)
+                return self._json(502, {"error": str(exc), "name": rec["name"]})
+            return self._json(200, {"reply": reply, "name": rec["name"],
+                                    "ms": int((time.time() - t0) * 1000)})
 
         if parsed.path == "/embed/session":
             # A host application's SERVER calling this one. No cookie, no
@@ -1852,29 +2242,40 @@ class Handler(SimpleHTTPRequestHandler):
             text = str(obj.get("text") or "").strip()[:4000]
             if not text:
                 return self._json(400, {"error": "no text"})
-            cfg = read_backend()
+            # Which name was spoken decides where this goes. Nothing spoke a
+            # name at all when it was typed into the composer or pushed
+            # through an embed, and that is what the default route is for.
+            rid, cfg = resolve_route(read_routes(), str(obj.get("route") or "")[:32])
+            if not cfg:
+                return self._json(503, {"error": "no route is answering"})
+            # The route is named back on every reply, not just when it
+            # changes: the display is entitled to know which one answered,
+            # and the answer is the only place it could come from. The
+            # adapter kind is deliberately not in here — see public_routes.
+            about = {"route": rid, "name": cfg["name"]}
             if cfg["provider"] == "demo":
                 # The display owns the demo replies; say so plainly rather
                 # than inventing a second set that drifts from the first.
-                return self._json(200, {"reply": "", "demo": True,
-                                        "provider": "demo"})
+                return self._json(200, dict(about, reply="", demo=True))
             t0 = time.time()
             try:
                 reply = ask_backend(text, obj.get("history") or [], cfg,
                                     tz=str(obj.get("tz") or "")[:64])
             except Exception as exc:                       # noqa: BLE001
-                print("ask failed (%s/%s): %s"
-                      % (cfg["provider"], cfg["model"], exc), flush=True)
-                return self._json(502, {"error": str(exc),
-                                        "provider": cfg["provider"]})
+                print("ask failed (%s %s/%s): %s"
+                      % (rid, cfg["provider"], cfg["model"], exc), flush=True)
+                # The message names the route rather than the adapter. A
+                # display says this out loud, and "openai returned 401" tells
+                # the person standing in front of it nothing they can act on
+                # while telling anyone in earshot what this box is wired to.
+                return self._json(502, dict(about, error=str(exc)))
             ms = int((time.time() - t0) * 1000)
             if not reply:
-                return self._json(502, {"error": "the model returned nothing",
-                                        "provider": cfg["provider"], "ms": ms})
-            print("ask ok (%s %s) %dms" % (cfg["provider"], cfg["model"], ms),
+                return self._json(502, dict(about, ms=ms,
+                                            error="that route returned nothing"))
+            print("ask ok (%s %s %s) %dms" % (rid, cfg["provider"], cfg["model"], ms),
                   flush=True)
-            return self._json(200, {"reply": reply, "provider": cfg["provider"],
-                                    "model": cfg["model"], "ms": ms})
+            return self._json(200, dict(about, reply=reply, ms=ms))
 
         if parsed.path == "/app":
             s = self._require("admin")
@@ -2053,11 +2454,18 @@ def main():
     else:
         print("no cert.pem/key.pem — HTTPS disabled, mic will be blocked", flush=True)
 
-    _b = read_backend()
-    print("assistant: %s%s" % (
-        _b["provider"],
-        "" if _b["provider"] == "demo" else
-        " · %s · %s" % (_b["model"] or "(no model)", _b["base_url"])), flush=True)
+    # Reading it here also performs the migration, so an upgrade turns its
+    # single assistant into route one while somebody is watching the console
+    # rather than silently on the first question anybody asks.
+    _doc = read_routes()
+    for _rid in route_order(_doc):
+        _r = _doc["routes"][_rid]
+        print("route %-10s “%s”%s%s%s" % (
+            _r["name"], _r["wakeword"],
+            "" if _r["provider"] == "demo" else
+            " · %s · %s" % (_r["model"] or "(no model)", _r["base_url"]),
+            "  (default)" if _rid == _doc["default"] else "",
+            "" if _r.get("enabled", True) else "  — not answering"), flush=True)
 
     if redirect_plain:
         print("HTTP  on %s:%d  → redirects to HTTPS on %d"
