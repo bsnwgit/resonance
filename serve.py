@@ -1404,6 +1404,25 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
 EMBED_ROUTES = ("/embed", "/embed/session")
 
 
+def hidden(path):
+    """Anything with a dot-prefixed segment in it. Not served, at all, on any
+    listener.
+
+    The base class serves files out of the directory `serve.py` sits in, and
+    that directory is a deployment — whatever else happens to be there is
+    reachable. Found the hard way: the documented deploy command had no
+    `--exclude=.git`, so one rsync put the whole repository on the box and
+    `/.git/config` answered 200 on the display listener. Private source and
+    its entire history, readable by anybody who could reach the port.
+
+    Excluding it at the deploy is the fix for that particular file and is
+    also being done. This is the fix for the class: a product that serves a
+    page, a script and an icon has no business serving `.git`, `.env`,
+    `.htpasswd` or an editor's swap file, and the next thing to land beside
+    it will not be foreseen either. Deny by shape rather than by name."""
+    return any(seg.startswith(".") for seg in path.split("/") if seg)
+
+
 class Handler(SimpleHTTPRequestHandler):
     #: set per-listener by make_server — the admin port is a different surface
     #: with different rules, not the same surface with an extra check
@@ -1568,6 +1587,10 @@ class Handler(SimpleHTTPRequestHandler):
     def do_HEAD(self):
         if self._redirected():
             return
+        # the same rule as GET: a HEAD that confirms a file is there is a
+        # disclosure of its own, and it is the cheap way to go looking
+        if hidden(self.path.split("?")[0]):
+            return self._json(404, {"error": "not found"})
         return super().do_HEAD()
 
     def do_GET(self):
@@ -1576,6 +1599,8 @@ class Handler(SimpleHTTPRequestHandler):
         if self._redirected():
             return
         path = self.path.split("?")[0]
+        if hidden(path):
+            return self._json(404, {"error": "not found"})
         # The configuration interface does not exist as far as the public
         # listeners are concerned — not hidden by CSS, not gated in JS, absent.
         # Answering 401 here would still confirm the route is there; 404 is
