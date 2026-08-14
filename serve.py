@@ -1404,23 +1404,29 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
 EMBED_ROUTES = ("/embed", "/embed/session")
 
 
-def hidden(path):
-    """Anything with a dot-prefixed segment in it. Not served, at all, on any
-    listener.
+#: Every file this server will hand out, and there are four of them. An
+#: ALLOW-list, because the alternative was tried and failed: the directory
+#: `serve.py` runs from is a deployment, not a document root, and the base
+#: class will serve anything sitting in it. What was sitting in it was the
+#: TLS private key, the accounts and their password hashes, the assistant's
+#: API keys, the log and the source — all of it 200 OK, unauthenticated, on a
+#: listener bound to every interface.
+#:
+#: A list of things to hide could never have been right. `routes.json` is the
+#: proof: it did not exist yet when such a list would have been written, and
+#: it arrived holding one credential per route. The next file to land beside
+#: these will not be foreseen either, so the default has to be no.
+#:
+#: admin.html is here because the admin listener serves it; the earlier
+#: ADMIN_ONLY_FILES check has already made it absent everywhere else.
+SERVABLE = frozenset(("/index.html", "/admin.html", "/icon.svg", "/lockup.svg"))
 
-    The base class serves files out of the directory `serve.py` sits in, and
-    that directory is a deployment — whatever else happens to be there is
-    reachable. Found the hard way: the documented deploy command had no
-    `--exclude=.git`, so one rsync put the whole repository on the box and
-    `/.git/config` answered 200 on the display listener. Private source and
-    its entire history, readable by anybody who could reach the port.
 
-    Excluding it at the deploy is the fix for that particular file and is
-    also being done. This is the fix for the class: a product that serves a
-    page, a script and an icon has no business serving `.git`, `.env`,
-    `.htpasswd` or an editor's swap file, and the next thing to land beside
-    it will not be foreseen either. Deny by shape rather than by name."""
-    return any(seg.startswith(".") for seg in path.split("/") if seg)
+def servable(path):
+    """Exact match on the path with its query stripped. Deny-by-default gets
+    traversal and percent-encoding for nothing: `/docs/../key.pem` and
+    `/%6bey.pem` are simply not in the set, so neither needs its own rule."""
+    return path.split("?")[0] in SERVABLE
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -1587,9 +1593,9 @@ class Handler(SimpleHTTPRequestHandler):
     def do_HEAD(self):
         if self._redirected():
             return
-        # the same rule as GET: a HEAD that confirms a file is there is a
-        # disclosure of its own, and it is the cheap way to go looking
-        if hidden(self.path.split("?")[0]):
+        # The same allow-list as GET. A HEAD that confirms key.pem is there is
+        # a disclosure of its own, and it is the cheap way to go looking.
+        if not servable(self.path):
             return self._json(404, {"error": "not found"})
         return super().do_HEAD()
 
@@ -1599,8 +1605,6 @@ class Handler(SimpleHTTPRequestHandler):
         if self._redirected():
             return
         path = self.path.split("?")[0]
-        if hidden(path):
-            return self._json(404, {"error": "not found"})
         # The configuration interface does not exist as far as the public
         # listeners are concerned — not hidden by CSS, not gated in JS, absent.
         # Answering 401 here would still confirm the route is there; 404 is
@@ -1795,8 +1799,16 @@ class Handler(SimpleHTTPRequestHandler):
                 "allowed": list(ALLOWED),
                 "error": _model_err,
             })
-        if path == "/" and self.admin_port:
-            self.path = "/admin.html"        # the admin port opens on admin.html
+        # The root is named explicitly rather than left to the base class,
+        # which would otherwise answer it with a directory listing of the
+        # deployment if index.html ever went missing.
+        if path == "/":
+            self.path = "/admin.html" if self.admin_port else "/index.html"
+        # Everything that is going to be served has been decided above. What
+        # reaches here is a request for a file, and only four of those exist
+        # as far as this server is concerned — see SERVABLE.
+        if not servable(self.path):
+            return self._json(404, {"error": "not found"})
         return super().do_GET()
 
     def _body(self, limit=256 * 1024):
