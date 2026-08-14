@@ -21,25 +21,21 @@ Each has its own service, its own model, its own key, its own instructions,
 and optionally its own greeting and voice — so a room with more than one can
 hear which replied.
 
-The panel gives each of them three topics:
+**One block per endpoint**, and the block is the whole of it: the wake word
+that reaches it and the connection it reaches, saved together by the SAVE
+inside it. **ADD INSTANCE** at the foot of the tab makes another and opens it;
+each block carries its own TEST, MAKE DEFAULT, SWITCH OFF, FORGET KEY and
+DELETE.
 
-| Topic | What it settles |
-|---|---|
-| **Who it is** | what it is called, what you say, how closely that must match, how it greets you, what it sounds like |
-| **What answers it** | the service behind it, and how to reach it |
-| **What it is told first** | its instructions, sent ahead of every question |
+Every block's heading says what you say to reach it and what it is wired to —
+`say "house" -> house-agent` — so you can find the right one without opening
+three of them.
 
-Pick one in **Assistants** and those three describe it. Each carries a
-`SETTING UP:` line naming it, because with one topic open at a time you cannot
-see the list while you work. Any of the three SAVE buttons commits the whole
-thing.
-
-### The one marked DEFAULT
+### The one marked default
 
 **Where anything with no name in front of it goes**: typed into the box at the
 bottom of the display, sent by an embedded copy, or spoken while the wake word
-is switched off. There is always exactly one, and **ANSWER BY DEFAULT** moves
-it. One that is switched off cannot hold it, and the server moves it for you
+is switched off. There is always exactly one, and **MAKE DEFAULT** moves it. One that is switched off cannot hold it, and the server moves it for you
 rather than leaving the display with nowhere to send anything.
 
 ### What a display is told, and what it never is
@@ -55,6 +51,17 @@ happens. **What it is connected to does not, at any tier** — nothing needs it,
 replies come back already labelled with whoever gave them, and it is the one
 field that would tell a reader what this machine is wired to. A display cannot
 tell anyone, because it is never sent it.
+
+### The instance name and the wake word are two fields
+
+They are the same word by default — the wake word follows the name as you type
+it, until you edit the wake word, after which it stays where you put it.
+
+They are separate because they answer to different things. The **instance
+name** labels the endpoint in the panel, in the log and in `{assistant}`; it is
+never spoken and never matched against. The **wake word** is what somebody
+actually says. An endpoint called *Kitchen Lights* is a perfectly good label
+and a terrible thing to say out loud.
 
 ### CLOSE ENOUGH and THE EXACT WORD
 
@@ -84,13 +91,13 @@ checked yet.
 
 **LEARN HOW I SAY IT** captures what the transcriber actually returns when you
 say the word, three times, and adds those forms to *also answers to*. It
-teaches whichever assistant is selected, and that one has to have been saved
-first. The captured words land in the field unsaved — press **SAVE** to keep
+teaches the endpoint whose block the button is in, and that endpoint has to
+have been saved first. The captured words land in the field unsaved — press **SAVE** to keep
 them.
 
-### ASK IT SOMETHING
+### TEST
 
-Puts one short question to the assistant you are looking at. With several of
+Puts one short question to the endpoint whose block it is in. With several of
 them this stops being a convenience: "the assistant works" is no longer
 something that can be true or false about this server as a whole, and a test
 that quietly exercised a different one would be worse than none.
@@ -236,8 +243,7 @@ than slow, the model is too small before anything else is at fault.
 
 ## Testing and diagnosing
 
-**ASK IT SOMETHING** puts one short question to the selected assistant and
-reports the reply and the round trip in milliseconds. It uses that one's own
+**TEST** puts one short question to that endpoint and reports the reply and the round trip in milliseconds. It uses that one's own
 connection, so a pass here means a viewer who says its name will get an answer
 too.
 
