@@ -702,7 +702,7 @@ two people in one room with three listening microphones between them.
 
 | | phase | delivers | sits on | open decisions |
 |---|---|---|---|---|
-| 1a | **Routes** | three names reaching three destinations, verifiable with no Home Assistant involved | — | **1** · how much of a route reaches the browser |
+| 1a | **Routes** | three names reaching three destinations, verifiable with no Home Assistant involved | — | none |
 | 1b | **The Home Assistant adapter** | saying the house name switches a light on | 1a | none |
 | 2 | **Displays, and binding a route to one** | only the tablets you approved can actuate the house, whatever anyone's browser is set to | 1b | none |
 | 3 | **What a wall display looks like** | voice only, and a screensaver that is still the product | 2 | none |
@@ -716,9 +716,11 @@ The last column counts decisions that need **you**, not implementation choices
 made while building and shown afterwards. A phase reading *none* is ready to
 start.
 
-Only one of them blocks anything: **1a's**, because it has to be settled
-before a route is first published to a browser. The rest can be answered when
-their phase comes up.
+**Nothing outstanding blocks starting.** Everything before phase 4 reads
+*none*, and phase 4 is a design problem to think through rather than a
+question to answer — its position will move once it has been. The three
+remaining are each answerable when their own phase comes up, and one of them
+is deliberately waiting on experience rather than on a decision.
 
 **One is two deliveries rather than one.** Routes stand up on their own — demo,
 a local model and a hosted one are three destinations reachable by three
@@ -755,16 +757,30 @@ it. Each entry below carries its own panel scope.
 
   `/ask` takes a route. The adapter machinery underneath does not change.
 
-  **Open, and deliberately not settled yet: how much of a route reaches the
-  browser.** It needs the wake word and its aliases, because matching happens
-  there — so at minimum the names are public, and anyone who opens the display
-  can read what the house answers to. The adapter's URL, its API key and the
-  Home Assistant token stay on the server and appear in no response, as the
-  single backend configuration already does. What sits between those two — the
-  route's name, its adapter *kind*, its greeting, its voice — is the part to
-  decide, and it is a decision about what a stranger at the screen should be
-  able to learn about the house. Recorded here so it is chosen rather than
-  arrived at.
+  **A route is published in two halves, and one of them is never published at
+  all.** Wake-word matching happens in the browser, so some of a route has to
+  reach it; the rest has no business there.
+
+  | | fields | who sees it |
+  | --- | --- | --- |
+  | **presentation** | name, greeting, voice | anyone who can reach the port |
+  | **routing** | wake word, aliases, match strictness | the same today; behind the device token from phase 2 |
+  | **connection** | adapter kind, base URL, API key, Home Assistant token | nobody, through any browser |
+
+  **The adapter kind is on the wrong side of that line to publish.** Nothing
+  needs it — routing is by wake word and replies come back already labelled —
+  and it is the one field that tells a reader this box fronts a home
+  automation system rather than merely an assistant. That is a targeting
+  signal rather than a name. If the interface later wants a house route to
+  *look* different, the server can send a neutral presentation hint that says
+  "style this one apart" without naming what it connects to.
+
+  **Splitting presentation from routing is what lets an unapproved display
+  still render.** Appearance and names are harmless and keep a newly hung
+  tablet looking correct; the wake words are what actually make it usable, and
+  those move behind the device token when phase 2 lands. Until then the whole
+  document is readable by anything that can reach the port, which is an
+  argument for the network boundary rather than for delaying either phase.
 
   **The wake word that woke it decides the route, and the route stays bound to
   the conversation rather than to the sentence.** This falls out of what is
