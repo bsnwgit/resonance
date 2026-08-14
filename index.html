@@ -505,8 +505,9 @@ const FALLBACK_WAKEWORD = 'resonance';
    whichever route is answering — which is the same sentence, and now says
    something more useful.
 
-   `{route}` is its name, which is a separate field. Put it in the assistant
-   label and the transcript attributes each answer to the route that gave it.
+   `{assistant}` is its name, which is a separate field. Put it in the
+   assistant label and the transcript attributes each answer to whichever one
+   gave it.
 
    An unknown variable is left standing rather than blanked. Somebody typing
    {displya} should see their typo, not a name that silently vanished. */
@@ -516,7 +517,7 @@ const VARS = {
     const r = Routes.current();
     return cap(((r && r.wakeword) || FALLBACK_WAKEWORD).trim());
   },
-  route:   ()=>{
+  assistant: ()=>{
     const r = Routes.current();
     return cap(((r && r.name) || FALLBACK_WAKEWORD).trim());
   },

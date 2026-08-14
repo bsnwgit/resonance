@@ -362,10 +362,19 @@ microphone, recorder, routes, the route that would answer, render-and-speak —
 and names whichever one is broken. Keep demo mode permanently: it is how you
 tell whether a fault is the front-end or the model behind it.
 
-Configure the rest in the admin page under **AI → Routes**. The panel is
+Configure the rest in the admin page under **AI → Assistants**. The panel is
 deliberately terse; the reasoning behind each field is here.
 
-### Routes
+### Routes, which the panel calls assistants
+
+**The two words are deliberate, and they are not a synonym for each other.**
+`route` is what the mechanism does — a name resolving to a destination — and
+it is what the document, the API paths and the rest of this file call it. The
+panel says *assistant*, because that is what an admin is setting up, and
+because "route" already means something else entirely to anyone who has
+configured a network. Code and interface are allowed to have their own
+vocabularies; pretending one word serves both is how panels end up written for
+their implementers.
 
 **A route is a name that reaches a destination.** Say its wake word and
 everything after it goes there until the sleep word or the awake timer — the

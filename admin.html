@@ -545,6 +545,17 @@
     padding-left:8px;margin-left:-10px;padding-right:8px;margin-right:-10px;
   }
   .erow.sel .nm{color:#d2f2e2}
+  /* Actions belong to the row you picked, and get a line of their own so a
+     long label never wraps a row into a ragged block. */
+  .erow .acts{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
+  /* Which assistant the topic below belongs to. With one topic open at a
+     time you cannot see the list while you edit, so each of the three that
+     describe one assistant has to say whose settings these are — otherwise
+     you are editing something you have to remember having chosen. */
+  .note.editing{
+    color:#a8e3c4;letter-spacing:.1em;margin:0 0 4px;
+    padding-bottom:7px;border-bottom:1px solid rgba(122,201,160,.28);
+  }
   .erow .badge{font-size:calc(7.5px * var(--fs));letter-spacing:.14em;padding:1px 5px;
                border:1px solid rgba(var(--glass),.25);color:rgba(var(--paper),.8)}
   .cks{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;margin:6px 0 2px}
@@ -890,8 +901,11 @@ size it is setting, so you read the choice while making it.</div>
 
 Either can be a variable instead of a fixed word:
 
-<b>{name}</b> — the wake word, so renaming what it answers to renames what it
-is called. Already what the greeting and farewell fields use.
+<b>{name}</b> — the word you say to reach whichever assistant is answering, so
+renaming that renames this. Already what the greeting and farewell fields use.
+
+<b>{assistant}</b> — what that assistant is called, which is its own field.
+Put it here and the transcript credits each answer to whoever gave it.
 
 <b>{display}</b> — the name of the display this is being viewed at, from
 <b>?display=</b> on the URL. Put it in <i>the person</i> and each dedicated
@@ -939,80 +953,96 @@ recognised is left standing so a typo is visible rather than silent.</div>
   <div class="sl"><label>line weight</label><output id="o_lw"></output><input id="s_lw" type="range" min=".3" max="3" step=".05"></div></div>
   </section>
   <section class="grp" data-tab="ai">
-    <h4>Routes</h4>
+    <h4>Assistants</h4>
     <div class="grpbody">
+  <div class="note" style="margin-bottom:8px">Each one has a name you say out
+loud. Say it and everything after it goes to that assistant, until you say the
+sleep word or it times out.</div>
   <div id="rtlist"></div>
   <div class="seg" style="margin-top:8px">
-    <button id="b_addroute" class="act-save">ADD ROUTE</button>
+    <button id="b_addroute" class="act-save">ADD AN ASSISTANT</button>
   </div>
   <div class="note" id="rtlistnote"></div>
-  <div class="note help" style="margin-top:10px">A <b>route</b> is a name that
-reaches a destination. Say its wake word and everything after it goes there,
-until the sleep word or the awake timer — so a follow-up needs no second
-address.
+  <div class="note help" style="margin-top:10px">Pick one to set it up in the
+three topics below.
 
-Each route has its own adapter, its own model, its own key, and optionally its
-own <b>voice</b>, so a room with more than one can hear which answered.
+<b>ANSWERS BY DEFAULT</b> marks the one that takes anything with no name in
+front of it — typed into the box at the bottom of the display, sent by an
+embedded copy, or spoken while the wake word is switched off.
 
-<b>The default</b> is where anything with no name in front of it goes: typed
-into the composer, sent through an embed, or spoken while the wake gate is
-off.
+Each has its own model, its own key and optionally its own voice, so a room
+with more than one can hear which replied.
 
-<b>Nothing here reaches a browser but the name, the greeting, the voice, the
-wake word and how strictly it matches.</b> The adapter, the URL and the key
-are not published at any tier — a display cannot tell you what this box is
-wired to, because it does not know.</div>
+<b>What a display is told: the name, the greeting, the voice, the words it
+answers to.</b> Never what it is connected to — not the service, not the
+address, not the key. A display cannot tell anyone what this machine is wired
+to, because it is never sent it.</div>
     </div>
   </section>
 
   <section class="grp" data-tab="ai" id="grp_route">
-    <h4>Route</h4>
+    <h4>Who it is</h4>
     <div class="grpbody">
-  <div class="note" id="rtwhich"></div>
+  <div class="note editing" id="rtwhich"></div>
 
-  <label class="bklab">name</label>
+  <label class="bklab">called</label>
   <input id="rt_name" type="text" spellcheck="false" autocomplete="off"
-         placeholder="house">
-  <div class="note help">What it is called — in the panel, and in the transcript
-wherever a label uses <b>{route}</b>.</div>
+         placeholder="the house">
+  <div class="note help">The name you see in the list, and what
+<b>{assistant}</b> shows in the transcript.</div>
 
-  <label class="bklab">wake word</label>
+  <label class="bklab">you say</label>
   <input id="rt_wake" type="text" spellcheck="false" autocomplete="off"
-         placeholder="what you say to reach it">
+         placeholder="house">
   <div class="seg" style="margin-top:6px"><button id="b_learn">LEARN HOW I SAY IT (3x)</button></div>
   <div id="learnwakenote" class="learnnote"></div>
-  <label class="bklab">also accept (learned)</label>
+  <label class="bklab">also answers to</label>
   <textarea id="rt_aliases" rows="3" spellcheck="false" placeholder="one per line"></textarea>
-  <div class="note help">Choose words that are <b>acoustically far apart</b>, not
-merely different — differing syllable counts, vowels and stress survive a noisy
-room, two names a letter apart do not. Worth getting right before a household
-learns them.</div>
+  <div class="note help">Speech goes through a transcriber that mishears short
+words constantly. LEARN records how <i>you</i> say it, three times, and adds
+what comes back — the reliable fix when a name is not an ordinary word.
 
-  <label class="bklab">matching</label>
+Choose names that sound <b>far apart</b>, not merely different: differing
+syllable counts, vowels and stress survive a noisy room, two names one letter
+apart do not. Worth settling before a household learns them.</div>
+
+  <label class="bklab">how closely it must match</label>
   <div class="seg" id="rt_strict">
-    <button data-v="0" class="on">FUZZY</button>
-    <button data-v="1">EXACT</button>
+    <button data-v="0" class="on">CLOSE ENOUGH</button>
+    <button data-v="1">THE EXACT WORD</button>
   </div>
-  <div class="note help">FUZZY wakes on near-misses, which is right for a route
-that answers questions — a transcriber mishears a short word constantly. EXACT
-is for a route that <i>does</i> things: the same false-positive rate costs a few
-tokens on one and actuates hardware on the other.</div>
+  <div class="note help">CLOSE ENOUGH forgives a mishearing, which is what you
+want from something that answers questions. THE EXACT WORD is for one that
+<i>does</i> things — the same near-miss costs you a few tokens on one and
+switches on the lights on the other.</div>
 
-  <label class="bklab">greeting</label>
+  <label class="bklab">says hello with</label>
   <input id="rt_greeting" type="text" spellcheck="false" autocomplete="off"
-         placeholder="blank — use the shared greeting phrases">
-  <div class="note help">Said when this route is woken by name with nothing after
-it. Blank falls back to the phrases on the SPEECH tab. <b>{name}</b> is this
-route's wake word.</div>
+         placeholder="leave blank to use the shared phrases">
+  <div class="note help">Spoken when you say its name and nothing else. Blank
+falls back to the greeting phrases on the SPEECH tab. <b>{name}</b> becomes the
+word you say to reach it.</div>
 
-  <label class="bklab">voice</label>
+  <label class="bklab">speaks with</label>
   <select id="rt_voice"></select>
-  <div class="note help">Blank uses the shared voice. Give the routes different
-ones and you can tell them apart without looking at the screen — which is the
-whole of what a wall display offers.</div>
+  <div class="note help">Give them different voices and you can tell who
+answered without looking at the screen — which is all a wall display offers.</div>
 
-  <div class="note help" style="margin-top:12px">Which assistant answers. OPENAI-COMPATIBLE covers Ollama,
-OpenClaw, LM Studio and vLLM — they differ only by base URL.</div>
+  <div class="seg" style="margin-top:12px">
+    <button id="b_bksave2" class="act-save">SAVE</button>
+  </div>
+  <div class="note" id="whonote"></div>
+    </div>
+  </section>
+
+  <section class="grp" data-tab="ai" id="grp_conn">
+    <h4>What answers it</h4>
+    <div class="grpbody">
+  <div class="note editing" id="rtwhich2"></div>
+
+  <div class="note help">OPENAI-COMPATIBLE is a shape, not a company: Ollama,
+OpenClaw, LM Studio and vLLM all speak it and differ only by address. DEMO
+answers from built-in text and reaches nothing.</div>
   <div class="seg" id="bk_provider" style="margin-top:8px">
     <button data-v="demo" class="on">DEMO</button>
     <button data-v="openai">OPENAI-COMPATIBLE</button>
@@ -1030,7 +1060,7 @@ OpenClaw, LM Studio and vLLM — they differ only by base URL.</div>
   </div>
   </div>
 
-  <label class="bklab">base URL</label>
+  <label class="bklab">address</label>
   <input id="bk_url" type="text" spellcheck="false" autocomplete="off"
          placeholder="http://127.0.0.1:11434/v1">
   <label class="bklab">model</label>
@@ -1048,6 +1078,11 @@ browser. Leave blank to keep the stored one; a local model needs none.</div>
   <div class="sl" id="row_temp"><label>temperature</label><output id="o_bktemp"></output><input id="s_bktemp" type="range" min="0" max="1.5" step=".05"></div>
   <div class="sl"><label>turns of context</label><output id="o_bkhist"></output><input id="s_bkhist" type="range" min="0" max="24" step="1"></div>
   <div class="sl"><label>timeout</label><output id="o_bktimeout"></output><input id="s_bktimeout" type="range" min="5" max="600" step="5"></div>
+  <div class="note help">A cold model can take half a minute to load before it
+says anything, so keep the timeout generous — one tuned to a warm model looks
+like a dead server every morning. <b>turns of context</b> is how much of the
+conversation goes back with each question: at zero, "and the other one?" means
+nothing.</div>
 
   <div id="row_keepalive">
   <label class="bklab">keep model loaded</label>
@@ -1062,8 +1097,8 @@ keep-alive are not sent to Anthropic — steer it with the system prompt.</div>
   </div><!-- /bk_conn -->
 
   <div class="seg" style="margin-top:10px">
-    <button id="b_bksave" class="act-save">SAVE ROUTE</button>
-    <button id="b_bktest">TEST</button>
+    <button id="b_bksave" class="act-save">SAVE</button>
+    <button id="b_bktest">ASK IT SOMETHING</button>
     <button id="b_bkforget" class="act-undo">FORGET KEY</button>
   </div>
   <div class="note" id="bknote"></div>
@@ -1071,15 +1106,16 @@ keep-alive are not sent to Anthropic — steer it with the system prompt.</div>
   </section>
 
   <section class="grp" data-tab="ai" id="grp_prompt">
-    <h4>System prompt</h4>
+    <h4>What it is told first</h4>
     <div class="grpbody">
-  <div class="note help">What this route's assistant is told before every
-question. Each route has its own — a house and a general assistant want
-different instructions, and one prompt covering both is a compromise neither
-needs. The reply is read aloud, so this asks for plain prose.</div>
+  <div class="note editing" id="rtwhich3"></div>
+  <div class="note help">Sent ahead of every question. Each assistant has its
+own — a house and a general assistant want different instructions, and one
+wording covering both suits neither. Every reply is read out loud, so this asks
+for plain prose: bullets and headings are unlistenable.</div>
   <textarea id="bk_system" rows="8" spellcheck="false"></textarea>
   <div class="seg" style="margin-top:8px">
-    <button id="b_bksaveprompt" class="act-save">SAVE PROMPT</button>
+    <button id="b_bksaveprompt" class="act-save">SAVE</button>
     <button id="b_bkresetprompt" class="act-undo" title="back to the wording this ships with">RESET</button>
   </div>
   <div class="note" id="promptnote"></div>
@@ -1168,10 +1204,10 @@ picks.</div>
     <button data-v="0">GO QUIET</button>
   </div>
   <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:10px">greeting phrases</label>
-  <textarea id="greetings" rows="4" spellcheck="false" placeholder="one per line — {name} inserts the wake word"></textarea>
+  <textarea id="greetings" rows="4" spellcheck="false" placeholder="one per line — {name} inserts the word you said"></textarea>
   <div class="note help">The fallback for every route that has no greeting of its
 own. Several lines so a display somebody talks to all day does not repeat
-itself; <b>{name}</b> is the wake word of whichever route was addressed.</div>
+itself; <b>{name}</b> is the word that was said to reach whoever answered.</div>
   <div class="seg"><button id="b_greet">TEST GREETING</button></div>
   <div id="wakestate" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5"></div></div>
     </section>
@@ -1187,7 +1223,7 @@ itself; <b>{name}</b> is the wake word of whichever route was addressed.</div>
   <textarea id="sleepaliases" rows="2" spellcheck="false" placeholder="one per line"></textarea>
 
   <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:10px">farewell phrases</label>
-  <textarea id="farewells" rows="3" spellcheck="false" placeholder="one per line — {name} inserts the wake word"></textarea>
+  <textarea id="farewells" rows="3" spellcheck="false" placeholder="one per line — {name} inserts the word you said"></textarea>
   <div class="seg"><button id="b_bye">TEST FAREWELL</button></div>
   
     <div id="sleepstate" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5"></div>
@@ -1858,9 +1894,9 @@ function buildControls(){
   if (lw) lw.addEventListener('click', ()=>{
     if (!BK || !BK.id){
       const el = $('learnwakenote');
-      if (el) el.textContent = 'Save this route first — LEARN teaches the '
-                             + 'display a word, and it can only teach it one '
-                             + 'that is really there.';
+      if (el) el.textContent = 'Save this one first — LEARN teaches the '
+                             + 'display a word, and it can only teach it a '
+                             + 'word that is really there.';
       return;
     }
     cmd('learnwake', BK.id);
@@ -2251,11 +2287,14 @@ function bkPaint(){
   document.querySelectorAll('#rt_strict button').forEach(b=>
     b.classList.toggle('on', (b.dataset.v === '1') === !!BK.strict));
   paintVoiceChoices();
-  const which = $('rtwhich');
-  if (which) which.textContent = !BK.id
-    ? 'A new route. Nothing is on the server until you press SAVE ROUTE.'
-    : (BK.name + (BK.is_default ? ' · the default' : '')
-       + (BK.enabled === false ? ' · not answering' : ''));
+  const subject = !BK.id
+    ? 'NEW — nothing is saved until you press SAVE'
+    : ('SETTING UP: ' + (BK.name || '(unnamed)')
+       + (BK.is_default ? '  ·  answers by default' : '')
+       + (BK.enabled === false ? '  ·  switched off' : ''));
+  ['rtwhich', 'rtwhich2', 'rtwhich3'].forEach(id=>{
+    const el = $(id); if (el) el.textContent = subject;
+  });
   bkSyncProvider();
 }
 
@@ -2291,9 +2330,10 @@ function paintRoutes(){
   const rows = RT.routes.slice();
   if (BK && !BK.id) rows.push(BK);            // the unsaved draft sits with them
   rows.forEach(r=>{
+    const sel = !!(BK && r.id === BK.id);
     const row = document.createElement('div');
     row.className = 'erow pick' + (r.enabled === false ? ' off' : '')
-                  + (BK && r.id === BK.id ? ' sel' : '');
+                  + (sel ? ' sel' : '');
     row.onclick = e=>{ if (!e.target.closest('button')) selectRoute(r.id); };
 
     const top = document.createElement('div'); top.className = 'top';
@@ -2307,37 +2347,7 @@ function paintRoutes(){
     if (!r.id) badge('UNSAVED');
     if (r.is_default) badge('DEFAULT');
     if (r.strict) badge('EXACT');
-    if (r.enabled === false) badge('NOT ANSWERING');
-
-    const right = document.createElement('span'); right.className = 'r';
-    if (r.id){
-      if (!r.is_default && r.enabled !== false){
-        const d = document.createElement('button');
-        d.textContent = 'MAKE DEFAULT';
-        d.onclick = ()=> routeAction('/routes/default', {id:r.id});
-        right.appendChild(d);
-      }
-      const flip = document.createElement('button');
-      flip.textContent = r.enabled === false ? 'ENABLE' : 'DISABLE';
-      flip.onclick = ()=> routeAction('/routes/enable',
-                                      {id:r.id, enabled: r.enabled === false});
-      const del = document.createElement('button');
-      del.textContent = 'DELETE';
-      del.className = 'act-danger';
-      del.onclick = ()=>{
-        if (confirm('Delete the route "' + r.name + '"? Anything that answers '
-                    + 'to “' + r.wakeword + '” stops immediately, and its key '
-                    + 'is gone with it.'))
-          routeAction('/routes/delete', {id:r.id});
-      };
-      right.appendChild(flip); right.appendChild(del);
-    } else {
-      const drop = document.createElement('button');
-      drop.textContent = 'DISCARD';
-      drop.onclick = ()=>{ BK_PAINTED = {}; selectRoute(RT.default); };
-      right.appendChild(drop);
-    }
-    top.appendChild(right);
+    if (r.enabled === false) badge('OFF');
 
     const meta = document.createElement('div');
     meta.className = 'meta';
@@ -2348,6 +2358,42 @@ function paintRoutes(){
     meta.appendChild(document.createTextNode(
       words.length ? '“' + words.join('”, “') + '”' : 'nothing yet'));
     row.appendChild(top); row.appendChild(meta);
+
+    /* Only the one you have picked offers its actions. Nine buttons down a
+       list of three is the clutter, and it is also the wrong shape: this is a
+       list you choose from, and what you do to a thing comes after choosing
+       it. They sit on their own line so nothing has to wrap. */
+    if (sel){
+      const acts = document.createElement('div');
+      acts.className = 'acts';
+      if (r.id){
+        if (!r.is_default && r.enabled !== false){
+          const d = document.createElement('button');
+          d.textContent = 'ANSWER BY DEFAULT';
+          d.onclick = ()=> routeAction('/routes/default', {id:r.id});
+          acts.appendChild(d);
+        }
+        const flip = document.createElement('button');
+        flip.textContent = r.enabled === false ? 'SWITCH ON' : 'SWITCH OFF';
+        flip.onclick = ()=> routeAction('/routes/enable',
+                                        {id:r.id, enabled: r.enabled === false});
+        const del = document.createElement('button');
+        del.textContent = 'DELETE';
+        del.className = 'act-danger';
+        del.onclick = ()=>{
+          if (confirm('Delete "' + r.name + '"? Saying “' + r.wakeword + '” stops '
+                      + 'reaching anything immediately, and its key goes with it.'))
+            routeAction('/routes/delete', {id:r.id});
+        };
+        acts.appendChild(flip); acts.appendChild(del);
+      } else {
+        const drop = document.createElement('button');
+        drop.textContent = 'DISCARD';
+        drop.onclick = ()=>{ BK_PAINTED = {}; selectRoute(RT.default); };
+        acts.appendChild(drop);
+      }
+      row.appendChild(acts);
+    }
     box.appendChild(row);
   });
 }
@@ -2358,9 +2404,9 @@ function selectRoute(id){
   BK_PAINTED = {};
   bkPaint();
   paintRoutes();
-  bkNote(!BK.id ? 'name it, give it a wake word, then SAVE ROUTE'
+  bkNote(!BK.id ? 'name it, say what you will call it, then SAVE'
        : BK.provider === 'demo'
-         ? 'answering from built-in text — pick a provider to connect one'
+         ? 'answering from built-in text — pick a service to connect one'
          : BK.model + ' at ' + BK.base_url);
   listModels();
 }
@@ -2384,10 +2430,10 @@ async function loadBackend(){
     paintRoutes();
     if (BK.unsaved)
       bkNote('you have unsaved changes here — they were kept, but nothing is '
-             + 'live until you press SAVE ROUTE', true);
+             + 'live until you press SAVE', true);
     else
       bkNote(BK.provider === 'demo'
-        ? 'answering from built-in text — pick a provider to connect one'
+        ? 'answering from built-in text — pick a service to connect one'
         : BK.model + ' at ' + BK.base_url);
     listModels();
   }catch(e){ bkNote(e.message, true); }
@@ -2469,7 +2515,7 @@ async function saveRoute(note){
     BK_PAINTED = {};              // saved: the stored values are truth again
     bkPaint();
     paintRoutes();
-    say('saved · ' + BK.name + ' answers to “' + BK.wakeword + '” · ' +
+    say('saved · say “' + BK.wakeword + '” to reach ' + BK.name + ' · ' +
         (BK.provider === 'demo' ? 'built-in replies'
                                 : BK.model + ' at ' + BK.base_url));
     routesChanged();
@@ -2517,6 +2563,20 @@ $('b_addroute').addEventListener('click', ()=>{
 
 $('b_bksave').addEventListener('click', ()=> saveRoute());
 
+/* Three topics describe one assistant and only one of them is open at a time,
+   so each commits the whole thing. Every field keeps its value while its
+   topic is collapsed, which is what lets any of the three buttons capture the
+   lot — the alternative is opening a different topic to save what you just
+   typed in this one. */
+$('b_bksave2').addEventListener('click', ()=>{
+  const el = $('whonote');
+  saveRoute((m, bad)=>{
+    el.className = 'note' + (bad ? ' bad' : '');
+    el.textContent = m;
+    if (!bad) bkNote(m);
+  });
+});
+
 $('b_bksaveprompt').addEventListener('click', ()=>{
   const el = $('promptnote');
   saveRoute((m, bad)=>{
@@ -2533,7 +2593,7 @@ $('b_bkresetprompt').addEventListener('click', ()=>{
 });
 
 $('b_bkforget').addEventListener('click', async ()=>{
-  if (!BK || !BK.id) return bkNote('this route has no stored key yet');
+  if (!BK || !BK.id) return bkNote('this one has no stored key yet');
   try{
     const j = await api('/routes/save', {method:'POST',
       body: JSON.stringify({id: BK.id, clear_key: true})});
@@ -2554,8 +2614,8 @@ $('b_bkforget').addEventListener('click', async ()=>{
    route selected here rather than whatever the display happens to be bound
    to. */
 $('b_bktest').addEventListener('click', async ()=>{
-  if (!BK || !BK.id) return bkNote('save this route first — there is nothing '
-                                   + 'on the server to test yet', true);
+  if (!BK || !BK.id) return bkNote('save this one first — there is nothing on '
+                                   + 'the server to ask yet', true);
   bkNote('asking ' + BK.name + ' something…');
   const t0 = Date.now();
   try{

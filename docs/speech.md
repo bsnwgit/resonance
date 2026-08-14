@@ -108,15 +108,15 @@ Without a wake word, an AUTO display responds to any speech near it —
 including two people talking to each other. The wake gate is what makes it
 usable in an occupied room.
 
-**The words themselves are not here.** They belong to the routes, on the AI
-tab: with several routes the word is what picks between them, so it belongs
-to the thing it picks. LEARN, aliases and per-route greetings are all there
-too. What is on this tab is the gate's behaviour, which is one thing for the
-whole display however many routes it can reach.
+**The words themselves are not here.** Each belongs to an assistant, on the AI
+tab: with more than one, the word is what picks between them, so it belongs to
+the thing it picks. LEARN, the alternative spellings and each one's own
+greeting are all there too. What is on this tab is the gate's behaviour, which
+is one thing for the whole display however many assistants it can reach.
 
 | Mode | Behaviour |
 |---|---|
-| OFF | no gate; anything heard is a question, and goes to the default route |
+| OFF | no gate; anything heard is a question, and goes to the one marked DEFAULT |
 | AUTO ONLY | the gate applies in AUTO, and is skipped in push-to-talk |
 | ALWAYS | the gate applies in both modes |
 
@@ -127,14 +127,14 @@ friction for nothing.
 **stays awake for** sets how long it keeps listening after being woken.
 Activity extends it.
 
-**greeting phrases** are the fallback for every route with no greeting of its
-own. `{name}` is the wake word of whichever route was addressed, so one line
+**greeting phrases** are the fallback for every assistant with no greeting of
+its own. `{name}` is the word that was said to reach whoever answered, so one line
 written here reads correctly whichever one answers.
 
 ## Sleep word
 
-One word, shared by every route: there is one way out of a conversation
-whichever one you are in. It ends the conversation deliberately rather than
+One word, shared by all of them: there is one way out of a conversation
+whichever assistant you are in it with. It ends the conversation deliberately rather than
 waiting for the timeout, and **clears the conversation history**. Farewells
 to answer with, aliases for near-misses, and the same three-times learning.
 

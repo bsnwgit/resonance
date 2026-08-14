@@ -41,9 +41,10 @@ DOCS = [
      "summary": "Transcription, voices, wake and sleep words, and why HTTPS is "
                 "not optional."},
     {"id": "backend", "file": "assistant.md",
-     "title": "Routes, and connecting an assistant", "audience": "admin",
-     "summary": "Several names reaching several destinations: what a route "
-                "is, what of one reaches a browser, and the three providers."},
+     "title": "Assistants", "audience": "admin",
+     "summary": "One display, several assistants: the name you say to reach "
+                "each, what a browser is told about them, and the services "
+                "behind them."},
     {"id": "app",     "file": "app-settings.md",
      "title": "App settings & accounts", "audience": "admin",
      "summary": "Ports, restarts, session lifetime, and the two roles."},
