@@ -104,6 +104,39 @@ display is set up — and read these documents — without being able to alter i
 The server will not let you remove or demote the last admin account. An
 interface nobody can administer is a brick.
 
+## Locking down a deployment
+
+`settings.json` is served to anything that can reach the display port. That is
+deliberate — the display is built from it, and the browser needs it to render
+and to match wake words. It holds no credential: API keys, tokens and upstream
+addresses are in `backend.json`, which no browser ever sees.
+
+**The network is the boundary, and today it is the only one.** In order of
+effect:
+
+1. **Put the wall displays on their own VLAN** and let nothing else onto it.
+   A device that cannot open a connection needs no other control.
+2. **Bind to one address** rather than every interface, in APP SETTINGS →
+   Reach & sign-in. A machine that later joins another network then does not
+   follow you onto it.
+3. **Firewall the display ports** to the addresses that should have them.
+
+### What that does not cover
+
+**Anyone using an approved device can read what that device reads.** The page
+runs on hardware they are holding, so no setting here changes it. What they
+get is the appearance settings and the wake words — which, on a device they
+are allowed to talk to, they already know. They do not get a credential, an
+upstream address, or any way to reach Home Assistant except by asking this
+server, which they could already do by speaking.
+
+**Two people sharing one device cannot be told apart.** Nothing here is
+per-person.
+
+**A token inside the page would not help.** It would be served to whoever
+asked for the page and could be read back out of it. Access control belongs in
+what the server will answer, not in what the page carries.
+
 ## Where things are kept
 
 | File | Holds | Visible to |

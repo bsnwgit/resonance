@@ -186,6 +186,64 @@ route — no route. `admin.html` is not served on them either, and returns 404.
 Users keep exactly four controls: microphone, mute, push-to-talk versus
 hands-free, and whether the transcript is shown.
 
+### What reaches a browser, and what never does
+
+Three tiers, and the boundary between them is the whole of the model:
+
+| tier | contents | who can read it |
+| --- | --- | --- |
+| **never leaves the server** | API keys, the Home Assistant token, adapter base URLs, password hashes | nobody, through any browser |
+| **served to the display** | the settings document: appearance, and — once routes land — wake words and route names | today, anyone who can reach the port |
+| **held by the browser, unreadable by it** | the device token, in an `HttpOnly` cookie | the server, on presentation |
+
+The first row is the one that matters and it is absolute: no credential and no
+upstream address is in any response the display listeners produce. Reading
+everything a browser can obtain gets you no closer to reaching Home Assistant
+or a paid API than reading nothing.
+
+**You cannot keep a secret in a page you serve to somebody.** A token
+embedded in `index.html` can be read out of it by whoever received the file,
+so it is obfuscation rather than access control — the same reason the identity
+design refuses to encrypt anything in the browser and keeps the secrecy in the
+server-side mapping.
+
+So the boundary is not *which fields are hidden*. It is **which devices may
+ask at all**, and there are two mechanisms for that:
+
+- **The network.** Bind to one address, firewall the port, and put the wall
+  displays on their own isolated VLAN. An unapproved device cannot open a
+  connection, so there is nothing to authorise. This is available now and is
+  the strongest of the two.
+- **The device token** (roadmap phase 2). Server-issued, `HttpOnly` so page
+  script genuinely cannot read it, and gated on an admin approving that
+  device. `curl` does not have the cookie. A guest's phone is issued a token
+  and refused because it was never approved.
+
+#### The limitations, stated exactly
+
+**A person using an approved device can read what that device reads.** This is
+not fixable — the page runs on hardware they hold — and it is worth being
+clear about how little it costs:
+
+- On a **wall display**, that person is standing in your hallway, and they can
+  already operate the house by talking to it. Reading the wake words they
+  would have to say anyway is not the exposure in that room.
+- On a **personal device**, that person is its owner, who says those wake
+  words daily. The document tells them nothing they did not already have.
+- In **neither case** does it yield a credential, an endpoint, or anything
+  that would let them reach Home Assistant except by asking this server —
+  which is the thing they were already allowed to do.
+
+**Two people sharing one approved device cannot be told apart.** Approval is
+per device. Distinguishing the people using it needs the PIN, and even then it
+governs what is *remembered* rather than what may be *read*.
+
+**What is exposed today, before phase 2:** the whole settings document, to
+anything that can reach the port. It is appearance values now; it gains wake
+words and route names with routes. Until the device token lands, the network
+is the only boundary there is — which is the argument for the VLAN rather than
+an argument for waiting.
+
 ### The admin interface
 
 `https://<host>:9702` — sign in, and you get the full control panel with a
