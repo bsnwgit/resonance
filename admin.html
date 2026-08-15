@@ -1077,7 +1077,7 @@ recognised is left standing so a typo is visible rather than silent.</div>
   <div id="ttsnote" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:8px;line-height:1.5"></div></div>
   </section>
   <section class="grp" data-tab="speech">
-    <h4>Speech in (mic)</h4>
+    <h4>Speech in (mic, STT)</h4>
     <div class="grpbody">  <div class="seg" data-set="ptt">
     <button data-v="1" class="on">PUSH TO TALK</button>
     <button data-v="0">AUTO (voice detect)</button>
@@ -1085,7 +1085,8 @@ recognised is left standing so a typo is visible rather than silent.</div>
   <div class="seg" style="margin-top:6px"><button id="b_mic">MIC ONLY (no transcript)</button></div>
   <div class="sl"><label>mic gain</label><output id="o_micgain"></output><input id="s_micgain" type="range" min=".2" max="5" step=".05"></div>
   <div class="sl"><label>noise gate</label><output id="o_micgate"></output><input id="s_micgate" type="range" min="0" max=".15" step=".002"></div>
-  <div class="seg" data-set="sttmodel" style="margin-top:6px">
+  <label class="bklab" style="margin-top:8px">transcription model (STT)</label>
+  <div class="seg" data-set="sttmodel">
     <button data-v="base.en">FAST (base.en)</button>
     <button data-v="small.en" class="on">ACCURATE (small.en)</button>
   </div>
