@@ -41,9 +41,15 @@ At the top:
 At the foot, pinned so they are always reachable:
 
 - **APP SETTINGS** — how the server itself is wired.
-- **ACCOUNTS** — who can sign in.
+- **DISPLAYS** — the devices that may use this server, and what they may reach.
+- **EMBEDS** — keys that let another application frame this interface.
+- **ACCOUNTS** — who can sign in, and the groups access is granted to.
 - **DOCUMENTATION** — these documents.
 - Your own name, your role, and **SIGN OUT**.
+
+**Your own account is behind your name.** Click it for the box that changes
+your password. It is the one thing on this page you do to yourself, so it sits
+where your name is rather than as a topic on a tab about everybody else.
 
 ## Changes, and who sees them
 
