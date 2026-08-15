@@ -118,6 +118,11 @@ test question is never a command: a TEST button that switches something on is
 one nobody presses twice. To check that the right devices are exposed, ask it
 to switch something on out loud.
 
+**TEST does not follow a fallthrough either**, and says so when one is set: it
+is checking this endpoint's own connection, and a pass borrowed from a
+different endpoint would tell you nothing about this one. The line underneath
+names where the same question would have gone in use.
+
 ## The four providers
 
 ### DEMO
@@ -204,10 +209,15 @@ request is two model passes rather than one. Set the **timeout** to the agent
 you actually have; one chosen for the intent engine will cut off an LLM agent
 just before it succeeds.
 
-**It ends the conversation when it is finished.** A command that completed
-closes the conversation and the display goes back to sleep without a farewell;
-a reply that asks something — *"which room?"* — stays awake, so the answer needs
-no wake word. Home Assistant decides that per reply, not you.
+**It stays awake after a command, like every other assistant.** Home Assistant
+reports that it has finished acting, and Resonance deliberately does not act on
+that: give another command straight away, without saying the name again. The
+usual awake window ends the conversation, the same as everywhere else.
+
+That was not the behaviour on the first day. It slept the moment a command
+completed, which is defensible on paper and awful in a room — the display went
+quiet with no farewell, and everything said after it was discarded. It looked
+broken. If you ever see that again, it is a bug, not a setting.
 
 **When it recognises nothing, ask** hands the question to another assistant.
 Somebody will ask the house what the capital of France is, and this is meant to
@@ -228,14 +238,22 @@ Leave it at *nothing* for an LLM-backed agent, which interprets rather than
 matches, answers general questions itself, and so almost never reports that it
 recognised nothing.
 
+**If the assistant it hands to cannot be reached, you hear that**, rather than
+the house's "I couldn't understand that". The house's words would be true of
+the house and misleading about the system — the question did reach something
+that could have answered it, and that failed — so a person told the first
+thing would go away believing they had phrased it badly. The spoken failure
+names the assistant you addressed; the reason appears on the display's status
+line.
+
 Only the **timeout** applies from the Limits box, and there is no system prompt:
 Home Assistant holds the conversation itself and its agent is instructed over
 there. Those controls hide themselves rather than sit on screen doing nothing.
 
-**Not yet tested against a real installation.** Implemented from the published
-API and exercised end to end against a server answering in it — which proves
-the request is well formed, not that a real house agrees. Press TEST first, and
-see the note under it below.
+**Tested against a real installation.** Spoken to by name and asked to switch a
+real light on and off, over voice, end to end. Press TEST first anyway — it
+tells you in one round trip whether the address, the token and the agent are
+right, which is three of the four things that go wrong.
 
 ## Fields that do not apply everywhere
 

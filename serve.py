@@ -574,14 +574,23 @@ def ask_homeassistant(text, cfg, conversation_id=""):
     if not speech and kind == "action_done":
         speech = "Done."
 
-    # continue_conversation decides whether to hang up, and it belongs to the
-    # reply rather than to the configuration: a command should acknowledge and
-    # close, but "turn on the lights" answered with "which room?" has to stay
-    # open, and a route configured one-shot would hang up on the question it
-    # just asked. Absent — an older Home Assistant that does not send it — is
-    # not false: staying awake is the behaviour every other adapter has.
+    # `continue_conversation` is read and deliberately not acted on. It was,
+    # for one day: false closed the conversation immediately, on the reasoning
+    # that a completed command has nothing to follow. In a room that is wrong.
+    #
+    # Measured 2026-08-15, on the first real installation: after each command
+    # the display went silently to sleep, five further utterances were
+    # transcribed and dropped at the wake gate, and the person concluded it had
+    # locked up — they had no way to know the conversation had ended, and the
+    # house had become the one endpoint you cannot speak to twice. Saying a
+    # wake word again was the fix, which is a thing nobody should have to
+    # discover.
+    #
+    # The awake window already does this job, everywhere, the same way. Closing
+    # a few seconds earlier is not worth a house that behaves unlike every
+    # other endpoint, and `true` needs nothing done to it — staying awake is
+    # the default, so "which room?" is answered without re-addressing.
     return {"reply": speech, "code": code,
-            "hangup": j.get("continue_conversation") is False,
             "conversation_id": str(j.get("conversation_id") or "")}
 
 
@@ -1383,7 +1392,31 @@ def write_settings(obj):
 MODEL_NAME = os.environ.get("STT_MODEL", "small.en")
 MAX_UPLOAD = 12 * 1024 * 1024        # ~12MB of opus is minutes of speech
 
-ALLOWED = ("base.en", "small.en", "distil-small.en", "medium.en")
+# Every model faster-whisper knows how to fetch, because there is no way to
+# know from here what somebody is running this on. Four of these are sensible
+# on the reference box and the rest are for hardware it has never seen; the
+# aliases (`large` for large-v2, `turbo` for large-v3-turbo) are deliberately
+# left out, since a list offering the same weights twice under two names is a
+# choice nobody can make correctly.
+#
+# CAUTION, and it is stated in the panel too: a model that is not on disk is
+# DOWNLOADED on first use — up to ~1.6GB, inside the first request that asks
+# for it, from a box that may have no route to the internet. The failure is
+# visible rather than silent (the display's status line carries the error),
+# but the wait is real and belongs to whoever is standing there.
+#
+# The `.en` models are English-only and better at English than the
+# multilingual model of the same size. Choosing a multilingual one is what
+# makes this transcribe anything other than English at all.
+ALLOWED = (
+    # English-only, smallest first
+    "tiny.en", "base.en", "distil-small.en", "small.en",
+    "distil-medium.en", "medium.en",
+    # multilingual
+    "tiny", "base", "small", "medium",
+    "large-v1", "large-v2", "large-v3", "large-v3-turbo",
+    "distil-large-v2", "distil-large-v3",
+)
 _models = {}
 _model_err = None
 _model_lock = threading.Lock()
@@ -2314,15 +2347,31 @@ class Handler(SimpleHTTPRequestHandler):
                 # the address, the token and the agent — three of the four
                 # things that go wrong. The fourth, whether the right entities
                 # are exposed, only a real command answers.
+                missed = out.get("code") == "no_intent_match"
                 res["check"] = ("no command was recognised in the test "
                                 "sentence, which is what the built-in intent "
                                 "engine does with anything that is not one — "
                                 "the address, the token and the agent are all "
                                 "good. Ask it to switch something on to test "
                                 "what is exposed."
-                                if out.get("code") == "no_intent_match" else
+                                if missed else
                                 "the agent answered — address, token and agent "
                                 "are all good.")
+                # TEST goes down this endpoint's own connection and stops
+                # there, deliberately: it is testing the house, not the chain.
+                # But an admin who has just configured a fallthrough and gets
+                # the house's refusal back reasonably concludes the fallthrough
+                # is broken — it was read as exactly that, twice, before this
+                # line existed. Say what the same sentence would do in use.
+                alt = doc["routes"].get(rec.get("fallthrough") or "")
+                if alt and alt.get("enabled", True):
+                    res["check"] += (
+                        " In use a question like this would go to %s instead — "
+                        "TEST stops here on purpose, so a pass cannot come from "
+                        "a different endpoint answering." % alt["name"]
+                        if missed else
+                        " A question it could not place would go to %s instead."
+                        % alt["name"])
             return self._json(200, res)
 
         if parsed.path == "/embed/session":
@@ -2509,16 +2558,25 @@ class Handler(SimpleHTTPRequestHandler):
                     except Exception as exc:               # noqa: BLE001
                         print("fallthrough failed (%s -> %s): %s"
                               % (rid, ft, exc), flush=True)
+                        # Audible, and NOT the house's own words. Those were
+                        # "I couldn't understand that" — true of the house, and
+                        # a lie about the system: the question was placed with
+                        # somebody who could have answered it, and that failed.
+                        # Speaking the refusal here would dress a broken model
+                        # as a badly phrased question, which is the same defect
+                        # as a light command that fails quietly, wearing a
+                        # politer hat. The person waited the full timeout for
+                        # it, too. The reason goes to the display's status
+                        # line; the name of the second endpoint stays out of
+                        # the air, since it is not one anybody addressed.
+                        return self._json(502, dict(
+                            about, ms=int((time.time() - t0) * 1000),
+                            error=str(exc)))
                     else:
                         fell_to = alt["name"]
                         # The house's conversation id survives — the binding is
-                        # still to the house and the next turn goes there. Its
-                        # hang-up does not: it was refusing a sentence, and
-                        # closing the conversation on an answer somebody is
-                        # still listening to is the one thing that would make
-                        # this visible.
-                        out = dict(out, reply=second.get("reply") or "",
-                                   hangup=False, code="")
+                        # still to the house, and the next turn goes there.
+                        out = dict(out, reply=second.get("reply") or "", code="")
 
             ms = int((time.time() - t0) * 1000)
             reply = out.get("reply") or ""
@@ -2529,11 +2587,11 @@ class Handler(SimpleHTTPRequestHandler):
                   % (rid, route_dest(cfg), ms,
                      " — fell through to " + fell_to if fell_to else ""),
                   flush=True)
-            # `hangup` and `conversation_id` are the display's to act on: it
-            # owns the awake window, and the server has no idea a conversation
-            # is in progress between two requests.
+            # `conversation_id` is the display's to hold: it owns the awake
+            # window, and the server has no idea a conversation is in progress
+            # between two requests. Nothing here ends one — see the note in
+            # ask_homeassistant about the flag that used to.
             return self._json(200, dict(about, reply=reply, ms=ms,
-                                        hangup=bool(out.get("hangup")),
                                         conversation_id=out.get("conversation_id") or ""))
 
         if parsed.path == "/app":

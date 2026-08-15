@@ -97,6 +97,12 @@ on the server. Push-to-talk (hold space) or hands-free.
 rendered server-side and played through Web Audio. The browser's own voices
 remain available as a fallback.
 
+**It says why nothing happened.** A line above the input carries what was
+heard and how long each stage took, that a recording came back empty, that it
+is asleep and what it heard instead of a name, or why an endpoint failed. A
+voice interface that goes quiet is indistinguishable from a broken one, and
+that applies to its diagnostics as much as to its answers.
+
 **Wake and sleep words.** Both editable, both with a *learn* mode that records
 what the transcriber actually returns for your pronunciation and accepts those
 forms thereafter. A conversation stays open for a configurable window,
@@ -142,6 +148,14 @@ Measured on six CPU cores, no GPU:
 | `base.en` | ~450 ms, sloppier on technical vocabulary |
 | `small.en` | ~1.4 s, accurate |
 
+Those two are what a modest box wants, and they are the ones measured here.
+**The panel offers every model faster-whisper can fetch** — `tiny.en` through
+`large-v3`, the distilled variants, and the multilingual models, which are the
+only way this transcribes anything other than English. Nothing here knows what
+hardware somebody will run it on, so the list is not curated down to this one.
+A model that is not already on disk is downloaded inside the first request
+that asks for it.
+
 ## Run
 
 The microphone requires a secure origin, so generate a certificate first:
@@ -186,6 +200,15 @@ separate listener, on a separate port, behind a username and password.
 route — no route. `admin.html` is not served on them either, and returns 404.
 Users keep exactly four controls: microphone, mute, push-to-talk versus
 hands-free, and whether the transcript is shown.
+
+**A display says why nothing happened**, on a dim line above the input: what it
+heard and how long each stage took, that a recording came back empty, that it
+is asleep and what it heard instead of a name, or the reason an endpoint
+failed. This is not a debug affordance bolted on — the messages already
+existed and were being written to elements present only in the admin panel's
+preview, so every explanation was discarded at the one place somebody was
+standing. A voice interface that goes quiet is indistinguishable from a broken
+one; that applies to its diagnostics as much as to its answers.
 
 ### What reaches a browser, and what never does
 
@@ -466,10 +489,11 @@ so it has no preset — the provider button fills it. A key is required, and
 saving without one is refused rather than discovered later by whoever is
 standing in front of the screen.
 
-**HOME ASSISTANT** — the house as an endpoint. Also **verified against a stub
-speaking its wire format rather than against a real installation**, on the same
-terms as Anthropic above: every field is implemented from the published shape
-and exercised end to end against a server that answers in it.
+**HOME ASSISTANT** — the house as an endpoint. **Proven against a real
+installation, 2026-08-15**: spoken to by name, a real light switched on and off
+by voice, the reply read aloud in that endpoint's own voice. Unlike the
+Anthropic adapter above, this one no longer rests on a stub — though the stub
+came first and caught the wire-format faults before a house was ever involved.
 
 It is an adapter, not a second concept. Its conversation API is chat-shaped —
 `POST /api/conversation/process` with a bearer token, text in and
@@ -484,14 +508,20 @@ works too — what is typed is stored, and the path is normalised per request.
 
 Three fields of the reply do more than carry the words:
 
-- **`continue_conversation` decides whether to hang up**, and it belongs to
-  the reply rather than to the configuration. A command should acknowledge and
-  close, but *"turn on the lights"* answered with *"which room?"* has to stay
-  open, and an endpoint configured one-shot would hang up on the question it
-  just asked. The display sleeps when the flag is `false`, silently — the
-  reply is already being spoken and a farewell on top of it is one sentence
-  too many. Absent, on a Home Assistant predating the flag, is **not** false:
-  staying awake is what every other endpoint does.
+- **`continue_conversation` is read and deliberately not acted on.** It was for
+  one day. The reasoning was sound on paper — a completed command has nothing
+  to follow, so close — and wrong in a room: the display went silently to sleep
+  after every command, so the next sentence was dropped at the wake gate, and
+  the next, and the next. Measured on the first real installation: five
+  consecutive utterances transcribed and discarded, and a person reasonably
+  concluding the thing had locked up. **The house had become the one endpoint
+  you cannot speak to twice**, and the remedy — say a wake word again — is not
+  discoverable from silence.
+
+  The awake window already ends conversations, everywhere, identically. Closing
+  a few seconds earlier is not worth an endpoint that behaves unlike all the
+  others, and `true` needs nothing done to it, because staying awake is already
+  what happens — which is what makes *"which room?" → "the kitchen"* work.
 - **`conversation_id`** is held for exactly as long as the route binding —
   handed back on every turn, dropped on sleep and on switching endpoints. It
   is what makes *"which room?" → "the kitchen"* mean anything. The display
@@ -538,15 +568,28 @@ this is a branch rather than string-matching an apology.
 The answer keeps the **house's name and voice** — the person addressed the
 house, and an answer arriving in a different voice would announce the mistake
 the fallthrough exists to hide. The house's `conversation_id` survives, so the
-next turn still goes to the house; its hang-up does not, because it was
-refusing a sentence rather than finishing a job, and closing the conversation
-on an answer somebody is still listening to is the one thing that would make
-this visible.
+next turn still goes to the house.
 
 **One hop, and never the target's own fallthrough.** A chain is a question
 travelling somewhere nobody chose, at a cost per link, and two endpoints
 pointing at each other would do it for ever. Deleting an endpoint clears
 whatever pointed at it, rather than leaving an id naming nothing.
+
+**When the fallthrough itself fails, the house's own words are not spoken.**
+They would be a lie about the system: *"Sorry, I couldn't understand that"* is
+true of the house and false of the arrangement, because the question *was*
+placed with something that could have answered it and that failed. Speaking it
+dresses a dead model as a badly phrased question — the same defect as a light
+command failing quietly, wearing a politer hat — and the person has already
+waited the full timeout to hear it. So the failure is spoken, naming the
+endpoint that was addressed, with the reason on the display's status line. The
+second endpoint is not named aloud: nobody addressed it.
+
+**TEST does not follow the fallthrough**, because it exists to test that
+endpoint's own connection and a pass that came from somewhere else would be
+worthless. It says so now — *"in use a question like this would go to X
+instead"* — after the house's refusal was read as a broken fallthrough twice
+in one morning.
 
 **With an LLM-backed agent this is an option you leave off.** That agent
 interprets rather than matches, so `no_intent_match` essentially never fires
@@ -738,12 +781,12 @@ On every listener:
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `POST` | `/stt` | audio in, `{"text": …}` out. `?model=`, `?hint=` |
-| `GET` | `/stt/status` | which transcription models are resident |
+| `GET` | `/stt/status` | which transcription models are resident, and which this server will accept |
 | `POST` | `/tts` | text in, WAV out. `?voice=`, `?rate=` |
 | `GET` | `/tts/voices` | installed neural voices |
 | `GET` | `/settings` | the shared interface configuration |
 | `GET` | `/routes` | the routes, presentation and routing halves only |
-| `POST` | `/ask` | a question — `{"route": …}` picks one, absent means the default. `{"conversation_id": …}` continues one the endpoint is keeping; the reply carries that id back, plus `hangup` when the endpoint has finished |
+| `POST` | `/ask` | a question — `{"route": …}` picks one, absent means the default. `{"conversation_id": …}` continues one the endpoint is keeping, and the reply carries that id back |
 
 Display listeners only — the embed does not exist on the admin port:
 
@@ -896,8 +939,17 @@ interface users are not supposed to have was one guessed parameter away.
 
 **A deliberately inert feature must say it is inert.** The wake word applied
 only to hands-free mode and did nothing in push-to-talk, with no indication —
-it read as simply broken. Live status text now states whether each gate is in
-effect and why.
+it read as simply broken. The panel's live status text now states whether each
+gate is in effect and why, and the gate grew an ALWAYS mode for anyone who
+wants the word required in push-to-talk too.
+
+**And saying so in the panel is not saying so where it happens.** That status
+text was written for the admin sitting in front of the settings; the person
+standing in front of the *display* got nothing, for a year, because the two
+elements it writes to were never in `index.html` at all. The lesson is not
+"add a status line" — it is that a message is only delivered where the fault
+is experienced, and a panel that reports faults to their configurer instead of
+their witness has not reported them.
 
 **A deployment directory is not a document root.** `SimpleHTTPRequestHandler`
 serves what is beside it, and beside it were `key.pem`, `users.json`,
@@ -969,7 +1021,7 @@ two people in one room with three listening microphones between them.
 | | phase | delivers | sits on | open decisions |
 |---|---|---|---|---|
 | 1a | ~~**Routes**~~ **— done** | three names reaching three destinations, verifiable with no Home Assistant involved | — | none |
-| 1b | ~~**The Home Assistant adapter**~~ **— built** | saying the house name switches a light on | 1a | none |
+| 1b | ~~**The Home Assistant adapter**~~ **— done** | saying the house name switches a light on | 1a | none |
 | 2 | **Displays, and binding a route to one** | only the tablets you approved can actuate the house, whatever anyone's browser is set to | 1b | none |
 | 3 | **What a wall display looks like** | voice only, and a screensaver that is still the product | 2 | none |
 | 4 | **Staying up unattended** | a tablet nobody touches for a year is still working | 3 | **all of it** · not designed |
@@ -994,14 +1046,17 @@ names, and wake-word routing can be shaken out on a test box before Home
 Assistant is anywhere near it. If the refactor breaks something, that is when
 you find out, rather than while also debugging a new adapter.
 
-**1b is built and not yet proven.** Every field of the conversation API is
-implemented and exercised end to end against a stub that answers in it —
-commands, a question that stays open, the fallthrough, a rejected token, an
-unreachable house, and a Home Assistant old enough not to send
-`continue_conversation`. What a stub cannot tell you is whether a real
-installation agrees, so it is *built* in the table above rather than *done*:
-the first real token and a real light are the test. The same distinction the
-Anthropic adapter carries, for the same reason.
+**1b is done**, and the phrase that closed it was *"turn off couch lamps"*
+answered by *"Turned off the light"* — a real house, a real token, a real light,
+spoken to by name. It was built against a stub first, which was worth doing:
+the wire-format faults were all found there, and what the real installation
+then caught were things no stub could have — an intent engine that reports an
+unknown *device* where the design expected an unrecognised *sentence*, and a
+hang-up that was correct on paper and made the house the one endpoint you
+could not speak to twice.
+
+Both of those are in the log below. Neither was a coding error; both were
+assumptions, and only a house could refute them.
 
 **1a is done**, and closed out rather than left half-verified. Proven on real
 hardware with a real microphone: several names reaching several destinations,
@@ -1085,11 +1140,11 @@ it. Each entry below carries its own panel scope.
 
   Two fields of that reply are worth more than they look:
 
-  **`continue_conversation` decides whether to hang up**, and it belongs to
-  the reply rather than to the configuration. A command should acknowledge and
-  close; but "turn on the lights" answered with *"which room?"* must stay
-  open, and a route configured one-shot would hang up on the question it just
-  asked. Read the flag and call the existing `sleepNow()` when it is false.
+  **`continue_conversation` was going to decide whether to hang up** — read
+  the flag, call `sleepNow()` when it is false. Built that way, tried in a
+  room, and taken out the next morning: see the entry under the provider. The
+  awake window ends conversations for every endpoint, and a house that closes
+  a few seconds earlier is a house you cannot speak to twice.
 
   **`data.code == "no_intent_match"` is the fallthrough signal.** Nobody
   remembers which name owns which capability, and asking the house a question
@@ -1644,6 +1699,61 @@ on a desk. A tablet bolted to a wall, answering a household, moves them:
 
 Newest first.
 
+### 2026-08-15 — a real house, and what only a house could tell us
+
+Phase 1b closed on *"turn off couch lamps"* → *"Turned off the light"*: a real
+installation, a real token, a real light, addressed by name over a microphone.
+Everything the stub proved held. What it could not have proved, and what the
+house corrected in a morning:
+
+- **The fallthrough fires on the wrong sentences.** Designed around
+  `no_intent_match`; the built-in engine matches a sentence shape before it
+  looks for a device, so a general question returns `no_valid_targets` and
+  never reaches it. Left as it is, deliberately — see the note under the
+  provider. The two wordings are the tell: *"I couldn't understand that"* falls
+  through, *"I am not aware of any device called X"* does not.
+- **The hang-up had to go**, one day after it was written. Its own entry below.
+- **The display had no status line.** `micNote()` and `note()` had been
+  writing to elements that exist only in the admin panel's preview, so every
+  explanation a display could offer — what it heard, why it stayed asleep, why
+  a backend call failed — was discarded at the one place somebody was standing.
+  That is why two separate faults this morning both presented as *"it just
+  stops responding"*. A line above the composer now carries them, and the
+  refusal says what it heard: `asleep — heard "…", which names none of …`.
+- **Timings that only a real box shows.** 4.4s to decode one sentence on
+  `small.en`; 13–29s from local models with nothing resident in Ollama; a 7b
+  that will not fit beside two Whisper models and Piper voices in 7.6GB, whose
+  runner dies mid-request and surfaces as *"Remote end closed connection
+  without response"*. The house itself answers in 90–200ms — it is the fastest
+  thing in the chain by two orders of magnitude.
+
+### 2026-08-15 — the house stopped hanging up
+
+One day old, built from the API's own signal, and wrong the first time a real
+house answered a real command.
+
+- **`continue_conversation: false` closed the conversation, silently.** The
+  reasoning: a completed command has nothing to follow, and *"Turned on the
+  light. Goodbye."* is one sentence too many. What it produced: the display
+  slept the instant the light came on, and the next sentence was dropped at the
+  wake gate. Five in a row, in the log — transcribed, never asked, never in the
+  transcript.
+- **It reads as a lockup, not as sleep**, because nothing announced it and
+  because every other endpoint stays awake for the window. The house became the
+  one endpoint you cannot speak to twice, and the fix — say the wake word
+  again — is not discoverable from silence.
+- **The awake window already does this**, everywhere, identically. That is the
+  whole argument: closing a few seconds earlier bought nothing that the timer
+  does not already do, and cost the one property a voice interface cannot
+  afford to lose — that it behaves the same way twice.
+- **`true` needed nothing doing to it.** Staying awake is the default, so
+  *"which room?" → "the kitchen"* worked without the flag being consulted at
+  all — which is the tell that the flag was never load-bearing.
+- **Kept: reading it.** The value is still parsed and still described in the
+  adapter, with the reason it is ignored beside it. A signal you decided not
+  to act on is worth more in the source than an absence somebody re-adds in a
+  year.
+
 ### 2026-08-14 — the house is an endpoint
 
 Roadmap phase 1b. Saying the house name switches a light on, and it took no
@@ -1651,24 +1761,18 @@ new mechanism to do it: Home Assistant's conversation API is text in and text
 out, so it is a fourth provider beside `demo`, the OpenAI dialect and
 Anthropic.
 
-- **Three fields of the reply do more than carry words.**
-  `continue_conversation` decides whether to hang up, and it belongs to the
-  reply rather than the configuration — *"turn on the lights"* answered with
-  *"which room?"* must stay open, and an endpoint configured one-shot would
-  hang up on the question it just asked. `conversation_id` is held for exactly
-  the route binding and handed back each turn, which is what makes the answer
-  to that question land. `data.code` is what makes the fallthrough a branch
-  rather than string-matching an apology.
-- **A missing flag is not a false one.** An older Home Assistant sends no
-  `continue_conversation` at all, and reading absent as "hang up" would end
-  every conversation on those installations. Absent means what every other
-  endpoint means: stay awake.
+- **Two fields of the reply do more than carry words.** `conversation_id` is
+  held for exactly the route binding and handed back each turn, which is what
+  makes *"which room?" → "the kitchen"* land. `data.code` is what makes the
+  fallthrough a branch rather than string-matching an apology.
+- **A third was built and removed the next morning.** `continue_conversation`
+  closed the conversation when false, which is right on paper and wrong in a
+  room — see the entry below.
 - **When the house recognises nothing, another endpoint answers** — in the
   house's own name and voice, so nobody is told they used the wrong word. One
   hop only, and never the target's own: a chain is a question travelling
   somewhere nobody chose, at a cost per link. The house's conversation id
-  survives the hand-off and its hang-up does not, because it was refusing a
-  sentence rather than finishing a job.
+  survives the hand-off, because the binding is still to the house.
 - **Silence is how a failure sounds**, which is the difference between this
   adapter and a chat one. A command that quietly did nothing is
   indistinguishable from one that worked, so an unreachable house, a rejected

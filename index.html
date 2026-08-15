@@ -227,6 +227,20 @@
     padding:12px 26px;border-top:1px solid rgba(var(--glass),.12);
     background:linear-gradient(to top,rgba(0,0,0,.6),rgba(0,0,0,.15));
   }
+  /* Above the composer, below the transcript, and quiet enough to ignore
+     until you need it. One line each, clipped rather than wrapped: this must
+     never grow tall enough to push the conversation about. Empty spans
+     collapse, so a display with nothing to report shows nothing at all. */
+  #status{
+    position:relative;z-index:4;flex:0 0 auto;display:flex;gap:18px;
+    padding:0 26px;font-size:calc(9px * var(--fs));letter-spacing:.06em;
+    color:rgba(var(--paper),.42);
+  }
+  #status span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #micnote{flex:1 1 60%}
+  #ttsnote{flex:1 1 40%;text-align:right}
+  #status:empty{display:none}
+  body[data-noparts~="transcript"] #status{display:none}
   #bar .pr{color:rgba(var(--paper),.78);letter-spacing:.2em;font-size:calc(10px * var(--fs))}
   #q{
     flex:1;background:none;border:0;outline:0;color:var(--text);
@@ -321,6 +335,19 @@
   </div>
 
   <div id="log"></div>
+
+  <!-- What just happened, for the person standing in front of it. Every one of
+       these messages already existed and was written to elements that were not
+       on this page: micNote() and note() resolved to null here, and only ever
+       appeared inside the admin panel's preview, which relays them. So a
+       display that heard nothing, mis-heard you, could not reach its endpoint,
+       or had gone to sleep looked identical — silent — and the explanation was
+       thrown away at the one place it was needed. Dim and one line: it is a
+       status line, not a second transcript. -->
+  <div id="status">
+    <span id="micnote"></span>
+    <span id="ttsnote"></span>
+  </div>
 
   <div id="bar">
     <span class="pr">&gt;</span>
@@ -2010,11 +2037,9 @@ const LOCAL_TZ = (()=>{
    needs that: a diagnostic that inherits whatever was being discussed is
    answered in that context, so it stops being a measurement of the backend
    and becomes a measurement of the backend plus the last ten minutes. */
-/* Returns {reply, hangup} rather than the string it used to. Some endpoints
-   have something to say about the conversation as well as in it — a house
-   that has finished acting wants the display to stop listening — and a
-   second channel for that beside the string would be the same data under a
-   worse name. */
+/* Returns {reply} rather than the bare string it used to. Some endpoints have
+   something to say about the conversation as well as in it — a house keeps a
+   conversation of its own, and its id comes back beside the words. */
 async function askBackend(text, bare){
   /* No display-wide demo switch any more. Whether an endpoint answers from
      built-in text is a property OF that endpoint — the server replies
@@ -2047,7 +2072,7 @@ async function askBackend(text, bare){
     if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
     if (j.ms) ev((j.name || 'reply') + ' ' + j.ms + 'ms');
     if (!bare && j.conversation_id) Wake.convo = j.conversation_id;
-    return {reply: j.reply, hangup: !!j.hangup};
+    return {reply: j.reply};
   }catch(e){
     /* Say something, and name whoever did not answer. A voice interface that
        goes quiet is indistinguishable from a broken one, and the person may
@@ -2071,11 +2096,11 @@ function submit(text){
   askBackend(text).then(out => {
     remember('assistant', out.reply);
     respond(out.reply);
-    /* The endpoint asked to hang up: it acted, and it is not expecting
-       anything further. Silently — the reply is already being spoken, and a
-       farewell on top of "the kitchen light is on" is one sentence too many.
-       Saying the wake word starts the next one. */
-    if (out.hangup) Wake.sleepNow(false);
+    /* Nothing here ends the conversation. A house reports that it has finished
+       acting, and for one day this slept on that — which made it the one
+       endpoint you could not speak to twice, silently, with every following
+       sentence dropped at the wake gate by a display that looked broken. The
+       awake window ends conversations, everywhere, the same way. */
   });
 }
 qEl.addEventListener('keydown', e=>{
@@ -2678,7 +2703,10 @@ const Wake = {
     }
     const h = this.heard(text);
     if (!h){
-      micNote('asleep — say ' + Routes.spoken() + ' to wake me');
+      /* What was heard, in the same breath as the refusal. They used to be two
+         notes and the second overwrote the first, which threw away the one
+         fact that tells you whether a name was mis-heard or never said. */
+      micNote('asleep — heard “' + text + '”, which names none of ' + Routes.spoken());
       return null;
     }
     return this.wakeOn(h);

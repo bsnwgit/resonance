@@ -13,6 +13,13 @@ happening it idles quietly.
 
 Below it is the transcript, and below that a single input row.
 
+Between them is a dim line that reports what just happened — what it heard,
+how long transcription took, or why nothing came of it. You can ignore it
+entirely; it is there for the times when you press TALK, speak, and nothing
+appears. Then it will say whether it heard nothing at all, heard you and
+matched no assistant's name, or reached one that failed. Hiding the transcript
+with **TEXT** hides this line too.
+
 ## The four controls
 
 They sit along the bottom right. Each one is a toggle — press it and it stays
@@ -82,12 +89,10 @@ can also end the conversation deliberately with the sleep word, if one is
 configured — one word, whichever assistant you were talking to. Ask your
 administrator which words are set.
 
-**An assistant that controls something may hang up by itself.** Ask one wired
-to a house to switch a light on and it will confirm, then stop listening
-straight away — the job is done, and there is nothing to follow up. If instead
-it asks you something back — *"which room?"* — it stays awake for the answer, so
-just say it. You never have to work out which of the two just happened; say the
-name again if it has gone quiet.
+**An assistant wired to a house behaves like any other.** Ask it to switch a
+light on, it confirms, and it keeps listening — so a second command needs no
+second wake word. If it asks you something back — *"which room?"* — just answer.
+Either way the conversation ends the usual way: the sleep word, or the pause.
 
 **Going to sleep clears the conversation.** This is deliberate — see below.
 
@@ -129,6 +134,10 @@ If you are on `https://` and it still does not work:
 - In SPACE mode, start speaking after you press, not as you press.
 - If it consistently mishears one particular word, tell your administrator —
   there is an accuracy setting they can change.
+- **Read the dim line above the input box.** It quotes what it actually heard,
+  which is usually the whole answer: a name transcribed slightly wrong is
+  refused by an assistant set to answer only to the exact word, and that line
+  is the only place you can see it happen.
 
 ## Getting a better answer
 
