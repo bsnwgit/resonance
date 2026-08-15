@@ -1421,7 +1421,7 @@ Short by default — this session configures what everyone else is looking at.
     </div>
   </section>
 
-  <section class="grp" data-tab="accounts">
+  <section class="grp" data-tab="accounts" data-signin>
     <h4>Your account</h4>
     <div class="grpbody">
   <div class="whoami" id="whoami"></div>
@@ -1434,7 +1434,7 @@ Short by default — this session configures what everyone else is looking at.
     </div>
   </section>
 
-  <section class="grp" data-tab="accounts">
+  <section class="grp" data-tab="accounts" data-signin>
     <h4>Accounts</h4>
     <div class="grpbody">
   <div id="userlist"></div>
@@ -1445,7 +1445,7 @@ Short by default — this session configures what everyone else is looking at.
     </div>
   </section>
 
-  <section class="grp" data-tab="accounts">
+  <section class="grp" data-tab="accounts" data-signin>
     <h4>Add an account</h4>
     <div class="grpbody">
   <label class="bklab">Username</label>
@@ -1465,6 +1465,44 @@ Short by default — this session configures what everyone else is looking at.
        worth once given. Its own topic rather than a preamble to the list: the
        list is read when somebody is deciding about a device, and these are
        settled once and then left alone for months. -->
+  <!-- A name for a set of them, so a grant is made once instead of ticked
+       twelve times and re-ticked every time somebody gets a new phone. Two
+       kinds, and they do not mix: people who asked to be here, and devices an
+       admin put somewhere. Named wherever access is granted — today an
+       endpoint's allow-list, and anything later that grants something can name
+       them the same way. -->
+  <section class="grp" data-tab="accounts">
+    <h4>Groups</h4>
+    <div class="grpbody">
+  <div id="grouplist"></div>
+  <div class="labrow" style="margin-top:10px">
+    <input id="gr_name" type="text" spellcheck="false" autocomplete="off"
+           placeholder="Physics department">
+    <div class="seg" id="gr_kind">
+      <button data-v="user" class="on">PEOPLE</button>
+      <button data-v="device">DEVICES</button>
+    </div>
+    <button id="b_addgroup" class="act-save">CREATE</button>
+  </div>
+  <div class="note" id="groupnote"></div>
+  <div class="note help" style="margin-top:10px">A group of <b>people</b> holds
+those who asked for access and were approved. A group of <b>devices</b> holds
+the screens you created and sent a code to. They are separate populations
+answering separate questions — <i>the physics department</i> and <i>the screens
+in the east wing</i> — so a group holds one or the other, and its kind cannot
+be changed once it exists.
+
+Name a group under an endpoint's <b>who may use it</b> and everyone in it may
+reach that endpoint. <b>Grants add up:</b> a group never takes away a grant
+made to one device on its own, and somebody whose access has run out is still
+refused whatever group they are in.
+
+Deleting a group removes it from every endpoint that named it. The devices and
+people in it are untouched — a group is a way of referring to them, not a
+thing they belong to.</div>
+    </div>
+  </section>
+
   <section class="grp" data-tab="displays">
     <h4>Requested Access</h4>
     <div class="grpbody">
@@ -2613,7 +2651,7 @@ function newInstance(){
           base_url:'http://127.0.0.1:11434/v1', model:'', system:SHIPPED_PROMPT,
           max_tokens:400, temperature:0.4, timeout:120, keep_alive:'30m',
           history_turns:8, has_key:false, is_default:false,
-          agent_id:'', fallthrough:'', restricted:false, displays:[]};
+          agent_id:'', fallthrough:'', restricted:false, displays:[], groups:[]};
 }
 
 // `esc` is already taken further down by the documentation renderer
@@ -2673,6 +2711,9 @@ other.</div>
     <button data-v="0" class="on">ANY DISPLAY</button>
     <button data-v="1">ONLY THESE</button>
   </div>
+  <label class="bklab" data-r="grouplab">Groups</label>
+  <div class="cks" data-r="groups"></div>
+  <label class="bklab" data-r="onelab">One at a time</label>
   <div class="cks" data-r="displays"></div>
   <div class="note" data-r="whonote"></div>
   <div class="note help">Two reasons to restrict one. <b>A room with several
@@ -2986,8 +3027,12 @@ function blockPaint(blk, r){
         + (words ? ' +' + words + ' more' : '')
         + (r.strict ? ' · exact' : ''),
     who: !r.restricted ? 'any display'
-       : (r.displays || []).length
-         ? (r.displays || []).length + ' named'
+       : ((r.groups || []).length + (r.displays || []).length)
+         ? [(r.groups || []).length
+              ? (r.groups || []).length + ' group' + ((r.groups || []).length === 1 ? '' : 's')
+              : '',
+            (r.displays || []).length
+              ? (r.displays || []).length + ' named' : ''].filter(Boolean).join(' + ')
          : 'nobody',
     voice: (r.greeting ? '“' + r.greeting.slice(0, 28)
                        + (r.greeting.length > 28 ? '…' : '') + '” · ' : 'shared greeting · ')
@@ -3043,12 +3088,35 @@ function blockPaint(blk, r){
    list, so a device that has been deleted stops being offered and one that
    arrived a minute ago is there to tick. */
 function blockFillWho(blk, r){
-  const box = R(blk, 'displays');
+  const box = R(blk, 'displays'), gbox = R(blk, 'groups');
   if (!box) return;
-  const want = r.displays || [];
+  const want = r.displays || [], wantG = r.groups || [];
   // Never rebuilt under somebody's cursor — replacing the nodes would drop
   // the tick they were in the middle of making.
-  if (!box.contains(document.activeElement)){
+  if (!box.contains(document.activeElement)
+      && !(gbox && gbox.contains(document.activeElement))){
+    /* Groups first, and in their own box. Naming a group is the grant you
+       want to make most of the time — twelve people who all get the same
+       thing — and a list that mixed them in among the individuals would bury
+       it among the exceptions. */
+    if (gbox){
+      gbox.innerHTML = '';
+      GROUPS.forEach(g=>{
+        const lab = document.createElement('label');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.dataset.g = g.id;
+        cb.checked = wantG.indexOf(g.id) >= 0;
+        lab.appendChild(cb);
+        lab.appendChild(document.createTextNode(
+          ' ' + g.name + ' (' + g.members.length + ')'));
+        gbox.appendChild(lab);
+      });
+      if (!GROUPS.length){
+        const em = document.createElement('span');
+        em.textContent = 'no groups yet — they are made under ACCOUNTS';
+        gbox.appendChild(em);
+      }
+    }
     box.innerHTML = '';
     DISPLAYS.forEach(d=>{
       const lab = document.createElement('label');
@@ -3075,8 +3143,12 @@ function blockFillWho(blk, r){
 function blockSyncWho(blk){
   const on = blk.querySelector('[data-f="restricted"] button.on');
   const restricted = !!on && on.dataset.v === '1';
-  const box = R(blk, 'displays');
-  if (box) box.style.display = restricted ? '' : 'none';
+  ['groups', 'grouplab', 'onelab', 'displays'].forEach(n=>{
+    const el = R(blk, n);
+    if (el) el.style.display = restricted ? '' : 'none';
+  });
+  const box = R(blk, 'displays'), gbox = R(blk, 'groups');
+  const tickedG = gbox ? [...gbox.querySelectorAll('input:checked')] : [];
   const ticked = box ? [...box.querySelectorAll('input:checked')] : [];
   const live = ticked.filter(cb=>{
     const d = DISPLAYS.find(x=> x.id === cb.dataset.d);
@@ -3088,16 +3160,22 @@ function blockSyncWho(blk){
     if (!restricted){
       msg = 'Any display, approved or not — the same as every endpoint before '
           + 'displays existed.';
-    }else if (!ticked.length){
+    }else if (!ticked.length && !tickedG.length){
       // Allowed rather than refused: restricting one before the tablet that
       // will use it has been hung is a legitimate order to do things in.
       msg = 'No display may use this endpoint — nothing reaches it until one '
           + 'is ticked.';
       bad = true;
     }else{
-      msg = ticked.length + (ticked.length === 1 ? ' display' : ' displays');
+      const bits = [];
+      if (tickedG.length)
+        bits.push(tickedG.length + (tickedG.length === 1 ? ' group' : ' groups'));
+      if (ticked.length)
+        bits.push(ticked.length + (ticked.length === 1 ? ' display named on its own'
+                                                       : ' displays named on their own'));
+      msg = bits.join(' · ');
       if (live.length !== ticked.length)
-        msg += ' — ' + (ticked.length - live.length) + ' of them not approved '
+        msg += ' — ' + (ticked.length - live.length) + ' of those not approved '
              + 'yet, and refused until they are';
     }
     /* The composer sends typed questions to the DEFAULT endpoint with no wake
@@ -3135,6 +3213,8 @@ function blockCollect(blk){
      somebody has to fill in twice. */
   body.displays = [...blk.querySelectorAll('[data-r="displays"] input:checked')]
                     .map(cb=> cb.dataset.d);
+  body.groups = [...blk.querySelectorAll('[data-r="groups"] input:checked')]
+                  .map(cb=> cb.dataset.g);
   const ft = F(blk, 'fallthrough');
   if (ft) body.fallthrough = ft.value;
   const key = F(blk, 'api_key');
@@ -3408,6 +3488,147 @@ async function loadDisplays(){
   }catch(e){ DISPLAYS = []; }
   return DISPLAYS;
 }
+
+/* ----------------------------------------------------------- groups
+   A name for a set of displays, so a grant is made once instead of ticked
+   twelve times. Two kinds, two populations, and a group holds one of them. */
+let GROUPS = [], GRPEOPLE = [], GRDEVICES = [];
+
+async function loadGroups(){
+  try{
+    const j = await api('/groups');
+    GROUPS = j.groups || [];
+    GRPEOPLE = j.people || [];
+    GRDEVICES = j.devices || [];
+  }catch(e){ GROUPS = []; }
+  return GROUPS;
+}
+
+function groupNote(m, bad){
+  const el = $('groupnote');
+  if (!el) return;
+  el.className = 'note' + (bad ? ' bad' : '');
+  el.textContent = m || '';
+}
+
+async function refreshGroups(){
+  const box = $('grouplist');
+  if (!box || ME.role !== 'admin'){ if (box) box.textContent = ''; return; }
+  await loadGroups();
+  box.innerHTML = '';
+  if (!GROUPS.length){
+    box.className = 'note';
+    box.textContent = 'No groups yet. Name one below and pick which population '
+                    + 'it is drawn from.';
+    return;
+  }
+  box.className = '';
+  GROUPS.forEach(g=>{
+    const row = document.createElement('div');
+    row.className = 'erow';
+
+    const top = document.createElement('div'); top.className = 'top';
+    const nm = document.createElement('input');
+    nm.type = 'text'; nm.className = 'nm'; nm.value = g.name; nm.spellcheck = false;
+    nm.onkeydown = (e)=>{ if (e.key === 'Enter') nm.blur(); };
+    nm.onchange = ()=> groupAction('/groups/save', {id: g.id, name: nm.value.trim()});
+    top.appendChild(nm);
+    const b = document.createElement('span');
+    b.className = 'badge';
+    b.textContent = g.kind === 'user' ? 'PEOPLE' : 'DEVICES';
+    top.appendChild(b);
+    row.appendChild(top);
+
+    /* Membership is the group. Ticked in place rather than behind an EDIT,
+       because the list is short and the whole reason to open a group is to
+       change who is in it. */
+    const pool = g.kind === 'user' ? GRPEOPLE : GRDEVICES;
+    const cks = document.createElement('div');
+    cks.className = 'cks';
+    if (!pool.length){
+      const em = document.createElement('span');
+      em.textContent = g.kind === 'user'
+        ? 'nobody has asked for access yet'
+        : 'no devices have been created yet';
+      cks.appendChild(em);
+    }
+    pool.forEach(m=>{
+      const lab = document.createElement('label');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.dataset.m = m.id;
+      cb.checked = g.members.indexOf(m.id) >= 0;
+      cb.onchange = ()=> groupAction('/groups/save', {
+        id: g.id,
+        members: [...cks.querySelectorAll('input:checked')].map(x=> x.dataset.m),
+      });
+      lab.appendChild(cb);
+      lab.appendChild(document.createTextNode(
+        ' ' + m.label + (m.approved ? '' : ' — not approved')));
+      cks.appendChild(lab);
+    });
+    row.appendChild(cks);
+
+    const named = (RT.routes || []).filter(x=> (x.groups || []).indexOf(g.id) >= 0);
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    [['Members', g.members.length ? g.labels.join(', ') : 'none yet'],
+     ['Used by', named.length ? named.map(x=> x.name).join(', ')
+                              : 'no endpoint names this group']].forEach(([k, v])=>{
+      const el = document.createElement('div');
+      const bb = document.createElement('b');
+      bb.textContent = k + ' ';
+      el.appendChild(bb);
+      el.appendChild(document.createTextNode(v));
+      meta.appendChild(el);
+    });
+    row.appendChild(meta);
+
+    const acts = document.createElement('div');
+    acts.className = 'acts';
+    const del = document.createElement('button');
+    del.textContent = 'DELETE';
+    del.className = 'act-danger';
+    del.onclick = ()=>{
+      if (confirm('Delete the group "' + g.name + '"? It is removed from every '
+                  + 'endpoint that names it. Nothing in it is deleted — a group '
+                  + 'is a way of referring to them, not a thing they belong to.'))
+        groupAction('/groups/delete', {id: g.id});
+    };
+    acts.appendChild(del);
+    row.appendChild(acts);
+    box.appendChild(row);
+  });
+}
+
+async function groupAction(path, body){
+  try{
+    await api(path, {method:'POST', body: JSON.stringify(body)});
+    await refreshGroups();
+    groupNote('');
+    // An endpoint's allow-list offers groups, so it has to be rebuilt too.
+    paintBlocks();
+  }catch(e){ groupNote(e.message, true); }
+}
+
+$('b_addgroup').addEventListener('click', async ()=>{
+  const el = $('gr_name');
+  const name = (el.value || '').trim();
+  if (!name){
+    groupNote('give it a name first', true);
+    el.focus();
+    return;
+  }
+  const kind = document.querySelector('#gr_kind button.on');
+  el.value = '';
+  await groupAction('/groups/save', {name, kind: kind ? kind.dataset.v : 'device'});
+});
+$('gr_name').addEventListener('keydown', e=>{
+  if (e.key === 'Enter') $('b_addgroup').click();
+});
+$('gr_kind').addEventListener('click', e=>{
+  const b = e.target.closest('button');
+  if (b) segSet('gr_kind', b.dataset.v);
+});
 
 /* ---- the settings above the list ---- */
 function paintDpSettings(){
@@ -3888,10 +4109,11 @@ async function displayAction(path, body){
 async function loadBackend(){
   if (!ME || ME.role !== 'admin') return;
   try{
-    /* The displays before the endpoints, because each endpoint's allow-list is
-       drawn from them: painting a block first would show an empty list and
-       then blink it full. */
+    /* The displays and the groups before the endpoints, because each
+       endpoint's allow-list is drawn from both: painting a block first would
+       show an empty list and then blink it full. */
     await loadDisplays();
+    await loadGroups();
     const j = await api('/routes/all');
     RT = {routes: j.routes || [], default: j.default || '', voices: j.voices || []};
     paintBlocks();
@@ -4508,7 +4730,7 @@ function panelNav(){
     render();
     syncSaveRow();
     $('panelscroll').scrollTop = 0;
-    if (tab === 'accounts') refreshUsers();
+    if (tab === 'accounts'){ refreshUsers(); refreshGroups(); }
     if (tab === 'displays') refreshDisplays();
     if (tab === 'embeds') refreshEmbeds();
     if (tab === 'app') loadApp();
@@ -4575,10 +4797,14 @@ function start(){
   // read-only account does — and the server refuses the routes anyway.
   $('tab_displays').style.display = admin ? '' : 'none';
   $('tab_embeds').style.display = admin ? '' : 'none';
-  // Same argument for accounts when there is no sign-in: the tab manages a
-  // set of people who cannot sign in and are keeping nobody out. The server
-  // refuses those routes outright; the panel should not offer them either.
-  $('tab_accounts').style.display = ME.no_auth ? 'none' : '';
+  /* The accounts tab stays, because Groups live on it and a group has nothing
+     to do with signing in. What goes, where there is no sign-in, is the three
+     sections about accounts themselves: they would manage a set of people who
+     cannot sign in and are keeping nobody out, and the server refuses those
+     routes outright anyway. */
+  document.querySelectorAll('#panel .grp[data-signin]').forEach(g=>{
+    g.style.display = ME.no_auth ? 'none' : '';
+  });
   $('b_signout').style.display = ME.no_auth ? 'none' : '';
   if (!admin) status('read-only account — you can look, not change');
   // the create form opens on the preset its first button is already lit for

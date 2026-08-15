@@ -275,6 +275,33 @@ A display's token has no expiry. A wall display is commissioned once, and one
 that stopped working a year later for a reason nobody standing in front of it
 could see would be worse than anything the expiry bought.
 
+## Groups
+
+A name for a set of them, so a grant is made once instead of ticked twelve
+times and re-ticked every time somebody gets a new phone. Groups are made on
+the **ACCOUNTS** tab and named wherever access is granted — today that is an
+endpoint's *who may use it*, and anything added later that grants something can
+name them the same way.
+
+**Two kinds, and they do not mix.** A group of **people** holds those who asked
+for access and were approved. A group of **devices** holds the screens you
+created and sent a code to. They answer separate questions — *the physics
+department* and *the screens in the east wing* — so a group holds one or the
+other, and its kind cannot be changed once it exists.
+
+**Grants add up.** An endpoint reachable by a group and by one device named on
+its own is reachable by everyone in the group plus that device. Being in a
+group never takes away a grant made individually.
+
+**A group is not approval.** Somebody in a group who has not been approved is
+still refused, and so is somebody whose access has run out. The group says
+*which* endpoints they may reach; approval says whether they may reach anything
+at all.
+
+**Deleting a group** removes it from every endpoint that named it. Nothing in
+it is deleted — a group is a way of referring to people and devices, not a
+thing they belong to.
+
 ## Locking down a deployment
 
 `settings.json` is served to anything that can reach the display port. That is

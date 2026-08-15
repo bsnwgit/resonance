@@ -844,6 +844,9 @@ Admin listener only — everything below returns 404 on the public ports:
 | `POST` | `/displays/reissue` | kill the row's live token now and issue a new code; name and permissions kept — `admin` role |
 | `POST` | `/displays/decide` | approve — with the endpoints it may use, in the same call — or refuse, with a message for them, a note for you, and whether it may ask again — `admin` role |
 | `POST` | `/displays/settings` | whether guests may ask, how long a grant lasts, the two limits, and the request form — `admin` role |
+| `GET` | `/groups` | every group, plus the two populations one can be drawn from — `admin` role |
+| `POST` | `/groups/save` | create one, rename it, or set its membership — `admin` role |
+| `POST` | `/groups/delete` | remove one, and take it off every endpoint that named it — `admin` role |
 | `POST` | `/displays/approve` | approve one, or withdraw it; may name it in the same call — `admin` role |
 | `POST` | `/displays/rename` | change what it is listed as; blank hands the row back to the name the device declares — `admin` role |
 | `POST` | `/displays/delete` | revoke: its token stops matching, and it is removed from every route's allow-list — `admin` role |
@@ -1438,6 +1441,23 @@ it. Each entry below carries its own panel scope.
   **A refusal is per device, not per person** — the same human on their phone
   is a new row with a fresh ask. That is what device identity is, and anything
   stronger needs an identity a person carries.
+
+  **Groups, so a grant is made once.** Twelve people who all get the same
+  endpoint is twelve ticks and a re-tick every time somebody gets a new phone,
+  which is not a permission model, it is data entry. A group is a name for a
+  set of them, made under ACCOUNTS and named wherever access is granted.
+
+  **Two kinds, and they do not mix**: people who asked to be here, and devices
+  an admin created and sent a code to. They answer separate questions — *the
+  physics department*, *the screens in the east wing* — and one list that could
+  hold both would be a list nobody could describe. A group's kind is fixed at
+  creation, because changing it would silently empty it.
+
+  **Grants add up, and a group is not approval.** An endpoint reachable by a
+  group and by one device on its own is reachable by both; being in a group
+  never removes an individual grant. And somebody in a group who was never
+  approved, or whose access has run out, is still refused — the group decides
+  *which* endpoints, approval decides whether they reach anything at all.
 
   **REISSUE is the same mechanism pointed at a row that already exists** — a
   browser that wiped its data, a screen replaced in the same place. The row is

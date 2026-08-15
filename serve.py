@@ -655,6 +655,11 @@ ROUTE_DEFAULTS.update({
     # out loud instead.
     "restricted": False,
     "displays": [],
+    # …and the groups it names. Kept beside the individual list rather than
+    # folded into it: a grant made to "the physics department" should still
+    # read that way next year, and flattening it at the point of saving would
+    # turn it into twelve ids nobody can maintain.
+    "groups": [],
 })
 MAX_ROUTES = 24                  # a household, not a directory service
 
@@ -713,6 +718,8 @@ def read_routes():
                                               (rec.get("aliases") or [])) if w]
                 out["displays"] = [str(d)[:32] for d in
                                    (rec.get("displays") or [])][:MAX_ALLOW]
+                out["groups"] = [str(g)[:32] for g in
+                                 (rec.get("groups") or [])][:MAX_GROUPS]
                 out["created"] = rec.get("created")
                 out["created_by"] = rec.get("created_by")
                 doc["routes"][str(rid)] = out
@@ -879,6 +886,15 @@ def validate_route(obj, current, doc, rid=None):
                 seen.add(d)
                 out.append(d)
         rec["displays"] = out[:MAX_ALLOW]
+    if "groups" in obj:
+        known = read_groups()
+        seen, out = set(), []
+        for g in (obj["groups"] or []):
+            g = str(g)[:32]
+            if g in known and g not in seen:
+                seen.add(g)
+                out.append(g)
+        rec["groups"] = out[:MAX_GROUPS]
     if "wakeword" in obj:
         rec["wakeword"] = _norm_word(obj["wakeword"])[:40]
     if not rec["wakeword"]:
@@ -1271,10 +1287,22 @@ def write_displays(displays):
 
 
 def display_label(rec):
-    """What to call it. The admin's name where there is one, otherwise the name
-    it announced itself with — which is the whole of what a brand new device
-    has to offer."""
-    return rec.get("name") or rec.get("asked") or "unnamed display"
+    """What to call it. The admin's name where there is one, then the name it
+    announced itself with, then the first thing the person typed on the request
+    form — which on a form that asks for a name is their name, and on one that
+    does not is at least something that tells two rows apart.
+
+    Without that last fall-back, everybody who asked for access appears as
+    "unnamed display", which makes the list unreadable and the group picker
+    unusable — a set of identical entries nobody can choose between."""
+    if rec.get("name"):
+        return rec["name"]
+    if rec.get("asked"):
+        return rec["asked"]
+    for a in (rec.get("answers") or []):
+        if a.get("value"):
+            return str(a["value"])[:40]
+    return "unnamed display"
 
 
 def find_display(token):
@@ -1552,8 +1580,12 @@ def display_may(disp, route):
     # Expiry is checked here rather than at the door, which is what makes a
     # grant run out cleanly mid-conversation: the turn already in flight was
     # allowed when it started and finishes, and the next one is refused.
-    return (bool(disp.get("approved")) and not display_expired(disp)
-            and disp["id"] in (route.get("displays") or []))
+    if not disp.get("approved") or display_expired(disp):
+        return False
+    if disp["id"] in (route.get("displays") or []):
+        return True
+    # Grants add up: named directly, or named by a group it is in.
+    return disp["id"] in group_members(route.get("groups"))
 
 
 def admin_displays():
@@ -1584,6 +1616,122 @@ def admin_displays():
                    refused_at=ref[1] if ref else 0,
                    refused_from=ref[2] if ref else "")
         out.append(row)
+    return out
+
+
+# -------------------------------------------------------------------- groups
+# A name for a set of them, so a grant can be made once instead of ticked
+# twelve times and re-ticked every time somebody gets a new phone.
+#
+# TWO KINDS, and they do not mix. A group of PEOPLE holds rows that asked to be
+# here; a group of DEVICES holds rows an admin created and sent a code for.
+# They are different populations answering different questions — "the physics
+# department" and "the screens in the east wing" — and a group that could hold
+# both would be a list nobody could describe.
+#
+# Groups are named wherever access is granted. Today that is an endpoint's
+# allow-list; anything later that grants something can name them the same way,
+# which is the point of them living in a file of their own rather than inside
+# the thing that currently uses them.
+GROUPS_PATH = os.path.join(ROOT, "groups.json")
+_groups_lock = threading.Lock()
+GROUP_KINDS = ("user", "device")
+MAX_GROUPS = 200
+
+
+def read_groups():
+    try:
+        with open(GROUPS_PATH) as fh:
+            doc = json.load(fh)
+        stored = doc.get("groups", {}) if isinstance(doc, dict) else {}
+    except (OSError, ValueError):
+        return {}
+    out = {}
+    for gid, rec in stored.items():
+        if not isinstance(rec, dict):
+            continue
+        kind = rec.get("kind")
+        out[str(gid)] = {
+            "name": str(rec.get("name") or "")[:60],
+            "kind": kind if kind in GROUP_KINDS else "device",
+            "members": [str(m)[:32] for m in (rec.get("members") or [])][:MAX_ALLOW],
+            "created": rec.get("created"), "created_by": rec.get("created_by"),
+        }
+    return out
+
+
+def write_groups(groups):
+    with _groups_lock:
+        tmp = GROUPS_PATH + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump({"version": 1, "groups": groups}, fh, indent=2, sort_keys=True)
+        os.replace(tmp, GROUPS_PATH)
+
+
+def group_kind_of(rec):
+    """Which population a display row belongs to. Asking to be here is what
+    makes somebody a person as far as this is concerned; everything else is a
+    device an admin put somewhere."""
+    return "user" if is_guest(rec) else "device"
+
+
+def clean_members(ids, kind):
+    """Only rows that exist, and only of this group's own kind. A member that
+    is neither is dropped rather than refused — the panel sends the list it was
+    shown, and a display deleted in another tab between the two is not a
+    mistake worth making somebody retype a form over."""
+    displays = read_displays()
+    seen, out = set(), []
+    for did in (ids or []):
+        did = str(did)[:32]
+        rec = displays.get(did)
+        if rec and did not in seen and group_kind_of(rec) == kind:
+            seen.add(did)
+            out.append(did)
+    return out[:MAX_ALLOW]
+
+
+def group_members(gids, groups=None):
+    """Every display id named by these groups, flattened. Grants ADD UP: this
+    is unioned with an endpoint's individually named displays, and being in a
+    group never takes an individual grant away."""
+    groups = read_groups() if groups is None else groups
+    out = set()
+    for gid in (gids or []):
+        rec = groups.get(gid)
+        if rec:
+            out.update(rec["members"])
+    return out
+
+
+def validate_group(obj, current):
+    rec = dict(current)
+    if "name" in obj:
+        rec["name"] = str(obj["name"] or "").strip()[:60]
+    if not rec.get("name"):
+        return None, "a group needs a name — it is what you will look for"
+    if "kind" in obj:
+        k = str(obj["kind"] or "").strip()
+        if k not in GROUP_KINDS:
+            return None, "a group is either people or devices"
+        rec["kind"] = k
+    if "members" in obj:
+        rec["members"] = clean_members(obj["members"], rec["kind"])
+    return rec, None
+
+
+def admin_groups():
+    groups = read_groups()
+    displays = read_displays()
+    out = []
+    for gid, rec in sorted(groups.items(),
+                           key=lambda kv: (kv[1]["kind"], kv[1]["name"].lower())):
+        # Named rows only. A member whose display was deleted is not shown as a
+        # phantom — it is simply gone, the same way a deleted display leaves an
+        # endpoint's allow-list.
+        live = [m for m in rec["members"] if m in displays]
+        out.append(dict(rec, id=gid, members=live,
+                        labels=[display_label(displays[m]) for m in live]))
     return out
 
 
@@ -2239,7 +2387,8 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      # /displays, one letter and a whole boundary apart.
                      "/displays", "/displays/approve", "/displays/rename",
                      "/displays/delete", "/displays/new", "/displays/reissue",
-                     "/displays/decide", "/displays/settings")
+                     "/displays/decide", "/displays/settings",
+                     "/groups", "/groups/save", "/groups/delete")
 #: where an enrolment code is typed. On the display listeners only — it hands
 #: out a display's token, and the admin listener is not a display.
 ENROL_PREFIX = "/e/"
@@ -2715,6 +2864,22 @@ class Handler(SimpleHTTPRequestHandler):
                                     "enrol_base": "%s://%s:%d/e/"
                                                   % ("https" if secure else "http", host,
                                                      secure or RUNNING.get("http_port") or 0)})
+        if path == "/groups":
+            if not self._require("admin"):
+                return
+            # The two populations a group can be drawn from, so the panel can
+            # offer the right one rather than every row it has ever seen.
+            displays = read_displays()
+            people, devices = [], []
+            for did, rec in sorted(displays.items(),
+                                   key=lambda kv: display_label(kv[1]).lower()):
+                row = {"id": did, "label": display_label(rec),
+                       "approved": bool(rec.get("approved"))}
+                (people if group_kind_of(rec) == "user" else devices).append(row)
+            return self._json(200, {"groups": admin_groups(),
+                                    "people": people, "devices": devices,
+                                    "kinds": list(GROUP_KINDS),
+                                    "max": MAX_GROUPS})
         if path == "/app":
             if not self._require("admin"):
                 return
@@ -3397,6 +3562,75 @@ class Handler(SimpleHTTPRequestHandler):
                   % (rec["id"], display_label(rec),
                      " again" if obj.get("renew") else ""), flush=True)
             return self._json(200, {"display": self._display_state(rec)})
+
+        if parsed.path == "/groups/save":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            groups = read_groups()
+            gid = str(obj.get("id") or "")
+            if gid:
+                if gid not in groups:
+                    return self._json(404, {"error": "no such group"})
+                current = groups[gid]
+            else:
+                if len(groups) >= MAX_GROUPS:
+                    return self._json(409, {"error": "that is %d groups already"
+                                                     % MAX_GROUPS})
+                current = {"name": "", "kind": "device", "members": []}
+            rec, err = validate_group(obj, current)
+            if err:
+                return self._json(400, {"error": err})
+            if gid:
+                rec.update(created=current.get("created"),
+                           created_by=current.get("created_by"))
+                # The kind cannot change under an existing group: its members
+                # are of one population and a switch would silently empty it.
+                rec["kind"] = current["kind"]
+            else:
+                gid = "g" + secrets.token_hex(4)
+                rec.update(created=int(time.time()), created_by=s["user"])
+            groups[gid] = rec
+            write_groups(groups)
+            print("group %s (%s, %s) saved by %s — %d member(s)"
+                  % (gid, rec["name"], rec["kind"], s["user"],
+                     len(rec["members"])), flush=True)
+            return self._json(200, {"ok": True, "id": gid,
+                                    "groups": admin_groups()})
+
+        if parsed.path == "/groups/delete":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            groups = read_groups()
+            gid = str(obj.get("id") or "")
+            if gid not in groups:
+                return self._json(404, {"error": "no such group"})
+            name = groups.pop(gid)["name"]
+            write_groups(groups)
+            # An endpoint naming a group that no longer exists is a permission
+            # nobody can see and nobody can withdraw — the same reasoning that
+            # clears a deleted display from an allow-list, and a deleted
+            # endpoint from a fallthrough.
+            doc = read_routes()
+            touched = [r for r, o in doc["routes"].items()
+                       if gid in (o.get("groups") or [])]
+            for r in touched:
+                doc["routes"][r]["groups"] = [g for g in doc["routes"][r]["groups"]
+                                              if g != gid]
+            if touched:
+                write_routes(doc)
+            print("group %s (%s) deleted by %s%s"
+                  % (gid, name, s["user"],
+                     " — removed from %d endpoint(s)" % len(touched)
+                     if touched else ""), flush=True)
+            return self._json(200, {"ok": True, "groups": admin_groups()})
 
         if parsed.path == "/displays/settings":
             s = self._require("admin")
