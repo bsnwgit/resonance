@@ -2180,7 +2180,7 @@ $('b_appsave').addEventListener('click', async ()=>{
    there are now several of every field on the page and an id can only ever
    name one of them. */
 const RT_FIELDS = ['name','wakeword','aliases','greeting','voice','base_url',
-                   'model','system','keep_alive'];
+                   'model','system','keep_alive','agent_id'];
 const RT_SLIDERS = {max_tokens:  v=> v,
                     temperature: v=> (+v).toFixed(2),
                     history_turns: v=> v == 0 ? 'none' : v,
@@ -2221,7 +2221,8 @@ function newInstance(){
           greeting:'', voice:'', provider:'demo', enabled:true,
           base_url:'http://127.0.0.1:11434/v1', model:'', system:SHIPPED_PROMPT,
           max_tokens:400, temperature:0.4, timeout:120, keep_alive:'30m',
-          history_turns:8, has_key:false, is_default:false};
+          history_turns:8, has_key:false, is_default:false,
+          agent_id:'', fallthrough:''};
 }
 
 // `esc` is already taken further down by the documentation renderer
@@ -2294,11 +2295,14 @@ the screen — which is all a wall display offers.</div>
     <div class="subbody">
   <div class="note help">OPENAI-COMPATIBLE is a shape, not a company: Ollama,
 OpenClaw, LM Studio and vLLM all speak it and differ only by base URL. DEMO
-answers from built-in text and reaches nothing.</div>
+answers from built-in text and reaches nothing. HOME ASSISTANT talks to a
+house rather than to a model — it is an endpoint like any other here, and
+everything it can be asked to touch is decided over there.</div>
   <div class="seg" data-f="provider">
     <button data-v="demo" class="on">DEMO</button>
     <button data-v="openai">OPENAI-COMPATIBLE</button>
     <button data-v="anthropic">ANTHROPIC</button>
+    <button data-v="homeassistant">HOME ASSISTANT</button>
   </div>
   <div data-r="conn">
   <div data-r="presetrow">
@@ -2310,17 +2314,36 @@ answers from built-in text and reaches nothing.</div>
     <button data-v="openai">OPENAI</button>
   </div>
   </div>
-  <label class="bklab">base URL</label>
+  <label class="bklab" data-r="urllabel">base URL</label>
   <input data-f="base_url" type="text" spellcheck="false" autocomplete="off"
          placeholder="http://127.0.0.1:11434/v1">
+  <div data-r="modelrow">
   <label class="bklab">model</label>
   <input data-f="model" type="text" spellcheck="false" autocomplete="off"
          placeholder="qwen2.5:3b">
+  </div>
   <div class="note" data-r="models"></div>
-  <label class="bklab">API key</label>
+  <label class="bklab" data-r="keylabel">API key</label>
   <input data-f="api_key" type="password" spellcheck="false" autocomplete="off"
          placeholder="unchanged">
   <div class="note" data-r="keynote"></div>
+  <div data-r="harows">
+  <label class="bklab">conversation agent</label>
+  <input data-f="agent_id" type="text" spellcheck="false" autocomplete="off"
+         placeholder="leave blank for the configured default">
+  <div class="note help">Which agent in Home Assistant answers. The built-in
+one matches sentences, so it does what it is told and nothing else; an
+LLM-backed one interprets, so "it's a bit dark in here" works and costs a model
+call. Blank uses whichever is set as default over there.</div>
+  <label class="bklab">when it recognises nothing, ask</label>
+  <select data-f="fallthrough"></select>
+  <div class="note help">Nobody remembers which name owns which capability, so
+somebody will ask the house a general question. Name another endpoint here and
+it answers instead — in this one's name and voice, so the person is never told
+they used the wrong word. It only fires when the house recognised no command
+at all, which an LLM-backed agent essentially never reports: leave it at
+nothing for one of those.</div>
+  </div>
   </div>
     </div>
   </div>
@@ -2328,9 +2351,9 @@ answers from built-in text and reaches nothing.</div>
   <div class="subgrp" data-g="limits">
     <h5>Limits<span class="subsum"></span></h5>
     <div class="subbody">
-  <div class="sl"><label>reply limit (tokens)</label><output data-o="max_tokens"></output><input data-s="max_tokens" type="range" min="16" max="2000" step="16"></div>
+  <div class="sl" data-r="maxrow"><label>reply limit (tokens)</label><output data-o="max_tokens"></output><input data-s="max_tokens" type="range" min="16" max="2000" step="16"></div>
   <div class="sl" data-r="temprow"><label>temperature</label><output data-o="temperature"></output><input data-s="temperature" type="range" min="0" max="1.5" step=".05"></div>
-  <div class="sl"><label>turns of context</label><output data-o="history_turns"></output><input data-s="history_turns" type="range" min="0" max="24" step="1"></div>
+  <div class="sl" data-r="ctxrow"><label>turns of context</label><output data-o="history_turns"></output><input data-s="history_turns" type="range" min="0" max="24" step="1"></div>
   <div class="sl"><label>timeout</label><output data-o="timeout"></output><input data-s="timeout" type="range" min="5" max="600" step="5"></div>
   <div data-r="keepaliverow">
   <label class="bklab">keep model loaded</label>
@@ -2339,6 +2362,16 @@ answers from built-in text and reaches nothing.</div>
   </div>
   <div class="note" data-r="anthnote" style="display:none">Temperature and
 keep-alive are not sent to Anthropic — steer it with the system prompt.</div>
+  <div class="note" data-r="hanote" style="display:none">Only the timeout
+applies to Home Assistant. It holds the conversation itself, and what the
+agent is told is configured over there — so a reply limit, a temperature, a
+context length and a prompt set here would be settings nothing reads.
+
+Set the timeout to the <b>agent</b>, not to "Home Assistant": the built-in
+intent engine answers in about a tenth of a second, while an LLM-backed one is
+two model passes with your exposed entities in the prompt each time. On modest
+hardware that is tens of seconds, and a timeout chosen for the first cuts off
+the second just before it succeeds.</div>
   <div class="note help">A cold model can take half a minute to load before it
 says anything, so keep the timeout generous — one tuned to a warm model looks
 like a dead server every morning. <b>turns of context</b> is how much of the
@@ -2393,37 +2426,54 @@ function blockNote(blk, m, bad){
 function blockSyncProvider(blk){
   const on = blk.querySelector('[data-f="provider"] button.on');
   const v = on ? on.dataset.v : 'demo';
-  const connected = v !== 'demo', anth = v === 'anthropic';
+  const connected = v !== 'demo', anth = v === 'anthropic',
+        ha = v === 'homeassistant';
   const show = (name, yes)=>{ const el = R(blk, name); if (el) el.style.display = yes ? '' : 'none'; };
   show('conn', connected);
   show('promptblock', connected);
   /* Anthropic takes neither of these — see the note that replaces them. A
      slider wired to a field the adapter deliberately never sends is the same
-     defect as a toggle nothing reads. */
-  show('temprow', connected && !anth);
-  show('keepaliverow', connected && !anth);
+     defect as a toggle nothing reads. Home Assistant takes fewer still: it
+     holds the conversation and the instructions itself, so everything but the
+     timeout goes with it. */
+  show('temprow', connected && !anth && !ha);
+  show('keepaliverow', connected && !anth && !ha);
+  show('maxrow', connected && !ha);
+  show('ctxrow', connected && !ha);
   show('anthnote', anth);
-  show('presetrow', connected && !anth);   // one endpoint; nothing to pick
-  show('models', connected && !anth);      // that listing is an Ollama trick
+  show('hanote', ha);
+  show('harows', ha);
+  show('modelrow', connected && !ha);      // HA is not a model
+  show('presetrow', connected && !anth && !ha);   // one endpoint; nothing to pick
+  show('models', connected && !anth && !ha);      // that listing is an Ollama trick
   const t = blk.querySelector('[data-a="test"]');
   if (t) t.disabled = !connected;
-  /* DEMO reaches nothing, so its limits and its prompt are inert. Dimmed and
-     closed rather than removed: they keep their place, so connecting a
-     service does not rearrange the block under you. */
+  /* DEMO reaches nothing, so its limits and its prompt are inert; the prompt
+     is equally inert on a house, which is told what to do in Home Assistant.
+     Dimmed and closed rather than removed: they keep their place, so
+     connecting a service does not rearrange the block under you. */
   ['limits','prompt'].forEach(g=>{
     const box = blk.querySelector('[data-g="' + g + '"]');
     if (!box) return;
-    box.style.opacity = connected ? '' : '.45';
-    if (!connected) box.classList.remove('open');
+    const live = connected && !(ha && g === 'prompt');
+    box.style.opacity = live ? '' : '.45';
+    if (!live) box.classList.remove('open');
   });
   const url = F(blk, 'base_url');
   if (url) url.placeholder = anth ? 'https://api.anthropic.com'
-                                  : 'http://127.0.0.1:11434/v1';
+                          : ha   ? 'http://homeassistant.local:8123'
+                                 : 'http://127.0.0.1:11434/v1';
   const model = F(blk, 'model');
   if (model && anth && !model.placeholder.startsWith('claude'))
     model.placeholder = 'claude-opus-5';
+  const ul = R(blk, 'urllabel');
+  if (ul) ul.textContent = ha ? 'Home Assistant address' : 'base URL';
+  const kl = R(blk, 'keylabel');
+  if (kl) kl.textContent = ha ? 'long-lived access token' : 'API key';
   const kn = R(blk, 'keynote');
-  if (kn) kn.textContent = anth
+  if (kn) kn.textContent = ha
+    ? 'Required. Make it a non-admin Home Assistant user of its own: the token carries that user’s permissions and never expires, and every action appears in the logbook as that user whoever spoke. Held on the server, never sent back to a browser; blank keeps the stored one.'
+    : anth
     ? 'Required. Held on the server, never sent back to a browser. Blank keeps the stored one.'
     : 'Held on the server, never sent back to a browser. Blank keeps the stored one; a local model needs none.';
 }
@@ -2437,6 +2487,7 @@ function blockPaint(blk, r){
   const sum = blk.querySelector('.rtsum');
   const where = !r.id ? 'unsaved'
     : r.provider === 'demo' ? 'built-in replies'
+    : r.provider === 'homeassistant' ? 'Home Assistant'
     : (r.model || 'no model');
   sum.innerHTML = (r.wakeword ? 'say <b>&ldquo;' + rtEsc(r.wakeword) + '&rdquo;</b> &rarr; ' : '')
                 + rtEsc(where)
@@ -2471,6 +2522,29 @@ function blockPaint(blk, r){
   const key = F(blk, 'api_key');
   if (key) key.placeholder = r.has_key ? 'unchanged — a key is stored' : 'none stored';
 
+  /* Every OTHER endpoint, because falling through to yourself is a loop and
+     falling through to a house is asking the thing that just declined. Built
+     from what is on the server rather than from what is on screen: a draft
+     nobody has saved has no id to point at. */
+  const ft = F(blk, 'fallthrough');
+  if (ft && ft.dataset.touched !== '1'){
+    const want = r.fallthrough || '';
+    ft.innerHTML = '';
+    /* DEMO is left out because it answers from the display's own text: the
+       server would find nothing to say and the question would die there.
+       Another house is offered — two of them in one building is a real
+       arrangement, and one may know a room the other does not. */
+    const opts = [['', 'nothing — it answers for itself']].concat(
+      (RT.routes || []).filter(x=> x.id !== r.id && x.provider !== 'demo')
+                       .map(x=> [x.id, x.name]));
+    if (want && !opts.some(([v])=> v === want)) opts.push([want, 'an endpoint that is gone']);
+    opts.forEach(([v, label])=>{
+      const o = document.createElement('option');
+      o.value = v; o.textContent = label; ft.appendChild(o);
+    });
+    ft.value = want;
+  }
+
   /* What each closed box holds, so the whole endpoint reads off the headings
      and opening one is for changing it rather than for finding out. */
   const words = (r.aliases || []).length;
@@ -2482,11 +2556,16 @@ function blockPaint(blk, r){
                        + (r.greeting.length > 28 ? '…' : '') + '” · ' : 'shared greeting · ')
          + (r.voice || 'shared voice'),
     conn: r.provider === 'demo' ? 'demo — built-in replies'
+        : r.provider === 'homeassistant'
+        ? 'Home Assistant · ' + (r.agent_id || 'default agent')
+          + (r.has_key ? ' · token stored' : ' · no token')
         : (r.model || 'no model') + (r.has_key ? ' · key stored' : ''),
-    limits: r.max_tokens + ' tokens · '
+    limits: r.provider === 'homeassistant' ? r.timeout + 's'
+          : r.max_tokens + ' tokens · '
           + (r.history_turns ? r.history_turns + ' turns' : 'no context') + ' · '
           + r.timeout + 's',
     prompt: r.provider === 'demo' ? 'not used in demo'
+          : r.provider === 'homeassistant' ? 'set in Home Assistant'
           : ((r.system || '').trim().split(/\s+/).filter(Boolean).length + ' words'),
   };
   Object.keys(sums).forEach(g=>{
@@ -2538,6 +2617,8 @@ function blockCollect(blk){
   body.provider = prov ? prov.dataset.v : 'demo';
   const strict = blk.querySelector('[data-f="strict"] button.on');
   body.strict = !!strict && strict.dataset.v === '1';
+  const ft = F(blk, 'fallthrough');
+  if (ft) body.fallthrough = ft.value;
   const key = F(blk, 'api_key');
   if (key && key.value) body.api_key = key.value;
   if (blk.dataset.rid) body.id = blk.dataset.rid;
@@ -2589,8 +2670,34 @@ function wireBlock(blk){
     if (!b) return;
     const seg = b.closest('.seg[data-f], .seg[data-r="preset"]');
     if (seg){
+      const was = seg.dataset.f === 'provider' ? seg.querySelector('button.on') : null;
+      const from = was ? was.dataset.v : '';
       seg.querySelectorAll('button').forEach(x=> x.classList.toggle('on', x === b));
-      if (seg.dataset.f === 'provider') blockSyncProvider(blk);
+      if (seg.dataset.f === 'provider'){
+        /* A base URL and a key belong to a provider, and neither survives a
+           change of one — the server refuses to carry them across, and this
+           panel used to defeat that by sending the field back unchanged with
+           every save. Left alone, an endpoint switched to a hosted provider
+           kept whatever address it had, so a hosted key went to whatever was
+           listening on the old URL: a failure in the one direction that looks
+           like success. Cleared here, visibly, rather than on the server
+           where nobody would see it happen. */
+        if (from && from !== b.dataset.v){
+          const url = F(blk, 'base_url');
+          if (url){
+            url.value = b.dataset.v === 'anthropic' ? 'https://api.anthropic.com'
+                      : b.dataset.v === 'homeassistant' ? ''
+                      : b.dataset.v === 'openai' ? 'http://127.0.0.1:11434/v1' : '';
+            url.dataset.touched = '1';
+          }
+          const key = F(blk, 'api_key');
+          if (key) key.value = '';
+          if (b.dataset.v !== 'demo')
+            blockNote(blk, 'address and key cleared — they belonged to the '
+                         + 'endpoint you just switched away from');
+        }
+        blockSyncProvider(blk);
+      }
       if (seg.dataset.r === 'preset'){
         const pre = BK_PRESETS[b.dataset.v];
         if (pre){
@@ -2646,7 +2753,9 @@ async function blockAction(blk, act, btn){
       const rec = RT.routes.find(x=> x.id === j.id) || {};
       if (now) blockNote(now, 'saved · say “' + rec.wakeword + '” to reach '
         + rec.name + ' · ' + (rec.provider === 'demo' ? 'built-in replies'
-                                                      : rec.model + ' at ' + rec.base_url));
+                            : rec.provider === 'homeassistant'
+                            ? 'Home Assistant at ' + rec.base_url
+                            : rec.model + ' at ' + rec.base_url));
       return;
     }catch(e){ return blockNote(blk, e.message, true); }
   }
@@ -2655,7 +2764,11 @@ async function blockAction(blk, act, btn){
     try{
       const j = await api('/routes/test', {method:'POST', body: JSON.stringify({id: rid})});
       if (j.demo) return blockNote(blk, 'this one is set to DEMO — nothing was asked of a model');
-      return blockNote(blk, j.name + ' replied in ' + j.ms + 'ms\n\n' + j.reply);
+      /* `check` is how a house says it is well. Its agent may perfectly
+         reasonably answer a test sentence with "I don't understand", and
+         without a word of explanation that reads as a failed test. */
+      return blockNote(blk, j.name + ' replied in ' + j.ms + 'ms\n\n' + j.reply
+                          + (j.check ? '\n\n' + j.check : ''));
     }catch(e){ return blockNote(blk, e.message, true); }
   }
   if (act === 'delete'){

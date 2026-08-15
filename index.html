@@ -2010,12 +2010,18 @@ const LOCAL_TZ = (()=>{
    needs that: a diagnostic that inherits whatever was being discussed is
    answered in that context, so it stops being a measurement of the backend
    and becomes a measurement of the backend plus the last ten minutes. */
+/* Returns {reply, hangup} rather than the string it used to. Some endpoints
+   have something to say about the conversation as well as in it — a house
+   that has finished acting wants the display to stop listening — and a
+   second channel for that beside the string would be the same data under a
+   worse name. */
 async function askBackend(text, bare){
   /* No display-wide demo switch any more. Whether an endpoint answers from
      built-in text is a property OF that endpoint — the server replies
      {demo:true} for one set to DEMO and the branch below handles it. Two
      places meaning "demo", one of them overriding the other invisibly, is a
      setting nobody could reason about. */
+  let who = '';
   try{
     const r = await fetch('ask', {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -2026,20 +2032,34 @@ async function askBackend(text, bare){
          wake word is a thing people mispronounce. An id it does not
          recognise — a route deleted while this display was awake — falls
          back to the default there rather than failing here. */
+      /* And which conversation this is a turn of, where the endpoint keeps
+         one of its own. It is held for exactly as long as the route binding —
+         see Wake.convo — because that is what makes an answer of "which
+         room?" followed by "the kitchen" mean anything. */
       body: JSON.stringify({text, history: bare ? [] : convo, tz: LOCAL_TZ,
-                            route: Routes.currentId()})
+                            route: Routes.currentId(),
+                            conversation_id: bare ? '' : Wake.convo})
     });
     const j = await r.json().catch(()=>({}));
+    who = j && j.name || '';
     // the route still being on demo is not an error, just not wired up yet
-    if (j && j.demo) return REPLIES[replyIx++ % REPLIES.length];
+    if (j && j.demo) return {reply: REPLIES[replyIx++ % REPLIES.length]};
     if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
     if (j.ms) ev((j.name || 'reply') + ' ' + j.ms + 'ms');
-    return j.reply;
+    if (!bare && j.conversation_id) Wake.convo = j.conversation_id;
+    return {reply: j.reply, hangup: !!j.hangup};
   }catch(e){
-    /* Say something. A voice interface that goes quiet is indistinguishable
-       from a broken one, and the person may not be looking at the screen. */
+    /* Say something, and name whoever did not answer. A voice interface that
+       goes quiet is indistinguishable from a broken one, and the person may
+       not be looking at the screen — a command that failed silently is
+       indistinguishable from one that worked, which is worse still.
+
+       The name, never the reason: "the house" is what somebody can act on,
+       where "401 from the conversation API" tells them nothing and tells
+       everyone in earshot what this box is wired to. The reason goes to the
+       note, which is on the screen rather than in the air. */
     note('backend: ' + e.message);
-    return "I could not reach the assistant just then.";
+    return {reply: "I could not reach " + (who || 'the assistant') + " just then."};
   }
 }
 
@@ -2048,7 +2068,15 @@ function submit(text){
   addMsg('you', text);
   remember('user', text);
   qEl.value = '';
-  askBackend(text).then(reply => { remember('assistant', reply); respond(reply); });
+  askBackend(text).then(out => {
+    remember('assistant', out.reply);
+    respond(out.reply);
+    /* The endpoint asked to hang up: it acted, and it is not expecting
+       anything further. Silently — the reply is already being spoken, and a
+       farewell on top of "the kitchen light is on" is one sentence too many.
+       Saying the wake word starts the next one. */
+    if (out.hangup) Wake.sleepNow(false);
+  });
 }
 qEl.addEventListener('keydown', e=>{
   if (e.key !== 'Enter') return;
@@ -2109,7 +2137,7 @@ async function selfTest(){
      default unless something woke it — so the line says which. A self-test
      that silently tested a different destination from the one that answers
      would be worse than no self-test. */
-  const reply = await askBackend(
+  const {reply} = await askBackend(
     'Reply with one short sentence confirming you can hear me.', true);
   say(!!reply, 'default endpoint “' + (cur ? cur.name : 'none') + '” answered ' +
       (reply ? reply.length + ' chars: "' + reply.trim().slice(0, 60) +
@@ -2476,6 +2504,15 @@ const Wake = {
      the default route. */
   route:'',
 
+  /* The endpoint's own id for this conversation, where it keeps one — Home
+     Assistant returns one and accepts it back, and it is how a reply of
+     "which room?" is still about the lights when the answer comes. Opaque
+     here: this display neither reads it nor invents one, it hands back
+     whatever it was given. Its lifetime is exactly the route binding's —
+     held while awake, dropped on sleep and on switching endpoints, for the
+     same reason the conversation itself is. */
+  convo:'',
+
   norm(s){
     return (s||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
   },
@@ -2540,6 +2577,7 @@ const Wake = {
        it. A device that is allowed to remember will opt out of this once
        device kinds exist; until then the safe behaviour is the only one. */
     forgetConversation();
+    this.convo = '';              // theirs goes the same way ours does
     syncTalk(); syncWake();
     if (sayBye) farewell();
     else micNote('asleep — say ' + Routes.spoken() + ' to start again');
@@ -2650,7 +2688,7 @@ const Wake = {
      the name was the whole utterance and the right answer is hello. */
   wakeOn(h){
     const switching = this.awake && this.route && this.route !== h.route.id;
-    if (switching) forgetConversation();
+    if (switching){ forgetConversation(); this.convo = ''; }
     this.awake = true; this.route = h.route.id;
     this.touch(); syncTalk(); syncWake();
     if (h.fuzzy)
