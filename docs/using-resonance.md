@@ -64,13 +64,23 @@ finish with the keyboard.
 
 ## Wake and sleep words
 
-An administrator may have set a wake word. If so, the display ignores what it
-hears until it hears that word — which is what makes it usable in a room where
-people are talking to each other rather than to it.
+An administrator may have set one or more wake words. If so, the display
+ignores what it hears until it hears one of them — which is what makes it
+usable in a room where people are talking to each other rather than to it.
+
+**Each name reaches a different assistant.** Say one and everything after it
+goes there: the question you asked, and the follow-up after that, without
+having to say the name again. Say a *different* name mid-conversation and you
+switch — one person at one screen changing what they are addressing. What was
+said to the first one does not come with you, which is the point.
+
+You may hear which one answered rather than read it: an administrator can
+give each a different voice, and each can greet you in its own words.
 
 Once woken it stays awake for a set period and then goes quiet on its own. You
 can also end the conversation deliberately with the sleep word, if one is
-configured. Ask your administrator which words are set.
+configured — one word, whichever assistant you were talking to. Ask your
+administrator which words are set.
 
 **Going to sleep clears the conversation.** This is deliberate — see below.
 

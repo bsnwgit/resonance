@@ -68,14 +68,15 @@ it is ready to be — as a consumer of this project, not as a part of it.
 **Settled:** the look, the interaction model, the local voice pipeline, the
 shared-settings model, administration — its own HTTPS listener behind local
 accounts with roles, with a live preview of the real display — the backend
-adapter that puts a real assistant behind it, and the embed API that lets
-another application put this interface inside its own page.
+adapters that put a real assistant behind it, routes, so several names reach
+several destinations from one display, and the embed API that lets another
+application put this interface inside its own page.
 
-**Not done, in the order it matters:** the deployment shapes, because a single
-person running this on their own laptop should not have to configure accounts
-to talk to it. Then identity and memory, so a conversation can mean something
-an hour later — the embed is deliberately memoryless until that lands. Then
-packaging it as a library other projects can install.
+**Not done, in the order it matters:** the Home Assistant adapter, so one of
+those names reaches a house. Then displays the server knows about, which is
+what makes a route binding hold. Then identity and memory, so a conversation
+can mean something an hour later — the embed is deliberately memoryless until
+that lands. Then packaging it as a library other projects can install.
 
 The [Roadmap](#roadmap) carries the reasoning for each, including the
 decisions already taken about how identity and memory should work.
@@ -83,9 +84,9 @@ decisions already taken about how identity and memory should work.
 ## How it works
 
 ```
-  microphone ─→ VAD ─→ /stt (faster-whisper) ─→ wake-word gate ─→ askBackend()
-                                                                      │
-   visualiser ←── Web Audio analyser ←── /tts (Piper) ←── reply ←──────┘
+  microphone ─→ VAD ─→ /stt (faster-whisper) ─→ wake-word gate ─→ /ask + route
+                                            (which word → which route)   │
+   visualiser ←── Web Audio analyser ←── /tts (Piper) ←── reply ←─────────┘
 ```
 
 **Speech in.** Microphone through an adaptive voice-activity detector, then
@@ -186,6 +187,64 @@ route — no route. `admin.html` is not served on them either, and returns 404.
 Users keep exactly four controls: microphone, mute, push-to-talk versus
 hands-free, and whether the transcript is shown.
 
+### What reaches a browser, and what never does
+
+Three tiers, and the boundary between them is the whole of the model:
+
+| tier | contents | who can read it |
+| --- | --- | --- |
+| **never leaves the server** | API keys, the Home Assistant token, adapter base URLs, password hashes | nobody, through any browser |
+| **served to the display** | the settings document: appearance. The routes document: names, greetings, voices, wake words and how strictly each matches | today, anyone who can reach the port |
+| **held by the browser, unreadable by it** | the device token, in an `HttpOnly` cookie | the server, on presentation |
+
+The first row is the one that matters and it is absolute: no credential and no
+upstream address is in any response the display listeners produce. Reading
+everything a browser can obtain gets you no closer to reaching Home Assistant
+or a paid API than reading nothing.
+
+**You cannot keep a secret in a page you serve to somebody.** A token
+embedded in `index.html` can be read out of it by whoever received the file,
+so it is obfuscation rather than access control — the same reason the identity
+design refuses to encrypt anything in the browser and keeps the secrecy in the
+server-side mapping.
+
+So the boundary is not *which fields are hidden*. It is **which devices may
+ask at all**, and there are two mechanisms for that:
+
+- **The network.** Bind to one address, firewall the port, and put the wall
+  displays on their own isolated VLAN. An unapproved device cannot open a
+  connection, so there is nothing to authorise. This is available now and is
+  the strongest of the two.
+- **The device token** (roadmap phase 2). Server-issued, `HttpOnly` so page
+  script genuinely cannot read it, and gated on an admin approving that
+  device. `curl` does not have the cookie. A guest's phone is issued a token
+  and refused because it was never approved.
+
+#### The limitations, stated exactly
+
+**A person using an approved device can read what that device reads.** This is
+not fixable — the page runs on hardware they hold — and it is worth being
+clear about how little it costs:
+
+- On a **wall display**, that person is standing in your hallway, and they can
+  already operate the house by talking to it. Reading the wake words they
+  would have to say anyway is not the exposure in that room.
+- On a **personal device**, that person is its owner, who says those wake
+  words daily. The document tells them nothing they did not already have.
+- In **neither case** does it yield a credential, an endpoint, or anything
+  that would let them reach Home Assistant except by asking this server —
+  which is the thing they were already allowed to do.
+
+**Two people sharing one approved device cannot be told apart.** Approval is
+per device. Distinguishing the people using it needs the PIN, and even then it
+governs what is *remembered* rather than what may be *read*.
+
+**What is exposed today, before phase 2:** the whole settings document, to
+anything that can reach the port. It is appearance values now; it gains wake
+words and route names with routes. Until the device token lands, the network
+is the only boundary there is — which is the argument for the VLAN rather than
+an argument for waiting.
+
 ### The admin interface
 
 `https://<host>:9702` — sign in, and you get the full control panel with a
@@ -234,9 +293,10 @@ admin changes theirs: once someone has muted a display it stays muted for
 them. A browser that has never touched a control follows the admin's document
 exactly.
 
-Nothing else is kept per viewer. Look, geometry, palette, voice and wake word
-remain wholly admin-controlled, because the point of the shared document is
-that one person decides what everyone sees.
+Nothing else is kept per viewer. Look, geometry, palette and voice remain
+wholly admin-controlled, and the wake words are not in that document at all —
+they belong to the routes — because the point of both is that one person
+decides what everyone sees.
 
 The microphone is deliberately not remembered — re-opening it on load would
 raise a permission prompt nobody asked for.
@@ -296,14 +356,81 @@ the network is already the boundary.
 ## Connecting a real assistant
 
 Out of the box it answers from built-in text, so the whole chain can be
-commissioned before any backend exists. **RUN SELF-TEST** in the settings panel
-walks each link — secure origin, settings store, transcription service, voices,
-microphone, recorder, backend, render-and-speak — and names whichever one is
-broken. Keep demo mode permanently: it is how you tell whether a fault is the
-front-end or the model behind it.
+commissioned before any backend exists. **RUN CHECK** on the SPEECH tab walks
+each link — secure origin, settings store, transcription service, voices,
+microphone, recorder, routes, the default route answering, render-and-speak —
+and names whichever one is broken. Keep demo permanently: it is how you tell
+whether a fault is the front-end or the model behind it.
 
-Configure the rest in the admin page under **AI → Assistant**. The panel is
+**Demo is per route, and there is no display-wide switch for it.** There was
+one, and it duplicated the route's own `demo` provider while silently
+overriding it — two settings meaning the same thing, one of them invisible
+from where the other is configured.
+
+Configure the rest in the admin page under **AI → Assistants**. The panel is
 deliberately terse; the reasoning behind each field is here.
+
+### Routes, which the panel calls assistants
+
+**The two words are deliberate, and they are not a synonym for each other.**
+`route` is what the mechanism does — a name resolving to a destination — and
+it is what the document, the API paths and the rest of this file call it. The
+panel says *assistant*, because that is what an admin is setting up, and
+because "route" already means something else entirely to anyone who has
+configured a network. Code and interface are allowed to have their own
+vocabularies; pretending one word serves both is how panels end up written for
+their implementers.
+
+**A route is a name that reaches a destination.** Say its wake word and
+everything after it goes there until the sleep word or the awake timer — the
+route binds to the *conversation* rather than to the sentence, so a follow-up
+needs no second address. Saying a different route's name mid-conversation
+switches to it, and the conversation does not come along: what was said to
+one assistant is another party's words, and handing them over would pay for
+them twice.
+
+A route is a name, a wake word and its aliases, how strictly it matches, an
+adapter and its configuration, and optionally its own greeting and voice — so
+you can *hear* which one answered, which matters the moment two of them can
+reply to the same room. Each carries its own model, prompt, context length
+and key.
+
+Exactly one is the **default**, and it is where anything with no name in
+front of it goes: typed into the composer, sent through an embed, or spoken
+while the wake gate is off.
+
+**A route is published in two halves, and one of them not at all.**
+
+| | fields | who sees it |
+| --- | --- | --- |
+| **presentation** | name, greeting, voice | anyone who can reach the port |
+| **routing** | wake word, aliases, matching | the same today; behind the device token when displays land |
+| **connection** | adapter kind, base URL, API key, prompt | nobody, through any browser |
+
+The wake words must reach the browser because that is where matching happens.
+The adapter kind must not: nothing needs it, replies come back already
+labelled with the route that gave them, and it is the one field that tells a
+reader what this box fronts. `public_routes()` enumerates what is published
+rather than what is withheld, so a field added to a route later is private
+until somebody decides otherwise.
+
+**Matching strictness belongs to the route.** The matcher wakes on
+near-misses, which is right for an assistant and wrong for a light switch:
+the same false-positive rate costs a few tokens on one route and actuates
+hardware on the other. An **exact hit always beats a fuzzy one**, wherever
+each was found — otherwise a near-miss on one route steals an utterance that
+named another outright, which is the worst failure available here.
+
+Two routes cannot share a word, including through an alias, and it is refused
+at the point of saving. Words that are merely *acoustically* close are not
+checked — that wants the matcher that does the waking rather than a string
+comparison, and it arrives with personal wake words.
+
+**Upgrading is automatic and reversible.** `backend.json` becomes route one
+on first start, taking its wake word from the shared settings so the box
+answers to the same word afterwards as before. Both source documents are left
+on disk: an upgrade that deletes what it read from has no way back if the
+migration was wrong.
 
 ### The three providers
 
@@ -382,10 +509,15 @@ one.
 
 Never in `settings.json`. That document is world-readable by design — every
 viewer's interface is built from it — so a credential there would be handed to
-anyone who opened the page. The assistant configuration lives in its own
-`backend.json` at mode 600, admin-only, and the key is never returned to a
-browser: the field shows whether one is stored, not what it is. **FORGET KEY**
-clears it.
+anyone who opened the page. The routes live in their own `routes.json` at mode
+600, admin-only, one key per route, and a key is never returned to a browser:
+the field shows whether one is stored, not what it is. **FORGET KEY** clears
+it for the selected route.
+
+Changing a route's provider drops its key and its base URL unless new ones
+arrive in the same save. Carrying one provider's endpoint into another would
+send a hosted key to whatever is listening on the old URL — a failure in the
+one direction that looks like success.
 
 Measured round-trips on the reference box, cold then warm:
 `qwen2.5:1.5b` 1.4s / 1.6s, `qwen2.5:3b` 10.1s / 3.6s, `qwen2.5:7b` 28.2s /
@@ -457,7 +589,8 @@ On every listener:
 | `POST` | `/tts` | text in, WAV out. `?voice=`, `?rate=` |
 | `GET` | `/tts/voices` | installed neural voices |
 | `GET` | `/settings` | the shared interface configuration |
-| `POST` | `/ask` | a question to the connected assistant |
+| `GET` | `/routes` | the routes, presentation and routing halves only |
+| `POST` | `/ask` | a question — `{"route": …}` picks one, absent means the default |
 
 Display listeners only — the embed does not exist on the admin port:
 
@@ -475,20 +608,41 @@ Admin listener only — everything below returns 404 on the public ports:
 | `POST` | `/auth/logout` | end the session |
 | `GET` | `/auth/me` | who am I, and with what role |
 | `POST` | `/auth/password` | change a password; your own needs the current one |
-| `POST` | `/settings` | replace the configuration — `admin` role |
+| `POST` | `/settings` | write the configuration — `admin` role. A bare object replaces it; `{settings, merge}` writes only the keys it carries |
 | `GET` | `/app` | ports and session length, plus what is actually running |
 | `POST` | `/app` | change them — `admin` role, restart to apply |
 | `GET` | `/users` | list accounts — `admin` role |
 | `POST` | `/users` | create an account — `admin` role |
 | `POST` | `/users/role` | change a role — `admin` role |
 | `POST` | `/users/delete` | remove an account — `admin` role |
+| `GET` | `/routes/all` | every route in full, less the keys — `admin` role |
+| `POST` | `/routes/new` | create one — `admin` role |
+| `POST` | `/routes/save` | change one — `admin` role |
+| `POST` | `/routes/default` | choose which answers the unaddressed — `admin` role |
+| `POST` | `/routes/enable` | enable or disable one — `admin` role |
+| `POST` | `/routes/delete` | remove one, and its key — `admin` role |
+| `POST` | `/routes/test` | one real round trip against that route — `admin` role |
 | `GET` | `/embeds` | list embed keys — `admin` role |
 | `POST` | `/embeds` | create one; the key is returned once — `admin` role |
 | `POST` | `/embeds/enable` | enable or disable one — `admin` role |
 | `POST` | `/embeds/delete` | revoke one — `admin` role |
 
+**Everything else 404s, including files that are not secret.** The server
+hands out four files — `index.html`, `admin.html`, `icon.svg`, `lockup.svg` —
+and refuses every other path. An allow-list rather than a list of things to
+hide, because the directory `serve.py` runs from is a deployment: the base
+class serves whatever is sitting in it, and what was sitting in it was the TLS
+private key, the account hashes and one API key per route. Deny-by-default
+also answers traversal and percent-encoding without either needing a rule.
+
 The last admin account cannot be deleted or demoted; an interface nobody can
-administer is a brick.
+administer is a brick. The last route cannot be deleted or switched off for
+the same reason: a server with nowhere to send a question is a composer wired
+to nothing, recoverable only by editing JSON on the box.
+
+`/routes` is the one path with a public half and a private half, and every
+privileged operation sits under `/routes/…` precisely so the admin-only list
+can stay a list of paths rather than a list of paths and methods.
 
 ## Driving the visualiser directly
 
@@ -592,6 +746,23 @@ only to hands-free mode and did nothing in push-to-talk, with no indication —
 it read as simply broken. Live status text now states whether each gate is in
 effect and why.
 
+**A deployment directory is not a document root.** `SimpleHTTPRequestHandler`
+serves what is beside it, and beside it were `key.pem`, `users.json`,
+`routes.json` and the source. The fix is an allow-list of the four files that
+are genuinely pages or artwork; the lesson is that a *denylist* of secrets
+cannot be written correctly, because the file holding one credential per route
+did not exist yet when it would have been written. Deny by default, and
+enumerate what is published rather than what is withheld — the same shape as
+`public_routes()`.
+
+**A dangling CSS selector list is invisible to every check.** Deleting a rule
+took the `{max-width:560px}` off the end of a shared selector list, leaving
+three selectors reading on into the next rule — which was `display:none`, so
+the filter field, the tab caption and the whole tab row vanished. The braces
+still balanced, the JavaScript still parsed, and CSS has no error to report:
+it simply continues to the next block. The check that catches it is that no
+comma-terminated selector line may be followed by a comment or a blank line.
+
 ## Contributing
 
 Branch off `main`, deploy and verify live, then open a PR — see
@@ -619,7 +790,399 @@ twin-lobe silhouette at favicon size and stays legible to 16px.
 
 ## Roadmap
 
-Roughly in order of value:
+This stopped being "roughly in order of value" the moment there was a concrete
+deployment to build for. A real target decides what blocks what, and several
+things that looked independent turn out to sit on top of each other.
+
+### The deployment this is now ordered around
+
+Wall-mounted tablets through a house, driving **Home Assistant by voice**,
+while remaining a general assistant. It is a gateway: one name reaches the
+house and can switch a light on, another reaches a model running locally, a
+third reaches a hosted one — every wake word a field somebody sets, none of
+them a default. People also have their own devices, their own conversation
+histories, and are standing in the same rooms as the tablets.
+
+Of those three destinations only the house is new work. A local model and a
+hosted one are the `openai` dialect and the `anthropic` adapter that already
+exist; what changes is that they stop being *the* configuration and become
+entries in a set.
+
+That last sentence is where the difficulty lives. Everything else follows from
+two people in one room with three listening microphones between them.
+
+### Build order
+
+| | phase | delivers | sits on | open decisions |
+|---|---|---|---|---|
+| 1a | ~~**Routes**~~ **— built** | three names reaching three destinations, verifiable with no Home Assistant involved | — | none |
+| 1b | **The Home Assistant adapter** | saying the house name switches a light on | 1a | none |
+| 2 | **Displays, and binding a route to one** | only the tablets you approved can actuate the house, whatever anyone's browser is set to | 1b | none |
+| 3 | **What a wall display looks like** | voice only, and a screensaver that is still the product | 2 | none |
+| 4 | **Staying up unattended** | a tablet nobody touches for a year is still working | 3 | **all of it** · not designed |
+| 5 | **Identity and the PIN** | a person, as distinct from a place | 2 | **1** · whether an identity carries its own Home Assistant token |
+| 6 | **Personal wake words** | one person addressing a tablet stops triggering another person's device | 5 | none |
+| 7 | **Memory** | conversations that mean something across sessions | 5 | **1** · what the retained unit is — deliberately left to experience |
+| 8 | **Diagnostics** | a failing screen findable without standing in front of it | 2 | **1** · the retention default |
+
+The last column counts decisions that need **you**, not implementation choices
+made while building and shown afterwards. A phase reading *none* is ready to
+start.
+
+**Nothing outstanding blocks starting.** Everything before phase 4 reads
+*none*, and phase 4 is a design problem to think through rather than a
+question to answer — its position will move once it has been. The three
+remaining are each answerable when their own phase comes up, and one of them
+is deliberately waiting on experience rather than on a decision.
+
+**One is two deliveries rather than one.** Routes stand up on their own — demo,
+a local model and a hosted one are three destinations reachable by three
+names, and wake-word routing can be shaken out on a test box before Home
+Assistant is anywhere near it. If the refactor breaks something, that is when
+you find out, rather than while also debugging a new adapter.
+
+**1a is built** — see the progress log. It was worth splitting: it turned up
+three faults that had nothing to do with Home Assistant and would have been
+debugged through a new adapter otherwise.
+
+**Four is a placeholder, not a specification** — see its entry. Its position
+here is a guess and will move once it has been thought through.
+
+Two and three were one phase until the wall-mounted side outgrew it. They
+share a substrate — a display the server knows about — but nothing else:
+phase 2 is server-side enforcement and gate logic, phase 3 is canvas and
+presentation. Splitting them keeps each verifiable in one sitting, and stops a
+safety property waiting on a screensaver.
+
+**Three sits where it does because burn-in is a clock, not a backlog item.**
+Every day a tablet runs without it is damage that cannot be taken back, and
+that clock starts the day the first one goes on a wall — which is during
+phase 2. Everything after it can wait; this cannot wait as cheaply.
+
+**The admin interface is part of each phase, not a phase of its own.** A route
+you cannot configure is not a feature, and a phase whose settings are only
+reachable by editing JSON on the box cannot be tested by the person who wants
+it. Each entry below carries its own panel scope.
+
+---
+
+- **Routes, and Home Assistant.** One assistant configuration becomes a set of
+  named ones. A route is a name, a wake word and its aliases, an adapter and
+  its configuration, and optionally its own voice — so you can *hear* which
+  one answered, which turns out to matter when two of them can reply to the
+  same room.
+
+  `/ask` takes a route. The adapter machinery underneath does not change.
+
+  **A route is published in two halves, and one of them is never published at
+  all.** Wake-word matching happens in the browser, so some of a route has to
+  reach it; the rest has no business there.
+
+  | | fields | who sees it |
+  | --- | --- | --- |
+  | **presentation** | name, greeting, voice | anyone who can reach the port |
+  | **routing** | wake word, aliases, match strictness | the same today; behind the device token from phase 2 |
+  | **connection** | adapter kind, base URL, API key, Home Assistant token | nobody, through any browser |
+
+  **The adapter kind is on the wrong side of that line to publish.** Nothing
+  needs it — routing is by wake word and replies come back already labelled —
+  and it is the one field that tells a reader this box fronts a home
+  automation system rather than merely an assistant. That is a targeting
+  signal rather than a name. If the interface later wants a house route to
+  *look* different, the server can send a neutral presentation hint that says
+  "style this one apart" without naming what it connects to.
+
+  **Splitting presentation from routing is what lets an unapproved display
+  still render.** Appearance and names are harmless and keep a newly hung
+  tablet looking correct; the wake words are what actually make it usable, and
+  those move behind the device token when phase 2 lands. Until then the whole
+  document is readable by anything that can reach the port, which is an
+  argument for the network boundary rather than for delaying either phase.
+
+  **The wake word that woke it decides the route, and the route stays bound to
+  the conversation rather than to the sentence.** This falls out of what is
+  already there: the wake word does not gate each utterance, it sets `awake`
+  with a timeout and everything after it passes through until the sleep word
+  or the timer. So a follow-up reaches the same destination without being
+  re-addressed, which is the only tolerable behaviour for speech.
+
+  **Home Assistant is an adapter, not a second concept.** Its conversation API
+  is chat-shaped: `POST /api/conversation/process` with a bearer token, and
+  the reply carries `response.speech.plain.speech` — text to read aloud, the
+  same shape `openai` and `anthropic` already produce. Inventing an "action
+  target" beside the adapter would be a second mechanism for something the
+  first one does.
+
+  Two fields of that reply are worth more than they look:
+
+  **`continue_conversation` decides whether to hang up**, and it belongs to
+  the reply rather than to the configuration. A command should acknowledge and
+  close; but "turn on the lights" answered with *"which room?"* must stay
+  open, and a route configured one-shot would hang up on the question it just
+  asked. Read the flag and call the existing `sleepNow()` when it is false.
+
+  **`data.code == "no_intent_match"` is the fallthrough signal.** Nobody
+  remembers which name owns which capability, and asking the house a question
+  it cannot answer will be constant. A route can name another to fall through
+  to: the house does not recognise it, the model gets it instead, and the
+  person is never told they used the wrong word. Structured, so this is a
+  branch rather than string-matching an apology.
+
+  **`conversation_id` has to be held for the awake window.** HA returns one
+  and accepts it back, and it is what makes *"which room?" → "kitchen"* work.
+  Its lifetime is exactly the route binding's: hold it while awake, send it on
+  every turn, drop it on sleep.
+
+  **`agent_id` is a field on the route, not a constant.** HA can have several
+  conversation agents, and which one answers changes the design around it:
+
+  - the **built-in intent engine** matches sentences, so it reports
+    `no_intent_match` reliably and the fallthrough above is what makes it
+    usable
+  - an **LLM-backed agent** interprets instead of matching, so "it's a bit
+    dark in here" works, and `no_intent_match` then essentially never fires
+
+  **HA has no model of its own.** What it has is the harness: a
+  conversation-agent framework, integrations that point at a model *you*
+  supply — hosted, or local through its Ollama integration — and the exposure
+  layer that turns your entities into tools that model may call. Worth being
+  exact about, because it means adopting this still costs you a model and
+  somewhere to run it.
+
+  **The LLM agent is the one this deployment wants**, and the interpretation
+  belongs on the HA side rather than here — but for a narrower reason than
+  "HA does it already". What is not worth rebuilding is the **tool and
+  exposure layer**: entity discovery, tool definitions, the calling loop, and
+  the gating that decides what may be touched. That is HA's, it is the fiddly
+  part, and a copy here would be a second weaker version of a control that
+  already holds no matter what talks to HA. The rule from the entity-exposure
+  note applies to the reasoning as well as the permissions: **the house's
+  logic belongs to the house.**
+
+  One consequence of supplying that model: it is a *second* one, beside the
+  route Resonance already points at. On one Ollama instance that is a single
+  box serving two callers that want different things — conversational quality
+  on one side, reliable tool calling on the other — and those are not always
+  the same model.
+
+  Consequence worth stating plainly, because it inverts the paragraph above:
+  with an LLM agent, fallthrough is an option you leave off for that route
+  rather than the thing that rescues it.
+
+  **What voice may touch is configured in HA**, through exposing entities to
+  Assist. Resonance must not grow its own allow-list of entities — it would be
+  a second, weaker copy of a control that already holds no matter what talks
+  to HA.
+
+  **Give it a non-admin HA user of its own.** A long-lived token carries that
+  user's permissions and never expires, and every action appears in the
+  logbook as that user regardless of who spoke. Once identities exist, an
+  identity can carry its own token, which is the only way to make HA aware of
+  who actually asked.
+
+  **Timeout belongs to the route, and tracks the agent rather than "HA".**
+  The two agents are orders of magnitude apart: the built-in intent engine
+  answers in about a tenth of a second, while an LLM agent is *two* model
+  passes — one to emit the tool call, another to write the reply once HA has
+  executed it — each carrying the exposed-entity tool definitions in its
+  prompt. On modest or CPU-only hardware that is tens of seconds, and a
+  timeout chosen for an intent engine would cut off requests that were about
+  to succeed.
+
+  The corollary for a first deployment: **expose few entities.** It shrinks
+  the prompt on every call, which is most of the latency, and it makes the
+  choice easier, which is where a small model actually fails. Choosing among
+  four lights is a fair test of the design; choosing among sixty is a test of
+  the model.
+
+  **A failure has to be audible.** A chat backend failing quietly is an
+  annoyance; a light command that failed quietly is indistinguishable from one
+  that worked, and somebody walks away believing the house did something.
+  Unreachable, rejected token and HA-side error all get spoken.
+
+  **Not taken: the Wyoming satellite route.** It is HA's expected way to
+  integrate a voice device, and it inverts this product — HA would own wake
+  word, transcription and speech, leaving a microphone with a screen. The
+  conversation API keeps the seam at text, which is the one place these two
+  systems agree. Recorded so it is not rediscovered as an oversight.
+
+  **Match strictness belongs to the route.** The existing matcher wakes on
+  near-misses, which is right for an assistant and wrong for a light switch:
+  the same false-positive rate costs a few tokens on one route and actuates
+  hardware on the other. Exact on routes that do things, fuzzy on routes that
+  answer.
+
+  **Wake words want to be acoustically distant, not merely different.** Three
+  shared names plus a personal one per person is a lot for a fuzzy matcher on
+  transcribed speech to tell apart. Differing syllable counts, vowels and
+  stress survive a noisy room; two names a letter apart do not. Worth choosing
+  on that basis before a household learns them, because changing one
+  afterwards is its own small misery.
+
+  *Panel:* one block per endpoint rather than one form — its wake word and its
+  connection together, saved together, with its own TEST. For a house route
+  that test is worth more than usual, since it answers whether the token, the
+  agent and the exposure are all right at once. Built; see the progress log.
+
+- **Displays, and binding a route to one.** The problem this exists for: two
+  people in a room, one of them addressing the wall tablet, and everybody
+  else's microphone hearing it too.
+
+  Push-to-talk on personal devices is the correct configuration and is already
+  a per-browser setting — and it is not a control, because nothing makes
+  anybody set it. **So the enforcement is server-side at `/ask`:** a route
+  carries the displays allowed to use it, and a phone that wakes on the house
+  name is refused there regardless of how its browser is configured. The
+  browser's settings stop being load-bearing.
+
+  **A name cannot be the credential.** `?display=kitchen` is guessable, so
+  binding on the declared name alone would let anything that types it reach
+  the route. The server issues an unguessable token on first visit and an
+  admin approves the device; the name says which place it is, the token says
+  it is that place. This is the `token` row of the identity entry below,
+  needed here first and for a different reason.
+
+  **The refusal is silent.** No spoken error, nothing in the transcript: that
+  utterance was addressed to a different device, and one nobody was talking to
+  announcing that it cannot help is noise laid over the answer somebody is
+  waiting for.
+
+  **The same rule has to apply mid-conversation**, which is the worse case.
+  A device already awake on its own route passes everything it hears straight
+  through — so another person's house command would land in a stranger's
+  conversation, be paid for, and be answered aloud. The gate rule:
+
+  > Hearing a wake word for a route this display is not allowed to use — drop
+  > the utterance. Do not pass it to the current route, and do not switch.
+
+  Stated that way it also gives the behaviour you *do* want: where the display
+  **is** allowed the route, hearing its wake word mid-conversation switches to
+  it. One person at one tablet changing what they are addressing.
+
+  **An unapproved display renders, and cannot be spoken to.** The appearance
+  settings are public, so a new tablet shows the geometry correctly the moment
+  it is hung; it holds no approved token, so no wake word reaches a route.
+  Hang it, see it appear in the admin list, approve it, and it starts working.
+  Wrong-looking and refused would be a worse first five minutes than
+  right-looking and inert.
+
+  It is also the answer to the obvious attack, and the reason a token exists
+  rather than a URL being treated as secret. Somebody types a wall display's
+  URL into their own phone: that phone has no cookie, so it is issued a *new*
+  token, which nobody approved. The kitchen tablet's token is in the kitchen
+  tablet's cookie jar and was never in the URL. **The URL is a name, not a
+  key** — which is the same point as names being guessable, wearing a
+  different hat.
+
+  **Places and people bind differently, and the difference is cardinality:**
+
+  | | bound by | how many devices |
+  | --- | --- | --- |
+  | a **place** — the tablet in the kitchen | token + an admin approving it | exactly one |
+  | a **person** | their PIN | as many as they like |
+
+  A wall display is one physical object and two things claiming to be it is
+  always wrong, so it is pinned to a single token that an admin blesses. A
+  person is not a physical object — phone, tablet and laptop are all
+  legitimately them — so their credential is something they *carry* rather
+  than something a device *has*. They enter the PIN, that device earns its own
+  token, and they are not asked again.
+
+  One mechanism, two ways of granting it: an admin bestows a place's, a person
+  earns their own.
+
+  **An unapproved request is recorded and shown**, with the display it asked
+  for and when. Not an alarm — a line in the list. It is the enrolment queue
+  when it is your own new tablet, and the early warning when it is somebody
+  trying a URL they overheard.
+
+  A stored device fingerprint may sit beside that entry as a **hint for the
+  person approving** — "this matches your approved kitchen display" — for the
+  one case a token cannot survive, which is a browser wiping its data. It must
+  never become the credential: fingerprints are forgeable by the client,
+  unstable across updates, and identical across two tablets bought together,
+  which is every property you do not want in one.
+
+  *Panel:* a displays list — declared name, token, last seen, approve, rename,
+  delete — unapproved requests with what they asked for, and an
+  allowed-displays list on each route.
+
+- **What a wall display looks like.** The two settings that make a tablet on a
+  wall a different object from a browser tab. Both hang off the display the
+  phase above registered, and neither touches the server's behaviour — this is
+  entirely canvas and presentation.
+
+  **Voice only** — the geometry alone, no transcript and no composer. That is
+  what a tablet bolted to a wall wants: it is not a workstation, and a screen
+  of scrolling text in a hallway is neither useful nor discreet.
+
+  Most of this exists. `data-text="off"` already hides the transcript and the
+  composer together, and the embed chrome does the same through
+  `data-noparts`. What is missing is somewhere for an admin to say it once,
+  per display, rather than it being whatever the last person to touch the
+  screen chose.
+
+  It has to **outrank the viewer preference**, which is a reversal worth
+  stating: the three viewer controls were built to beat the shared settings
+  deliberately, because a person in front of a screen knows better than a
+  document does. This is the exception — a policy for a place, not a
+  preference of a passer-by. And where it applies the TEXT button is
+  **removed, not disabled**. A control that is present and ignores you is
+  worse than one that was never offered.
+
+  **A screensaver that is still the product.** A tablet showing a
+  mostly-stationary field for years will burn it into the panel. The usual
+  answer replaces the screen with something else; this one keeps the same face
+  — every appearance setting still applied — and moves it.
+
+  **Scale down, then drift**, rather than drift alone: drawn full-bleed there
+  is nowhere to go and translating only clips the edges. Shrinking first
+  creates the margin to move within, and lights fewer pixels while it is at
+  it. Slow continuous drift rather than a bouncing path — it covers more of
+  the panel over a night and is calmer to share a room with.
+
+  **A dim level beside it**, as its own number. Reducing brightness does more
+  against burn-in than movement does, and it is independently what a hallway
+  screen should do at two in the morning.
+
+  **It ends on the wake word or on touch**, easing back to the centre rather
+  than snapping. On a voice-only display touch is the only signal that is not
+  speech, so it has to count. The transcript hides while it drifts — text
+  sliding around a screen is worse than either state on its own.
+
+  *Panel:* voice only, and the screensaver's idle delay, scale and dim, on
+  each display in the list the phase above builds.
+
+- **Staying up unattended.** *Not designed yet — this entry states the problem
+  and nothing else. Its position in the order is provisional.*
+
+  Everything built so far assumes a page somebody opened and will close. A
+  tablet on a wall is a browser tab running for a year: through server
+  restarts, network drops, Home Assistant reboots, certificate renewals and
+  its own operating system's ideas about backgrounding, with nobody standing
+  in front of it to notice or reload.
+
+  The questions, unanswered:
+
+  - does the page recover by itself when `serve.py` restarts, or does somebody
+    walk over and tap reload
+  - does a failed request retry, and how does it behave while the server is
+    down — quietly, or by saying so
+  - does anything leak over weeks: the canvas, the transcript, audio nodes,
+    the session
+  - what happens when the tablet's browser suspends a background tab, or the
+    screen sleeps, or the device reboots at 4am after an update
+  - how does anyone *find out* it stopped working, given the whole point of
+    the two phases above is that it shows very little
+
+  The failure mode worth designing against is specific: **a screen that looks
+  perfect and does nothing.** The geometry is still moving because it is
+  driven locally, the drift is still drifting, and nothing has reached the
+  server in a week. That is worse than a blank screen, which at least gets
+  reported.
+
+  It is not much work. It is invisible work, which is why it needs its own
+  entry — nobody ever gets to it as part of something else.
 
 - **Identity, in three strengths.** How a device or person identifies itself
   decides what may be kept, because the strength of the claim and the
@@ -716,6 +1279,40 @@ Roughly in order of value:
   visible rather than silent, and the server names it specifically if
   something asks for it over the API.
 
+  **The token row is pulled forward** into the displays entry above, where it
+  is needed to make a route binding hold rather than to make memory durable.
+  What is left here is the PIN, and the thing the PIN unlocks: **per-identity
+  settings**, a storage tier that does not exist yet. There is shared
+  configuration, per-browser preference, and per-embed grant; a setting that
+  belongs to a *person* has nowhere to live. Personal wake words are the first
+  thing to need it and memory is the second.
+
+  *Panel:* identities, PIN policy and its minimum length, per-display session
+  length, and a PIN reset on the device list.
+
+- **Personal wake words.** Two people in a room, both with their own devices,
+  and one of them says the name that reaches the model — both devices answer.
+  Route binding cannot help: they are both legitimately allowed that route.
+
+  Give an identified person their own wake word and the collision stops
+  happening rather than being reconciled after the fact. It is also what
+  people expect: an assistant answers to a name you chose.
+
+  **Uniqueness has to be enforced with the matcher that does the waking**, not
+  a string comparison. A word acoustically close to the house name, or to
+  somebody else's, puts you back where you started — so a candidate is run
+  through the same fuzzy matcher against every word already in use and refused
+  on a near-hit. What passes validation is then exactly what will not
+  cross-trigger, because the same function decided both.
+
+  Shared words stay the default for any display with no identity attached,
+  which is every wall tablet. One consequence to expect: a person standing at
+  a tablet and using *their* word gets nothing, because that tablet is not
+  their device. Correct, and it will still surprise somebody the first time.
+
+  *Panel:* a wake word on each identity, with the collision check answering at
+  the point of entry rather than on save.
+
 - **Memory.** Give conversations meaning across sessions — derived, not
   verbatim. A rolling summary or a small set of retained facts, not a
   transcript: it survives context limits, and it is a far smaller thing to
@@ -758,11 +1355,54 @@ Roughly in order of value:
   useful unit is a summary per session, extracted facts, or something narrower
   is an empirical question, and guessing means building the wrong shape.
 
+  *Panel:* retention window, what is held per identity, and deletion — for an
+  admin over anybody, and for a person over themselves.
+
 - **Diagnostics.** Technical events keyed to a device: the microphone would not
   open, transcription took four seconds, the voice service returned an error,
-  this browser has no recorder. No conversation content. A health view per
-  device in the admin page, so a failing screen can be found without anyone
-  standing in front of it.
+  this browser has no recorder. A health view per device in the admin page, so
+  a failing screen can be found without anyone standing in front of it.
+
+  Sits on the displays entry rather than on identity: the useful key is the
+  device with the failing microphone, not whoever happened to be standing at
+  it.
+
+  **This entry used to promise "no conversation content", and that boundary
+  has moved.** Stated precisely rather than quietly broken, because a promise
+  like that is worth only what it is kept to:
+
+  > What was addressed to the device — from the wake word to the end of the
+  > conversation — and the routing decision that followed, retained for a
+  > window. Nothing outside an active conversation is recorded.
+
+  The reasoning for the change: a voice-only display shows nobody anything, so
+  when it mishears there is no record at all and nothing to fix. And the
+  captured text is exactly what already leaves the machine — it goes to HA or
+  to a model regardless — so this adds retention, not disclosure. Nothing is
+  captured unless somebody said a wake word.
+
+  **The words are the least useful part.** What makes a voice fault
+  diagnosable is the decision trail beside them:
+
+  - what the recogniser produced, **before** the wake word was stripped
+  - which route matched, and how — exact, or fuzzy on which alias
+  - what was sent, what came back, how long each leg took
+  - errors, verbatim
+
+  "It didn't work" then resolves into *the recogniser heard "hows" and matched
+  it fuzzily to the house route*, which is something you can act on. It is
+  also the only way to find out that two wake words are cross-triggering,
+  which is the standing risk of several shared names in one house.
+
+  Some of this is already computed and thrown away: the interface says *woke
+  on "hows" (near "house")* as a note that fades, and on a wall tablet nobody
+  is ever there to read it.
+
+  Retention is the control, since there is no other, and it wants a short
+  default rather than a generous one.
+
+  *Panel:* health per display and the conversation record, alongside the entry
+  that already lists them; retention window; deletion.
 - **The embed, once there is an identity to attach to it.** The memoryless
   embed shipped first, deliberately: it is exactly the `named, no PIN → no
   memory` row above, so it needs no notion of a person at all. What remains
@@ -795,21 +1435,128 @@ Roughly in order of value:
   means adding a voice needs shell access to the machine. Transcription
   models are deliberately out of scope: faster-whisper fetches those itself
   on first use, and the panel already picks between them.
+Four of the remaining entries were nice-to-have while this was a chat window
+on a desk. A tablet bolted to a wall, answering a household, moves them:
+
 - **Barge-in.** Detect speech during playback and duck immediately. Nobody
-  tolerates waiting out a wrong answer.
+  tolerates waiting out a wrong answer — and a wall tablet is the case where
+  you cannot simply stop it, because there is no keyboard and you are holding
+  something in both hands.
 - **State in the geometry.** Distinct colour and motion for thinking, speaking
-  and *failing*, so a fault is visible without reading anything.
-- **Domain vocabulary hints.** `?hint=` already exists and is unused; a host
-  application knows its own hostnames and interfaces.
+  and *failing*, so a fault is visible without reading anything. The two
+  adapter kinds now have wildly different tempos — a local intent answers in
+  about a tenth of a second, a model takes seconds — and a display that looks
+  identical during both teaches people it has frozen.
+- **Domain vocabulary hints.** `?hint=` already exists and is unused. **Home
+  Assistant knows its own room and entity names**, which is exactly the
+  vocabulary the recogniser is going to get wrong: "turn on the bedside lamp"
+  fails on the two words that carry the whole sentence. Pulling that list from
+  the same server the route already points at is close to free, and it
+  improves the case that matters most.
 - **Unprompted speech.** Let a host application make it speak — an alert
   arrives, the geometry wakes, it tells you. That is a different product from
   a chat box. The `signage` embed preset is already the shape that wants it:
   the figure alone, no microphone, speaking only what the host pushes — and
-  until this lands there is nothing for the host to push with.
+  until this lands there is nothing for the host to push with. **Home
+  Assistant is a host with things to say**: a door left open, a machine
+  finished, somebody at the gate. A house that can only answer when spoken to
+  is half of what people want from one.
 
 ## Progress log
 
 Newest first.
+
+### 2026-08-14 — the panel stopped being written for its implementer
+
+The routing worked; the interface describing it did not. Reworked against
+repeated, specific complaints, each of which turned out to be pointing at
+something real.
+
+- **Routes became endpoints, and each is one block.** A list plus three shared
+  sections that repainted for whichever row was selected asked you to hold
+  "which one am I editing" across three collapsed sections, and made a second
+  endpoint feel like a mode rather than a thing. Each endpoint is now one
+  block — its wake word and its connection together, saved together — headed
+  with what you say and what it is wired to. Three of them in a column is its
+  own answer to whether more than one is supported.
+- **Its sections are separate boxes, not one long form.** Five of them, tiling
+  rather than stacked, each summarising itself so the whole configuration
+  reads off the closed headings: *"house" +2 more · exact*, *400 tokens · 8
+  turns · 120s*. Opening one is for changing it, not for finding out what it
+  says. The endpoint's actions run along the foot of its box.
+- **The word `route` left the interface.** It means something else entirely to
+  anyone who has configured a network, and the panel had two sections one
+  letter apart. It survives in the document, the API paths and this file,
+  where it accurately describes a name resolving to a destination. Code and
+  interface are allowed their own vocabularies; pretending one word serves
+  both is how a panel ends up written for the people who implemented it.
+- **Three bugs behind one complaint.** ADD created the endpoint and left the
+  only section holding its name collapsed — `focus()` on an element inside a
+  hidden section does nothing, so there was nowhere to type, and editing a
+  saved wake word looked impossible for the same reason. Any repaint tore the
+  blocks down and rebuilt them, discarding work in progress. And a successful
+  save never cleared "saving…", which reads as a hang.
+- **One place means demo.** A display-wide DEMO / CONNECTED AI switch
+  duplicated each endpoint's own `demo` provider *and silently overrode it* —
+  you could point an endpoint at a real model and still get built-in replies,
+  with the reason on a different tab. Gone; the endpoint decides. Testing an
+  endpoint is the TEST in its own block, which goes through its own adapter,
+  so it will test Home Assistant against Home Assistant with no change. What
+  the old self-test really did was check the chain *around* the endpoints, so
+  it moved to SPEECH as RUN CHECK, beside the microphone and voices.
+- **Each tab commits itself.** One SAVE FOR EVERYONE across three tabs meant
+  pressing it while looking at MOTION also published what had been left
+  half-adjusted on LOOK. Each tab now saves only its own settings, which
+  needed `{settings, merge}` on `/settings` — merging inside the write, so two
+  admins cannot undo each other. Which tab owns which setting is learned from
+  where the control sits, and anything the panel can change that no tab claims
+  is called out in the row. That check immediately found one.
+
+### 2026-08-14 — three names, three destinations
+
+Roadmap phase 1a. One assistant configuration became a set of named ones, and
+the assistant tab became a list rather than a form.
+
+- **A route is a name that reaches a destination**, and it binds to the
+  *conversation* rather than to the sentence — the follow-up goes where the
+  first question went. Saying another route's name mid-conversation switches
+  to it and **drops the conversation**: those words were addressed to
+  somebody else, and forwarding them would pay for them twice.
+- **Published in two halves, and one of them not at all.** Presentation and
+  routing reach the browser because that is where matching happens; the
+  adapter kind, base URL and key do not, at any tier. `public_routes()`
+  enumerates what is published rather than what is withheld, so the next
+  field added to a route is private by default.
+- **Exact beats fuzzy, wherever each was found.** Without that rule a
+  near-miss on the first route in the list steals an utterance that named the
+  second one outright — the person said the right word and got the wrong
+  assistant. It is the one thing in the matcher worth a test, and it has one.
+- **Strictness belongs to the route**, because the same false-positive rate
+  costs a few tokens on one and actuates hardware on the other. `hows` no
+  longer reaches a strict `house`.
+- **Per-route greeting and voice**, so a room with three of them can hear
+  which answered rather than read it.
+- **A per-route TEST**, replacing one that asked "does the assistant work".
+  With several routes that stopped being a question with an answer, and a
+  test quietly exercising the default while you looked at another route would
+  be worse than none.
+- **Upgrading is automatic and reversible.** `backend.json` becomes route one
+  and keeps the wake word out of the shared settings, so the box answers to
+  the same word afterwards as before. Both source documents stay on disk.
+- **Three faults found by building this before the adapter**, which is the
+  whole argument for splitting the phase: a route switched to Anthropic kept
+  the local base URL *and* the previous key, so a hosted credential would have
+  gone to a model on this network on an `x-api-key` header — failing in the
+  one direction that looks like success. Disabling the default route left the
+  default pointing at it, so the composer would have gone quiet. And the wake
+  state readouts in the panel had never worked at all: the code that writes
+  them runs in the display, where the elements do not exist. All three fixed.
+- **The wake word left the SPEECH tab**, because with several routes the word
+  is what picks between them and it belongs to the thing it picks. What is
+  left there is the gate's behaviour, which is one thing for the whole
+  display. LEARN went with it and now teaches one named route — it cannot
+  save, so the words it captures come back up the preview channel into the
+  panel's field, unsaved, for an admin to commit.
 
 ### 2026-08-13 — what it is reachable at, and what it takes to get in
 

@@ -262,21 +262,31 @@
      instead of a division of the panel. */
   #panelhead > .findrow,
   #panelhead > .tabgroup,
-  #panelhead > .tabs,
-  #panelhead > #savestate,
-  #panelhead > #saverow{max-width:560px}
+  #panelhead > .tabs{max-width:560px}
 
   /* The app tab's own commit row, at the foot of the box. Hidden outright
      on every other tab: a save button that belongs to settings you cannot
      currently see is a save button somebody will eventually press. */
-  #approw{display:none;margin-top:14px;padding-top:10px;
+  #approw,#airow,.uirow{display:none;margin-top:14px;padding-top:10px;
           border-top:1px solid rgba(var(--glass),.30)}
-  #approw.on{display:block}
-  #approw .seg{justify-content:flex-end;margin-top:8px}
-  #approw .seg button{border-width:2px;border-style:solid;padding:6px 10px}
+  #approw.on,#airow.on,.uirow.on{display:block}
+  #approw .seg,#airow .seg,.uirow .seg{justify-content:flex-end;margin-top:8px}
+  #approw .seg button,#airow .seg button,
+  .uirow .seg button{border-width:2px;border-style:solid;padding:6px 10px}
+  /* What this row's scope actually is. Worth a line, because "shared" is the
+     property that separates these from the three controls a viewer keeps. */
+  .uirow .scope{
+    font-size:calc(8.5px * var(--fs));letter-spacing:.08em;
+    color:rgba(var(--paper),.6);
+  }
+  .uirow .state{
+    font-size:calc(9px * var(--fs));letter-spacing:.06em;margin-top:4px;
+    color:rgba(var(--paper),.8);
+  }
+  .uirow .state.alert{color:#eaa8a8}
   /* Spans every column once the topics tile, so it reads as the foot of the
      whole box rather than the tail of whichever column it landed in. */
-  @container (min-width:700px){ #approw{grid-column:1/-1} }
+  @container (min-width:700px){ #approw,#airow,.uirow{grid-column:1/-1} }
 
   /* The caption over a row of tabs. Quieter than anything it labels — it is
      there to be read once and then ignored, not to compete with the tabs
@@ -299,15 +309,7 @@
   #panelfoot > *{max-width:560px}
   /* nothing but the tab row lives here now — the identity moved to the bar
      at the top of the panel, where it does not scroll away */
-  #savestate{
-    font-size:calc(9px * var(--fs));letter-spacing:.06em;line-height:1.5;
-    color:rgba(var(--paper),.88);margin:8px 0 0;min-height:0;
-  }
   /* the one state where the admin's view and everyone else's disagree */
-  #savestate.alert{
-    color:#ff6b6b;letter-spacing:.1em;
-    border-left:2px solid #ff6b6b;padding-left:7px;
-  }
   /* Both dividers read at the same strength: one closes the panel header,
      the other separates saving the interface from configuring the server.
      Brighter than the hairline between topics, so they group rather than
@@ -391,16 +393,11 @@
   /* Saving is the consequential act on this page — everything else previews,
      this is what reaches other people. Heavier border and brighter text so it
      does not read as one more control in a column of them. */
-  #saverow{margin:10px 0 0}
   /* The weight, not the colour. Saving is the consequential act on this page
      — everything else previews, this is what reaches other people — so the
      pair keeps its heavier border. What colour that border is now comes from
      the .act-save / .act-undo classes below, so this rule must not name one
      or it would override them from a more specific selector. */
-  #saverow button{
-    border-width:2px;border-style:solid;
-    padding:6px 10px;letter-spacing:.12em;
-  }
 
   #saverule{margin:10px 0 2px}
   /* AI sits in the tab row itself now, and the four pinned entries are a row
@@ -441,8 +438,8 @@
   #em_ttl::-webkit-outer-spin-button,
   #em_ttl::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   #pw_cur:focus,#pw_new:focus,#nu_name:focus,#nu_pw:focus,
-  #bk_url:focus,#bk_model:focus,#bk_key:focus,#bk_keepalive:focus,
-  #bk_system:focus,#em_name:focus,#em_origins:focus{border-color:var(--hue-dim)}
+  #em_name:focus,#em_origins:focus,
+  #panel input[data-f]:focus,#panel textarea[data-f]:focus{border-color:var(--hue-dim)}
   #portgrid .now{grid-column:1/-1;font-size:calc(8.5px * var(--fs));letter-spacing:.06em;
                  color:rgba(var(--paper),.7);margin:-2px 0 4px}
   /* The panel's own bar, matching #stagebar across the window so the two
@@ -490,8 +487,11 @@
           padding-bottom:6px}
   .bklab{display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;
          color:rgba(var(--paper),.9);margin-top:10px}
+  /* Every field inside an endpoint block is addressed by `data-f` rather than
+     by id — there are now several of each on the page, and an id can only
+     ever name one of them. */
   #pw_cur,#pw_new,#nu_name,#nu_pw,
-  #bk_url,#bk_model,#bk_key,#bk_keepalive,#bk_system,
+  #panel input[data-f],#panel textarea[data-f],#panel select[data-f],
   #em_name,#em_origins{
     width:100%;margin:4px 0;font:inherit;font-size:calc(9.5px * var(--fs));padding:5px 6px;
     background:rgba(0,0,0,.6);color:var(--text);
@@ -525,6 +525,112 @@
               color:rgba(var(--paper),.72);margin-top:4px}
   .erow .meta b{color:rgba(var(--paper),.9);font-weight:400}
   .erow.off{opacity:.5}
+  /* The selected route. A list you edit one row of needs to say which row
+     the form beside it belongs to, or the form is describing something the
+     reader has to remember choosing.
+
+     Not --hue: in this panel that resolves to very nearly the same near-white
+     as the row's own name, so a marker drawn in it is technically present and
+     practically invisible. The lit row takes the same green the commit
+     buttons use — the panel's one "this is the live thing" colour — plus a
+     ground behind it, because a hairline alone is easy to miss on a list of
+     four. */
+  .erow.pick{cursor:pointer}
+  .erow.pick:hover .nm{color:#a8e3c4}
+  .erow.sel{
+    border-left:2px solid rgba(122,201,160,.9);
+    background:rgba(122,201,160,.07);
+    padding-left:8px;margin-left:-10px;padding-right:8px;margin-right:-10px;
+  }
+  .erow.sel .nm{color:#d2f2e2}
+  /* Actions belong to the row you picked, and get a line of their own so a
+     long label never wraps a row into a ragged block. */
+  .erow .acts{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
+
+  /* One block per endpoint. The heading carries what you say to reach it and
+     what it is wired to, because that is the pair somebody is scanning for
+     and it saves opening three blocks to find the right one. */
+  .grp .rtsum{
+    font-size:calc(8.5px * var(--fs));letter-spacing:.06em;
+    color:rgba(var(--paper),.62);font-weight:400;text-transform:none;
+    margin-left:8px;
+  }
+  .grp .rtsum b{color:rgba(var(--paper),.85);font-weight:400}
+
+  /* Inside an endpoint, small focused boxes rather than one long one. Two
+     levels of collapse, with deliberately different rules: exactly one
+     ENDPOINT is open at a time, because they are alternatives to each other;
+     as many of an endpoint's detail boxes as you like, because they are parts
+     of one thing and you are often comparing two of them.
+
+     Each carries a summary of what is inside it, so the whole configuration
+     reads off the closed headings and opening one is for changing it rather
+     than for finding out what it says. */
+  /* The sections of an endpoint are separate boxes, laid out as boxes rather
+     than stacked into one long form. An OPEN endpoint takes the full width of
+     the panel to give them room to sit side by side; closed, it is one line
+     again and tiles with the others. */
+  #grpbox .grp[data-rid]:not(.shut){grid-column:1/-1}
+  .subwrap{
+    display:grid;gap:8px;margin-top:10px;
+    grid-template-columns:repeat(auto-fill, minmax(215px, 1fr));
+    align-items:start;
+  }
+  .subgrp{
+    border:1px solid rgba(var(--glass),.16);
+    background:rgba(var(--glass),.025);
+  }
+  .subgrp > h5{
+    margin:0;padding:7px 9px 7px 22px;position:relative;cursor:pointer;
+    font:inherit;font-size:calc(9px * var(--fs));font-weight:400;
+    letter-spacing:.16em;text-transform:uppercase;
+    color:rgba(var(--paper),.82);display:flex;align-items:baseline;gap:8px;
+  }
+  .subgrp > h5:hover{color:var(--hue)}
+  .subgrp > h5::before{                    /* the same caret as a section */
+    content:'';position:absolute;left:9px;top:11px;
+    border-left:4px solid rgba(var(--paper),.6);
+    border-top:3.5px solid transparent;border-bottom:3.5px solid transparent;
+    transform:rotate(0deg);transform-origin:2px 3.5px;transition:transform .12s;
+  }
+  .subgrp.open > h5::before{transform:rotate(90deg)}
+  .subgrp .subsum{
+    margin-left:auto;text-transform:none;letter-spacing:.04em;
+    font-size:calc(8.5px * var(--fs));color:rgba(var(--paper),.55);
+    text-align:right;
+  }
+  .subgrp > .subbody{display:none;padding:2px 9px 9px}
+  .subgrp.open > .subbody{display:block}
+  /* Every action for this endpoint on one line along the foot of its box,
+     clear of the section boxes above it — they belong to the endpoint, not to
+     whichever section happens to be open. */
+  .rtacts{
+    display:flex;flex-wrap:wrap;gap:5px;
+    margin-top:12px;padding-top:10px;
+    border-top:1px solid rgba(var(--glass),.22);
+  }
+  .rtacts button{border-width:2px;border-style:solid;padding:6px 10px}
+  .rtacts .spacer{flex:1}
+  /* The first control in a box should not sit tight under its heading. */
+  .subgrp > .subbody > .bklab:first-child{margin-top:2px}
+  .grp.isdefault > h4{border-left:2px solid rgba(122,201,160,.9);padding-left:7px}
+  .grp.isoff > h4{opacity:.55}
+  /* A divider inside a block: the wake word half above, the connection half
+     below. Not two sections — one endpoint is one thing to save. */
+  .rtsplit{
+    margin:16px 0 2px;padding-top:9px;
+    border-top:1px solid rgba(var(--glass),.16);
+    font-size:calc(8px * var(--fs));letter-spacing:.22em;text-transform:uppercase;
+    color:rgba(var(--paper),.55);
+  }
+  /* Which assistant the topic below belongs to. With one topic open at a
+     time you cannot see the list while you edit, so each of the three that
+     describe one assistant has to say whose settings these are — otherwise
+     you are editing something you have to remember having chosen. */
+  .note.editing{
+    color:#a8e3c4;letter-spacing:.1em;margin:0 0 4px;
+    padding-bottom:7px;border-bottom:1px solid rgba(122,201,160,.28);
+  }
   .erow .badge{font-size:calc(7.5px * var(--fs));letter-spacing:.14em;padding:1px 5px;
                border:1px solid rgba(var(--glass),.25);color:rgba(var(--paper),.8)}
   .cks{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;margin:6px 0 2px}
@@ -625,7 +731,7 @@
             background:rgba(var(--glass),.18);outline:0}
   .sl input::-webkit-slider-thumb{-webkit-appearance:none;width:9px;height:9px;background:var(--hue);cursor:pointer}
   .sl input::-moz-range-thumb{width:9px;height:9px;border:0;background:var(--hue);cursor:pointer}
-  #voicesel,#neuralvoice,#wakeword,#sleepword,#greetings,#wakealiases,#sleepaliases,#farewells,
+  #voicesel,#neuralvoice,#sleepword,#greetings,#sleepaliases,#farewells,
   #opname,#ainame,#ap_bindaddr{
     width:100%;margin:9px 0 4px;font:inherit;font-size:calc(9.5px * var(--fs));padding:5px 6px;
     background:rgba(0,0,0,.6);color:var(--text);
@@ -639,15 +745,20 @@
      lands 9px higher than the bare one. */
   #browservoice{display:none;margin:9px 0 0}
   #browservoice > #voicesel{margin-top:0}
-  #wakeword,#sleepword{letter-spacing:.12em;text-transform:lowercase}
+  /* a wake word is spoken, so it is normalised to lowercase anyway —
+     the field says so rather than letting a capital survive to the save */
+  #panel input[data-f="wakeword"],#sleepword{letter-spacing:.12em;text-transform:lowercase}
+  #panel input[data-f="name"],#panel input[data-f="greeting"]{letter-spacing:.06em}
   /* not lowercased: a name may legitimately be capitalised, and a variable
      has to read as one — {display} typed into a lowercasing field still
      works, but it stops looking like the token it is */
   #opname,#ainame{letter-spacing:.06em}
-  #bk_key{letter-spacing:.18em}
-  #bk_url,#bk_model,#bk_keepalive{letter-spacing:.04em}
-  #greetings,#wakealiases,#sleepaliases,#farewells,
-  #bk_system{resize:vertical;line-height:1.6;min-height:44px}
+  #panel input[data-f="api_key"]{letter-spacing:.18em}
+  #panel input[data-f="base_url"],#panel input[data-f="model"],
+  #panel input[data-f="keep_alive"]{letter-spacing:.04em}
+  #greetings,#sleepaliases,#farewells,
+  #panel textarea[data-f]{resize:vertical;line-height:1.6;min-height:44px}
+  #panel select[data-f] option{background:#0a0d14;color:#dfe9f2}
   /* LEARN prompts must sit next to the button that starts the training —
      they used to go to the mic section's note, which is invisible when that
      topic is folded, so the user never saw "say it now". */
@@ -793,14 +904,7 @@
     <button data-tab="speech">SPEECH</button>
     <button id="tab_ai" data-tab="ai">AI</button>
   </div>
-  <div id="savestate"></div>
   <div class="rule"></div>
-
-  <div class="seg" id="saverow">
-    <button id="b_save" class="act-save">SAVE FOR EVERYONE</button>
-    <button id="b_revert" class="act-undo">REVERT</button>
-  </div>
-  <div class="rule" id="saverule"></div>
   </div><!-- /panelhead -->
 
   <div id="grpbox">
@@ -866,8 +970,11 @@ size it is setting, so you read the choice while making it.</div>
 
 Either can be a variable instead of a fixed word:
 
-<b>{name}</b> — the wake word, so renaming what it answers to renames what it
-is called. Already what the greeting and farewell fields use.
+<b>{name}</b> — the word you say to reach whichever assistant is answering, so
+renaming that renames this. Already what the greeting and farewell fields use.
+
+<b>{assistant}</b> — what that assistant is called, which is its own field.
+Put it here and the transcript credits each answer to whoever gave it.
 
 <b>{display}</b> — the name of the display this is being viewed at, from
 <b>?display=</b> on the URL. Put it in <i>the person</i> and each dedicated
@@ -914,97 +1021,12 @@ recognised is left standing so a typo is visible rather than silent.</div>
   <div class="sl"><label>scanlines</label><output id="o_scan"></output><input id="s_scan" type="range" min="0" max="1" step=".01"></div>
   <div class="sl"><label>line weight</label><output id="o_lw"></output><input id="s_lw" type="range" min=".3" max="3" step=".05"></div></div>
   </section>
-  <section class="grp" data-tab="ai">
-    <h4>Assistant</h4>
-    <div class="grpbody">
-  <div class="note help">Which assistant answers. OPENAI-COMPATIBLE covers Ollama,
-OpenClaw, LM Studio and vLLM — they differ only by base URL.</div>
-  <div class="seg" id="bk_provider" style="margin-top:8px">
-    <button data-v="demo" class="on">DEMO</button>
-    <button data-v="openai">OPENAI-COMPATIBLE</button>
-    <button data-v="anthropic">ANTHROPIC</button>
-  </div>
-
-  <div id="bk_conn">
-  <div id="row_preset">
-  <label class="bklab">preset</label>
-  <div class="seg" id="bk_preset">
-    <button data-v="ollama">OLLAMA</button>
-    <button data-v="openclaw">OPENCLAW</button>
-    <button data-v="lmstudio">LM STUDIO</button>
-    <button data-v="openai">OPENAI</button>
-  </div>
-  </div>
-
-  <label class="bklab">base URL</label>
-  <input id="bk_url" type="text" spellcheck="false" autocomplete="off"
-         placeholder="http://127.0.0.1:11434/v1">
-  <label class="bklab">model</label>
-  <input id="bk_model" type="text" spellcheck="false" autocomplete="off"
-         placeholder="qwen2.5:3b">
-  <div class="note" id="bk_models"></div>
-
-  <label class="bklab">API key</label>
-  <input id="bk_key" type="password" spellcheck="false" autocomplete="off"
-         placeholder="unchanged">
-  <div class="note" id="keynote">Held on the server and never sent back to a
-browser. Leave blank to keep the stored one; a local model needs none.</div>
-
-  <div class="sl"><label>reply limit (tokens)</label><output id="o_bkmax"></output><input id="s_bkmax" type="range" min="16" max="2000" step="16"></div>
-  <div class="sl" id="row_temp"><label>temperature</label><output id="o_bktemp"></output><input id="s_bktemp" type="range" min="0" max="1.5" step=".05"></div>
-  <div class="sl"><label>turns of context</label><output id="o_bkhist"></output><input id="s_bkhist" type="range" min="0" max="24" step="1"></div>
-  <div class="sl"><label>timeout</label><output id="o_bktimeout"></output><input id="s_bktimeout" type="range" min="5" max="600" step="5"></div>
-
-  <div id="row_keepalive">
-  <label class="bklab">keep model loaded</label>
-  <input id="bk_keepalive" type="text" spellcheck="false" autocomplete="off"
-         placeholder="30m">
-  <div class="note help">An Ollama extension: holds the model in memory so the next
-question isn't the slow one. Blank it for a hosted provider.</div>
-  </div>
-
-  <div class="note" id="anthnote" style="display:none">Temperature and
-keep-alive are not sent to Anthropic — steer it with the system prompt.</div>
-  </div><!-- /bk_conn -->
-
-  <div class="seg" style="margin-top:10px">
-    <button id="b_bksave" class="act-save">SAVE ASSISTANT</button>
-    <button id="b_bktest">TEST</button>
-    <button id="b_bkforget" class="act-undo">FORGET KEY</button>
-  </div>
-  <div class="note" id="bknote"></div>
-    </div>
-  </section>
-
-  <section class="grp" data-tab="ai" id="grp_prompt">
-    <h4>System prompt</h4>
-    <div class="grpbody">
-  <div class="note help">What the assistant is told before every question. The
-reply is read aloud, so this asks for plain prose.</div>
-  <textarea id="bk_system" rows="8" spellcheck="false"></textarea>
-  <div class="seg" style="margin-top:8px">
-    <button id="b_bksaveprompt" class="act-save">SAVE PROMPT</button>
-    <button id="b_bkresetprompt" class="act-undo" title="back to the wording this ships with">RESET</button>
-  </div>
-  <div class="note" id="promptnote"></div>
-    </div>
-  </section>
-
-  <section class="grp" data-tab="ai">
-    <h4>Setup &amp; self-test</h4>
-    <div class="grpbody">
-  <div class="seg" data-set="backend">
-    <button data-v="demo" class="on">DEMO REPLIES</button>
-    <button data-v="api">CONNECTED AI</button>
-  </div>
-  <div style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5">
-    DEMO answers from built-in text, so you can prove the whole chain works
-    before connecting anything. Keep it here during setup.
-  </div>
-  <div class="seg" style="margin-top:8px"><button id="b_selftest">RUN SELF-TEST</button></div>
-  <div id="selftest" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.6;white-space:pre-line"></div>
-    </div>
-  </section>
+  <!-- One block per AI endpoint, built at runtime by paintBlocks(), inserted
+       before this anchor. The AI tab holds nothing else: testing an endpoint
+       is the TEST inside that endpoint's own block, which uses its own
+       adapter — so it tests demo against demo and a real service against
+       that service, with nothing to keep in step. -->
+  <div id="ai_anchor" hidden></div>
 
     <section class="grp" data-tab="speech">
     <h4>Speech out (TTS)</h4>
@@ -1053,17 +1075,17 @@ reply is read aloud, so this asks for plain prose.</div>
   <div id="micnote" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:8px;line-height:1.5">off</div></div>
   </section>
   <section class="grp" data-tab="speech">
-    <h4>Wake word</h4>
-    <div class="grpbody">  <div class="seg" data-set="wake">
+    <h4>The wake gate</h4>
+    <div class="grpbody">
+  <div class="note help">Whether a name is needed at all, and how long one
+lasts. <b>The words themselves live on the routes</b>, in AI — with several
+routes the word is what picks between them, so it belongs to the thing it
+picks.</div>
+  <div class="seg" data-set="wake" style="margin-top:8px">
     <button data-v="off">OFF</button>
     <button data-v="auto" class="on">AUTO ONLY</button>
     <button data-v="always">ALWAYS</button>
   </div>
-  <input id="wakeword" type="text" spellcheck="false" autocomplete="off" placeholder="trigger word">
-  <div class="seg" style="margin-top:6px"><button id="b_learn">LEARN HOW I SAY IT (3x)</button></div>
-  <div id="learnwakenote" class="learnnote"></div>
-  <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:10px">also accept (learned)</label>
-  <textarea id="wakealiases" rows="3" spellcheck="false" placeholder="one per line"></textarea>
 
 <div class="sl"><label>stays awake for</label><output id="o_wakewindow"></output><input id="s_wakewindow" type="range" min="3" max="60" step="1"></div>
   <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:8px">when that time runs out</label>
@@ -1072,7 +1094,10 @@ reply is read aloud, so this asks for plain prose.</div>
     <button data-v="0">GO QUIET</button>
   </div>
   <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:10px">greeting phrases</label>
-  <textarea id="greetings" rows="4" spellcheck="false" placeholder="one per line — {name} inserts the wake word"></textarea>
+  <textarea id="greetings" rows="4" spellcheck="false" placeholder="one per line — {name} inserts the word you said"></textarea>
+  <div class="note help">The fallback for every route that has no greeting of its
+own. Several lines so a display somebody talks to all day does not repeat
+itself; <b>{name}</b> is the word that was said to reach whoever answered.</div>
   <div class="seg"><button id="b_greet">TEST GREETING</button></div>
   <div id="wakestate" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5"></div></div>
     </section>
@@ -1088,12 +1113,28 @@ reply is read aloud, so this asks for plain prose.</div>
   <textarea id="sleepaliases" rows="2" spellcheck="false" placeholder="one per line"></textarea>
 
   <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:10px">farewell phrases</label>
-  <textarea id="farewells" rows="3" spellcheck="false" placeholder="one per line — {name} inserts the wake word"></textarea>
+  <textarea id="farewells" rows="3" spellcheck="false" placeholder="one per line — {name} inserts the word you said"></textarea>
   <div class="seg"><button id="b_bye">TEST FAREWELL</button></div>
   
     <div id="sleepstate" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5"></div>
     </div>
 </section>
+<section class="grp" data-tab="speech">
+    <h4>Commissioning check</h4>
+    <div class="grpbody">
+  <div class="note help">Walks every link in the chain and names whichever is
+broken: secure origin, the settings store, transcription, the voice service,
+the microphone, the recorder, the endpoints, and whether the default one
+answers and can be rendered and spoken.
+
+It is not an AI test — each endpoint has its own TEST, on the AI tab, which
+puts a question to that endpoint's own service. This is for the parts around
+it, which is why it lives beside the microphone and the voices.</div>
+  <div class="seg" style="margin-top:8px"><button id="b_selftest">RUN CHECK</button></div>
+  <div id="selftest" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.6;white-space:pre-line"></div>
+    </div>
+  </section>
+
 <section class="grp" data-tab="speech">
     <h4>Test drive</h4>
     <div class="grpbody">  <div class="seg">
@@ -1333,6 +1374,21 @@ button to download it as a PDF.</div>
        belonging to everything above it rather than to the last topic — and
        so it does not become one more collapsible section you have to open
        to find out how to save. -->
+  <!-- One commit row per tab, each writing only the settings on that tab.
+       There was a single SAVE FOR EVERYONE across all of them, which meant
+       pressing it while looking at MOTION also published whatever had been
+       left half-adjusted on LOOK — a save whose scope was wider than the
+       thing you were looking at. -->
+  <div id="uirow_look" class="uirow" data-uitab="look"></div>
+  <div id="uirow_motion" class="uirow" data-uitab="motion"></div>
+  <div id="uirow_speech" class="uirow" data-uitab="speech"></div>
+
+  <div id="airow">
+    <div class="note" id="rtlistnote"></div>
+    <div class="seg">
+      <button id="b_addroute" class="act-save">ADD INSTANCE</button>
+    </div>
+  </div>
   <div id="approw">
     <div class="note" id="appnote"></div>
     <div class="pending" id="apppending" hidden></div>
@@ -1624,9 +1680,9 @@ function push(){
   if (ready && S) frame.contentWindow.postMessage(
     {rsn:1, kind:'settings', settings:S}, location.origin);
 }
-function cmd(name){
+function cmd(name, arg){
   if (ready) frame.contentWindow.postMessage(
-    {rsn:1, kind:'cmd', cmd:name}, location.origin);
+    {rsn:1, kind:'cmd', cmd:name, arg}, location.origin);
 }
 window.addEventListener('message', e=>{
   if (e.source !== frame.contentWindow) return;
@@ -1647,8 +1703,30 @@ window.addEventListener('message', e=>{
     status(reverting ? 'reloaded from the server' : '');
     reverting = false;
   } else if (m.kind === 'status'){
-    const el = $(m.slot);
+    /* The wake-word LEARN prompts belong beside the button that started
+       them, and that button is now inside one endpoint's block. */
+    let el = $(m.slot);
+    if (m.slot === 'learnwakenote'){
+      const blk = document.querySelector('#panel .grp[data-rid="' + LEARNING + '"]');
+      el = blk && blk.querySelector('[data-r="learnnote"]');
+    }
     if (el){ el.textContent = m.text; el.classList.toggle('live', !!m.live); }
+  } else if (m.kind === 'learned'){
+    /* What the transcriber actually produces when this person says the wake
+       word. The display cannot store it — endpoints are written from here, by
+       somebody signed in — so it comes back up the channel and lands in the
+       field, unsaved, for an admin to commit.
+
+       Into the block that asked, matched on the id the command carried:
+       opening a different block mid-LEARN would otherwise teach the wrong
+       endpoint, silently. `touched` keeps a repaint from wiping it. */
+    const blk = document.querySelector('#panel .grp[data-rid="' + m.route + '"]');
+    if (!blk || m.route !== LEARNING) return;
+    const el = blk.querySelector('[data-f="aliases"]');
+    if (!el) return;
+    const have = el.value.split(/[\n,]/).map(x=>x.trim()).filter(Boolean);
+    el.value = [...new Set([...have, ...(m.words || [])])].join('\n');
+    el.dataset.touched = '1';
   }
 });
 
@@ -1679,17 +1757,28 @@ function fmtOf(key){
   return v=> v;
 }
 
+/* Which tab each shared setting lives on, learned from where its control
+   actually sits rather than from a list kept in step by hand. A control moved
+   between tabs takes its setting with it, and a new one is covered the moment
+   it is bound. */
+const KEY_TAB = {};
+function ownTab(el, key){
+  const g = el.closest('.grp');
+  if (g && g.dataset.tab) KEY_TAB[key] = g.dataset.tab;
+}
+
 function bindSlider(el){
   const id  = el.id.slice(2);
   const key = SLIDER_KEY[id] || id;
   if (!(key in S)) return;
+  ownTab(el, key);
   const out = $('o_' + id);
   const fmt = key === 'hangover' ? (v=> Math.round(v*1000)+'ms') : fmtOf(key);
   const paint = ()=>{ el.value = S[key]; if (out) out.textContent = fmt(S[key]); };
   el.addEventListener('input', ()=>{
     S[key] = parseFloat(el.value);
     if (out) out.textContent = fmt(S[key]);
-    push(); dirty();
+    push(); dirty(key);
   });
   paint(); SLIDERS.push(paint);
 }
@@ -1697,8 +1786,9 @@ function bindSlider(el){
 function bindField(el, key){
   key = key || el.id;
   if (!(key in S)) return;
+  ownTab(el, key);
   const paint = ()=>{ el.value = S[key] == null ? '' : S[key]; };
-  el.addEventListener('input', ()=>{ S[key] = el.value; push(); dirty(); });
+  el.addEventListener('input', ()=>{ S[key] = el.value; push(); dirty(key); });
   paint(); FIELDS.push(paint);
 }
 
@@ -1710,18 +1800,20 @@ function syncSeg(key){
 
 function buildControls(){
   document.querySelectorAll('#panel input[type="range"]').forEach(bindSlider);
-  ['wakeword','sleepword','wakealiases','sleepaliases','greetings','farewells',
+  // no wakeword or wakealiases: those are a route's, saved with the route
+  ['sleepword','sleepaliases','greetings','farewells',
    'opname','ainame']
     .forEach(id=>{ const el = $(id); if (el) bindField(el, id); });
 
   document.querySelectorAll('.seg[data-set]').forEach(seg=>{
     const key = seg.dataset.set;
+    ownTab(seg, key);
     syncSeg(key);
     seg.addEventListener('click', e=>{
       const b = e.target.closest('button');
       if (!b || b.disabled) return;
       S[key] = BOOL_KEYS.has(key) ? b.dataset.v === '1' : b.dataset.v;
-      syncSeg(key); push(); dirty();
+      syncSeg(key); push(); dirty(key);
     });
   });
 
@@ -1729,12 +1821,13 @@ function buildControls(){
   const ACTIONS = {
     b_reo:'reorient', b_idle:'idle', b_think:'thinking', b_speak:'speak',
     b_beep:'beep', b_test:'testvoice', b_diag:'diagnose', b_cal:'calibrate',
-    b_mic:'miconly', b_learn:'learnwake', b_learnsleep:'learnsleep',
+    b_mic:'miconly', b_learnsleep:'learnsleep',
     b_bye:'farewell', b_greet:'greet'
   };
   Object.keys(ACTIONS).forEach(id=>{
     const el = $(id); if (el) el.addEventListener('click', ()=> cmd(ACTIONS[id]));
   });
+
   const st = $('b_selftest');
   if (st) st.addEventListener('click', ()=>{
     const el = $('selftest');
@@ -1742,7 +1835,17 @@ function buildControls(){
     cmd('selftest');
   });
 
+  /* Claimed by hand, and unconditionally: this select is filled from the
+     server rather than bound through bindField, and on a box with no voices
+     installed that fill never happens — which would leave the setting owned
+     by no tab, saved by nothing, on exactly the installs least likely to
+     notice. */
+  ownTab($('neuralvoice'), 'ttsvoice');
   voiceLists();
+  /* The rows count what each tab owns, and they cannot know that until every
+     control has been bound — which is here, not at sign-in where they are
+     first drawn. */
+  paintUiRows();
 }
 
 /* Neural voices come from the server; browser voices from this browser,
@@ -1758,7 +1861,7 @@ async function voiceLists(){
         o.value = v; o.textContent = v; nv.appendChild(o);
       });
       if (S.ttsvoice) nv.value = S.ttsvoice;
-      nv.addEventListener('change', ()=>{ S.ttsvoice = nv.value; push(); dirty(); });
+      nv.addEventListener('change', ()=>{ S.ttsvoice = nv.value; push(); dirty('ttsvoice'); });
     }catch(e){ nv.innerHTML = '<option>— server unreachable —</option>'; }
   }
   const bv = $('voicesel');
@@ -1776,40 +1879,115 @@ async function voiceLists(){
 }
 
 /* -------------------------------------------------------------- saving */
-function dirty(){
-  isDirty = true;
-  /* Red, because this is the one state where what the admin is looking at
-     and what everyone else is looking at have come apart. It is easy to tune
-     something, be satisfied by the preview, and walk away having changed
-     nothing for anybody. */
-  status('UNSAVED — the preview shows these changes, viewers do not', true);
+/* Per tab, because each tab now commits itself. `dirty` used to be one flag
+   for the whole shared document; a single flag cannot say which of three
+   commit buttons is the one that has work waiting behind it. */
+const DIRTY = new Set();
+
+function dirty(key){
+  const tab = KEY_TAB[key] || CURRENT_TAB;
+  if (tab) DIRTY.add(tab);
+  isDirty = DIRTY.size > 0;      // still what beforeunload asks
+  paintUiRows();
 }
-function status(m, bad){
-  const el = $('savestate');
-  if (!el) return;
-  el.textContent = m;
-  el.classList.toggle('alert', !!bad);
+/* Each tab's last word, held per tab. Kept in a map rather than read back off
+   the element, because painting one row must not depend on what another row
+   happens to be saying — repainting after a save on LOOK was wiping the
+   message MOTION had just put up. */
+const SAID = {};
+function status(m, bad, tab){
+  const t = tab || CURRENT_TAB;
+  SAID[t] = {m, bad};
+  paintUiRows();
 }
 
-$('b_save').addEventListener('click', async ()=>{
-  if (ME.role !== 'admin') return status('this account is read-only', true);
-  status('saving…');
+/* Each row says what it covers and whether it has anything waiting. Red on
+   unsaved, because this is the one state where what the admin is looking at
+   and what everyone else is looking at have come apart — it is easy to tune
+   something, be satisfied by the preview, and walk away having changed
+   nothing for anybody. */
+const UI_TABS = ['look', 'motion', 'speech'];
+function paintUiRows(){
+  UI_TABS.forEach(t=>{
+    const row = $('uirow_' + t);
+    if (!row) return;
+    if (!row.dataset.built){
+      row.dataset.built = '1';
+      row.innerHTML = '<div class="scope"></div>'
+                    + '<div class="seg">'
+                    + '<button class="act-save" data-do="save">SAVE FOR EVERYONE</button>'
+                    + '<button class="act-undo" data-do="revert">REVERT</button></div>'
+                    + '<div class="state"></div>';
+      row.querySelector('[data-do="save"]').addEventListener('click', ()=> saveTab(t));
+      row.querySelector('[data-do="revert"]').addEventListener('click', ()=> revertTab(t));
+    }
+    const n = Object.keys(KEY_TAB).filter(k=> KEY_TAB[k] === t).length;
+    const orphans = unclaimedSettings();
+    row.querySelector('.scope').textContent =
+      n + ' setting' + (n === 1 ? '' : 's') + ' on this tab, shared with every viewer'
+      + (orphans.length ? '  ·  ' + orphans.length + ' on no tab and saved by nothing: '
+                          + orphans.join(', ') : '');
+    /* Unsaved outranks whatever was last said: it is the one state where what
+       the admin is looking at and what everyone else is looking at have come
+       apart, and it must not be buried under a stale "saved". */
+    const st = row.querySelector('.state');
+    const said = SAID[t];
+    if (DIRTY.has(t)){
+      st.textContent = 'UNSAVED — the preview shows these changes, viewers do not';
+      st.classList.add('alert');
+    } else {
+      st.textContent = said ? said.m : '';
+      st.classList.toggle('alert', !!(said && said.bad));
+    }
+  });
+}
+
+/* Anything the panel can change but no tab claims would be silently dropped
+   by every SAVE. Cheap to check, and it fails loudly in the one place
+   somebody would look. */
+function unclaimedSettings(){
+  // S arrives from the preview, which reports after this page has signed in —
+  // so this runs at least once with nothing to check.
+  return S ? Object.keys(S).filter(k=> !(k in KEY_TAB)) : [];
+}
+
+function tabKeys(tab){
+  const out = {};
+  if (!S) return out;
+  Object.keys(KEY_TAB).forEach(k=>{ if (KEY_TAB[k] === tab) out[k] = S[k]; });
+  return out;
+}
+
+async function saveTab(tab){
+  if (ME.role !== 'admin') return status('this account is read-only', true, tab);
+  status('saving…', false, tab);
   try{
-    const j = await api('/settings', {method:'POST', body: JSON.stringify(S)});
-    isDirty = false;
-    status('saved for everyone · ' + j.keys + ' settings');
-  }catch(e){ status(e.message, true); }
-});
+    const body = {settings: tabKeys(tab), merge: true};
+    const j = await api('/settings', {method:'POST', body: JSON.stringify(body)});
+    DIRTY.delete(tab);
+    isDirty = DIRTY.size > 0;
+    status('saved for everyone · ' + Object.keys(body.settings).length
+           + ' settings on this tab', false, tab);
+  }catch(e){ status(e.message, true, tab); }
+}
 
-/* Reload the preview rather than patch this page: the display re-reads the
-   server and announces what it actually ended up with, which is the only
-   version worth trusting. */
-$('b_revert').addEventListener('click', ()=>{
-  status('reloading from the server…');
-  reverting = true;
-  ready = false;
-  frame.src = '/index.html?preview=1';
-});
+/* Only this tab's settings go back to what the server holds. Everything else
+   somebody has in flight on another tab stays in flight — reverting LOOK
+   should not throw away an hour spent on SPEECH. */
+async function revertTab(tab){
+  status('reloading this tab from the server…', false, tab);
+  try{
+    const j = await fetch('/settings', {cache:'no-store'}).then(r=>r.json());
+    const stored = (j && j.settings) || {};
+    Object.keys(tabKeys(tab)).forEach(k=>{ if (k in stored) S[k] = stored[k]; });
+    repaintControls();
+    applyType();
+    push();
+    DIRTY.delete(tab);
+    isDirty = DIRTY.size > 0;
+    status('back to what the server holds', false, tab);
+  }catch(e){ status(e.message, true, tab); }
+}
 
 $('b_reload').addEventListener('click', ()=>{ ready = false; frame.src = '/index.html?preview=1'; });
 $('b_open').addEventListener('click', ()=> window.open('/index.html', '_blank'));
@@ -1963,146 +2141,394 @@ $('b_appsave').addEventListener('click', async ()=>{
   }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
 });
 
-/* ------------------------------------------------------------ assistant */
-/* Which model answers. Kept apart from the shared settings because it holds
-   a credential and that document is world-readable — the same reason the
-   accounts live in their own file. The key is never sent back to a browser,
-   so the field shows a placeholder rather than a value. */
-const BK_FIELDS = {bk_url:'base_url', bk_model:'model', bk_system:'system',
-                   bk_keepalive:'keep_alive'};
-const BK_SLIDERS = {s_bkmax:['max_tokens', v=>v],
-                    s_bktemp:['temperature', v=>(+v).toFixed(2)],
-                    s_bkhist:['history_turns', v=> v==0 ? 'none' : v],
-                    s_bktimeout:['timeout', v=> v+'s']};
+/* ------------------------------------------------- AI endpoints (routes) */
+/* One block per endpoint, and the block is the whole of it: the wake word
+   that reaches it and the connection it reaches, together, saved together.
+
+   This replaced a list plus three shared topics that repainted for whichever
+   row was selected. That shape asked you to hold "which one am I editing" in
+   your head across three collapsed sections, and it made a second endpoint
+   feel like a mode rather than a thing. A block per endpoint has no selection
+   state to lose, and three of them sitting in a column is its own answer to
+   whether more than one is supported.
+
+   Fields are addressed by `data-f` within a block rather than by id, because
+   there are now several of every field on the page and an id can only ever
+   name one of them. */
+const RT_FIELDS = ['name','wakeword','aliases','greeting','voice','base_url',
+                   'model','system','keep_alive'];
+const RT_SLIDERS = {max_tokens:  v=> v,
+                    temperature: v=> (+v).toFixed(2),
+                    history_turns: v=> v == 0 ? 'none' : v,
+                    timeout:     v=> v + 's'};
 /* A preset is only a base URL and a hint at the model format. It exists so
    nobody has to remember that OpenClaw listens on 18789 and routes by putting
    an agent id in the model field. */
 const BK_PRESETS = {
-  ollama:   {base_url:'http://127.0.0.1:11434/v1', hint:'qwen2.5:3b',   keep_alive:'30m', provider:'openai'},
-  openclaw: {base_url:'http://127.0.0.1:18789/v1', hint:'openclaw:main', keep_alive:'',   provider:'openai'},
-  lmstudio: {base_url:'http://127.0.0.1:1234/v1',  hint:'',             keep_alive:'',    provider:'openai'},
-  openai:   {base_url:'https://api.openai.com/v1', hint:'gpt-4o-mini',  keep_alive:'',    provider:'openai'}
+  ollama:   {base_url:'http://127.0.0.1:11434/v1', hint:'qwen2.5:3b',    keep_alive:'30m', provider:'openai'},
+  openclaw: {base_url:'http://127.0.0.1:18789/v1', hint:'openclaw:main', keep_alive:'',    provider:'openai'},
+  lmstudio: {base_url:'http://127.0.0.1:1234/v1',  hint:'',              keep_alive:'',    provider:'openai'},
+  openai:   {base_url:'https://api.openai.com/v1', hint:'gpt-4o-mini',   keep_alive:'',    provider:'openai'}
   /* No Anthropic preset. A preset exists to fill in a base URL you would
      otherwise have to remember, and Anthropic has exactly one — the provider
-     button already fills it. A sixth button here only wrapped the row onto a
-     second line and gave the panel two buttons with the same name. */
+     button already fills it. */
 };
-let BK = null;
+const SHIPPED_PROMPT = 'You are a spoken assistant. Answer in one or two ' +
+  'short sentences unless asked for more. Write plain prose only — no ' +
+  'markdown, lists, headings, or emoji — because your reply is read aloud.';
 
-function bkNote(m, bad){
-  const el = $('bknote');
+let openTopic = ()=>{};        // assigned once the panel's sections exist
+let rescanGroups = ()=>{};     // ditto — this tab builds sections at runtime
+let RT = {routes: [], default: '', voices: []};
+let LEARNING = '';             // which block asked the display to LEARN
+
+function rtListNote(m, bad){
+  const el = $('rtlistnote');
+  if (!el) return;
   el.className = 'note' + (bad ? ' bad' : '');
-  el.textContent = m;
+  el.textContent = m || '';
 }
 
-/* Nothing below the provider choice applies to DEMO: there is no connection
-   to configure and the built-in replies ignore the prompt. Leaving the fields
-   on screen would be a panel full of controls wired to nothing, which is
-   worse than a short panel. */
-function bkSyncProvider(){
-  const p = (document.querySelector('#bk_provider button.on') || {}).dataset;
-  const v = p ? p.v : 'demo';
-  const connected = v !== 'demo';
-  const anth = v === 'anthropic';
-  const conn = $('bk_conn');
-  if (conn) conn.style.display = connected ? '' : 'none';
-  // inline display beats the tab renderer's hidden attribute, so it has to be
-  // cleared rather than left for render() to undo
-  const prompt = $('grp_prompt');
-  if (prompt) prompt.style.display = connected ? '' : 'none';
-  const test = $('b_bktest');
-  if (test) test.disabled = !connected;
+/* Not on the server until SAVE. Checking the whole endpoint in one go is what
+   lets a colliding wake word be a refusal on the field it belongs to, rather
+   than a half-created instance to go and tidy up. */
+function newInstance(){
+  return {id:'', name:'', wakeword:'', aliases:[], strict:false,
+          greeting:'', voice:'', provider:'demo', enabled:true,
+          base_url:'http://127.0.0.1:11434/v1', model:'', system:SHIPPED_PROMPT,
+          max_tokens:400, temperature:0.4, timeout:120, keep_alive:'30m',
+          history_turns:8, has_key:false, is_default:false};
+}
+
+// `esc` is already taken further down by the documentation renderer
+const rtEsc = t => String(t == null ? '' : t)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;');
+
+/* The markup of one block. Everything an endpoint has, in the order somebody
+   sets it up: what reaches it, then what it reaches, then what it is told. */
+function blockHTML(r){
+  return `
+  <h4><span class="rtname"></span><span class="rtsum"></span></h4>
+  <div class="grpbody">
+  <label class="bklab" style="margin-top:2px">instance name</label>
+  <input data-f="name" type="text" spellcheck="false" autocomplete="off"
+         placeholder="House">
+  <div class="note help">Labels this endpoint — in the heading above, in the
+server log, and wherever a transcript label uses <b>{assistant}</b>. It is
+never spoken and never matched against.</div>
+
+  <div class="subwrap">
+  <div class="subgrp" data-g="wake">
+    <h5>Wake word<span class="subsum"></span></h5>
+    <div class="subbody">
+  <label class="bklab">wake word</label>
+  <input data-f="wakeword" type="text" spellcheck="false" autocomplete="off"
+         placeholder="house">
+  <div class="seg" style="margin-top:6px"><button data-a="learn">LEARN HOW I SAY IT (3x)</button></div>
+  <div data-r="learnnote" class="learnnote"></div>
+  <label class="bklab">also answers to</label>
+  <textarea data-f="aliases" rows="3" spellcheck="false" placeholder="one per line"></textarea>
+  <label class="bklab">matching</label>
+  <div class="seg" data-f="strict">
+    <button data-v="0" class="on">CLOSE ENOUGH</button>
+    <button data-v="1">THE EXACT WORD</button>
+  </div>
+  <div class="note help">What somebody says to reach this endpoint. It follows
+the instance name until you edit it, then stays where you put it — an endpoint
+named <b>Kitchen Lights</b> is a good label and a poor thing to say out loud.
+
+Pick words that sound <b>far apart</b>, not merely different: differing
+syllable counts, vowels and stress survive a noisy room, two words one letter
+apart do not. LEARN records how you actually say it, three times, and adds
+what the transcriber returns.
+
+CLOSE ENOUGH forgives a mishearing, which is what an endpoint that answers
+questions wants. THE EXACT WORD is for one that <i>does</i> things — the same
+near-miss costs a few tokens on one and switches on the lights on the
+other.</div>
+    </div>
+  </div>
+
+  <div class="subgrp" data-g="voice">
+    <h5>Greeting &amp; voice<span class="subsum"></span></h5>
+    <div class="subbody">
+  <label class="bklab">greeting</label>
+  <input data-f="greeting" type="text" spellcheck="false" autocomplete="off"
+         placeholder="leave blank for the shared phrases">
+  <label class="bklab">voice</label>
+  <select data-f="voice"></select>
+  <div class="note help">The greeting is spoken when its wake word is said and
+nothing else; blank falls back to the phrases on the SPEECH tab. Give the
+endpoints different voices and you can tell which replied without looking at
+the screen — which is all a wall display offers.</div>
+    </div>
+  </div>
+
+  <div class="subgrp" data-g="conn">
+    <h5>Connection<span class="subsum"></span></h5>
+    <div class="subbody">
+  <div class="note help">OPENAI-COMPATIBLE is a shape, not a company: Ollama,
+OpenClaw, LM Studio and vLLM all speak it and differ only by base URL. DEMO
+answers from built-in text and reaches nothing.</div>
+  <div class="seg" data-f="provider">
+    <button data-v="demo" class="on">DEMO</button>
+    <button data-v="openai">OPENAI-COMPATIBLE</button>
+    <button data-v="anthropic">ANTHROPIC</button>
+  </div>
+  <div data-r="conn">
+  <div data-r="presetrow">
+  <label class="bklab">preset</label>
+  <div class="seg" data-r="preset">
+    <button data-v="ollama">OLLAMA</button>
+    <button data-v="openclaw">OPENCLAW</button>
+    <button data-v="lmstudio">LM STUDIO</button>
+    <button data-v="openai">OPENAI</button>
+  </div>
+  </div>
+  <label class="bklab">base URL</label>
+  <input data-f="base_url" type="text" spellcheck="false" autocomplete="off"
+         placeholder="http://127.0.0.1:11434/v1">
+  <label class="bklab">model</label>
+  <input data-f="model" type="text" spellcheck="false" autocomplete="off"
+         placeholder="qwen2.5:3b">
+  <div class="note" data-r="models"></div>
+  <label class="bklab">API key</label>
+  <input data-f="api_key" type="password" spellcheck="false" autocomplete="off"
+         placeholder="unchanged">
+  <div class="note" data-r="keynote"></div>
+  </div>
+    </div>
+  </div>
+
+  <div class="subgrp" data-g="limits">
+    <h5>Limits<span class="subsum"></span></h5>
+    <div class="subbody">
+  <div class="sl"><label>reply limit (tokens)</label><output data-o="max_tokens"></output><input data-s="max_tokens" type="range" min="16" max="2000" step="16"></div>
+  <div class="sl" data-r="temprow"><label>temperature</label><output data-o="temperature"></output><input data-s="temperature" type="range" min="0" max="1.5" step=".05"></div>
+  <div class="sl"><label>turns of context</label><output data-o="history_turns"></output><input data-s="history_turns" type="range" min="0" max="24" step="1"></div>
+  <div class="sl"><label>timeout</label><output data-o="timeout"></output><input data-s="timeout" type="range" min="5" max="600" step="5"></div>
+  <div data-r="keepaliverow">
+  <label class="bklab">keep model loaded</label>
+  <input data-f="keep_alive" type="text" spellcheck="false" autocomplete="off"
+         placeholder="30m">
+  </div>
+  <div class="note" data-r="anthnote" style="display:none">Temperature and
+keep-alive are not sent to Anthropic — steer it with the system prompt.</div>
+  <div class="note help">A cold model can take half a minute to load before it
+says anything, so keep the timeout generous — one tuned to a warm model looks
+like a dead server every morning. <b>turns of context</b> is how much of the
+conversation goes back with each question: at zero, "and the other one?" means
+nothing. <b>keep model loaded</b> is an Ollama extension that holds it in
+memory so the next question isn't the slow one.</div>
+    </div>
+  </div>
+
+  <div class="subgrp" data-g="prompt">
+    <h5>System prompt<span class="subsum"></span></h5>
+    <div class="subbody">
+  <textarea data-f="system" rows="7" spellcheck="false"></textarea>
+  <div class="seg" style="margin-top:6px">
+    <button data-a="resetprompt" class="act-undo" title="back to the wording this ships with">RESET</button>
+  </div>
+  <div class="note help">Sent ahead of every question this endpoint is asked.
+Each has its own — a house controller and a general assistant want different
+instructions, and one wording covering both suits neither. The reply is read
+out loud, so ask for plain prose.</div>
+    </div>
+  </div>
+
+  </div><!-- /subwrap -->
+
+  <div class="rtacts">
+    <button data-a="save" class="act-save">SAVE</button>
+    <button data-a="test">TEST</button>
+    <button data-a="default">MAKE DEFAULT</button>
+    <button data-a="enable">SWITCH OFF</button>
+    <span class="spacer"></span>
+    <button data-a="forget" class="act-undo">FORGET KEY</button>
+    <button data-a="delete" class="act-danger">DELETE</button>
+  </div>
+  <div class="note" data-r="note"></div>
+  </div>`;
+}
+
+const F = (blk, name)=> blk.querySelector('[data-f="' + name + '"]');
+const R = (blk, name)=> blk.querySelector('[data-r="' + name + '"]');
+
+function blockNote(blk, m, bad){
+  const el = R(blk, 'note');
+  if (!el) return;
+  el.className = 'note' + (bad ? ' bad' : '');
+  el.textContent = m || '';
+}
+
+/* Nothing below the provider choice applies to DEMO: there is no connection to
+   configure and the built-in replies ignore the prompt. Leaving the fields on
+   screen would be a block full of controls wired to nothing. */
+function blockSyncProvider(blk){
+  const on = blk.querySelector('[data-f="provider"] button.on');
+  const v = on ? on.dataset.v : 'demo';
+  const connected = v !== 'demo', anth = v === 'anthropic';
+  const show = (name, yes)=>{ const el = R(blk, name); if (el) el.style.display = yes ? '' : 'none'; };
+  show('conn', connected);
+  show('promptblock', connected);
   /* Anthropic takes neither of these — see the note that replaces them. A
      slider wired to a field the adapter deliberately never sends is the same
      defect as a toggle nothing reads. */
-  const show = (id, on)=>{ const el = $(id); if (el) el.style.display = on ? '' : 'none'; };
-  show('row_temp', !anth);
-  show('row_keepalive', !anth);
+  show('temprow', connected && !anth);
+  show('keepaliverow', connected && !anth);
   show('anthnote', anth);
-  show('row_preset', !anth);          // one endpoint; nothing to pick between
-  show('bk_models', !anth);           // that listing is an Ollama trick
-  const url = $('bk_url');
+  show('presetrow', connected && !anth);   // one endpoint; nothing to pick
+  show('models', connected && !anth);      // that listing is an Ollama trick
+  const t = blk.querySelector('[data-a="test"]');
+  if (t) t.disabled = !connected;
+  /* DEMO reaches nothing, so its limits and its prompt are inert. Dimmed and
+     closed rather than removed: they keep their place, so connecting a
+     service does not rearrange the block under you. */
+  ['limits','prompt'].forEach(g=>{
+    const box = blk.querySelector('[data-g="' + g + '"]');
+    if (!box) return;
+    box.style.opacity = connected ? '' : '.45';
+    if (!connected) box.classList.remove('open');
+  });
+  const url = F(blk, 'base_url');
   if (url) url.placeholder = anth ? 'https://api.anthropic.com'
                                   : 'http://127.0.0.1:11434/v1';
-  const model = $('bk_model');
+  const model = F(blk, 'model');
   if (model && anth && !model.placeholder.startsWith('claude'))
     model.placeholder = 'claude-opus-5';
-  const kn = $('keynote');
+  const kn = R(blk, 'keynote');
   if (kn) kn.textContent = anth
     ? 'Required. Held on the server, never sent back to a browser. Blank keeps the stored one.'
     : 'Held on the server, never sent back to a browser. Blank keeps the stored one; a local model needs none.';
 }
 
-/* What each field held the last time this function wrote to it. Anything
-   that differs now was typed by the admin and not yet saved. */
-let BK_PAINTED = {};
+function blockPaint(blk, r){
+  blk.dataset.rid = r.id || '';
+  blk._rec = r;
+  blk.classList.toggle('isdefault', !!r.is_default);
+  blk.classList.toggle('isoff', r.enabled === false);
+  blk.querySelector('.rtname').textContent = r.name || (r.id ? '(unnamed)' : 'New endpoint');
+  const sum = blk.querySelector('.rtsum');
+  const where = !r.id ? 'unsaved'
+    : r.provider === 'demo' ? 'built-in replies'
+    : (r.model || 'no model');
+  sum.innerHTML = (r.wakeword ? 'say <b>&ldquo;' + rtEsc(r.wakeword) + '&rdquo;</b> &rarr; ' : '')
+                + rtEsc(where)
+                + (r.is_default ? ' &middot; default' : '')
+                + (r.enabled === false ? ' &middot; off' : '');
 
-function bkPaint(){
-  if (!BK) return;
-  /* Do NOT clobber a field somebody is part-way through editing. loadBackend()
-     runs on every entry to this tab, so without this, typing a system prompt,
-     glancing at another tab and coming back silently threw the work away —
-     no warning, no trace, and the panel looked as though the save had failed.
-     An unsaved edit survives and is called out instead. */
-  let kept = 0;
-  Object.keys(BK_FIELDS).forEach(id=>{
-    const el = $(id); if (!el) return;
-    const stored = BK[BK_FIELDS[id]] == null ? '' : String(BK[BK_FIELDS[id]]);
-    const dirty = BK_PAINTED[id] !== undefined && el.value !== BK_PAINTED[id];
-    if (dirty && el.value !== stored){ kept++; return; }
-    el.value = stored;
-    BK_PAINTED[id] = stored;
+  RT_FIELDS.forEach(k=>{
+    const el = F(blk, k); if (!el) return;
+    const dirty = el.dataset.touched === '1';
+    if (dirty) return;                 // never clobber what somebody is typing
+    el.value = k === 'aliases' ? (r.aliases || []).join('\n')
+                               : (r[k] == null ? '' : String(r[k]));
   });
-  BK.unsaved = kept > 0;
-  Object.keys(BK_SLIDERS).forEach(id=>{
-    const [key, fmt] = BK_SLIDERS[id];
-    const el = $(id), out = $('o_' + id.slice(2));
-    if (el){ el.value = BK[key]; if (out) out.textContent = fmt(BK[key]); }
+  Object.keys(RT_SLIDERS).forEach(k=>{
+    const el = blk.querySelector('[data-s="' + k + '"]');
+    const out = blk.querySelector('[data-o="' + k + '"]');
+    if (el){ el.value = r[k]; if (out) out.textContent = RT_SLIDERS[k](r[k]); }
   });
-  document.querySelectorAll('#bk_provider button').forEach(b=>
-    b.classList.toggle('on', b.dataset.v === BK.provider));
-  /* Light the preset the current base URL actually corresponds to, rather
-     than whichever was last pressed — after a reload nothing was pressed,
-     and the honest answer is which one you are on. */
-  const url = (BK.base_url || '').replace(/\/+$/, '');
-  document.querySelectorAll('#bk_preset button').forEach(b=>{
-    const p = BK_PRESETS[b.dataset.v];
-    b.classList.toggle('on', !!p && p.provider === BK.provider
-                                 && p.base_url.replace(/\/+$/, '') === url);
+  blk.querySelectorAll('[data-f="strict"] button').forEach(b=>
+    b.classList.toggle('on', (b.dataset.v === '1') === !!r.strict));
+  blk.querySelectorAll('[data-f="provider"] button').forEach(b=>
+    b.classList.toggle('on', b.dataset.v === r.provider));
+  /* Light the preset the base URL actually corresponds to, rather than
+     whichever was last pressed — after a reload nothing was pressed, and the
+     honest answer is which one you are on. */
+  const u = (r.base_url || '').replace(/\/+$/, '');
+  blk.querySelectorAll('[data-r="preset"] button').forEach(b=>{
+    const pre = BK_PRESETS[b.dataset.v];
+    b.classList.toggle('on', !!pre && pre.provider === r.provider
+                                   && pre.base_url.replace(/\/+$/, '') === u);
   });
-  $('bk_key').placeholder = BK.has_key ? 'unchanged — a key is stored' : 'none stored';
-  bkSyncProvider();
+  const key = F(blk, 'api_key');
+  if (key) key.placeholder = r.has_key ? 'unchanged — a key is stored' : 'none stored';
+
+  /* What each closed box holds, so the whole endpoint reads off the headings
+     and opening one is for changing it rather than for finding out. */
+  const words = (r.aliases || []).length;
+  const sums = {
+    wake: (r.wakeword ? '“' + r.wakeword + '”' : 'not set')
+        + (words ? ' +' + words + ' more' : '')
+        + (r.strict ? ' · exact' : ''),
+    voice: (r.greeting ? '“' + r.greeting.slice(0, 28)
+                       + (r.greeting.length > 28 ? '…' : '') + '” · ' : 'shared greeting · ')
+         + (r.voice || 'shared voice'),
+    conn: r.provider === 'demo' ? 'demo — built-in replies'
+        : (r.model || 'no model') + (r.has_key ? ' · key stored' : ''),
+    limits: r.max_tokens + ' tokens · '
+          + (r.history_turns ? r.history_turns + ' turns' : 'no context') + ' · '
+          + r.timeout + 's',
+    prompt: r.provider === 'demo' ? 'not used in demo'
+          : ((r.system || '').trim().split(/\s+/).filter(Boolean).length + ' words'),
+  };
+  Object.keys(sums).forEach(g=>{
+    const h = blk.querySelector('[data-g="' + g + '"] .subsum');
+    if (h) h.textContent = sums[g];
+  });
+  const voice = F(blk, 'voice');
+  if (voice){
+    const want = r.voice || '';
+    voice.innerHTML = '';
+    const opts = [['', 'the shared voice']].concat((RT.voices || []).map(v=> [v, v]));
+    if (want && !(RT.voices || []).includes(want))
+      opts.push([want, want + ' — not installed here']);
+    opts.forEach(([v, label])=>{
+      const o = document.createElement('option');
+      o.value = v; o.textContent = label; voice.appendChild(o);
+    });
+    voice.value = want;
+  }
+  // buttons that only mean something once it exists on the server
+  const set = (a, hide, label)=>{
+    const b = blk.querySelector('[data-a="' + a + '"]');
+    if (!b) return;
+    b.style.display = hide ? 'none' : '';
+    if (label) b.textContent = label;
+  };
+  set('default', !r.id || r.is_default || r.enabled === false);
+  set('enable',  !r.id, r.enabled === false ? 'SWITCH ON' : 'SWITCH OFF');
+  set('forget',  !r.id);
+  set('test',    !r.id);
+  // always offered: a draft you cannot back out of is a trap
+  set('delete',  false, r.id ? 'DELETE' : 'DISCARD');
+  blockSyncProvider(blk);
 }
 
-async function loadBackend(){
-  if (!ME || ME.role !== 'admin') return;
-  try{
-    const j = await api('/backend');
-    BK = Object.assign({}, j.backend, {has_key: j.has_key});
-    bkPaint();
-    if (BK.unsaved)
-      bkNote('you have unsaved changes here — they were kept, but nothing is '
-             + 'live until you press SAVE', true);
-    else
-      bkNote(BK.provider === 'demo'
-        ? 'answering from built-in text — pick a provider to connect one'
-        : BK.model + ' at ' + BK.base_url);
-    listModels();
-  }catch(e){ bkNote(e.message, true); }
+function blockCollect(blk){
+  const body = {};
+  RT_FIELDS.forEach(k=>{
+    const el = F(blk, k); if (!el) return;
+    body[k] = k === 'aliases'
+      ? el.value.split(/[\n,]/).map(x=>x.trim()).filter(Boolean)
+      : el.value;
+  });
+  Object.keys(RT_SLIDERS).forEach(k=>{
+    const el = blk.querySelector('[data-s="' + k + '"]');
+    if (el) body[k] = parseFloat(el.value);
+  });
+  const prov = blk.querySelector('[data-f="provider"] button.on');
+  body.provider = prov ? prov.dataset.v : 'demo';
+  const strict = blk.querySelector('[data-f="strict"] button.on');
+  body.strict = !!strict && strict.dataset.v === '1';
+  const key = F(blk, 'api_key');
+  if (key && key.value) body.api_key = key.value;
+  if (blk.dataset.rid) body.id = blk.dataset.rid;
+  return body;
 }
 
 /* Ollama will tell us what it has. Saves typing a model name from memory and
    getting it subtly wrong, which returns a 404 that reads like a dead server. */
-async function listModels(){
-  const el = $('bk_models');
-  // Anthropic has no equivalent of /api/tags on this path, and asking it
-  // anyway just puts a CORS failure in the console for nothing.
-  if (!BK || BK.provider !== 'openai' || !BK.base_url){ el.textContent = ''; return; }
-  /* Just ask. Ollama answers /api/tags; anything else 404s and we say
-     nothing. Sniffing for port 11434 was wrong — it misses Ollama on another
-     port or behind a tunnel, which is exactly when you most want the list. */
+async function listModels(blk){
+  const el = R(blk, 'models');
+  if (!el) return;
+  const rec = blk._rec || {};
+  if (rec.provider !== 'openai' || !rec.base_url){ el.textContent = ''; return; }
   try{
-    const base = BK.base_url.replace(/\/v1\/?$/, '');
+    const base = rec.base_url.replace(/\/v1\/?$/, '');
     const r = await fetch(base + '/api/tags', {cache:'no-store'});
     const j = await r.json();
     const names = (j.models || []).map(m=>m.name);
@@ -2110,106 +2536,211 @@ async function listModels(){
   }catch(e){ el.textContent = ''; }
 }
 
-function bkCollect(){
-  const body = {provider: (document.querySelector('#bk_provider button.on')||{}).dataset.v || 'demo'};
-  Object.keys(BK_FIELDS).forEach(id=>{ const el=$(id); if (el) body[BK_FIELDS[id]] = el.value; });
-  Object.keys(BK_SLIDERS).forEach(id=>{
-    const el=$(id); if (el) body[BK_SLIDERS[id][0]] = parseFloat(el.value);
+function wireBlock(blk){
+  blk.addEventListener('input', e=>{
+    const f = e.target.closest('[data-f]');
+    if (f) f.dataset.touched = '1';
+    /* The wake word follows the name while nobody has touched it. Typing the
+       same word twice for the common case is the duplication people notice;
+       keeping them separate fields is what lets an endpoint be called
+       "Kitchen Lights" and answer to "kitchen". */
+    if (f && f.dataset.f === 'name'){
+      const w = F(blk, 'wakeword');
+      if (w && w.dataset.touched !== '1') w.value = f.value.toLowerCase().trim();
+    }
+    const s = e.target.closest('[data-s]');
+    if (s){
+      const k = s.dataset.s;
+      const out = blk.querySelector('[data-o="' + k + '"]');
+      if (out) out.textContent = RT_SLIDERS[k](s.value);
+    }
   });
-  const k = $('bk_key').value;
-  if (k) body.api_key = k;
-  return body;
+  blk.addEventListener('click', e=>{
+    /* Independent, unlike the endpoints themselves: these are parts of one
+       thing rather than alternatives to each other, and you are often
+       comparing two of them. */
+    const h5 = e.target.closest('.subgrp > h5');
+    if (h5){ h5.parentNode.classList.toggle('open'); return; }
+    const b = e.target.closest('button');
+    if (!b) return;
+    const seg = b.closest('.seg[data-f], .seg[data-r="preset"]');
+    if (seg){
+      seg.querySelectorAll('button').forEach(x=> x.classList.toggle('on', x === b));
+      if (seg.dataset.f === 'provider') blockSyncProvider(blk);
+      if (seg.dataset.r === 'preset'){
+        const pre = BK_PRESETS[b.dataset.v];
+        if (pre){
+          F(blk, 'base_url').value = pre.base_url;
+          F(blk, 'keep_alive').value = pre.keep_alive;
+          if (pre.hint) F(blk, 'model').placeholder = pre.hint;
+          blk.querySelectorAll('[data-f="provider"] button').forEach(x=>
+            x.classList.toggle('on', x.dataset.v === pre.provider));
+          blockSyncProvider(blk);
+          blockNote(blk, 'preset filled in — set the model, then SAVE');
+        }
+      }
+      return;
+    }
+    const act = b.dataset.a;
+    if (act) blockAction(blk, act, b);
+  });
 }
 
-document.querySelector('#bk_provider').addEventListener('click', e=>{
-  const b = e.target.closest('button'); if (!b) return;
-  document.querySelectorAll('#bk_provider button').forEach(x=> x.classList.toggle('on', x===b));
-  bkSyncProvider();
-});
-
-document.querySelector('#bk_preset').addEventListener('click', e=>{
-  const b = e.target.closest('button'); if (!b) return;
-  const p = BK_PRESETS[b.dataset.v]; if (!p) return;
-  document.querySelectorAll('#bk_preset button').forEach(x=> x.classList.toggle('on', x===b));
-  $('bk_url').value = p.base_url;
-  $('bk_keepalive').value = p.keep_alive;
-  if (p.hint) $('bk_model').placeholder = p.hint;
-  document.querySelectorAll('#bk_provider button')
-          .forEach(x=> x.classList.toggle('on', x.dataset.v === p.provider));
-  bkSyncProvider();
-  bkNote('preset filled in — set the model, then save');
-});
-
-$('b_bksave').addEventListener('click', async ()=>{
-  bkNote('saving…');
+async function blockAction(blk, act, btn){
+  const rid = blk.dataset.rid;
+  const rec = blk._rec || {};
+  if (act === 'resetprompt'){
+    const t = F(blk, 'system');
+    t.value = SHIPPED_PROMPT; t.dataset.touched = '1';
+    return blockNote(blk, 'back to the shipped wording — not saved yet');
+  }
+  if (act === 'learn'){
+    if (!rid) return blockNote(blk, 'save this endpoint first — LEARN teaches '
+                                  + 'the display a word, and it can only teach '
+                                  + 'it one that is really there', true);
+    LEARNING = rid;
+    return cmd('learnwake', rid);
+  }
+  if (act === 'save'){
+    blockNote(blk, 'saving…');
+    try{
+      const j = await api(rid ? '/routes/save' : '/routes/new',
+                          {method:'POST', body: JSON.stringify(blockCollect(blk))});
+      RT.routes = j.routes; RT.default = j.default;
+      blk.querySelectorAll('[data-f]').forEach(el=> el.dataset.touched = '');
+      const key = F(blk, 'api_key'); if (key) key.value = '';
+      // it exists now, so it is no longer the draft — leaving DRAFT set would
+      // put a second, blank block underneath the one just saved
+      if (!rid){ DRAFT = null; blk.classList.remove('isdraft'); blk.dataset.rid = j.id; }
+      paintBlocks(j.id);
+      routesChanged();
+      /* Say so. Without this the note sat on "saving…" for ever after a save
+         that had worked perfectly — which reads as a hang, and is the sort of
+         thing that makes somebody press SAVE a second time. Resolved after
+         the repaint and by id, because the block may have been reordered. */
+      const now = document.querySelector('#panel .grp[data-rid="' + j.id + '"]');
+      const rec = RT.routes.find(x=> x.id === j.id) || {};
+      if (now) blockNote(now, 'saved · say “' + rec.wakeword + '” to reach '
+        + rec.name + ' · ' + (rec.provider === 'demo' ? 'built-in replies'
+                                                      : rec.model + ' at ' + rec.base_url));
+      return;
+    }catch(e){ return blockNote(blk, e.message, true); }
+  }
+  if (act === 'test'){
+    blockNote(blk, 'asking ' + (rec.name || 'it') + ' something…');
+    try{
+      const j = await api('/routes/test', {method:'POST', body: JSON.stringify({id: rid})});
+      if (j.demo) return blockNote(blk, 'this one is set to DEMO — nothing was asked of a model');
+      return blockNote(blk, j.name + ' replied in ' + j.ms + 'ms\n\n' + j.reply);
+    }catch(e){ return blockNote(blk, e.message, true); }
+  }
+  if (act === 'delete'){
+    if (!rid){ DRAFT = null; paintBlocks(RT.default); return; }   // discard a draft
+    if (!confirm('Delete "' + rec.name + '"? Saying “' + rec.wakeword + '” stops '
+                 + 'reaching anything immediately, and its key goes with it.')) return;
+  }
+  const path = {default:'/routes/default', enable:'/routes/enable',
+                delete:'/routes/delete', forget:'/routes/save'}[act];
+  if (!path) return;
+  const body = act === 'enable' ? {id: rid, enabled: rec.enabled === false}
+             : act === 'forget' ? {id: rid, clear_key: true}
+             : {id: rid};
+  blockNote(blk, 'working…');
   try{
-    const j = await api('/backend', {method:'POST', body: JSON.stringify(bkCollect())});
-    BK = Object.assign({}, j.backend, {has_key: j.has_key});
-    $('bk_key').value = '';
-    BK_PAINTED = {};              // saved: the stored values are truth again
-    bkPaint();
-    bkNote('saved · ' + (BK.provider === 'demo' ? 'built-in replies'
-                                                : BK.model + ' at ' + BK.base_url));
-    listModels();
-  }catch(e){ bkNote(e.message, true); }
-});
+    const j = await api(path, {method:'POST', body: JSON.stringify(body)});
+    if (j.routes){ RT.routes = j.routes; RT.default = j.default; }
+    paintBlocks(act === 'delete' ? RT.default : rid);
+    routesChanged();
+  }catch(e){ blockNote(blk, e.message, true); }
+}
 
-/* The prompt has its own save because it has its own section, and with one
-   section open at a time it would otherwise mean opening a different one to
-   commit what you just typed. Both write the whole assistant document — the
-   field keeps its value while collapsed, so either button captures it. */
-const SHIPPED_PROMPT = 'You are a spoken assistant. Answer in one or two ' +
-  'short sentences unless asked for more. Write plain prose only — no ' +
-  'markdown, lists, headings, or emoji — because your reply is read aloud.';
+/* Bring the column of blocks into line with RT.routes.
 
-$('b_bksaveprompt').addEventListener('click', async ()=>{
-  const note = $('promptnote');
-  note.className = 'note'; note.textContent = 'saving…';
+   Reconciled, never rebuilt. Tearing the blocks down and recreating them was
+   simpler and quietly threw away whatever somebody was part-way through
+   typing — a save, a tab switch or the display reporting a learned word would
+   all wipe the block they were working in, with no warning and no trace. A
+   block that already exists is kept and repainted, and `touched` on a field
+   is what stops the repaint clobbering an edit in it.
+
+   `keepOpen` is the endpoint whose block should be showing afterwards. */
+let DRAFT = null;
+function paintBlocks(keepOpen){
+  const anchor = $('ai_anchor');
+  if (!anchor) return;
+  const list = RT.routes.slice();
+  if (DRAFT) list.push(DRAFT);
+  const have = [...document.querySelectorAll('#panel .grp[data-tab="ai"][data-rid]')];
+  const kept = new Set(), order = [];
+  let target = null;
+  list.forEach(r=>{
+    const rid = r.id || '';
+    let blk = have.find(g=> !kept.has(g) && g.dataset.rid === rid
+                            && (!!rid || g.classList.contains('isdraft')));
+    if (!blk){
+      blk = document.createElement('section');
+      blk.className = 'grp' + (rid ? '' : ' isdraft');
+      blk.dataset.tab = 'ai';
+      blk.dataset.rid = rid;
+      blk.innerHTML = blockHTML(r);
+      anchor.parentNode.insertBefore(blk, anchor);
+      wireBlock(blk);
+      // a new endpoint opens on the two boxes you have to fill in
+      if (!rid) blk.querySelectorAll('[data-g="wake"],[data-g="conn"]')
+                   .forEach(x=> x.classList.add('open'));
+    }
+    order.push(blk);
+    kept.add(blk);
+    blockPaint(blk, r);
+    listModels(blk);
+    if (keepOpen !== undefined && rid === keepOpen) target = blk;
+  });
+  have.forEach(g=>{ if (!kept.has(g)) g.remove(); });
+  /* Put them in the server's order, and measure that against the OTHER AI
+     blocks rather than against every section in the panel — the blocks share
+     a parent with LOOK, MOTION and SPEECH, so positioning by absolute sibling
+     lifted the first endpoint above sections belonging to other tabs.
+
+     Skipped entirely while something inside one is focused: re-inserting an
+     element blurs it, and taking the cursor out of a field somebody is typing
+     in is worse than a list briefly out of order. It settles on the next
+     paint. */
+  const live = [...document.querySelectorAll('#panel .grp[data-tab="ai"][data-rid]')];
+  const same = live.length === order.length && live.every((g, i)=> g === order[i]);
+  if (!same && !order.some(g=> g.contains(document.activeElement)))
+    order.forEach(g=> anchor.parentNode.insertBefore(g, anchor));
+  rescanGroups();
+  if (target) openTopic(target);
+  rtListNote(RT.routes.length
+    ? RT.routes.length + (RT.routes.length === 1 ? ' endpoint' : ' endpoints')
+      + ' · say ' + RT.routes.map(r=> '“' + r.wakeword + '”').join(' or ')
+    : 'no endpoints yet — ADD INSTANCE to make one');
+}
+
+async function loadBackend(){
+  if (!ME || ME.role !== 'admin') return;
   try{
-    const j = await api('/backend', {method:'POST', body: JSON.stringify(bkCollect())});
-    BK = Object.assign({}, j.backend, {has_key: j.has_key});
-    BK_PAINTED = {};              // saved: the stored values are truth again
-    bkPaint();
-    note.textContent = 'saved';
-  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
-});
+    const j = await api('/routes/all');
+    RT = {routes: j.routes || [], default: j.default || '', voices: j.voices || []};
+    paintBlocks();
+  }catch(e){ rtListNote(e.message, true); }
+}
 
-$('b_bkresetprompt').addEventListener('click', ()=>{
-  $('bk_system').value = SHIPPED_PROMPT;
-  const note = $('promptnote');
-  note.className = 'note';
-  note.textContent = 'back to the shipped wording — not saved yet';
-});
+/* The preview is a display, and it read the route document when it loaded.
+   Nothing else would tell it a wake word had changed. */
+function routesChanged(){
+  if (ready) frame.contentWindow.postMessage({rsn:1, kind:'routes'}, location.origin);
+}
 
-$('b_bkforget').addEventListener('click', async ()=>{
-  try{
-    const j = await api('/backend', {method:'POST', body: JSON.stringify({clear_key:true})});
-    BK.has_key = j.has_key; bkPaint();
-    bkNote('key cleared');
-  }catch(e){ bkNote(e.message, true); }
-});
-
-/* A real round trip, not a reachability ping. A base URL that answers and a
-   model name that does not exist look identical until something asks. */
-$('b_bktest').addEventListener('click', async ()=>{
-  bkNote('asking it something…');
-  const t0 = Date.now();
-  try{
-    const r = await fetch('/ask', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        text: 'Reply with one short sentence confirming you are reachable.',
-        // same zone the display sends, so TEST exercises the real path
-        tz: (()=>{ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; }
-                   catch(e){ return ''; } })()
-      })
-    });
-    const j = await r.json().catch(()=>({}));
-    if (j.demo) return bkNote('still on DEMO — nothing was asked of a model');
-    if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
-    bkNote('replied in ' + (j.ms || (Date.now()-t0)) + 'ms via ' + j.model +
-           '\n\n' + j.reply);
-  }catch(e){ bkNote(e.message, true); }
+$('b_addroute').addEventListener('click', ()=>{
+  DRAFT = newInstance();
+  paintBlocks('');
+  const blk = document.querySelector('#panel .grp.isdraft');
+  if (blk){
+    const n = F(blk, 'name');
+    if (n) n.focus();
+    blockNote(blk, 'name it, give it a wake word, then SAVE');
+  }
 });
 
 /* ------------------------------------------------------------ accounts */
@@ -2701,18 +3232,43 @@ $('b_docpdf').addEventListener('click', async ()=>{
    replaced in the same tab, and calling this twice would stack a second set
    of listeners on every tab button and heading — so each click would toggle
    twice and appear to do nothing. */
+let CURRENT_TAB = 'look';
 let navBuilt = false;
 function panelNav(){
   if (navBuilt) return;
   navBuilt = true;
-  const groups = [...document.querySelectorAll('#panel .grp')];
+  /* Not a snapshot any more. The AI tab builds one section per endpoint at
+     runtime, and a section created after this ran had no collapse state and
+     no heading handler — it rendered as a permanently open block that
+     ignored its own title. rescan() is called whenever those are rebuilt. */
+  let groups = [];
   const shut = new Map();
   let tab = 'look';
-  /* Everything starts closed, so a tab opens as a list of topics rather
-     than as one topic and a list. With one section open at a time, an
-     already-expanded section is a choice made on the reader's behalf. */
-  groups.forEach(g=> shut.set(g, true));
   const findEl = $('rigfind');
+  function rescan(){
+    groups = [...document.querySelectorAll('#panel .grp')];
+    groups.forEach(g=>{
+      /* Everything starts closed, so a tab opens as a list of topics rather
+         than as one topic and a list. With one section open at a time, an
+         already-expanded section is a choice made on the reader's behalf. */
+      if (!shut.has(g)) shut.set(g, true);
+      if (g.dataset.wired) return;
+      g.dataset.wired = '1';
+      /* One section open at a time. Opening another closes the one before
+         it, so the column stays short enough to take in at a glance rather
+         than becoming a wall you scroll through hunting for a control.
+         Clicking the open one closes it, which is a legitimate state. */
+      g.querySelector('h4').addEventListener('click', ()=>{
+        const wasOpen = !shut.get(g);
+        groups.forEach(x=>{ if (x.dataset.tab === g.dataset.tab) shut.set(x, true); });
+        shut.set(g, wasOpen);
+        render();
+        // opening one further down should not leave its heading off-screen
+        if (!wasOpen) g.scrollIntoView({block:'nearest'});
+      });
+    });
+    buildHelp();
+  }
   function render(){
     const q = (findEl.value || '').trim().toLowerCase();
     groups.forEach(g=>{
@@ -2742,14 +3298,20 @@ function panelNav(){
      belongs on the tabs that edit it. App settings and accounts each save
      their own thing with their own button, and offering a second save that
      means something else is how somebody presses the wrong one. */
-  /* AI is a settings tab too: the DEMO / CONNECTED AI choice lives in the
-     shared document, so it needs the same save button the others use. The
-     assistant's own connection details save separately, with their own. */
-  const SETTINGS_TABS = new Set(['look', 'motion', 'speech', 'ai']);
+  /* AI is NOT one of these any more. It was, while the DEMO / CONNECTED AI
+     choice lived in the shared document — that choice is gone, because each
+     endpoint's own provider already says whether it answers from built-in
+     text, and two places meaning "demo" is a setting nobody can reason
+     about. Nothing on the AI tab writes the shared document now, so
+     SAVE FOR EVERYONE there would be a button that saves nothing on the tab
+     it is sitting on. Each endpoint saves itself, from inside its block. */
+  const SETTINGS_TABS = new Set(['look', 'motion', 'speech']);
   function syncSaveRow(){
     const show = SETTINGS_TABS.has(tab) ? '' : 'none';
-    ['saverow', 'savestate', 'saverule'].forEach(id=>{
-      const el = $(id); if (el) el.style.display = show;
+    UI_TABS.forEach(t=>{
+      const el = $('uirow_' + t);
+      if (el) el.classList.toggle('on', tab === t && !(findEl.value || '').trim()
+                                        && !!ME && ME.role === 'admin');
     });
     /* The app tab's own commit row. Only on that tab, and only when nothing
        is being filtered — a filter mixes sections from every tab, so a row
@@ -2758,9 +3320,16 @@ function panelNav(){
     const ar = $('approw');
     if (ar) ar.classList.toggle('on',
       tab === 'app' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
+    /* ADD INSTANCE is not inside any block, because it makes one — it has to
+       stay reachable whichever block happens to be open, or the only way to
+       add a second endpoint is to first collapse the first. */
+    const air = $('airow');
+    if (air) air.classList.toggle('on',
+      tab === 'ai' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
   }
   function selectTab(b){
     tab = b.dataset.tab;
+    CURRENT_TAB = tab;
     tabButtons.forEach(x=> x.classList.toggle('on', x === b));
     // arriving at a tab shows its topics closed, not whatever was left open
     groups.forEach(g=>{ if (g.dataset.tab === tab) shut.set(g, true); });
@@ -2774,18 +3343,19 @@ function panelNav(){
     if (tab === 'docs') loadDocs();
   }
   tabButtons.forEach(b=> b.addEventListener('click', ()=> selectTab(b)));
-  /* One section open at a time. Opening another closes the one before it,
-     so the column stays short enough to take in at a glance rather than
-     becoming a wall you scroll through hunting for a control. Clicking the
-     open one closes it, leaving none open, which is a legitimate state. */
-  groups.forEach(g=> g.querySelector('h4').addEventListener('click', ()=>{
-    const wasOpen = !shut.get(g);
+  /* Opening a section from somewhere other than its own heading: ADD has to
+     take you to the block it just created. Assigned out to module scope
+     because this closure is where the collapse state lives. */
+  openTopic = (g)=>{
+    if (!g) return;
+    rescan();
     groups.forEach(x=>{ if (x.dataset.tab === g.dataset.tab) shut.set(x, true); });
-    shut.set(g, wasOpen);
+    shut.set(g, false);
     render();
-    // opening a section further down should not leave its heading off-screen
-    if (!wasOpen) g.scrollIntoView({block:'nearest'});
-  }));
+    g.scrollIntoView({block:'nearest'});
+  };
+  rescanGroups = ()=>{ rescan(); render(); };
+  rescan();
   // the commit row depends on the filter as well as the tab, so both paths
   // have to re-run it
   findEl.addEventListener('input', ()=>{ render(); syncSaveRow(); });
@@ -2823,7 +3393,7 @@ function start(){
      only way to change account was a reload. */
   const admin = ME.role === 'admin';
   document.body.classList.toggle('ro', !admin);
-  $('b_save').style.display = admin ? '' : 'none';
+  paintUiRows();
   // /app is admin-only on the server, so a viewer would open an empty panel
   // and be left wondering. Don't offer it. Same for the embed keys, which
   // are credentials rather than configuration.

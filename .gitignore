@@ -5,6 +5,8 @@ settings.json
 app.json
 backend.json
 backend.json.tmp
+routes.json
+routes.json.tmp
 app.json.tmp
 server.pid
 users.json

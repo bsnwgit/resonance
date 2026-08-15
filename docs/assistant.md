@@ -1,20 +1,121 @@
-# Connecting an assistant
+# Assistants
 
 Out of the box the display answers from built-in text. That is not a
 placeholder to be rushed past — it is how you prove the whole chain works
 before any model exists, and how you tell later whether a fault is the
 front-end or the thing behind it. Keep it available.
 
-**RUN SELF-TEST** walks every link — secure origin, settings store,
-transcription, voices, microphone, recorder, backend, render-and-speak — and
-names whichever one is broken.
+Set an endpoint's service to **DEMO** and it answers from built-in text,
+reaching nothing. There is no display-wide demo switch — whether an endpoint
+is pretending is a property of that endpoint, and two places meaning the same
+thing is a setting nobody can reason about.
+
+**RUN CHECK**, on the SPEECH tab, walks the chain around the endpoints —
+secure origin, settings store, transcription, voices, microphone, recorder,
+and whether the default endpoint answers and can be spoken. It is not an AI
+test: that is the **TEST** inside each endpoint's own block.
+
+## One display, several assistants
+
+Each assistant has **a name you say out loud**. Say it and everything after it
+goes to that one, until you say the sleep word or it times out — so a
+follow-up needs no second address, which is the only tolerable behaviour for
+speech. Say a *different* name mid-conversation and you switch to that one
+instead.
+
+Each has its own service, its own model, its own key, its own instructions,
+and optionally its own greeting and voice — so a room with more than one can
+hear which replied.
+
+**One block per endpoint**, and the block is the whole of it: the wake word
+that reaches it and the connection it reaches, saved together by the SAVE
+inside it. **ADD INSTANCE** at the foot of the tab makes another and opens it;
+each block carries its own TEST, MAKE DEFAULT, SWITCH OFF, FORGET KEY and
+DELETE.
+
+Every block's heading says what you say to reach it and what it is wired to —
+`say "house" -> house-agent` — so you can find the right one without opening
+three of them.
+
+### The one marked default
+
+**Where anything with no name in front of it goes**: typed into the box at the
+bottom of the display, sent by an embedded copy, or spoken while the wake word
+is switched off. There is always exactly one, and **MAKE DEFAULT** moves it. One that is switched off cannot hold it, and the server moves it for you
+rather than leaving the display with nowhere to send anything.
+
+### What a display is told, and what it never is
+
+| | fields | who sees it |
+|---|---|---|
+| what it looks like | name, greeting, voice | anyone who can reach the port |
+| what it answers to | the words, and how closely they must match | the same, today |
+| **what it is connected to** | service, address, key, instructions | **nobody, through any browser** |
+
+The words have to reach the browser because that is where the listening
+happens. **What it is connected to does not, at any tier** — nothing needs it,
+replies come back already labelled with whoever gave them, and it is the one
+field that would tell a reader what this machine is wired to. A display cannot
+tell anyone, because it is never sent it.
+
+### The instance name and the wake word are two fields
+
+They are the same word by default — the wake word follows the name as you type
+it, until you edit the wake word, after which it stays where you put it.
+
+They are separate because they answer to different things. The **instance
+name** labels the endpoint in the panel, in the log and in `{assistant}`; it is
+never spoken and never matched against. The **wake word** is what somebody
+actually says. An endpoint called *Kitchen Lights* is a perfectly good label
+and a terrible thing to say out loud.
+
+### CLOSE ENOUGH and THE EXACT WORD
+
+CLOSE ENOUGH forgives a mishearing: a transcriber gets short words wrong
+constantly, so a name that had to come back spelled correctly would make
+waking a coin flip. That is what you want from something that answers
+questions.
+
+THE EXACT WORD is for one that *does* things. The same near-miss costs you a
+few tokens on one and switches on the lights on the other.
+
+**An exact hit always wins**, wherever it was found. Without that rule a
+near-miss on one name could steal an utterance that said another one outright
+— the worst failure available here, because the person said the right word and
+got the wrong assistant.
+
+### Choosing the words
+
+Choose names that sound **far apart**, not merely different. Differing
+syllable counts, vowels and stress survive a noisy room; two names one letter
+apart do not. Worth settling before a household learns them, because changing
+one afterwards is its own small misery.
+
+Two assistants cannot share a word — including through *also answers to* — and
+the panel refuses it as you save. Words that merely *sound* close are not
+checked yet.
+
+**LEARN HOW I SAY IT** captures what the transcriber actually returns when you
+say the word, three times, and adds those forms to *also answers to*. It
+teaches the endpoint whose block the button is in, and that endpoint has to
+have been saved first. The captured words land in the field unsaved — press **SAVE** to keep
+them.
+
+### TEST
+
+Puts one short question to the endpoint whose block it is in, through that
+endpoint's own service — so DEMO is tested against the built-in replies and a
+connected service against itself, with nothing to keep in step. With several of
+them this stops being a convenience: "the assistant works" is no longer
+something that can be true or false about this server as a whole, and a test
+that quietly exercised a different one would be worse than none.
 
 ## The three providers
 
 ### DEMO
 
 Answers from the display's own built-in text. Nothing is sent anywhere, no key
-is needed, and the system prompt is ignored. The connection fields hide
+is needed, and the instructions are ignored. The connection fields hide
 themselves, because a panel full of controls wired to nothing is worse than a
 short panel.
 
@@ -88,16 +189,30 @@ Never in `settings.json`. That document is world-readable by design — every
 viewer's browser fetches it to build the interface — so a key placed there
 would be handed to anyone who opened the page.
 
-It lives in `backend.json`, admin-only, mode 600. It is **never returned to a
-browser**: the field shows whether one is stored, not what it is. Leaving the
-field blank keeps the stored key; **FORGET KEY** clears it.
+Keys live in `routes.json`, admin-only, mode 600, one per assistant. A key is
+**never returned to a browser**: the field shows whether one is stored, not
+what it is. Leaving the field blank keeps the stored key; **FORGET KEY**
+clears it for the one selected.
 
-## The system prompt
+**Changing which service answers drops its key and its address**, unless you
+supply new ones in the same save. Carrying one provider's endpoint into
+another would send an Anthropic key to whatever happens to be listening on
+the old URL, which is worse than an error because it looks like it worked.
 
-What the assistant is told before every question, and it matters more here
-than in a chat box: the reply is **read aloud**. Markdown, bullets, headings
-and emoji are all noise when spoken, and a bulleted answer read out is
-unusable.
+An install that predates all this is migrated on first start: `backend.json`
+becomes the first assistant, keeping the word the shared settings had, so the
+box answers to the same word afterwards as before. `backend.json` is left on
+disk rather than deleted — an upgrade that removes the file it read from has
+no way back if the migration was wrong.
+
+## System prompt
+
+Sent ahead of every question, and it matters more here than in a chat box: the
+reply is **read aloud**. Markdown, bullets, headings and emoji are all noise
+when spoken, and a bulleted answer read out is unusable.
+
+Each assistant has its own. A house and a general assistant want different
+instructions, and one wording covering both suits neither.
 
 The shipped prompt asks for one or two sentences of plain prose. **RESET**
 returns to it. That single instruction is the largest difference between a
@@ -136,12 +251,16 @@ than slow, the model is too small before anything else is at fault.
 
 ## Testing and diagnosing
 
-**TEST** asks the configured model one short question and reports the reply
-and the round trip in milliseconds. It goes through exactly the same path the
-display uses, so a pass here means a viewer will get an answer too.
+**TEST** puts one short question to that endpoint and reports the reply and the round trip in milliseconds. It uses that one's own
+connection, so a pass here means a viewer who says its name will get an answer
+too.
 
 Failures report the provider's own message rather than a bare status code,
-because "404" tells you nothing about which field is wrong.
+because "404" tells you nothing about which field is wrong. On the *display*
+they are reported against the assistant's name rather than the service — a
+display says these out loud, and "openai returned 401" tells the person
+standing in front of it nothing they can act on while telling everyone in
+earshot what the box is wired to.
 
 | Symptom | Usually |
 |---|---|
@@ -149,7 +268,9 @@ because "404" tells you nothing about which field is wrong.
 | "404 ... model" | model name does not match what is installed |
 | "401" / "invalid api key" | key wrong, or missing for a hosted provider |
 | "timed out after ..." | cold model; raise the timeout |
-| still on DEMO | the provider is still DEMO — nothing was asked of a model |
+| still on DEMO | that one is set to DEMO — nothing was asked of a model |
+| the wrong one answered | a near-miss; set the other to THE EXACT WORD, or move the words further apart |
+| nothing woke at all | the word belongs to none of them, or the gate is off — SPEECH tab |
 | a confidently wrong answer | the model, not the plumbing — see above |
 
 ## Choosing a model

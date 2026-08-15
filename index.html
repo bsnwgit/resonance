@@ -435,18 +435,91 @@ const Embed = {
 const DISPLAY_NAME = (new URLSearchParams(location.search).get('display') || '')
   .replace(/[<>{}]/g, '').trim().slice(0, 40);
 
+/* ================================================================ ROUTES
+   Three names reaching three destinations. A route is a name, a wake word
+   and its aliases, an adapter and its configuration, and optionally its own
+   voice — so you can HEAR which one answered, which matters the moment two
+   of them can reply to the same room.
+
+   This page sees two thirds of one. Presentation and routing arrive here
+   because wake-word matching happens in the browser and a newly hung display
+   has to look right; the connection half — adapter kind, base URL, key —
+   is never published to any browser at any tier. So nothing on this page
+   knows or can say what a route is wired to. It knows a name and a word.
+
+   The document is public and this page only reads it, exactly like the
+   shared settings. */
+const Routes = {
+  list: [], defaultId: '',
+
+  async load(){
+    try{
+      const r = await fetch('routes', {cache:'no-store'});
+      const j = await r.json();
+      this.list = (j && j.routes || []).filter(x=> x && x.id && x.wakeword);
+      this.defaultId = (j && j.default) || (this.list[0] || {}).id || '';
+      return this.list.length;
+    }catch(e){ return -1; }
+  },
+
+  byId(id){ return this.list.find(r=> r.id === id) || null; },
+
+  /* Where a question goes. The wake word that woke it decides, and the route
+     stays bound to the CONVERSATION rather than to the sentence — a
+     follow-up reaches the same destination without being re-addressed, which
+     is the only tolerable behaviour for speech. Nothing was addressed at all
+     when it was typed into the composer or the wake gate is off, and that is
+     what the default is for. */
+  current(){
+    return (Wake.route && this.byId(Wake.route)) || this.byId(this.defaultId)
+           || this.list[0] || null;
+  },
+  currentId(){ const r = this.current(); return r ? r.id : ''; },
+
+  /* Every form one route answers to. */
+  words(r){ return r ? [r.wakeword].concat(r.aliases || []).filter(Boolean) : []; },
+
+  /* For the "say X to wake me" note. Wake words, not names: the word is what
+     somebody has to say, and on most routes the two are the same anyway. */
+  spoken(){
+    const w = this.list.map(r=> '“' + r.wakeword + '”');
+    return w.length ? w.join(' or ') : '“' + FALLBACK_WAKEWORD + '”';
+  },
+
+  /* The voice this route answers in, falling back to the shared choice.
+     Hearing which one replied is worth more than reading it on a wall
+     display that shows no text at all. */
+  voice(){
+    const r = this.current();
+    return (r && r.voice) || S.ttsvoice || '';
+  },
+};
+const FALLBACK_WAKEWORD = 'resonance';
+
 /* ---------------------------------------------------------- variables
    One expander for every setting that names something — the greeting, the
    farewell, and the two transcript labels. `{name}` predates this and meant
    the wake word, so it keeps meaning exactly that rather than being renamed
    into a tidier scheme that would break every greeting already written.
+   With routes there are several wake words, so it means the one belonging to
+   whichever route is answering — which is the same sentence, and now says
+   something more useful.
+
+   `{assistant}` is its name, which is a separate field. Put it in the
+   assistant label and the transcript attributes each answer to whichever one
+   gave it.
 
    An unknown variable is left standing rather than blanked. Somebody typing
    {displya} should see their typo, not a name that silently vanished. */
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 const VARS = {
   name:    ()=>{
-    const raw = (S.wakeword || 'resonance').trim();
-    return raw.charAt(0).toUpperCase() + raw.slice(1);
+    const r = Routes.current();
+    return cap(((r && r.wakeword) || FALLBACK_WAKEWORD).trim());
+  },
+  assistant: ()=>{
+    const r = Routes.current();
+    return cap(((r && r.name) || FALLBACK_WAKEWORD).trim());
   },
   display: ()=> DISPLAY_NAME,
 };
@@ -519,9 +592,13 @@ const S = {
   ttsengine:'local', ttsvoice:'',      // local = neural voice on the server
   micgain:1.6, micgate:0.020, ptt:true, micdsp:'clean',   // clean | raw
   sttmodel:'small.en', hangover:0.55,
-  backend:'demo',              // demo | api  — demo answers from built-in text
-  wake:'auto', wakeword:'resonance', wakewindow:12,   // off | auto | always
-  wakealiases:'',                                 // what the model ACTUALLY hears you say
+  /* The wake WORD is not here any more, and its absence is the point: it
+     belongs to a route now, because with several of them the word is what
+     picks between them. What is left here is the gate's behaviour, which is
+     one thing for the whole display however many routes it can reach. The
+     sleep word stays shared for the same reason — there is one way out of a
+     conversation regardless of which route you are in. */
+  wake:'auto', wakewindow:12,                     // off | auto | always
   sleepword:'goodbye', sleepaliases:'', byeontimeout:true,
   farewells:"{name} going quiet.\nStanding by.\nGoodbye.",
   greetings:"{name} here. Go ahead.\n{name} online. What do you need?\n"+
@@ -1529,7 +1606,11 @@ const Play = {
     this.body = r.body; this.caret = r.caret; this.full = text; this.onDone = done;
     this.shown = 0;
     try{
-      const resp = await fetch('tts?voice=' + encodeURIComponent(S.ttsvoice || '') +
+      /* The route's own voice where it has one, so a room with three
+         assistants in it can tell which one just answered without reading
+         anything. Resolved here rather than held: start() is reached
+         synchronously from respond(), while the route is still bound. */
+      const resp = await fetch('tts?voice=' + encodeURIComponent(Routes.voice()) +
                                '&rate=' + encodeURIComponent(S.vrate), {
         method:'POST', headers:{'Content-Type':'text/plain; charset=utf-8'}, body:text
       });
@@ -1905,19 +1986,29 @@ const LOCAL_TZ = (()=>{
    answered in that context, so it stops being a measurement of the backend
    and becomes a measurement of the backend plus the last ten minutes. */
 async function askBackend(text, bare){
-  if (S.backend === 'demo') return REPLIES[replyIx++ % REPLIES.length];
+  /* No display-wide demo switch any more. Whether an endpoint answers from
+     built-in text is a property OF that endpoint — the server replies
+     {demo:true} for one set to DEMO and the branch below handles it. Two
+     places meaning "demo", one of them overriding the other invisibly, is a
+     setting nobody could reason about. */
   try{
     const r = await fetch('ask', {
       method:'POST', headers:{'Content-Type':'application/json'},
       /* The server runs on UTC and the person is not necessarily standing in
          UTC. Only the browser knows where they are, so it says. */
-      body: JSON.stringify({text, history: bare ? [] : convo, tz: LOCAL_TZ})
+      /* Which name was spoken, so the server knows where to send this. The
+         id, not the word: the server has the document this came from and a
+         wake word is a thing people mispronounce. An id it does not
+         recognise — a route deleted while this display was awake — falls
+         back to the default there rather than failing here. */
+      body: JSON.stringify({text, history: bare ? [] : convo, tz: LOCAL_TZ,
+                            route: Routes.currentId()})
     });
     const j = await r.json().catch(()=>({}));
-    // the server still being on demo is not an error, just not wired up yet
+    // the route still being on demo is not an error, just not wired up yet
     if (j && j.demo) return REPLIES[replyIx++ % REPLIES.length];
     if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
-    if (j.ms) ev('reply ' + j.ms + 'ms');
+    if (j.ms) ev((j.name || 'reply') + ' ' + j.ms + 'ms');
     return j.reply;
   }catch(e){
     /* Say something. A voice interface that goes quiet is indistinguishable
@@ -1983,9 +2074,19 @@ async function selfTest(){
      non-answer then gets spoken aloud and read as a failure — the check
      passes, the transcript says something baffling. Ask it something it can
      actually answer, with no conversation behind it. */
+  const cur = Routes.current();
+  say(Routes.list.length > 0, 'routes · ' +
+      (Routes.list.map(r=> r.name + ' (“' + r.wakeword + '”' +
+                           (r.strict ? ', exact' : '') + ')').join(', ')
+       || 'none — nothing has a name to answer to'));
+
+  /* Against the route the display would actually use right now, which is the
+     default unless something woke it — so the line says which. A self-test
+     that silently tested a different destination from the one that answers
+     would be worse than no self-test. */
   const reply = await askBackend(
     'Reply with one short sentence confirming you can hear me.', true);
-  say(!!reply, 'backend (' + S.backend + ') answered ' +
+  say(!!reply, 'default endpoint “' + (cur ? cur.name : 'none') + '” answered ' +
       (reply ? reply.length + ' chars: "' + reply.trim().slice(0, 60) +
                (reply.trim().length > 60 ? '…' : '') + '"'
              : 'nothing'));
@@ -1995,7 +2096,7 @@ async function selfTest(){
   say(document.querySelectorAll('.msg').length > before, 'reply rendered and spoken');
 
   lines.push(lines.some(l=>l.startsWith('  FAIL')) ? '\nsomething above needs fixing.'
-                                                   : '\nall green — safe to connect a real backend.');
+                                                   : '\nall green.');
   show(lines.join('\n'));
 }
 
@@ -2341,6 +2442,12 @@ const wallNow = () => performance.now()/1000;
 const Wake = {
   awake:false, until:0,
 
+  /* The route this conversation is bound to — set by the word that woke it,
+     and held until the conversation ends rather than re-decided per
+     sentence. Empty means nothing has been addressed, and questions fall to
+     the default route. */
+  route:'',
+
   norm(s){
     return (s||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
   },
@@ -2381,7 +2488,6 @@ const Wake = {
     });
     return list.filter(Boolean);
   },
-  candidates(){      return this._list(S.wakeword,  S.wakealiases);  },
   sleepCandidates(){ return this._list(S.sleepword, S.sleepaliases); },
 
   /* Ending a conversation on purpose beats waiting out a timer — say the
@@ -2395,6 +2501,9 @@ const Wake = {
   },
 
   sleepNow(sayBye){
+    /* The farewell is spoken below, and it expands {name} — so the route has
+       to still be bound while it is said, or the display signs off in
+       somebody else's name. Cleared after. */
     this.awake = false;
     this.until = 0;
     /* The conversation is over, so what it was holding goes with it. On a
@@ -2405,13 +2514,22 @@ const Wake = {
     forgetConversation();
     syncTalk(); syncWake();
     if (sayBye) farewell();
-    else micNote('asleep — say “' + S.wakeword + '” to start again');
+    else micNote('asleep — say ' + Routes.spoken() + ' to start again');
+    this.route = '';
   },
 
   /* Token-based, so a stray plural "s" cannot be left behind in the
-     command. */
-  _tryWord(toks, w){
-    const tol  = w.length >= 7 ? 2 : w.length >= 4 ? 1 : 0;
+     command.
+
+     `strict` belongs to the route, and it is the difference between an
+     assistant and a light switch. The near-miss rules below are right when
+     the cost of a false wake is a few tokens and a slightly odd reply; they
+     are wrong when it actuates hardware. Under strict, a word matches when
+     it IS the word — either as one token or as a compound the transcriber
+     split in two, which is not a guess about what was meant but the same
+     word with a space in it. */
+  _tryWord(toks, w, strict){
+    const tol  = strict ? 0 : w.length >= 7 ? 2 : w.length >= 4 ? 1 : 0;
     const skel = this._skel(w);
     const wlen = w.split(' ').length;                 // aliases may be 2 words
     if (wlen > 1){                                    // multi-word alias
@@ -2431,6 +2549,7 @@ const Wake = {
       // EXACT only on the joined pair, or "good bytes" would match too.
       if (k+1 < toks.length && t + toks[k+1] === w)
         return {trigger:true, rest: toks.slice(k+2).join(' ').trim(), fuzzy:t+' '+toks[k+1]};
+      if (strict) continue;
       if (t.startsWith(w) && t.length - w.length <= 2) return {trigger:true, rest:rest()};
       if (tol && this._lev(t, w) <= tol) return {trigger:true, rest:rest(), fuzzy:t};
       if (t.length >= 3 && Math.abs(t.length - w.length) <= 2 && this._skel(t) === skel)
@@ -2439,14 +2558,27 @@ const Wake = {
     return null;
   },
 
+  /* Which route, if any, this utterance addressed.
+
+     An EXACT hit always beats a fuzzy one, wherever each was found. Without
+     that rule a near-miss on the first route in the list would steal an
+     utterance that named the second one outright — the worst possible
+     failure here, because the person said the right word and was answered by
+     the wrong assistant. Among equals the list order decides, which puts the
+     default first. */
   heard(text){
     const toks = this.norm(text).split(' ').filter(Boolean);
-    if (!toks.length) return {trigger:false, rest:''};
-    for (const w of this.candidates()){
-      const hit = this._tryWord(toks, w);
-      if (hit) return hit;
+    if (!toks.length) return null;
+    let near = null;
+    for (const r of Routes.list){
+      for (const w of Routes.words(r)){
+        const hit = this._tryWord(toks, this.norm(w), r.strict);
+        if (!hit) continue;
+        if (!hit.fuzzy) return Object.assign(hit, {route: r, word: w});
+        if (!near) near = Object.assign(hit, {route: r, word: w});
+      }
     }
-    return {trigger:false, rest:''};
+    return near;
   },
 
   touch(){ this.until = wallNow() + S.wakewindow; },
@@ -2463,16 +2595,40 @@ const Wake = {
     if (!this.armed()) return text;
     if (this.awake && wallNow() < this.until){
       if (this.heardSleep(text)){ this.sleepNow(true); return null; }
+      /* Mid-conversation, another route's wake word switches to it. One
+         person at one tablet changing what they are addressing — say the
+         house name while talking to the model and the house answers, without
+         having to say goodbye first.
+
+         The conversation does NOT come with them. What was said to one
+         assistant is not context the next one should be handed: it is
+         another party's words, it would be paid for a second time, and on a
+         house route it is a description of a room being sent somewhere it
+         was never addressed to. */
+      const sw = this.heard(text);
+      if (sw && sw.route.id !== this.route) return this.wakeOn(sw);
       this.touch();
       return text;
     }
     const h = this.heard(text);
-    if (!h.trigger){
-      micNote('asleep — say “' + S.wakeword + '” to wake me');
+    if (!h){
+      micNote('asleep — say ' + Routes.spoken() + ' to wake me');
       return null;
     }
-    this.awake = true; this.touch(); syncTalk(); syncWake();
-    if (h.fuzzy) micNote('woke on "' + h.fuzzy + '" (near “' + S.wakeword + '”)');
+    return this.wakeOn(h);
+  },
+
+  /* Bind, and hand back whatever was said after the name — or nothing, when
+     the name was the whole utterance and the right answer is hello. */
+  wakeOn(h){
+    const switching = this.awake && this.route && this.route !== h.route.id;
+    if (switching) forgetConversation();
+    this.awake = true; this.route = h.route.id;
+    this.touch(); syncTalk(); syncWake();
+    if (h.fuzzy)
+      micNote('woke on "' + h.fuzzy + '" (near “' + h.word + '”) — ' + h.route.name);
+    else if (switching)
+      micNote('now talking to ' + h.route.name);
     if (!h.rest){                            // just the name — say hello back
       greet();
       return null;
@@ -2499,6 +2655,9 @@ const Learn = {
   on:false, left:0, got:[],
 
   target:'wake',
+  /* Which route is being taught, when the target is a wake word. A sleep
+     word belongs to the display, so it has no route. */
+  route:'',
 
   say(m, live){
     const slot = this.target === 'sleep' ? 'learnsleepnote' : 'learnwakenote';
@@ -2514,16 +2673,23 @@ const Learn = {
     });
   },
 
-  start(target){
+  start(target, routeId){
     this.target = target || 'wake';
+    this.route = this.target === 'wake' ? (routeId || Routes.currentId()) : '';
     this.clearNotes();
+    if (this.target === 'wake' && !Routes.byId(this.route)){
+      this.say('Pick a route to teach first.');
+      return;
+    }
     if (!Mic.active || !Listen.on){
       this.say('Press TALK first (bottom right), then try again.');
       return;
     }
     this.on = true; this.left = 3; this.got = [];
     Wake.awake = false;
-    this.say('LISTENING 1 of 3 — say your ' + this.target + ' word now, then pause.', true);
+    const what = this.target === 'wake'
+      ? 'the wake word for ' + Routes.byId(this.route).name : 'your sleep word';
+    this.say('LISTENING 1 of 3 — say ' + what + ' now, then pause.', true);
   },
 
   take(text){
@@ -2537,28 +2703,57 @@ const Learn = {
     }
     this.on = false;
     const isWake = this.target === 'wake';
-    const key    = isWake ? 'wakealiases' : 'sleepaliases';
-    const have   = isWake ? Wake.candidates() : Wake.sleepCandidates();
+    const r = isWake ? Routes.byId(this.route) : null;
+    const have = isWake ? Routes.words(r).map(w=> Wake.norm(w))
+                        : Wake.sleepCandidates();
     const add = [...new Set(this.got)].filter(x => x && have.indexOf(x) < 0);
-    if (add.length){
-      const cur = (S[key]||'').split(/[\n,]/).map(x=>x.trim()).filter(Boolean);
-      S[key] = [...new Set([...cur, ...add])].join('\n');
-      const el = document.getElementById(key);
-      if (el) el.value = S[key];
-      this.say('Learned: ' + add.join(', ') +
-               ' — I now answer to these as well as “' +
-               (isWake ? S.wakeword : S.sleepword) + '”.');
-    } else {
+    if (!add.length){
       this.say('Nothing new to add — “' + this.got.join('”, “') +
                '” already matched.');
+      return;
     }
+    if (!isWake){
+      const cur = (S.sleepaliases||'').split(/[\n,]/).map(x=>x.trim()).filter(Boolean);
+      S.sleepaliases = [...new Set([...cur, ...add])].join('\n');
+      const el = document.getElementById('sleepaliases');
+      if (el) el.value = S.sleepaliases;
+      this.say('Learned: ' + add.join(', ') + ' — I now answer to these as ' +
+               'well as “' + S.sleepword + '”.');
+      return;
+    }
+    /* A wake word belongs to a route, and routes are written from the admin
+       listener by somebody signed in — this page has no route that accepts a
+       write and should not grow one. So the words go up the channel that is
+       already there and land in the panel's field, unsaved, for the admin to
+       look at and commit.
+
+       They are applied to this page's own copy of the route at the same
+       time, so the very next thing you say is tested against what was just
+       learned. That copy dies with the page, which is the honest state of
+       affairs until somebody presses SAVE. */
+    r.aliases = [...new Set([...(r.aliases || []), ...add])];
+    if (window.parent !== window)
+      window.parent.postMessage({rsn:1, kind:'learned', route:this.route,
+                                 words:add}, '*');
+    this.say('Learned: ' + add.join(', ') + ' — ' + r.name + ' answers to ' +
+             'these now, and will keep doing so once you SAVE the route.');
   }
 };
 
 /* Spoken greeting when woken by name. Uses whatever the wake word is set
-   to, so renaming it renames the greeting. */
+   to, so renaming it renames the greeting.
+
+   A route may carry its own, which is what makes a house sound like a house
+   and a model sound like a model. Blank means the shared phrases, so an
+   admin sets one line once and every route uses it until one of them wants
+   something else. The route's own is a single line rather than a pool: the
+   variety in the shared field exists so a display somebody talks to all day
+   does not repeat itself, and a route that says one specific thing is
+   choosing that thing on purpose. */
 const FALLBACK_GREETING = '{name} here. Go ahead.';
 function greetingText(){
+  const own = (Routes.current() || {}).greeting;
+  if (own && own.trim()) return expand(own.trim());
   const pool = (S.greetings || '').split('\n').map(x=>x.trim()).filter(Boolean);
   return expand(pool.length ? pool[(Math.random()*pool.length)|0] : FALLBACK_GREETING);
 }
@@ -2582,23 +2777,37 @@ function syncPtt(){
     : 'hands-free — sends when you stop speaking (click for push-to-talk)';
   syncSeg('ptt');                        // keep the rig's copy in step
 }
+/* Both readouts are RELAYED as well as written.
+
+   They only ever existed in the panel — this page has no element by either
+   name — so for as long as they have been here they have described the gate
+   to nobody. The state they report is only knowable on this side, which is
+   why the code lives here; sending it is what was missing. Worth more now
+   than it was, since what it says includes which route is being talked to. */
 function syncWake(){
-  const sl = document.getElementById('sleepstate');
-  if (sl) sl.textContent =
+  let sleepTxt =
       S.wake === 'off' ? 'Not used while the wake word is off.'
     : !Wake.armed()    ? 'Not in effect — the wake gate is inactive in this mode.'
     : Wake.awake       ? 'Say “' + (S.sleepword||'…') + '” to end the conversation now.'
     : 'Ready — used once it is awake.';
-  if (sl && S.byeontimeout && Wake.armed() && S.wake !== 'off')
-    sl.textContent += ' Also spoken when the awake timer runs out.';
-  const el = document.getElementById('wakestate');
-  if (!el) return;
-  el.textContent =
-      S.wake === 'off'                 ? 'OFF — every utterance is acted on.'
-    : Wake.armed()                     ? 'ACTIVE — say “' + (S.wakeword||'…') +
-                                          '” to wake. Now: ' + (Wake.awake ? 'AWAKE' : 'ASLEEP')
+  if (S.byeontimeout && Wake.armed() && S.wake !== 'off')
+    sleepTxt += ' Also spoken when the awake timer runs out.';
+  const sl = document.getElementById('sleepstate');
+  if (sl) sl.textContent = sleepTxt;
+  relay('sleepstate', sleepTxt);
+
+  const on = Wake.awake && Routes.current()
+    ? 'AWAKE — talking to ' + Routes.current().name : 'ASLEEP';
+  const wakeTxt =
+      S.wake === 'off'                 ? 'OFF — every utterance is acted on, and ' +
+                                          'goes to the default route.'
+    : Wake.armed()                     ? 'ACTIVE — say ' + Routes.spoken() +
+                                          ' to wake. Now: ' + on
     : 'NOT IN EFFECT — you are in SPACE mode, and AUTO ONLY skips the gate there. ' +
       'Switch the composer chip to AUTO, or set ALWAYS to require it in both modes.';
+  const el = document.getElementById('wakestate');
+  if (el) el.textContent = wakeTxt;
+  relay('wakestate', wakeTxt);
 }
 
 function setPtt(v, remember){
@@ -2653,8 +2862,9 @@ if (!window.isSecureContext || !Mic.ok){
 } else if (!Listen.supported()){
   micNote('mic available, but this browser has no MediaRecorder — visual only');
 }
-bindField('wakealiases','wakealiases');
-CMD.learnwake  = ()=> Learn.start('wake');
+/* LEARN takes the route it is teaching, because a wake word belongs to one
+   now. The panel sends which one along with the command. */
+CMD.learnwake  = (routeId)=> Learn.start('wake', routeId);
 CMD.learnsleep = ()=> Learn.start('sleep');
 
 const sleepIn = $('sleepword');
@@ -2673,16 +2883,9 @@ CMD.selftest = ()=> selfTest();
 bindField('greetings','greetings');
 CMD.greet = ()=> greet();
 
-const wakeIn = $('wakeword');
-if (wakeIn){
-  FIELDS.push(()=>{ wakeIn.value = S.wakeword; });
-  wakeIn.value = S.wakeword;
-  wakeIn.addEventListener('input', ()=>{
-    S.wakeword = wakeIn.value.trim();
-    Wake.awake = false;                     // new word means start over
-    syncTalk(); syncWake();
-  });
-}
+/* No wake-word field here any more. It is a route's, it is saved with the
+   route rather than with the shared settings, and a second copy of it on
+   this page would be a control writing to a document nothing reads. */
 slider('wakewindow','wakewindow', v=>v+'s');
 
 syncPtt();
@@ -2796,21 +2999,26 @@ function showPostureWarning(text){
   }
 }
 
-/* Rebuild every control from S — used after settings load. */
-function repaintAll(){
-  SLIDERS.forEach(f=>f());
-  FIELDS.forEach(f=>f());
-  ['mode','palette','layout','tmode','src','ptt','wake','micdsp','sttmodel','byeontimeout','backend','ttsengine','face','fs']
-    .forEach(syncSeg);
-  setPalette(S.palette);
-  setType();
-  /* Relabel what is already on screen. The admin is tuning this against a
-     live transcript, and a name that only applied to the next line would
-     look like it had not taken. */
+/* Relabel what is already on screen. The admin is tuning this against a live
+   transcript, and a name that only applied to the next line would look like
+   it had not taken. Its own function because the route document can change
+   under a page too, and {name} and {route} both come from there. */
+function repaintNames(){
   document.querySelectorAll('#log .msg').forEach(m=>{
     const w = m.querySelector('.who');
     if (w) w.textContent = speakerName(m.classList.contains('you') ? 'you' : 'ai');
   });
+}
+
+/* Rebuild every control from S — used after settings load. */
+function repaintAll(){
+  SLIDERS.forEach(f=>f());
+  FIELDS.forEach(f=>f());
+  ['mode','palette','layout','tmode','src','ptt','wake','micdsp','sttmodel','byeontimeout','ttsengine','face','fs']
+    .forEach(syncSeg);
+  setPalette(S.palette);
+  setType();
+  repaintNames();
   document.body.dataset.layout = S.layout;
   if (typeof syncPtt === 'function') syncPtt();
   if (typeof syncTalk === 'function') syncTalk();
@@ -2969,8 +3177,12 @@ if (PREVIEW){
       repaintAll();
       if (scanEl) scanEl.style.opacity = S.scan;
       tiltAim = S.tilt;
+    } else if (m.kind === 'routes'){
+      // the panel saved a route; take the new document rather than waiting
+      // for a reload to notice
+      Routes.load().then(()=>{ syncWake(); repaintNames(); });
     } else if (m.kind === 'cmd' && typeof CMD[m.cmd] === 'function'){
-      try { CMD[m.cmd](); }
+      try { CMD[m.cmd](m.arg); }
       catch(err){ relay('ttsnote', m.cmd + ' failed: ' + err.message); }
     }
   });
@@ -2993,8 +3205,13 @@ function applyPrefs(){
 }
 applyPrefs();
 
-Settings.load().then(()=>{
+/* Both documents before anything is drawn from either. The routes decide
+   what {name} expands to and what this display answers to, so loading them
+   after the first paint would flash the fallback name into the opening line
+   of the transcript. */
+Promise.all([Settings.load(), Routes.load()]).then(()=>{
   applyPrefs();
+  syncWake();
   /* After the prefs, always: the grant decides what this surface is, and a
      preference stored against another page on the same site does not get to
      argue with it. */

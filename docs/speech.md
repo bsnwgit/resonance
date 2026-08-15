@@ -102,15 +102,21 @@ Two signal-processing profiles, and they genuinely conflict:
 Choose by what the display is for. A display people ask questions of wants
 CLEAN. A display that mostly looks good in a foyer wants RAW.
 
-## Wake word
+## The wake gate
 
 Without a wake word, an AUTO display responds to any speech near it —
-including two people talking to each other. The wake word is what makes it
+including two people talking to each other. The wake gate is what makes it
 usable in an occupied room.
+
+**The words themselves are not here.** Each belongs to an assistant, on the AI
+tab: with more than one, the word is what picks between them, so it belongs to
+the thing it picks. LEARN, the alternative spellings and each one's own
+greeting are all there too. What is on this tab is the gate's behaviour, which
+is one thing for the whole display however many assistants it can reach.
 
 | Mode | Behaviour |
 |---|---|
-| OFF | no gate; anything heard is a question |
+| OFF | no gate; anything heard is a question, and goes to the one marked DEFAULT |
 | AUTO ONLY | the gate applies in AUTO, and is skipped in push-to-talk |
 | ALWAYS | the gate applies in both modes |
 
@@ -121,18 +127,27 @@ friction for nothing.
 **stays awake for** sets how long it keeps listening after being woken.
 Activity extends it.
 
-**LEARN HOW I SAY IT (3x)** records your pronunciation three times and matches
-against that, which is worth doing for any word the transcriber gets wrong —
-and for any name that is not an ordinary English word.
+**greeting phrases** are the fallback for every assistant with no greeting of
+its own. `{name}` is the word that was said to reach whoever answered, so one line
+written here reads correctly whichever one answers.
 
-You can set greetings for it to answer with, and aliases for near-misses the
-transcriber commonly produces.
+## Commissioning check
+
+**RUN CHECK** walks every link in the chain and names whichever is broken:
+secure origin, the settings store, transcription, the voice service, the
+microphone, the recorder, the endpoints, and whether the default endpoint
+answers and can be rendered and spoken.
+
+It lives here rather than on the AI tab because most of what it checks is on
+this one. It is not an AI test — each endpoint has its own **TEST**, which
+puts a question to that endpoint's own service.
 
 ## Sleep word
 
-Ends the conversation deliberately rather than waiting for the timeout, and
-**clears the conversation history**. Same options: farewells to answer with,
-aliases for near-misses, and the same three-times learning.
+One word, shared by all of them: there is one way out of a conversation
+whichever assistant you are in it with. It ends the conversation deliberately rather than
+waiting for the timeout, and **clears the conversation history**. Farewells
+to answer with, aliases for near-misses, and the same three-times learning.
 
 Also here: whether it says a farewell when it times out, or just goes quiet.
 On a wall display in a quiet office, quiet is usually the better manners.

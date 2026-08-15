@@ -49,9 +49,16 @@ the PR, not after. The visualiser, the microphone and the voice pipeline can
 only really be judged live.
 
 ```bash
-rsync -az --exclude-from=.gitignore ./ <host>:<path>/
+rsync -az --exclude=.git --exclude-from=.gitignore ./ <host>:<path>/
 ssh <host> '<path>/serve.sh stop && <path>/serve.sh start'
 ```
+
+**`--exclude=.git` is not optional.** `.gitignore` does not list `.git`, so
+without it one rsync puts the entire repository — source and full history —
+into a directory the display listener serves files out of. `serve.py` now
+refuses any path with a dot-prefixed segment, so a repository that got there
+before is no longer readable over HTTP, but do not rely on that: it should
+not be on the box in the first place.
 
 - **Never deploy directly from a feature branch to anything shared** — merge to
   `main` first.

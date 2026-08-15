@@ -76,8 +76,13 @@ and **resonance**, and either can be a fixed word or a variable.
 
 | Variable | Becomes |
 |---|---|
-| `{name}` | the wake word, capitalised |
+| `{name}` | the word you say to reach whoever is answering, capitalised |
+| `{assistant}` | what that assistant is called |
 | `{display}` | the name of the display being viewed, from `?display=` on the URL |
+
+`{assistant}` is the one to reach for once there is more than one of them: the
+transcript then credits each answer to whoever gave it, rather than to a fixed
+word.
 
 `{name}` is the same variable the greeting and farewell fields already use, so
 renaming what the assistant answers to can rename what it is called in the
