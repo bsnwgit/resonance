@@ -83,7 +83,7 @@ laptop, a phone. Anything else that hears its wake word drops the utterance: no
 answer, nothing passed to whatever it was already talking to, nothing said out
 loud, no matter how that browser is configured.
 
-Displays enrol themselves by loading the page and are approved under DISPLAYS;
+Devices enrol themselves by loading the page and are approved under DEVICES;
 one that has not been approved yet can be ticked here, and is refused until it
 is. Restricting the **default** endpoint is worth a moment's thought: anything
 typed into the composer with no name in front of it goes there, so displays

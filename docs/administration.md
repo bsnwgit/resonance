@@ -41,7 +41,7 @@ At the top:
 At the foot, pinned so they are always reachable:
 
 - **APP SETTINGS** — how the server itself is wired.
-- **DISPLAYS** — the devices that may use this server, and what they may reach.
+- **DEVICES** — what may use this server, and what each may reach.
 - **EMBEDS** — keys that let another application frame this interface.
 - **ACCOUNTS** — who can sign in, and the groups access is granted to.
 - **DOCUMENTATION** — these documents.
@@ -125,7 +125,7 @@ A display is one device — a screen on a wall, a TV, a laptop, somebody's phone
 — as distinct from a browser tab somebody opened. Anything with a browser and a
 microphone counts.
 
-The DISPLAYS tab holds four topics:
+The DEVICES tab holds four topics:
 
 | | |
 |---|---|

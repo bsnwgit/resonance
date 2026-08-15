@@ -1791,7 +1791,7 @@ button to download it as a PDF.</div>
     <div class="tabgroup">Admin settings</div>
     <div class="tabs" id="foottabs">
       <button id="tab_app" data-tab="app">APP SETTINGS</button>
-      <button id="tab_displays" data-tab="displays">DISPLAYS</button>
+      <button id="tab_displays" data-tab="displays">DEVICES</button>
       <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
       <button id="tab_accounts" data-tab="accounts">ACCOUNTS</button>
       <button id="tab_docs" data-tab="docs">DOCUMENTATION</button>
@@ -2779,7 +2779,7 @@ A display that hears a name it may not use <b>drops the utterance</b> — it
 does not answer, does not pass it to whatever it was already talking to, and
 says nothing out loud. The person was addressing another device.
 
-Displays enrol themselves and are approved under DISPLAYS.</div>
+Devices enrol themselves and are approved under DEVICES.</div>
     </div>
   </div>
 
@@ -3131,7 +3131,7 @@ function blockPaint(blk, r){
 }
 
 /* One checkbox per display this server knows about, ticked where this endpoint
-   already names it. Built from DISPLAYS rather than from the endpoint's own
+   already names it. Built from the loaded list rather than from the endpoint's own
    list, so a device that has been deleted stops being offered and one that
    arrived a minute ago is there to tick. */
 function blockFillWho(blk, r){
