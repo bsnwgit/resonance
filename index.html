@@ -1937,11 +1937,29 @@ const Listen = {
       else if (j.text)  {
         if (Learn.on){ Learn.take(j.text); }
         else {
-            const trip = Math.round(performance.now() - t0);
-          micNote('heard "' + j.text + '"  ·  ' + j.ms + 'ms decode, ' +
-                  trip + 'ms round trip, +' + Math.round(S.hangover*1000) + 'ms silence wait');
+          /* NOTHING IS SHOWN UNTIL THE GATE HAS DECIDED IT WAS ADDRESSED.
+             This used to print what it heard first and let the gate overwrite
+             it, which meant a display in an occupied room put every private
+             conversation within earshot on screen — a transcript of people
+             who were not talking to it, in a corridor, on a wall. The whole
+             argument for a wake word is that what is said near it is none of
+             its business, and printing it is exactly as much of a breach as
+             answering it would have been.
+
+             What survives is the timing, which is about this device rather
+             than about anybody in the room, and it is only written once
+             somebody has addressed it. */
+          const state = !Wake.armed() ? 'gate off'
+                      : Wake.awake && wallNow() < Wake.until
+                        ? 'awake, ' + Math.max(0, Math.round(Wake.until - wallNow())) + 's left'
+                      : 'woken';
           const act = Wake.gate(j.text);
-          if (act) submit(act);
+          if (act){
+            const trip = Math.round(performance.now() - t0);
+            micNote('heard you  ·  ' + state + '  ·  ' + j.ms + 'ms decode, ' +
+                    trip + 'ms round trip, +' + Math.round(S.hangover*1000) + 'ms silence wait');
+            submit(act);
+          }
         }
       }
       else              micNote('nothing recognised — try speaking a little louder', true);
@@ -3151,9 +3169,14 @@ const Wake = {
       /* What was heard, in the same breath as the refusal. They used to be two
          notes and the second overwrote the first, which threw away the one
          fact that tells you whether a name was mis-heard or never said. */
+      /* It says that something was said and that it named nothing — never
+         WHAT was said. Quoting it here is publishing a conversation nobody
+         addressed to this screen, which is the one thing a wake word exists
+         to prevent. A wake word that is being misheard is diagnosed with
+         LEARN, which asks first. */
       micNote(Routes.spoken()
-        ? 'asleep — heard “' + text + '”, which names none of ' + Routes.spoken()
-        : 'asleep — heard “' + text + '”, and ' + Routes.mute(), true);
+        ? 'asleep — that named none of ' + Routes.spoken()
+        : 'asleep — ' + Routes.mute(), true);
       return null;
     }
     if (!Routes.usable(h.route)) return this.notMine(h);

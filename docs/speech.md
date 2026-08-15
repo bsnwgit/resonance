@@ -166,9 +166,9 @@ answer to *"why did nothing happen?"* now appears:
 | It says | It means |
 |---|---|
 | `transcribing…` | the recording is with the server |
-| `heard "…" · 340ms decode, 512ms round trip` | what it transcribed, and how long each stage took |
+| `heard you · woken · 340ms decode, 512ms round trip` | it acted on what you said, and how long each stage took |
 | `nothing recognised — try speaking a little louder` | the recording came back empty; nothing to match against |
-| `asleep — heard "…", which names none of "house" or "ada"` | it transcribed you and no assistant answers to what it heard |
+| `asleep — that named none of "house" or "ada"` | somebody said something near it and no assistant was named. **It does not say what was said** |
 | `"house" is not for this display — ignored` | somebody addressed an assistant this display is not allowed to use. Nothing was sent, nothing was answered, and the conversation it was already having was left alone |
 | `waiting to be approved — kitchen (d4a19…)` | this display has never been approved. It renders correctly and answers to nothing; the id is what an administrator looks for in DISPLAYS |
 | `enrolled as kitchen wall — say "house" or "ada"` | an enrolment code was just typed into this screen and it worked |
@@ -177,6 +177,19 @@ answer to *"why did nothing happen?"* now appears:
 | `approved as kitchen — say "house" or "ada"` | somebody just approved it, and it noticed on its own |
 | `refused: this display may not use house` | a question typed into the box went to an assistant this display is not allowed to use |
 | `backend: …` | why an endpoint failed, in full, where the spoken reply gives only the name |
+
+**It never shows what it overheard.** While it is asleep the line says that
+something was said and that no assistant was named — never the words. A display
+in an occupied room that printed everything within earshot would be putting
+other people's conversations on a wall, which is exactly what the wake word
+exists to prevent: answering an unaddressed sentence and publishing one are the
+same breach. Nothing is written to the line until the gate has decided the
+display was being spoken to.
+
+The cost is real and worth knowing: a wake word that is being *misheard* used
+to be diagnosable from that line. It is not any more. **LEARN HOW I SAY IT** is
+the tool for that instead — it asks before it listens, captures three
+deliberate attempts, and adds the spellings the transcriber actually returns.
 
 **A refusal is red.** The line carries both *here is what happened* and *here
 is why nothing happened* — what it heard and how long it took, against a wake
