@@ -118,6 +118,11 @@ test question is never a command: a TEST button that switches something on is
 one nobody presses twice. To check that the right devices are exposed, ask it
 to switch something on out loud.
 
+**TEST does not follow a fallthrough either**, and says so when one is set: it
+is checking this endpoint's own connection, and a pass borrowed from a
+different endpoint would tell you nothing about this one. The line underneath
+names where the same question would have gone in use.
+
 ## The four providers
 
 ### DEMO
@@ -232,6 +237,14 @@ model that may claim to have done it.
 Leave it at *nothing* for an LLM-backed agent, which interprets rather than
 matches, answers general questions itself, and so almost never reports that it
 recognised nothing.
+
+**If the assistant it hands to cannot be reached, you hear that**, rather than
+the house's "I couldn't understand that". The house's words would be true of
+the house and misleading about the system — the question did reach something
+that could have answered it, and that failed — so a person told the first
+thing would go away believing they had phrased it badly. The spoken failure
+names the assistant you addressed; the reason appears on the display's status
+line.
 
 Only the **timeout** applies from the Limits box, and there is no system prompt:
 Home Assistant holds the conversation itself and its agent is instructed over

@@ -561,6 +561,22 @@ travelling somewhere nobody chose, at a cost per link, and two endpoints
 pointing at each other would do it for ever. Deleting an endpoint clears
 whatever pointed at it, rather than leaving an id naming nothing.
 
+**When the fallthrough itself fails, the house's own words are not spoken.**
+They would be a lie about the system: *"Sorry, I couldn't understand that"* is
+true of the house and false of the arrangement, because the question *was*
+placed with something that could have answered it and that failed. Speaking it
+dresses a dead model as a badly phrased question — the same defect as a light
+command failing quietly, wearing a politer hat — and the person has already
+waited the full timeout to hear it. So the failure is spoken, naming the
+endpoint that was addressed, with the reason on the display's status line. The
+second endpoint is not named aloud: nobody addressed it.
+
+**TEST does not follow the fallthrough**, because it exists to test that
+endpoint's own connection and a pass that came from somewhere else would be
+worthless. It says so now — *"in use a question like this would go to X
+instead"* — after the house's refusal was read as a broken fallthrough twice
+in one morning.
+
 **With an LLM-backed agent this is an option you leave off.** That agent
 interprets rather than matches, so `no_intent_match` essentially never fires
 and the fallthrough is dead weight. It is the built-in intent engine that

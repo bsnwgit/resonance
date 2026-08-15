@@ -2347,15 +2347,31 @@ class Handler(SimpleHTTPRequestHandler):
                 # the address, the token and the agent — three of the four
                 # things that go wrong. The fourth, whether the right entities
                 # are exposed, only a real command answers.
+                missed = out.get("code") == "no_intent_match"
                 res["check"] = ("no command was recognised in the test "
                                 "sentence, which is what the built-in intent "
                                 "engine does with anything that is not one — "
                                 "the address, the token and the agent are all "
                                 "good. Ask it to switch something on to test "
                                 "what is exposed."
-                                if out.get("code") == "no_intent_match" else
+                                if missed else
                                 "the agent answered — address, token and agent "
                                 "are all good.")
+                # TEST goes down this endpoint's own connection and stops
+                # there, deliberately: it is testing the house, not the chain.
+                # But an admin who has just configured a fallthrough and gets
+                # the house's refusal back reasonably concludes the fallthrough
+                # is broken — it was read as exactly that, twice, before this
+                # line existed. Say what the same sentence would do in use.
+                alt = doc["routes"].get(rec.get("fallthrough") or "")
+                if alt and alt.get("enabled", True):
+                    res["check"] += (
+                        " In use a question like this would go to %s instead — "
+                        "TEST stops here on purpose, so a pass cannot come from "
+                        "a different endpoint answering." % alt["name"]
+                        if missed else
+                        " A question it could not place would go to %s instead."
+                        % alt["name"])
             return self._json(200, res)
 
         if parsed.path == "/embed/session":
@@ -2542,6 +2558,20 @@ class Handler(SimpleHTTPRequestHandler):
                     except Exception as exc:               # noqa: BLE001
                         print("fallthrough failed (%s -> %s): %s"
                               % (rid, ft, exc), flush=True)
+                        # Audible, and NOT the house's own words. Those were
+                        # "I couldn't understand that" — true of the house, and
+                        # a lie about the system: the question was placed with
+                        # somebody who could have answered it, and that failed.
+                        # Speaking the refusal here would dress a broken model
+                        # as a badly phrased question, which is the same defect
+                        # as a light command that fails quietly, wearing a
+                        # politer hat. The person waited the full timeout for
+                        # it, too. The reason goes to the display's status
+                        # line; the name of the second endpoint stays out of
+                        # the air, since it is not one anybody addressed.
+                        return self._json(502, dict(
+                            about, ms=int((time.time() - t0) * 1000),
+                            error=str(exc)))
                     else:
                         fell_to = alt["name"]
                         # The house's conversation id survives — the binding is
