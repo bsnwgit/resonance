@@ -1443,8 +1443,59 @@ Short by default — this session configures what everyone else is looking at.
   <div class="note" id="usernote"></div>
     </div>
   </section>
+  <!-- Whether uninvited devices may ask at all, and what a grant to one is
+       worth once given. Its own topic rather than a preamble to the list: the
+       list is read when somebody is deciding about a device, and these are
+       settled once and then left alone for months. -->
   <section class="grp" data-tab="displays">
-    <h4>Displays</h4>
+    <h4>Requested Access</h4>
+    <div class="grpbody">
+  <label class="bklab" style="margin-top:2px">does a general user require approval?</label>
+  <div class="seg" id="dp_guest">
+    <button data-v="1" class="on">YES</button>
+    <button data-v="0">NO</button>
+  </div>
+  <div class="note help"><b>YES</b> — they get the request form instead of the
+transcript and composer, and reach nothing until you decide.
+
+<b>NO</b> — they open the page and use the default endpoint straight away.
+Restricted endpoints still need a code you issued. Only settable while an
+endpoint open to any display is the default, or NO would mean access to
+nothing.</div>
+
+  <div class="cols2">
+    <div>
+      <label class="bklab">how long a granted request lasts, days</label>
+      <input id="dp_days" type="number" min="1" max="3650">
+    </div>
+    <div>
+      <label class="bklab">displays in total</label>
+      <input id="dp_max" type="number" min="2" max="5000">
+    </div>
+    <div>
+      <label class="bklab">how many may wait at once</label>
+      <input id="dp_pending" type="number" min="1" max="1000">
+    </div>
+  </div>
+  <div class="note help">A granted request runs out and the person asks again —
+one press for them, because what they told you is kept. <b>Displays you issued
+a code for never expire</b>, whatever this says: a screen on a wall going dark
+on a timer is not a security property, it is an outage.
+
+When more than the waiting limit are queued, the oldest one waiting is dropped
+to make room — so set it high enough that a real request cannot be pushed out
+by noise.</div>
+
+  <div class="seg" style="margin-top:8px">
+    <button id="b_dpsave" class="act-save">SAVE GUEST ACCESS</button>
+    <button id="b_dprevert" class="act-undo">REVERT</button>
+  </div>
+  <div class="note" id="dpnote"></div>
+    </div>
+  </section>
+
+  <section class="grp" data-tab="displays">
+    <h4>Created Access</h4>
     <div class="grpbody">
   <label class="bklab" style="margin-top:2px">add a display — name it, then type the code into the screen</label>
   <div class="seg" id="dispadd">
@@ -1492,57 +1543,6 @@ is back to being a browser that has never been here.</div>
     </div>
   </section>
 
-  <!-- Whether uninvited devices may ask at all, and what a grant to one is
-       worth once given. Its own topic rather than a preamble to the list: the
-       list is read when somebody is deciding about a device, and these are
-       settled once and then left alone for months. -->
-  <section class="grp" data-tab="displays">
-    <h4>Guest access</h4>
-    <div class="grpbody">
-  <label class="bklab" style="margin-top:2px">does a general user require approval?</label>
-  <div class="seg" id="dp_guest">
-    <button data-v="1" class="on">YES</button>
-    <button data-v="0">NO</button>
-  </div>
-  <div class="note help"><b>YES</b> — they get the request form instead of the
-transcript and composer, and reach nothing until you decide.
-
-<b>NO</b> — they open the page and use the default endpoint straight away.
-Restricted endpoints still need a code you issued. Only settable while an
-endpoint open to any display is the default, or NO would mean access to
-nothing.</div>
-
-  <div class="cols2">
-    <div>
-      <label class="bklab">how long a granted request lasts, days</label>
-      <input id="dp_days" type="number" min="1" max="3650">
-    </div>
-    <div>
-      <label class="bklab">displays in total</label>
-      <input id="dp_max" type="number" min="2" max="5000">
-    </div>
-    <div>
-      <label class="bklab">how many may wait at once</label>
-      <input id="dp_pending" type="number" min="1" max="1000">
-    </div>
-  </div>
-  <div class="note help">A granted request runs out and the person asks again —
-one press for them, because what they told you is kept. <b>Displays you issued
-a code for never expire</b>, whatever this says: a screen on a wall going dark
-on a timer is not a security property, it is an outage.
-
-When more than the waiting limit are queued, the oldest one waiting is dropped
-to make room — so set it high enough that a real request cannot be pushed out
-by noise.</div>
-
-  <div class="seg" style="margin-top:8px">
-    <button id="b_dpsave" class="act-save">SAVE GUEST ACCESS</button>
-    <button id="b_dprevert" class="act-undo">REVERT</button>
-  </div>
-  <div class="note" id="dpnote"></div>
-    </div>
-  </section>
-
   <!-- Everything that is simply working. Its own topic, because the list
        above is a queue — read when something needs deciding — and this one is
        a register, read when somebody asks what is out there. Three rows that
@@ -1561,7 +1561,7 @@ here before anybody notices the wall.
 Devices on a granted request carry <b>access runs out</b>; those you issued a
 code for do not, and never will.
 
-<b>WITHDRAW</b> takes access away and puts the row back in the queue above.
+<b>WITHDRAW</b> takes access away and puts the row back under Created Access.
 <b>DELETE</b> goes further and forgets the device entirely.</div>
     </div>
   </section>
