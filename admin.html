@@ -2364,8 +2364,10 @@ nothing for one of those.</div>
 keep-alive are not sent to Anthropic — steer it with the system prompt.</div>
   <div class="note" data-r="hanote" style="display:none">Only the timeout
 applies to Home Assistant. It holds the conversation itself, and what the
-agent is told is configured over there — so a reply limit, a temperature, a
-context length and a prompt set here would be settings nothing reads.
+agent is told is configured over there — so the reply limit, the temperature,
+the context length and the whole System prompt section are not shown here:
+nothing would read them. Any wording already typed is kept, and comes back if
+this endpoint is pointed at a model again.
 
 Set the timeout to the <b>agent</b>, not to "Home Assistant": the built-in
 intent engine answers in about a tenth of a second, while an LLM-backed one is
@@ -2448,16 +2450,24 @@ function blockSyncProvider(blk){
   show('models', connected && !anth && !ha);      // that listing is an Ollama trick
   const t = blk.querySelector('[data-a="test"]');
   if (t) t.disabled = !connected;
-  /* DEMO reaches nothing, so its limits and its prompt are inert; the prompt
-     is equally inert on a house, which is told what to do in Home Assistant.
-     Dimmed and closed rather than removed: they keep their place, so
-     connecting a service does not rearrange the block under you. */
+  /* DEMO reaches nothing, so its limits and its prompt are inert. Dimmed and
+     closed rather than removed: DEMO is a temporary state on the way to
+     configuring something, and a block that rearranges itself as you connect
+     a service is a block you lose your place in.
+
+     A house is not a temporary state, and its prompt box is not inert but
+     absent: Home Assistant instructs its own agent, and there is no wording
+     here that would ever reach anything. So it goes, rather than sitting
+     greyed out implying it might apply after all. What was typed in it is
+     still stored and comes back if the endpoint is pointed at a model
+     again. */
   ['limits','prompt'].forEach(g=>{
     const box = blk.querySelector('[data-g="' + g + '"]');
     if (!box) return;
-    const live = connected && !(ha && g === 'prompt');
-    box.style.opacity = live ? '' : '.45';
-    if (!live) box.classList.remove('open');
+    const gone = ha && g === 'prompt';
+    box.style.display = gone ? 'none' : '';
+    box.style.opacity = connected ? '' : '.45';
+    if (!connected || gone) box.classList.remove('open');
   });
   const url = F(blk, 'base_url');
   if (url) url.placeholder = anth ? 'https://api.anthropic.com'

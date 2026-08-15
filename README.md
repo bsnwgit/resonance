@@ -553,6 +553,41 @@ interprets rather than matches, so `no_intent_match` essentially never fires
 and the fallthrough is dead weight. It is the built-in intent engine that
 needs it.
 
+**And on the built-in engine it fires far less than this design assumed.**
+Measured against a real installation, 2026-08-14:
+
+| said | code |
+|---|---|
+| "how are you" | `no_intent_match` |
+| "what's the capital of France?" | `no_valid_targets` |
+| "tell me a joke" | `no_valid_targets` |
+| "turn on the purple flamingo lantern" | `no_valid_targets` |
+
+The engine matches a sentence *shape* before it looks for a device, so
+*"what's the X"* and *"tell me a X"* both parse as **get the state of a device
+called X** — and a general question comes back as an unknown device rather than
+an unrecognised sentence. `no_intent_match` is left with the sentences that
+match no pattern at all, which is a much smaller set than "things the house
+cannot answer".
+
+**Widening it to `no_valid_targets` is not free, which is why it has not been
+done.** The last two rows of that table are byte-for-byte identical replies —
+same code, same wording, same shape. So a command for a device the house does
+not have cannot be told apart from a general question, and falling through
+would hand *"turn on the garden fountain"* to a language model, which may
+answer *"I've turned it on"*. Somebody then walks away believing the house
+acted, which is the one failure this adapter exists not to have.
+
+**Left as it is, deliberately, 2026-08-14.** What the person hears in the
+meantime is the house's own *"I am not aware of any device called capital of
+France"* — confusing, but true, and audible. If it is revisited, the shape is:
+fall through on both codes, and append one line to the target's prompt for that
+call only — *you cannot control any devices; if asked to, say you were unable
+to* — which turns a mis-routed command into an honest refusal rather than a
+claim. That reduces the hazard; it does not remove it, because a small model
+can ignore an instruction. The real answer is an LLM-backed agent, where
+neither code fires.
+
 ### Fields that do not apply everywhere
 
 **temperature** is not sent to Anthropic at all. The current Claude models

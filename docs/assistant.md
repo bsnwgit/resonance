@@ -210,11 +210,23 @@ a reply that asks something — *"which room?"* — stays awake, so the answer n
 no wake word. Home Assistant decides that per reply, not you.
 
 **When it recognises nothing, ask** hands the question to another assistant.
-Somebody will ask the house what the capital of France is, and this is what
-stops that being a dead end: the model answers, in the house's name and voice,
-and nobody is told they used the wrong word. Leave it at *nothing* for an
-LLM-backed agent, which interprets rather than matches and so almost never
-reports that it recognised nothing.
+Somebody will ask the house what the capital of France is, and this is meant to
+stop that being a dead end: the model answers, in the house's name and voice,
+and nobody is told they used the wrong word.
+
+**Expect it to fire rarely on the built-in agent.** That agent matches the
+*shape* of a sentence before it looks for a device, so "what's the capital of
+France" comes back as *"Sorry, I am not aware of any device called capital of
+France"* — an unknown device, not an unrecognised sentence, and the fallthrough
+does not apply. It catches sentences that match no pattern at all, such as "how
+are you". This is a known limit rather than a fault, and widening it is held
+back on purpose: an unknown device and a general question are indistinguishable
+in the reply, so a command for a device you do not have would be answered by a
+model that may claim to have done it.
+
+Leave it at *nothing* for an LLM-backed agent, which interprets rather than
+matches, answers general questions itself, and so almost never reports that it
+recognised nothing.
 
 Only the **timeout** applies from the Limits box, and there is no system prompt:
 Home Assistant holds the conversation itself and its agent is instructed over
