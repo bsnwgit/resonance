@@ -80,9 +80,19 @@ and **resonance**, and either can be a fixed word or a variable.
 | `{assistant}` | what that assistant is called |
 | `{display}` | the name of the display being viewed, from `?display=` on the URL |
 
-`{assistant}` is the one to reach for once there is more than one of them: the
-transcript then credits each answer to whoever gave it, rather than to a fixed
-word.
+`{assistant}` is the **default** for *the assistant*, and with more than one
+endpoint it is the only label that can be right — a fixed word attributes
+every answer to the same name however many answered.
+
+Each line keeps the name of whoever gave it. Switching endpoints
+mid-conversation does not rewrite what is already on screen, and changing this
+field still relabels the whole transcript so you can tune it against a live
+one.
+
+An install that predates endpoints and still holds the old shipped word is
+carried across to the variable on the way out of the settings file. On a
+single endpoint of that name it renders identically; once there is a second,
+it is correct instead of wrong.
 
 `{name}` is the same variable the greeting and farewell fields already use, so
 renaming what the assistant answers to can rename what it is called in the

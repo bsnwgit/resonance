@@ -994,8 +994,11 @@ Either can be a variable instead of a fixed word:
 <b>{name}</b> — the word you say to reach whichever assistant is answering, so
 renaming that renames this. Already what the greeting and farewell fields use.
 
-<b>{assistant}</b> — what that assistant is called, which is its own field.
-Put it here and the transcript credits each answer to whoever gave it.
+<b>{assistant}</b> — what answered, which is its own field on each endpoint.
+<b>This is the default</b>, and with more than one endpoint it is the only
+label that can be right: a fixed word attributes every answer to the same
+name. Each line keeps the name of whoever gave it, so switching endpoints
+mid-conversation does not rewrite what is already on screen.
 
 <b>{display}</b> — the name of the display this is being viewed at, from
 <b>?display=</b> on the URL. Put it in <i>the person</i> and each dedicated
