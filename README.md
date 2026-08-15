@@ -484,14 +484,20 @@ works too — what is typed is stored, and the path is normalised per request.
 
 Three fields of the reply do more than carry the words:
 
-- **`continue_conversation` decides whether to hang up**, and it belongs to
-  the reply rather than to the configuration. A command should acknowledge and
-  close, but *"turn on the lights"* answered with *"which room?"* has to stay
-  open, and an endpoint configured one-shot would hang up on the question it
-  just asked. The display sleeps when the flag is `false`, silently — the
-  reply is already being spoken and a farewell on top of it is one sentence
-  too many. Absent, on a Home Assistant predating the flag, is **not** false:
-  staying awake is what every other endpoint does.
+- **`continue_conversation` is read and deliberately not acted on.** It was for
+  one day. The reasoning was sound on paper — a completed command has nothing
+  to follow, so close — and wrong in a room: the display went silently to sleep
+  after every command, so the next sentence was dropped at the wake gate, and
+  the next, and the next. Measured on the first real installation: five
+  consecutive utterances transcribed and discarded, and a person reasonably
+  concluding the thing had locked up. **The house had become the one endpoint
+  you cannot speak to twice**, and the remedy — say a wake word again — is not
+  discoverable from silence.
+
+  The awake window already ends conversations, everywhere, identically. Closing
+  a few seconds earlier is not worth an endpoint that behaves unlike all the
+  others, and `true` needs nothing done to it, because staying awake is already
+  what happens — which is what makes *"which room?" → "the kitchen"* work.
 - **`conversation_id`** is held for exactly as long as the route binding —
   handed back on every turn, dropped on sleep and on switching endpoints. It
   is what makes *"which room?" → "the kitchen"* mean anything. The display
@@ -538,10 +544,7 @@ this is a branch rather than string-matching an apology.
 The answer keeps the **house's name and voice** — the person addressed the
 house, and an answer arriving in a different voice would announce the mistake
 the fallthrough exists to hide. The house's `conversation_id` survives, so the
-next turn still goes to the house; its hang-up does not, because it was
-refusing a sentence rather than finishing a job, and closing the conversation
-on an answer somebody is still listening to is the one thing that would make
-this visible.
+next turn still goes to the house.
 
 **One hop, and never the target's own fallthrough.** A chain is a question
 travelling somewhere nobody chose, at a cost per link, and two endpoints
@@ -743,7 +746,7 @@ On every listener:
 | `GET` | `/tts/voices` | installed neural voices |
 | `GET` | `/settings` | the shared interface configuration |
 | `GET` | `/routes` | the routes, presentation and routing halves only |
-| `POST` | `/ask` | a question — `{"route": …}` picks one, absent means the default. `{"conversation_id": …}` continues one the endpoint is keeping; the reply carries that id back, plus `hangup` when the endpoint has finished |
+| `POST` | `/ask` | a question — `{"route": …}` picks one, absent means the default. `{"conversation_id": …}` continues one the endpoint is keeping, and the reply carries that id back |
 
 Display listeners only — the embed does not exist on the admin port:
 
@@ -1085,11 +1088,11 @@ it. Each entry below carries its own panel scope.
 
   Two fields of that reply are worth more than they look:
 
-  **`continue_conversation` decides whether to hang up**, and it belongs to
-  the reply rather than to the configuration. A command should acknowledge and
-  close; but "turn on the lights" answered with *"which room?"* must stay
-  open, and a route configured one-shot would hang up on the question it just
-  asked. Read the flag and call the existing `sleepNow()` when it is false.
+  **`continue_conversation` was going to decide whether to hang up** — read
+  the flag, call `sleepNow()` when it is false. Built that way, tried in a
+  room, and taken out the next morning: see the entry under the provider. The
+  awake window ends conversations for every endpoint, and a house that closes
+  a few seconds earlier is a house you cannot speak to twice.
 
   **`data.code == "no_intent_match"` is the fallthrough signal.** Nobody
   remembers which name owns which capability, and asking the house a question
@@ -1644,6 +1647,33 @@ on a desk. A tablet bolted to a wall, answering a household, moves them:
 
 Newest first.
 
+### 2026-08-15 — the house stopped hanging up
+
+One day old, built from the API's own signal, and wrong the first time a real
+house answered a real command.
+
+- **`continue_conversation: false` closed the conversation, silently.** The
+  reasoning: a completed command has nothing to follow, and *"Turned on the
+  light. Goodbye."* is one sentence too many. What it produced: the display
+  slept the instant the light came on, and the next sentence was dropped at the
+  wake gate. Five in a row, in the log — transcribed, never asked, never in the
+  transcript.
+- **It reads as a lockup, not as sleep**, because nothing announced it and
+  because every other endpoint stays awake for the window. The house became the
+  one endpoint you cannot speak to twice, and the fix — say the wake word
+  again — is not discoverable from silence.
+- **The awake window already does this**, everywhere, identically. That is the
+  whole argument: closing a few seconds earlier bought nothing that the timer
+  does not already do, and cost the one property a voice interface cannot
+  afford to lose — that it behaves the same way twice.
+- **`true` needed nothing doing to it.** Staying awake is the default, so
+  *"which room?" → "the kitchen"* worked without the flag being consulted at
+  all — which is the tell that the flag was never load-bearing.
+- **Kept: reading it.** The value is still parsed and still described in the
+  adapter, with the reason it is ignored beside it. A signal you decided not
+  to act on is worth more in the source than an absence somebody re-adds in a
+  year.
+
 ### 2026-08-14 — the house is an endpoint
 
 Roadmap phase 1b. Saying the house name switches a light on, and it took no
@@ -1651,24 +1681,18 @@ new mechanism to do it: Home Assistant's conversation API is text in and text
 out, so it is a fourth provider beside `demo`, the OpenAI dialect and
 Anthropic.
 
-- **Three fields of the reply do more than carry words.**
-  `continue_conversation` decides whether to hang up, and it belongs to the
-  reply rather than the configuration — *"turn on the lights"* answered with
-  *"which room?"* must stay open, and an endpoint configured one-shot would
-  hang up on the question it just asked. `conversation_id` is held for exactly
-  the route binding and handed back each turn, which is what makes the answer
-  to that question land. `data.code` is what makes the fallthrough a branch
-  rather than string-matching an apology.
-- **A missing flag is not a false one.** An older Home Assistant sends no
-  `continue_conversation` at all, and reading absent as "hang up" would end
-  every conversation on those installations. Absent means what every other
-  endpoint means: stay awake.
+- **Two fields of the reply do more than carry words.** `conversation_id` is
+  held for exactly the route binding and handed back each turn, which is what
+  makes *"which room?" → "the kitchen"* land. `data.code` is what makes the
+  fallthrough a branch rather than string-matching an apology.
+- **A third was built and removed the next morning.** `continue_conversation`
+  closed the conversation when false, which is right on paper and wrong in a
+  room — see the entry below.
 - **When the house recognises nothing, another endpoint answers** — in the
   house's own name and voice, so nobody is told they used the wrong word. One
   hop only, and never the target's own: a chain is a question travelling
   somewhere nobody chose, at a cost per link. The house's conversation id
-  survives the hand-off and its hang-up does not, because it was refusing a
-  sentence rather than finishing a job.
+  survives the hand-off, because the binding is still to the house.
 - **Silence is how a failure sounds**, which is the difference between this
   adapter and a chat one. A command that quietly did nothing is
   indistinguishable from one that worked, so an unreachable house, a rejected

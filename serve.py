@@ -574,14 +574,23 @@ def ask_homeassistant(text, cfg, conversation_id=""):
     if not speech and kind == "action_done":
         speech = "Done."
 
-    # continue_conversation decides whether to hang up, and it belongs to the
-    # reply rather than to the configuration: a command should acknowledge and
-    # close, but "turn on the lights" answered with "which room?" has to stay
-    # open, and a route configured one-shot would hang up on the question it
-    # just asked. Absent — an older Home Assistant that does not send it — is
-    # not false: staying awake is the behaviour every other adapter has.
+    # `continue_conversation` is read and deliberately not acted on. It was,
+    # for one day: false closed the conversation immediately, on the reasoning
+    # that a completed command has nothing to follow. In a room that is wrong.
+    #
+    # Measured 2026-08-15, on the first real installation: after each command
+    # the display went silently to sleep, five further utterances were
+    # transcribed and dropped at the wake gate, and the person concluded it had
+    # locked up — they had no way to know the conversation had ended, and the
+    # house had become the one endpoint you cannot speak to twice. Saying a
+    # wake word again was the fix, which is a thing nobody should have to
+    # discover.
+    #
+    # The awake window already does this job, everywhere, the same way. Closing
+    # a few seconds earlier is not worth a house that behaves unlike every
+    # other endpoint, and `true` needs nothing done to it — staying awake is
+    # the default, so "which room?" is answered without re-addressing.
     return {"reply": speech, "code": code,
-            "hangup": j.get("continue_conversation") is False,
             "conversation_id": str(j.get("conversation_id") or "")}
 
 
@@ -2512,13 +2521,8 @@ class Handler(SimpleHTTPRequestHandler):
                     else:
                         fell_to = alt["name"]
                         # The house's conversation id survives — the binding is
-                        # still to the house and the next turn goes there. Its
-                        # hang-up does not: it was refusing a sentence, and
-                        # closing the conversation on an answer somebody is
-                        # still listening to is the one thing that would make
-                        # this visible.
-                        out = dict(out, reply=second.get("reply") or "",
-                                   hangup=False, code="")
+                        # still to the house, and the next turn goes there.
+                        out = dict(out, reply=second.get("reply") or "", code="")
 
             ms = int((time.time() - t0) * 1000)
             reply = out.get("reply") or ""
@@ -2529,11 +2533,11 @@ class Handler(SimpleHTTPRequestHandler):
                   % (rid, route_dest(cfg), ms,
                      " — fell through to " + fell_to if fell_to else ""),
                   flush=True)
-            # `hangup` and `conversation_id` are the display's to act on: it
-            # owns the awake window, and the server has no idea a conversation
-            # is in progress between two requests.
+            # `conversation_id` is the display's to hold: it owns the awake
+            # window, and the server has no idea a conversation is in progress
+            # between two requests. Nothing here ends one — see the note in
+            # ask_homeassistant about the flag that used to.
             return self._json(200, dict(about, reply=reply, ms=ms,
-                                        hangup=bool(out.get("hangup")),
                                         conversation_id=out.get("conversation_id") or ""))
 
         if parsed.path == "/app":

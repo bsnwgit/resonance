@@ -204,10 +204,15 @@ request is two model passes rather than one. Set the **timeout** to the agent
 you actually have; one chosen for the intent engine will cut off an LLM agent
 just before it succeeds.
 
-**It ends the conversation when it is finished.** A command that completed
-closes the conversation and the display goes back to sleep without a farewell;
-a reply that asks something — *"which room?"* — stays awake, so the answer needs
-no wake word. Home Assistant decides that per reply, not you.
+**It stays awake after a command, like every other assistant.** Home Assistant
+reports that it has finished acting, and Resonance deliberately does not act on
+that: give another command straight away, without saying the name again. The
+usual awake window ends the conversation, the same as everywhere else.
+
+That was not the behaviour on the first day. It slept the moment a command
+completed, which is defensible on paper and awful in a room — the display went
+quiet with no farewell, and everything said after it was discarded. It looked
+broken. If you ever see that again, it is a bug, not a setting.
 
 **When it recognises nothing, ask** hands the question to another assistant.
 Somebody will ask the house what the capital of France is, and this is meant to

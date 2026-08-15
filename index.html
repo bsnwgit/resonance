@@ -2010,11 +2010,9 @@ const LOCAL_TZ = (()=>{
    needs that: a diagnostic that inherits whatever was being discussed is
    answered in that context, so it stops being a measurement of the backend
    and becomes a measurement of the backend plus the last ten minutes. */
-/* Returns {reply, hangup} rather than the string it used to. Some endpoints
-   have something to say about the conversation as well as in it — a house
-   that has finished acting wants the display to stop listening — and a
-   second channel for that beside the string would be the same data under a
-   worse name. */
+/* Returns {reply} rather than the bare string it used to. Some endpoints have
+   something to say about the conversation as well as in it — a house keeps a
+   conversation of its own, and its id comes back beside the words. */
 async function askBackend(text, bare){
   /* No display-wide demo switch any more. Whether an endpoint answers from
      built-in text is a property OF that endpoint — the server replies
@@ -2047,7 +2045,7 @@ async function askBackend(text, bare){
     if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
     if (j.ms) ev((j.name || 'reply') + ' ' + j.ms + 'ms');
     if (!bare && j.conversation_id) Wake.convo = j.conversation_id;
-    return {reply: j.reply, hangup: !!j.hangup};
+    return {reply: j.reply};
   }catch(e){
     /* Say something, and name whoever did not answer. A voice interface that
        goes quiet is indistinguishable from a broken one, and the person may
@@ -2071,11 +2069,11 @@ function submit(text){
   askBackend(text).then(out => {
     remember('assistant', out.reply);
     respond(out.reply);
-    /* The endpoint asked to hang up: it acted, and it is not expecting
-       anything further. Silently — the reply is already being spoken, and a
-       farewell on top of "the kitchen light is on" is one sentence too many.
-       Saying the wake word starts the next one. */
-    if (out.hangup) Wake.sleepNow(false);
+    /* Nothing here ends the conversation. A house reports that it has finished
+       acting, and for one day this slept on that — which made it the one
+       endpoint you could not speak to twice, silently, with every following
+       sentence dropped at the wake gate by a display that looked broken. The
+       awake window ends conversations, everywhere, the same way. */
   });
 }
 qEl.addEventListener('keydown', e=>{
