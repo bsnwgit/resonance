@@ -1095,6 +1095,31 @@ recognised is left standing so a typo is visible rather than silent.</div>
     <button data-v="raw">RAW (best visuals)</button>
   </div>
   <div class="seg" style="margin-top:6px"><button id="b_cal">CALIBRATE (stay quiet 2s)</button></div>
+  <div class="note help">Everything here runs on this server — no audio leaves
+the box for transcription, whichever model is chosen.
+
+<b>transcription model</b> is grouped: the <b>.en</b> models are English-only,
+smaller and better at English than the multilingual model of the same size;
+picking one from <b>every language</b> is the only thing that makes this
+transcribe anything else. Sizes run from ~40MB to ~1.6GB and each option says
+what it costs, so the list assumes nothing about the machine you are running
+on. A bigger box wants <b>large-v3-turbo</b>; a modest one wants
+<b>distil-small.en</b> or the default <b>small.en</b>.
+
+<b>A model not already on disk is downloaded the first time somebody speaks
+after you pick it</b> — inside that request, up to 1.6GB, from a machine that
+may have no route out. Switch when nobody is waiting at a display, then say
+something to it yourself to pay for the download.
+
+The smaller the model, the more often a wake word is mis-heard — and an
+assistant set to THE EXACT WORD refuses a near-miss outright, where a CLOSE
+ENOUGH one forgives it. If you want a fast model on a strict assistant, press
+LEARN HOW I SAY IT on that assistant and it will accept the spellings this
+model actually returns.
+
+<b>CLEAN</b> filters the input for recognition; <b>RAW</b> leaves it alone, so
+the figure moves more and transcription is slightly worse. <b>CALIBRATE</b>
+measures the room rather than asking you to guess at the gate.</div>
   <div id="miclevel" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5">level —</div>
   <div id="micnote" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:8px;line-height:1.5">off</div></div>
   </section>
@@ -1946,12 +1971,12 @@ async function sttModels(){
     sel.appendChild(o);
   }
   bindField(sel, 'sttmodel');
-  if (note) note.textContent =
-    'Loaded now: ' + (j.loaded||[]).join(', ') + '. Anything else is '
-    + 'DOWNLOADED the first time somebody speaks after choosing it — up to '
-    + '1.6GB, during that request, from a machine that may have no route out. '
-    + 'Choose it while nobody is standing in front of the display, and say '
-    + 'something to it yourself to pay the download.';
+  /* Live state, and only live state: which models this server has in memory
+     right now, which is the one thing about this control that cannot be
+     written down in advance. Why the list is what it is, and what choosing an
+     absent model costs, are explanation — they belong behind the section's ?
+     with every other explanation, not stacked above the control. */
+  if (note) note.textContent = 'resident now: ' + ((j.loaded||[]).join(', ') || 'none');
 }
 
 /* Neural voices come from the server; browser voices from this browser,
