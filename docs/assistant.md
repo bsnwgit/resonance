@@ -152,6 +152,12 @@ preset to choose; selecting the provider fills it in. A key is **required**,
 and saving without one is refused at the point of saving rather than
 discovered later by whoever is standing in front of the screen.
 
+**Not yet tested against the live service.** This adapter is implemented from
+the published wire format and exercised end to end against a server that
+answers in it — which proves the request is well formed, not that the real
+endpoint accepts every assumption in it. If you are the first to point one at
+a real key, press TEST before trusting it in a room.
+
 ## Fields that do not apply everywhere
 
 **temperature is not sent to Anthropic at all.** The current Claude models
