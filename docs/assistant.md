@@ -205,7 +205,7 @@ box answers to the same word afterwards as before. `backend.json` is left on
 disk rather than deleted — an upgrade that removes the file it read from has
 no way back if the migration was wrong.
 
-## What it is told first
+## System prompt
 
 Sent ahead of every question, and it matters more here than in a chat box: the
 reply is **read aloud**. Markdown, bullets, headings and emoji are all noise

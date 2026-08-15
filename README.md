@@ -608,7 +608,7 @@ Admin listener only — everything below returns 404 on the public ports:
 | `POST` | `/auth/logout` | end the session |
 | `GET` | `/auth/me` | who am I, and with what role |
 | `POST` | `/auth/password` | change a password; your own needs the current one |
-| `POST` | `/settings` | replace the configuration — `admin` role |
+| `POST` | `/settings` | write the configuration — `admin` role. A bare object replaces it; `{settings, merge}` writes only the keys it carries |
 | `GET` | `/app` | ports and session length, plus what is actually running |
 | `POST` | `/app` | change them — `admin` role, restart to apply |
 | `GET` | `/users` | list accounts — `admin` role |
@@ -626,6 +626,14 @@ Admin listener only — everything below returns 404 on the public ports:
 | `POST` | `/embeds` | create one; the key is returned once — `admin` role |
 | `POST` | `/embeds/enable` | enable or disable one — `admin` role |
 | `POST` | `/embeds/delete` | revoke one — `admin` role |
+
+**Everything else 404s, including files that are not secret.** The server
+hands out four files — `index.html`, `admin.html`, `icon.svg`, `lockup.svg` —
+and refuses every other path. An allow-list rather than a list of things to
+hide, because the directory `serve.py` runs from is a deployment: the base
+class serves whatever is sitting in it, and what was sitting in it was the TLS
+private key, the account hashes and one API key per route. Deny-by-default
+also answers traversal and percent-encoding without either needing a rule.
 
 The last admin account cannot be deleted or demoted; an interface nobody can
 administer is a brick. The last route cannot be deleted or switched off for
@@ -737,6 +745,23 @@ interface users are not supposed to have was one guessed parameter away.
 only to hands-free mode and did nothing in push-to-talk, with no indication —
 it read as simply broken. Live status text now states whether each gate is in
 effect and why.
+
+**A deployment directory is not a document root.** `SimpleHTTPRequestHandler`
+serves what is beside it, and beside it were `key.pem`, `users.json`,
+`routes.json` and the source. The fix is an allow-list of the four files that
+are genuinely pages or artwork; the lesson is that a *denylist* of secrets
+cannot be written correctly, because the file holding one credential per route
+did not exist yet when it would have been written. Deny by default, and
+enumerate what is published rather than what is withheld — the same shape as
+`public_routes()`.
+
+**A dangling CSS selector list is invisible to every check.** Deleting a rule
+took the `{max-width:560px}` off the end of a shared selector list, leaving
+three selectors reading on into the next rule — which was `display:none`, so
+the filter field, the tab caption and the whole tab row vanished. The braces
+still balanced, the JavaScript still parsed, and CSS has no error to report:
+it simply continues to the next block. The check that catches it is that no
+comma-terminated selector line may be followed by a comment or a blank line.
 
 ## Contributing
 
@@ -994,10 +1019,10 @@ it. Each entry below carries its own panel scope.
   on that basis before a household learns them, because changing one
   afterwards is its own small misery.
 
-  *Panel:* the assistant tab becomes a list of routes rather than one form,
-  each with its own test — and for a house route the test is worth more than
-  usual, since it answers whether the token, the agent and the exposure are
-  all right at once.
+  *Panel:* one block per endpoint rather than one form — its wake word and its
+  connection together, saved together, with its own TEST. For a house route
+  that test is worth more than usual, since it answers whether the token, the
+  agent and the exposure are all right at once. Built; see the progress log.
 
 - **Displays, and binding a route to one.** The problem this exists for: two
   people in a room, one of them addressing the wall tablet, and everybody
@@ -1440,6 +1465,52 @@ on a desk. A tablet bolted to a wall, answering a household, moves them:
 ## Progress log
 
 Newest first.
+
+### 2026-08-14 — the panel stopped being written for its implementer
+
+The routing worked; the interface describing it did not. Reworked against
+repeated, specific complaints, each of which turned out to be pointing at
+something real.
+
+- **Routes became endpoints, and each is one block.** A list plus three shared
+  sections that repainted for whichever row was selected asked you to hold
+  "which one am I editing" across three collapsed sections, and made a second
+  endpoint feel like a mode rather than a thing. Each endpoint is now one
+  block — its wake word and its connection together, saved together — headed
+  with what you say and what it is wired to. Three of them in a column is its
+  own answer to whether more than one is supported.
+- **Its sections are separate boxes, not one long form.** Five of them, tiling
+  rather than stacked, each summarising itself so the whole configuration
+  reads off the closed headings: *"house" +2 more · exact*, *400 tokens · 8
+  turns · 120s*. Opening one is for changing it, not for finding out what it
+  says. The endpoint's actions run along the foot of its box.
+- **The word `route` left the interface.** It means something else entirely to
+  anyone who has configured a network, and the panel had two sections one
+  letter apart. It survives in the document, the API paths and this file,
+  where it accurately describes a name resolving to a destination. Code and
+  interface are allowed their own vocabularies; pretending one word serves
+  both is how a panel ends up written for the people who implemented it.
+- **Three bugs behind one complaint.** ADD created the endpoint and left the
+  only section holding its name collapsed — `focus()` on an element inside a
+  hidden section does nothing, so there was nowhere to type, and editing a
+  saved wake word looked impossible for the same reason. Any repaint tore the
+  blocks down and rebuilt them, discarding work in progress. And a successful
+  save never cleared "saving…", which reads as a hang.
+- **One place means demo.** A display-wide DEMO / CONNECTED AI switch
+  duplicated each endpoint's own `demo` provider *and silently overrode it* —
+  you could point an endpoint at a real model and still get built-in replies,
+  with the reason on a different tab. Gone; the endpoint decides. Testing an
+  endpoint is the TEST in its own block, which goes through its own adapter,
+  so it will test Home Assistant against Home Assistant with no change. What
+  the old self-test really did was check the chain *around* the endpoints, so
+  it moved to SPEECH as RUN CHECK, beside the microphone and voices.
+- **Each tab commits itself.** One SAVE FOR EVERYONE across three tabs meant
+  pressing it while looking at MOTION also published what had been left
+  half-adjusted on LOOK. Each tab now saves only its own settings, which
+  needed `{settings, merge}` on `/settings` — merging inside the write, so two
+  admins cannot undo each other. Which tab owns which setting is learned from
+  where the control sits, and anything the panel can change that no tab claims
+  is called out in the row. That check immediately found one.
 
 ### 2026-08-14 — three names, three destinations
 
