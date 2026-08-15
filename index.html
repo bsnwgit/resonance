@@ -244,10 +244,15 @@
   #request{display:none}
   body[data-request] #log,
   body[data-request] #bar{display:none}
+  /* Centred, because it is the whole of the page for as long as it is shown.
+     The transcript it replaces is a column of arriving text and belongs
+     against the edge; a form is one object and sitting it hard left with the
+     rest of the width empty reads as something that failed to load. */
   body[data-request] #request{
     position:relative;z-index:3;flex:1 1 auto;overflow-y:auto;
-    display:flex;flex-direction:column;gap:12px;padding:22px 26px 18px;
-    max-width:560px;
+    display:flex;flex-direction:column;justify-content:center;gap:12px;
+    padding:22px 26px 18px;
+    width:100%;max-width:560px;margin-inline:auto;
   }
   #reqhead{
     font-size:calc(12px * var(--fs));line-height:1.6;
