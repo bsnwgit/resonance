@@ -449,8 +449,15 @@ fill in. Pick a preset, set the model, save.
 | LM Studio | `http://127.0.0.1:1234/v1` | whatever is loaded |
 | OpenAI | `https://api.openai.com/v1` | e.g. `gpt-4o-mini` |
 
-**ANTHROPIC** is a shape of its own rather than another preset, because the
-wire format genuinely differs: the key rides an `x-api-key` header instead of
+**ANTHROPIC** — **verified against a stub speaking its wire format, never
+against the live service.** Stated here rather than left to be discovered:
+every field below is implemented from the published shape and exercised
+end to end against a server that answers in it, which catches a malformed
+request but cannot catch a wrong assumption about what the real endpoint
+accepts. Treat the first real key as the test.
+
+It is a shape of its own rather than another preset, because the wire format
+genuinely differs: the key rides an `x-api-key` header instead of
 `Authorization: Bearer`, an `anthropic-version` header is required, the system
 prompt is a top-level field rather than a message in the list, `max_tokens` is
 mandatory, and the reply arrives as a list of content blocks rather than a
@@ -815,7 +822,7 @@ two people in one room with three listening microphones between them.
 
 | | phase | delivers | sits on | open decisions |
 |---|---|---|---|---|
-| 1a | ~~**Routes**~~ **— built** | three names reaching three destinations, verifiable with no Home Assistant involved | — | none |
+| 1a | ~~**Routes**~~ **— done** | three names reaching three destinations, verifiable with no Home Assistant involved | — | none |
 | 1b | **The Home Assistant adapter** | saying the house name switches a light on | 1a | none |
 | 2 | **Displays, and binding a route to one** | only the tablets you approved can actuate the house, whatever anyone's browser is set to | 1b | none |
 | 3 | **What a wall display looks like** | voice only, and a screensaver that is still the product | 2 | none |
@@ -841,9 +848,17 @@ names, and wake-word routing can be shaken out on a test box before Home
 Assistant is anywhere near it. If the refactor breaks something, that is when
 you find out, rather than while also debugging a new adapter.
 
-**1a is built** — see the progress log. It was worth splitting: it turned up
-three faults that had nothing to do with Home Assistant and would have been
-debugged through a new adapter otherwise.
+**1a is done**, and closed out rather than left half-verified. Proven on real
+hardware with a real microphone: several names reaching several destinations,
+each answering in its own voice, each line of the transcript credited to
+whoever gave it, and LEARN teaching an endpoint the spellings a transcriber
+actually returns. The one thing it does not cover is the Anthropic adapter
+against the live service — see the note under that provider.
+
+Splitting it from the Home Assistant adapter earned its keep: it turned up
+three faults that had nothing to do with Home Assistant, plus two secret
+disclosures, all of which would otherwise have been debugged through a new
+adapter.
 
 **Four is a placeholder, not a specification** — see its entry. Its position
 here is a guess and will move once it has been thought through.

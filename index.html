@@ -512,21 +512,35 @@ const FALLBACK_WAKEWORD = 'resonance';
    An unknown variable is left standing rather than blanked. Somebody typing
    {displya} should see their typo, not a name that silently vanished. */
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+/* Each takes the endpoint it is being expanded FOR. Usually that is whichever
+   is answering, but a transcript line written twenty minutes ago belongs to
+   whoever gave it — recomputing those against the endpoint bound now would
+   rewrite history every time somebody switched. */
+/* No argument means "whoever is answering" — a greeting, a farewell, anything
+   said in the moment. An argument means a specific endpoint, and an argument
+   that names nothing means the DEFAULT rather than whoever is bound now: the
+   opening line is written before the endpoints have finished loading, so it
+   carries no id, and resolving that to "current" made it drift to a different
+   name every time somebody switched. */
+function forRoute(rid){
+  return rid === undefined ? Routes.current()
+                           : (Routes.byId(rid) || Routes.byId(Routes.defaultId));
+}
 const VARS = {
-  name:    ()=>{
-    const r = Routes.current();
+  name:    (rid)=>{
+    const r = forRoute(rid);
     return cap(((r && r.wakeword) || FALLBACK_WAKEWORD).trim());
   },
-  assistant: ()=>{
-    const r = Routes.current();
+  assistant: (rid)=>{
+    const r = forRoute(rid);
     return cap(((r && r.name) || FALLBACK_WAKEWORD).trim());
   },
   display: ()=> DISPLAY_NAME,
 };
-function expand(s){
+function expand(s, rid){
   return String(s == null ? '' : s).replace(/\{(\w+)\}/g, (m, k)=>{
     const f = VARS[k.toLowerCase()];
-    return f ? f() : m;
+    return f ? f(rid) : m;
   });
 }
 
@@ -534,9 +548,9 @@ function expand(s){
    when a setting expands to nothing — `{display}` on a URL that declared no
    name would otherwise leave the line attributed to nobody at all. */
 const SPEAKER_FALLBACK = {you: 'operator', ai: 'resonance'};
-function speakerName(who){
+function speakerName(who, rid){
   const raw = who === 'you' ? S.opname : S.ainame;
-  return expand(raw).trim() || SPEAKER_FALLBACK[who] || '';
+  return expand(raw, rid).trim() || SPEAKER_FALLBACK[who] || '';
 }
 
 /* ------------------------------------------------------- viewer prefs
@@ -577,10 +591,13 @@ Prefs.load();
 const S = {
   mode:'stack', palette:'blue', layout:'hero',
   face:'mono', fs:'1',                 // typography — see setType()
-  /* Who the transcript says is speaking. Literal defaults, not {name} — the
-     wake word is available as a variable but binding to it is a choice an
-     admin makes, not one made for them. */
-  opname:'operator', ainame:'resonance',
+  /* Who the transcript says is speaking. The assistant's label defaults to
+     the VARIABLE rather than to a word: with several endpoints a fixed label
+     attributes every answer to the same name, which is wrong the moment a
+     second one exists. It was a literal while there was only one, and that
+     reasoning did not survive the endpoints landing. The person's stays
+     literal — nothing about them varies. */
+  opname:'operator', ainame:'{assistant}',
   amp:1.0, lines:16, lag:3, depth:230, spread:620, persp:1100,
   tumble:1.0, reorient:12,
   tmode:'turntable', spin:1.0, tilt:0.187, wobble:1.0, roll:1.0,
@@ -1377,19 +1394,23 @@ let _meterAt = 0;
 function meter(){
   if (now - _meterAt < 0.1) return;
   _meterAt = now;
-  const el = document.getElementById('miclevel');
-  if (!el) return;
   const raw = Mic.raw || 0;
   const open = raw >= S.micgate;
-  el.style.whiteSpace = 'pre-line';
   const bars = Math.min(20, Math.round(raw*40));
-  el.textContent =
+  const text =
     'level ' + raw.toFixed(3) +
     '  [' + '#'.repeat(bars).padEnd(20,'·') + ']\n' +
     'voice thresh ' + (Mic.thresh||0).toFixed(3) +
     ' (room ' + (Mic.floor||0).toFixed(3) + ')  ' +
     (Mic.vadOpen ? (Listen.sawSpeech ? 'SPEAKING' : 'voice') : 'quiet') +
     '   ·   visual gate ' + S.micgate.toFixed(3) + (open ? ' open' : '');
+  const el = document.getElementById('miclevel');
+  if (el){ el.style.whiteSpace = 'pre-line'; el.textContent = text; }
+  /* Relayed, because the readout only exists in the panel. Without this it
+     was measured ten times a second and shown to nobody — and it is the one
+     thing that makes the noise gate settable, since the room's actual floor
+     cannot be guessed. Same defect the wake and sleep state readouts had. */
+  relay('miclevel', text);
 }
 
 /* Measure the room for 2s and put the gate just above it. */
@@ -1898,8 +1919,12 @@ function ev(s){
 function addMsg(who, text){
   const el = document.createElement('div');
   el.className = 'msg ' + who;
+  /* Stamped with the endpoint this line belongs to. Retuning the label in the
+     panel still relabels the whole transcript, but each line is relabelled as
+     ITSELF rather than as whoever happens to be answering now. */
+  el.dataset.route = Routes.currentId();
   el.innerHTML = '<span class="who"></span><span class="body"></span>';
-  el.querySelector('.who').textContent = speakerName(who);
+  el.querySelector('.who').textContent = speakerName(who, el.dataset.route);
   el.querySelector('.body').textContent = text;
   logEl.appendChild(el);
   followLive = true;
@@ -2237,12 +2262,15 @@ function syncEngine(){
 }
 
 function paintVoiceList(){
+  /* Written and relayed together: this note lives in the panel only, so
+     writing it here alone told nobody anything. */
   const note = document.getElementById('voicenote');
+  const say = t=>{ if (note) note.textContent = t; relay('voicenote', t); };
   if (!nvSel) return;
   if (!Play.available){
     nvSel.innerHTML = '<option>none installed</option>';
     nvSel.disabled = true;
-    if (note) note.textContent = 'No neural voices on the server — using the browser voice.';
+    say('No neural voices on the server — using the browser voice.');
     syncEngine();                       // must still fall back to the browser list
     return;
   }
@@ -2255,8 +2283,8 @@ function paintVoiceList(){
     nvSel.appendChild(o);
   });
   if (S.ttsvoice) nvSel.value = S.ttsvoice;
-  if (note) note.textContent = Play.voices.length +
-    ' neural voices · rendered on the server, and the geometry follows the real waveform.';
+  say(Play.voices.length +
+      ' neural voices · rendered on the server, and the geometry follows the real waveform.');
   syncEngine();
 }
 if (nvSel){
@@ -3006,7 +3034,8 @@ function showPostureWarning(text){
 function repaintNames(){
   document.querySelectorAll('#log .msg').forEach(m=>{
     const w = m.querySelector('.who');
-    if (w) w.textContent = speakerName(m.classList.contains('you') ? 'you' : 'ai');
+    if (w) w.textContent = speakerName(m.classList.contains('you') ? 'you' : 'ai',
+                                       m.dataset.route);
   });
 }
 

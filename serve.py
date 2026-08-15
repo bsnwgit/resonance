@@ -1222,12 +1222,29 @@ def drop_embed_sessions(embed_id):
             _embed_sessions.pop(t, None)
 
 
+#: What the assistant's transcript label used to ship as. An install that
+#: still holds this exact word is holding the old default rather than a
+#: choice: it was the shipped value back when there was one assistant to
+#: name, and it attributes every answer to that one name now that there are
+#: several. Carried forward to the variable, which renders identically on a
+#: single endpoint of that name and correctly once there is a second.
+OLD_AINAME = "resonance"
+
+
 def read_settings():
     try:
         with open(SETTINGS_PATH) as fh:
-            return json.load(fh)
+            stored = json.load(fh)
     except (OSError, ValueError):
         return {}
+    if not isinstance(stored, dict):
+        return {}
+    # Rewritten on the way out rather than on disk: nothing is lost if this
+    # turns out to be wrong, and it persists by itself the next time an admin
+    # saves the tab it lives on.
+    if stored.get("ainame") == OLD_AINAME:
+        stored["ainame"] = "{assistant}"
+    return stored
 
 
 def write_settings(obj):
