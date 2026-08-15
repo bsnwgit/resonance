@@ -117,7 +117,21 @@ interface nobody can administer is a brick.
 
 A display is one device — a screen on a wall, a TV, a laptop, somebody's phone
 — as distinct from a browser tab somebody opened. Anything with a browser and a
-microphone counts. The DISPLAYS tab lists every one that has loaded the page.
+microphone counts.
+
+The DISPLAYS tab holds four topics:
+
+| | |
+|---|---|
+| **Displays** | the queue: everything waiting on a decision, on a code being typed in, or on somebody asking again — and where you add one |
+| **Connected devices** | everything that is simply working, most recently heard from first |
+| **Guest access** | whether uninvited devices may ask, and what a grant to one is worth once given |
+| **The request form** | what a request asks for |
+
+The first two are separate lists on purpose. One is a to-do list and empties as
+you work through it; the other is a register you read when somebody asks what
+is out there. Three rows that need attention buried among fifty that do not is
+how a request sits unanswered for a week.
 
 **There are two ways one gets into the list**, and which you use depends on
 whether you knew it was coming.

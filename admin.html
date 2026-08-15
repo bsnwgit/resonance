@@ -514,7 +514,7 @@
      them as one teaches the operator the wrong model. */
   .erow{display:block;padding:8px 0;
         border-bottom:1px solid rgba(var(--glass),.08)}
-  .erow .top{display:flex;align-items:center;gap:8px}
+  .erow .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .erow .nm{font-size:calc(10px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.96)}
   /* A display's name is editable in place. Renaming is the only edit one has,
      and a RENAME button that opens a dialog for a single field is ceremony
@@ -1446,65 +1446,7 @@ Short by default — this session configures what everyone else is looking at.
   <section class="grp" data-tab="displays">
     <h4>Displays</h4>
     <div class="grpbody">
-  <label class="bklab" style="margin-top:2px">may an uninvited device ask for access?</label>
-  <div class="seg" id="dp_guest">
-    <button data-v="1" class="on">CAN ASK</button>
-    <button data-v="0">CANNOT ASK</button>
-  </div>
-  <div class="note help">CANNOT ASK means the only way in is a code you issued,
-and anything else that opens the page just uses the endpoints open to every
-display — no queue, nothing to decide. It can only be set that way while such
-an endpoint is the default: otherwise an uninvited device reaches nothing at
-all, silently, and there would be no way for anybody to say so.
-
-CAN ASK gives an unapproved device the form below in place of its transcript
-and composer. Either way every device that opens the page is listed here —
-asking is a row putting its hand up, not a row appearing.</div>
-
-  <div class="cols2">
-    <div>
-      <label class="bklab">how long a granted request lasts, days</label>
-      <input id="dp_days" type="number" min="1" max="3650">
-    </div>
-    <div>
-      <label class="bklab">displays in total</label>
-      <input id="dp_max" type="number" min="2" max="5000">
-    </div>
-    <div>
-      <label class="bklab">how many may wait at once</label>
-      <input id="dp_pending" type="number" min="1" max="1000">
-    </div>
-  </div>
-  <div class="note help">A granted request runs out and the person asks again —
-one click for them, because what they told you is kept. <b>Displays you issued
-a code for never expire</b>, whatever this says: a screen on a wall going dark
-on a timer is not a security property, it is an outage.
-
-When more than the waiting limit are queued, the oldest one waiting is dropped
-to make room — so set it high enough that a real request cannot be pushed out
-by noise.</div>
-
-  <label class="bklab">what the request asks for</label>
-  <div id="dp_form"></div>
-  <div class="seg" style="margin-top:6px">
-    <button id="b_addfield">ADD A FIELD</button>
-  </div>
-  <div class="note help">Up to five, and they are yours — this server has no
-opinion about what a request should ask. Somebody running a campus wants a name
-and a department; somebody running a house wants none of it. Tick <b>message</b>
-on one field to make it a box big enough for a reason, and mark the ones that
-must be answered.
-
-If you do not ask for a name, rows arrive labelled by their id and you approve
-them on whatever you did ask for.</div>
-
-  <div class="seg" style="margin-top:8px">
-    <button id="b_dpsave" class="act-save">SAVE THESE SETTINGS</button>
-    <button id="b_dprevert" class="act-undo">REVERT</button>
-  </div>
-  <div class="note" id="dpnote"></div>
-
-  <label class="bklab" style="margin-top:14px">add a display — name it, then type the code into the screen</label>
+  <label class="bklab" style="margin-top:2px">add a display — name it, then type the code into the screen</label>
   <div class="seg" id="dispadd">
     <input id="dp_name" type="text" spellcheck="false" autocomplete="off"
            placeholder="kitchen wall">
@@ -1547,6 +1489,112 @@ existed.
 
 DELETE is the revocation: that token stops matching anything, and the device
 is back to being a browser that has never been here.</div>
+    </div>
+  </section>
+
+  <!-- Everything that is simply working. Its own topic, because the list
+       above is a queue — read when something needs deciding — and this one is
+       a register, read when somebody asks what is out there. Three rows that
+       need attention buried among fifty that do not is how a request sits
+       unanswered for a week. -->
+  <section class="grp" data-tab="displays">
+    <h4>Connected devices</h4>
+    <div class="grpbody">
+  <div id="connlist"></div>
+  <div class="note" id="connnote"></div>
+  <div class="note help" style="margin-top:10px">Every device that is working,
+most recently heard from first. <b>last seen</b> is the last time one asked
+this server anything, so a screen that has been unplugged for a week says so
+here before anybody notices the wall.
+
+Devices on a granted request carry <b>access runs out</b>; those you issued a
+code for do not, and never will.
+
+<b>WITHDRAW</b> takes access away and puts the row back in the queue above.
+<b>DELETE</b> goes further and forgets the device entirely.</div>
+    </div>
+  </section>
+
+  <!-- Whether uninvited devices may ask at all, and what a grant to one is
+       worth once given. Its own topic rather than a preamble to the list: the
+       list is read when somebody is deciding about a device, and these are
+       settled once and then left alone for months. -->
+  <section class="grp" data-tab="displays">
+    <h4>Guest access</h4>
+    <div class="grpbody">
+  <label class="bklab" style="margin-top:2px">may an uninvited device ask for access?</label>
+  <div class="seg" id="dp_guest">
+    <button data-v="1" class="on">CAN ASK</button>
+    <button data-v="0">CANNOT ASK</button>
+  </div>
+  <div class="note help">CANNOT ASK means the only way in is a code you issued,
+and anything else that opens the page just uses the endpoints open to every
+display — no queue, nothing to decide. It can only be set that way while such
+an endpoint is the <b>default</b>: otherwise an uninvited device reaches
+nothing at all, silently, and there would be nowhere for anybody to be told
+why. The same rule refuses to restrict or switch off that default while this
+is off.
+
+CAN ASK gives a device that has been given nothing the request form in place
+of its transcript and composer. Either way every device that opens the page is
+listed under Displays — asking is a row putting its hand up, not a row
+appearing.</div>
+
+  <div class="cols2">
+    <div>
+      <label class="bklab">how long a granted request lasts, days</label>
+      <input id="dp_days" type="number" min="1" max="3650">
+    </div>
+    <div>
+      <label class="bklab">displays in total</label>
+      <input id="dp_max" type="number" min="2" max="5000">
+    </div>
+    <div>
+      <label class="bklab">how many may wait at once</label>
+      <input id="dp_pending" type="number" min="1" max="1000">
+    </div>
+  </div>
+  <div class="note help">A granted request runs out and the person asks again —
+one press for them, because what they told you is kept. <b>Displays you issued
+a code for never expire</b>, whatever this says: a screen on a wall going dark
+on a timer is not a security property, it is an outage.
+
+When more than the waiting limit are queued, the oldest one waiting is dropped
+to make room — so set it high enough that a real request cannot be pushed out
+by noise.</div>
+
+  <div class="seg" style="margin-top:8px">
+    <button id="b_dpsave" class="act-save">SAVE GUEST ACCESS</button>
+    <button id="b_dprevert" class="act-undo">REVERT</button>
+  </div>
+  <div class="note" id="dpnote"></div>
+    </div>
+  </section>
+
+  <!-- The form itself, which is a different job again: this one is written
+       once, in somebody's own words, and read by strangers. -->
+  <section class="grp" data-tab="displays">
+    <h4>The request form</h4>
+    <div class="grpbody">
+  <div id="dp_form"></div>
+  <div class="seg" style="margin-top:6px">
+    <button id="b_addfield">ADD A FIELD</button>
+  </div>
+  <div class="note help">Up to five fields, and they are yours — this server has
+no opinion about what a request should ask. Somebody running a campus wants a
+name and a department; somebody running a house wants none of it. Tick
+<b>message</b> on one field to make it a box big enough for a reason, and mark
+the ones that must be answered.
+
+If you do not ask for a name, rows arrive labelled by their id and you approve
+them on whatever you did ask for. Ask for nothing at all and a request carries
+nothing but that id.</div>
+
+  <div class="seg" style="margin-top:8px">
+    <button id="b_formsave" class="act-save">SAVE THE FORM</button>
+    <button id="b_formrevert" class="act-undo">REVERT</button>
+  </div>
+  <div class="note" id="formnote"></div>
     </div>
   </section>
 
@@ -3406,11 +3454,26 @@ function paintDpForm(fields){
   if (btn) btn.disabled = DPFORM.length >= 5;
 }
 
-function dpNote(m, bad){
-  const el = $('dpnote');
+/* Two topics, two commit rows, each writing only what is on it — the panel's
+   own rule. One SAVE across both would mean pressing it while looking at the
+   form also published a switch left half-changed above it. */
+function dpNote(m, bad, which){
+  const el = $(which || 'dpnote');
   if (!el) return;
   el.className = 'note' + (bad ? ' bad' : '');
   el.textContent = m || '';
+}
+
+async function saveDp(body, slot){
+  dpNote('saving…', false, slot);
+  try{
+    const j = await api('/displays/settings', {method:'POST',
+                                               body: JSON.stringify(body)});
+    DPCFG = j.settings;
+    paintDpSettings();
+    await refreshDisplays();
+    dpNote('saved', false, slot);
+  }catch(e){ dpNote(e.message, true, slot); }
 }
 
 $('b_addfield').addEventListener('click', ()=>{
@@ -3422,57 +3485,79 @@ $('dp_guest').addEventListener('click', e=>{
   const b = e.target.closest('button');
   if (b) segSet('dp_guest', b.dataset.v);
 });
-$('b_dprevert').addEventListener('click', ()=>{ paintDpSettings(); dpNote('back to what is saved'); });
-$('b_dpsave').addEventListener('click', async ()=>{
-  dpNote('saving…');
+$('b_dprevert').addEventListener('click', ()=>{
+  paintDpSettings();
+  dpNote('back to what is saved');
+});
+$('b_dpsave').addEventListener('click', ()=>{
   const on = document.querySelector('#dp_guest button.on');
-  const body = {
+  saveDp({
     guest_requests: !!on && on.dataset.v === '1',
     guest_days: parseInt($('dp_days').value, 10),
     max_displays: parseInt($('dp_max').value, 10),
     max_pending: parseInt($('dp_pending').value, 10),
-    form: DPFORM.filter(f=> (f.label || '').trim()),
-  };
-  try{
-    const j = await api('/displays/settings', {method:'POST', body: JSON.stringify(body)});
-    DPCFG = j.settings;
-    paintDpSettings();
-    await refreshDisplays();
-    dpNote('saved');
-  }catch(e){ dpNote(e.message, true); }
+  }, 'dpnote');
 });
 
+$('b_formrevert').addEventListener('click', ()=>{
+  paintDpForm((DPCFG && DPCFG.form) || []);
+  dpNote('back to what is saved', false, 'formnote');
+});
+$('b_formsave').addEventListener('click', ()=>{
+  saveDp({form: DPFORM.filter(f=> (f.label || '').trim())}, 'formnote');
+});
+
+/* What a row IS, and it decides which of the two lists it belongs in as well
+   as what the row says. `live` is a device that is working; everything else
+   wants something from somebody. */
+const dispState = (d)=> !d.enrolled ? (d.code ? 'code' : 'stale')
+                      : d.denied    ? 'denied'
+                      : d.requested_at && !d.approved ? 'asked'
+                      : d.expired   ? 'expired'
+                      : d.approved  ? 'live' : 'waiting';
+
 async function refreshDisplays(){
-  const box = $('displist');
-  if (!box || ME.role !== 'admin'){ if (box) box.textContent = ''; return; }
+  const box = $('displist'), conn = $('connlist');
+  if (!box || ME.role !== 'admin'){
+    if (box) box.textContent = '';
+    if (conn) conn.textContent = '';
+    return;
+  }
   const note = $('dispnote');
   await loadDisplays();
   // The settings above the list are painted from the same fetch, so the two
   // can never be describing different states of the same document.
   paintDpSettings();
   box.innerHTML = '';
-  if (!DISPLAYS.length){
-    box.className = 'note';
-    box.textContent = 'No displays yet. Name one above to get a code, or open '
-                    + 'the display page on any device and it appears here.';
-    if (note) note.textContent = '';
-    return;
-  }
-  box.className = '';
-  /* Four states, and the two that want something from you come first. In the
-     steady state this list is read once a year; the moment somebody is
-     actually looking at it, they have just added something. */
-  const state = (d)=> !d.enrolled ? (d.code ? 'code' : 'stale')
-                    : d.denied    ? 'denied'
-                    : d.requested_at && !d.approved ? 'asked'
-                    : d.expired   ? 'expired'
-                    : d.approved  ? 'live' : 'waiting';
-  const rank = {asked: 0, expired: 1, code: 2, waiting: 3, denied: 4,
-                stale: 5, live: 6};
+  conn.innerHTML = '';
+  /* Two lists, because they are read for opposite reasons. This one is a
+     queue — everything in it is waiting on a decision, a code being typed, or
+     somebody asking again — and it is empty when there is nothing to do.
+     Devices that are simply working are not a to-do list, and burying three
+     rows that need attention among fifty that do not is how a request sits
+     unanswered for a week. */
+  const rank = {asked: 0, expired: 1, code: 2, waiting: 3, denied: 4, stale: 5};
   const rows = DISPLAYS.slice().sort((a, b)=>
-    rank[state(a)] - rank[state(b)] || (b.created || 0) - (a.created || 0));
-  rows.forEach(d=>{
-    const st = state(d);
+    (rank[dispState(a)] - rank[dispState(b)]) || (b.created || 0) - (a.created || 0));
+  const pending = rows.filter(d=> dispState(d) !== 'live');
+  const live = DISPLAYS.slice()
+    .filter(d=> dispState(d) === 'live')
+    .sort((a, b)=> (b.last_seen || 0) - (a.last_seen || 0));
+  if (!pending.length){
+    box.className = 'note';
+    box.textContent = DISPLAYS.length
+      ? 'Nothing waiting. Every device here is working.'
+      : 'No displays yet. Name one above to get a code, or open the display '
+        + 'page on any device and it appears here.';
+  }else box.className = '';
+  if (!live.length){
+    conn.className = 'note';
+    conn.textContent = 'Nothing connected yet.';
+  }else conn.className = '';
+  /* Each list in its own order: the queue by how much it wants attention, the
+     connected list by what was heard from most recently. */
+  pending.concat(live).forEach(d=>{
+    const st = dispState(d);
     const row = document.createElement('div');
     row.className = 'erow' + (st === 'live' ? '' : ' off');
 
@@ -3502,42 +3587,55 @@ async function refreshDisplays(){
     if (d.renewals) badge('RENEWED ' + d.renewals + '×');
     if (d.refused) badge(d.refused + (d.refused === 1 ? ' REFUSAL' : ' REFUSALS'));
 
-    const r = document.createElement('span'); r.className = 'r';
+    /* A line of their own, under the row, rather than crowded onto the end of
+       the name. Four buttons plus a name box plus two badges do not fit a
+       425px column, and what they did instead was run over the edge of it. */
+    const r = document.createElement('div'); r.className = 'acts';
     /* Deciding is for a device that turned up on its own. A row created here
        was approved by being created, and has no device yet to decide about. */
     const deciding = d.enrolled && (st === 'asked' || st === 'waiting');
+    const grant = (label)=>{
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.className = 'act-save';
+      b.onclick = ()=> decide(d, true, nm.value.trim(), row);
+      r.appendChild(b);
+    };
     if (deciding){
-      const yes = document.createElement('button');
-      yes.textContent = 'APPROVE';
-      yes.className = 'act-save';
-      yes.onclick = ()=> decide(d, true, nm.value.trim(), row);
+      // A guest coming back is a RENEWAL, and it is not the same word as the
+      // admin's REISSUE below — one grants somebody access again, the other
+      // replaces the device behind a row and kills what is there now.
+      grant(d.guest && d.approved_at ? 'RENEW' : 'APPROVE');
       const no = document.createElement('button');
       no.textContent = 'REFUSE';
       no.className = 'act-danger';
       no.onclick = ()=> decide(d, false, nm.value.trim(), row);
-      r.appendChild(yes); r.appendChild(no);
+      r.appendChild(no);
     }else if (d.enrolled && d.approved){
       const flip = document.createElement('button');
       flip.textContent = 'WITHDRAW';
       flip.onclick = ()=> decide(d, false, nm.value.trim(), row);
       r.appendChild(flip);
     }else if (d.enrolled && (st === 'denied' || st === 'expired')){
-      const yes = document.createElement('button');
-      yes.textContent = 'APPROVE';
-      yes.className = 'act-save';
-      yes.onclick = ()=> decide(d, true, nm.value.trim(), row);
-      r.appendChild(yes);
+      grant(st === 'expired' ? 'RENEW' : 'APPROVE');
     }
-    const again = document.createElement('button');
-    again.textContent = st === 'code' ? 'NEW CODE' : 'REISSUE';
-    again.onclick = ()=>{
-      // Only worth stopping for where it takes a working screen off the air.
-      if (st !== 'live' || confirm('Reissue "' + d.label + '"?\n\nThe device '
-            + 'using it now stops working immediately, and the row waits for '
-            + 'somebody to type the new code into a screen. Its name and every '
-            + 'endpoint that names it are kept.'))
-        displayAction('/displays/reissue', {id: d.id});
-    };
+    /* Only for a display an admin issued a code for. On a guest's row it would
+       be the wrong mechanism entirely — killing their token and printing a
+       code for somebody to type into their laptop, where what was wanted was
+       to grant them access again. */
+    if (!d.guest){
+      const again = document.createElement('button');
+      again.textContent = st === 'code' ? 'NEW CODE' : 'REISSUE';
+      again.onclick = ()=>{
+        // Only worth stopping for where it takes a working screen off the air.
+        if (st !== 'live' || confirm('Reissue "' + d.label + '"?\n\nThe device '
+              + 'using it now stops working immediately, and the row waits for '
+              + 'somebody to type the new code into a screen. Its name and every '
+              + 'endpoint that names it are kept.'))
+          displayAction('/displays/reissue', {id: d.id});
+      };
+      r.appendChild(again);
+    }
     const del = document.createElement('button');
     del.textContent = 'DELETE';
     del.className = 'act-danger';
@@ -3548,8 +3646,7 @@ async function refreshDisplays(){
                   + 'come back as a new row, unapproved.'))
         displayAction('/displays/delete', {id: d.id});
     };
-    r.appendChild(again); r.appendChild(del);
-    top.appendChild(r);
+    r.appendChild(del);
 
     /* The whole thing somebody has to type, on its own line and big enough to
        read from across a room while typing it into a television with a
@@ -3631,19 +3728,28 @@ async function refreshDisplays(){
     });
 
     row.appendChild(meta);
-    box.appendChild(row);
+    row.appendChild(r);
+    (st === 'live' ? conn : box).appendChild(row);
   });
-  const asked = DISPLAYS.filter(d=> d.requested_at && !d.approved && !d.denied).length;
-  const waiting = DISPLAYS.filter(d=> d.enrolled && !d.approved && !d.denied
-                                   && !d.requested_at).length;
-  const coded = DISPLAYS.filter(d=> !d.enrolled && d.code).length;
+  const count = (st)=> pending.filter(d=> dispState(d) === st).length;
   if (note){
-    const bits = [DISPLAYS.length + (DISPLAYS.length === 1 ? ' display' : ' displays')];
-    if (asked) bits.push(asked + ' asking for access');
-    if (coded) bits.push(coded + ' waiting for a code to be typed in');
-    if (waiting) bits.push(waiting + ' here but not approved');
+    const bits = [];
+    if (count('asked')) bits.push(count('asked') + ' asking for access');
+    if (count('expired')) bits.push(count('expired') + ' expired');
+    if (count('code')) bits.push(count('code') + ' waiting for a code to be typed in');
+    if (count('waiting')) bits.push(count('waiting') + ' here but not approved');
+    if (count('denied')) bits.push(count('denied') + ' refused');
+    if (count('stale')) bits.push(count('stale') + ' whose code ran out');
     note.className = 'note';
     note.textContent = bits.join(' · ');
+  }
+  const cnote = $('connnote');
+  if (cnote){
+    const guests = live.filter(d=> d.guest).length;
+    cnote.className = 'note';
+    cnote.textContent = !live.length ? ''
+      : live.length + (live.length === 1 ? ' device' : ' devices')
+        + (guests ? ' · ' + guests + ' on a grant that runs out' : '');
   }
 }
 
