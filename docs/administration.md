@@ -146,6 +146,62 @@ laptop or a phone, and it appears in the list as WAITING within seconds. Give it
 a name and press APPROVE. It does not need reloading: a display that is waiting
 asks again every twenty seconds and starts working on its own.
 
+**Or it asks.** With *can ask* switched on, a device that has not been given
+access gets the figure and, where its transcript and composer would be, your
+request form — because both of those are wired to endpoints it cannot reach,
+and drawing them would be two controls that only ever refuse. It fills the form
+in, the row appears here saying what they told you, and you approve or refuse
+it.
+
+### Deciding
+
+**Approving is granting.** Press APPROVE and you tick which endpoints that
+device may use in the same gesture. The reason to approve anybody at all is to
+give them a particular assistant, so the decision and the grant are one thing —
+an approval that grants nothing is a row that changed colour.
+
+**Refusing takes two messages and a choice.** One is shown on their screen, so
+they know what happened. One is a note that never leaves this panel, for
+whoever comes back to this row in six months. And you decide whether that
+device may ask again or not.
+
+Refusing also takes back anything a previous approval gave. Otherwise *refused*
+would be a word on a row rather than a thing that happened.
+
+**A refusal is per device, not per person.** Somebody turned away on their
+laptop can open the page on their phone and ask again from a clean row. That is
+what device identity is — anything stronger needs an identity that person
+carries, which is what a dedicated URL will be.
+
+### The settings above the list
+
+**Can ask / cannot ask.** *Cannot ask* means the only way in is a code you
+issued, and anything else that opens the page simply uses the endpoints open to
+every display — no queue, and nothing to decide. It can only be set that way
+while such an endpoint is the **default**: otherwise an uninvited device would
+reach nothing at all, silently. The rule is enforced from both ends, so you
+also cannot restrict or switch off that default while requests are off.
+
+**How long a granted request lasts.** Guest access is a lifecycle, not a
+session: it runs out and the person asks again. Their answers are kept, so
+asking again is one press for them and one decision for you, and the row counts
+how many times it has been renewed.
+
+**Displays you issued a code for never expire**, whatever that number says. A
+screen on a wall going dark on a timer is not a security property, it is an
+outage.
+
+**Displays in total, and how many may wait at once.** When more than the
+waiting limit are queued the oldest waiting row is dropped to make room, so set
+it high enough that a real request cannot be pushed out by noise.
+
+**What the request asks for** is yours to build: up to five fields, each with a
+label and whether it must be answered, and one of them optionally a box big
+enough for a reason. This server has no opinion about it — somebody running a
+campus wants a name and a department, somebody running a house wants none of
+it. Ask for no name and rows arrive labelled by their id, and you approve them
+on whatever you did ask for.
+
 **REISSUE is for a screen that lost its identity** — a browser that wiped its
 data, a television swapped for a bigger one in the same place. The row keeps its
 name and every endpoint that names it, so nothing has to be ticked again, and

@@ -712,7 +712,7 @@ def read_routes():
                 out["aliases"] = [w for w in (_norm_word(a) for a in
                                               (rec.get("aliases") or [])) if w]
                 out["displays"] = [str(d)[:32] for d in
-                                   (rec.get("displays") or [])][:MAX_DISPLAYS]
+                                   (rec.get("displays") or [])][:MAX_ALLOW]
                 out["created"] = rec.get("created")
                 out["created_by"] = rec.get("created_by")
                 doc["routes"][str(rid)] = out
@@ -878,7 +878,7 @@ def validate_route(obj, current, doc, rid=None):
             if d in known and d not in seen:
                 seen.add(d)
                 out.append(d)
-        rec["displays"] = out[:MAX_DISPLAYS]
+        rec["displays"] = out[:MAX_ALLOW]
     if "wakeword" in obj:
         rec["wakeword"] = _norm_word(obj["wakeword"])[:40]
     if not rec["wakeword"]:
@@ -1008,11 +1008,11 @@ DISPLAY_COOKIE = "rsn_did"
 #: standing in front of it could see. Revocation is deleting the record, and
 #: that is immediate.
 DISPLAY_MAX_AGE = 10 * 365 * 24 * 3600
-MAX_DISPLAYS = 64                # a household, not a directory service
-#: and the queue of devices nobody has approved cannot grow for ever, or one
-#: script pointed at the port fills the panel with rows an admin has to wade
-#: through to find their own new tablet
-MAX_PENDING = 24
+#: The hard ceiling on an allow-list, and the only one of these that is not a
+#: setting: it bounds a field inside a route record rather than the size of the
+#: deployment, and no endpoint names five thousand devices one at a time. The
+#: numbers that DO scale with the deployment are in DISPLAY_SETTINGS.
+MAX_ALLOW = 500
 SEEN_INTERVAL = 300              # seconds between writes of "last seen"
 
 #: An enrolment code is TYPED, on the device being enrolled, and that device is
@@ -1073,7 +1073,66 @@ DISPLAY_DEFAULTS = {
     "salt": "", "hash": "",
     "created": 0, "last_seen": 0,
     "approved_by": "", "approved_at": 0,
+    # What the person at the device said when they asked for access, in the
+    # admin's own words: [{"label": …, "value": …}] in the order the form put
+    # them. Self-asserted and worth nothing on its own — but a request that
+    # arrives saying "Sarah, building 4 laptop" is one an admin who cannot see
+    # the device can act on, where an anonymous row is one they can only guess
+    # at. That guessing is the whole point: approving what you cannot identify
+    # is not a decision, it is a coin toss.
+    "answers": [], "requested_at": 0,
+    # Guest access is a LIFECYCLE, not a session. It runs out, and the person
+    # asks again — against this same row, so what they told you the first time
+    # is still here and they do not fill the form in twice. Zero means never,
+    # which is every display an admin issued a code for: a wall screen going
+    # dark on a timer is not a security property, it is an outage.
+    "expires": 0, "renewals": 0,
+    # A refusal, and it is two messages. One the person reads, one for whoever
+    # comes to this row in six months wondering why it says no.
+    "denied": False, "deny_reason": "", "deny_note": "",
+    # …and whether they may ask again. Per device rather than per person: a
+    # laptop turned away is a laptop turned away, and the same human on their
+    # phone is a new row with a fresh ask. Anything stronger needs an identity,
+    # which is what a dedicated URL is for.
+    "deny_repeat": True,
 }
+
+#: The displays document's own settings, as opposed to the rows in it. Set in
+#: the panel, and none of them needs a restart.
+DISPLAY_SETTINGS = {
+    # May a device nobody invited ask for access at all?
+    #
+    # Off, the only way in is a code an admin issued deliberately, and an
+    # uninvited device simply uses the endpoints open to everything — no queue,
+    # nothing to police, and no row anybody has to make a decision about. Which
+    # is why it cannot be turned off unless such an endpoint exists: off with
+    # nothing open is a server that answers nobody, silently.
+    #
+    # On, a device can put its hand up. Either way it is RECORDED: the list is
+    # what has connected, and a request is one of those rows asking for
+    # something.
+    "guest_requests": True,
+    # How many rows may exist at once. "A household, not a directory service"
+    # was the wrong ceiling the moment a guest's laptop became a row too — on a
+    # campus, sixty-four is a fortnight, and a full list means nothing new can
+    # arrive at all.
+    "max_displays": 500,
+    # …and how many may be waiting on a decision. The oldest waiting row is
+    # dropped when this fills, so this is the number that decides whether a
+    # genuine request can be pushed out of the queue by noise.
+    "max_pending": 100,
+    # Days a guest's access lasts before they have to ask again.
+    "guest_days": 30,
+    # The request form, as the admin built it. Up to five fields, each with a
+    # label and whether it must be answered, and at most one of them a message
+    # box for a reason somebody needs a paragraph to give. Empty means nobody
+    # has built one yet.
+    "form": [],
+}
+MAX_FORM_FIELDS = 5
+#: (low, high) for each number the panel can set
+DISPLAY_LIMITS = {"max_displays": (2, 5000), "max_pending": (1, 1000),
+                  "guest_days": (1, 3650)}
 
 #: The admin panel's own preview frames the real display page, so it says
 #: hello like any other. It is not a display: it is the panel, served from the
@@ -1087,6 +1146,91 @@ PREVIEW_DISPLAY = {"id": "(preview)", "name": "preview", "approved": True,
 #: configuration, and a device outside the house repeating itself must not turn
 #: into a write per utterance.
 _display_refusals = {}           # display id -> [count, last_ts, endpoint name]
+
+
+def read_displays_doc():
+    try:
+        with open(DISPLAYS_PATH) as fh:
+            doc = json.load(fh)
+        return doc if isinstance(doc, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def clean_form(raw):
+    """The admin's request form, sanitised. A field with no label is a box
+    nobody can answer, so it is dropped rather than shown blank — and only the
+    first message field stays a message, because two paragraph boxes is a form
+    somebody built by accident."""
+    out, seen_message = [], False
+    for f in (raw or [])[:MAX_FORM_FIELDS]:
+        if not isinstance(f, dict):
+            continue
+        label = str(f.get("label") or "").strip()[:60]
+        if not label:
+            continue
+        message = bool(f.get("message")) and not seen_message
+        seen_message = seen_message or message
+        out.append({"label": label, "required": bool(f.get("required")),
+                    "message": message})
+    return out
+
+
+def display_settings():
+    """Kept beside the displays rather than in the shared settings document,
+    which is world readable and belongs to the interface. Who may ask this
+    server for something is not an appearance value."""
+    cfg = dict(DISPLAY_SETTINGS)
+    stored = read_displays_doc().get("settings")
+    if isinstance(stored, dict):
+        cfg.update({k: v for k, v in stored.items() if k in DISPLAY_SETTINGS})
+    for k, (lo, hi) in DISPLAY_LIMITS.items():
+        try:
+            cfg[k] = min(hi, max(lo, int(cfg[k])))
+        except (TypeError, ValueError):
+            cfg[k] = DISPLAY_SETTINGS[k]
+    cfg["guest_requests"] = bool(cfg["guest_requests"])
+    cfg["form"] = clean_form(cfg.get("form"))
+    return cfg
+
+
+def write_display_settings(cfg):
+    doc = read_displays_doc()
+    doc["settings"] = cfg
+    _write_displays_doc(doc)
+
+
+def validate_display_settings(obj, current):
+    """Returns (settings, error). The one rule that is not a range: guest
+    requests cannot be switched off while there is nowhere for a guest to go —
+    see open_default_ok."""
+    cfg = dict(current)
+    for k, (lo, hi) in DISPLAY_LIMITS.items():
+        if k not in obj:
+            continue
+        try:
+            v = int(obj[k])
+        except (TypeError, ValueError):
+            return None, "%s must be a whole number" % k.replace("_", " ")
+        if not (lo <= v <= hi):
+            return None, ("%s must be between %d and %d"
+                          % (k.replace("_", " "), lo, hi))
+        cfg[k] = v
+    if cfg["max_pending"] > cfg["max_displays"]:
+        return None, ("more waiting than there is room for — the waiting limit "
+                      "cannot exceed the total")
+    if "form" in obj:
+        if not isinstance(obj["form"], (list, tuple)):
+            return None, "the request form must be a list of fields"
+        if len(obj["form"]) > MAX_FORM_FIELDS:
+            return None, "a request form has at most %d fields" % MAX_FORM_FIELDS
+        for f in obj["form"]:
+            if isinstance(f, dict) and not str(f.get("label") or "").strip():
+                return None, "every field needs a label — it is what somebody reads"
+        cfg["form"] = clean_form(obj["form"])
+    if "guest_requests" in obj:
+        cfg["guest_requests"] = bool(obj["guest_requests"])
+    return cfg, None
 
 
 def read_displays():
@@ -1106,14 +1250,24 @@ def read_displays():
     return out
 
 
-def write_displays(displays):
+def _write_displays_doc(doc):
+    doc["version"] = 1
+    doc.setdefault("displays", {})
     with _displays_lock:
         tmp = DISPLAYS_PATH + ".tmp"
         with open(tmp, "w") as fh:
-            json.dump({"version": 1, "displays": displays}, fh,
-                      indent=2, sort_keys=True)
+            json.dump(doc, fh, indent=2, sort_keys=True)
         os.chmod(tmp, 0o600)                     # token hashes
         os.replace(tmp, DISPLAYS_PATH)
+
+
+def write_displays(displays):
+    """Rows only. Read-modify-write of the whole document rather than a
+    replacement of it, because the settings live in the same file and a row
+    being written must not take the admin's form and limits with it."""
+    doc = read_displays_doc()
+    doc["displays"] = displays
+    _write_displays_doc(doc)
 
 
 def display_label(rec):
@@ -1149,18 +1303,19 @@ def new_display(asked, hint):
 
     Nothing is approved here. A device that has just arrived is a row in a
     list, and it stays inert until somebody says otherwise."""
+    cfg = display_settings()
     displays = read_displays()
     pending = sorted((d for d, r in displays.items() if not r["approved"]),
                      key=lambda d: displays[d]["created"])
     # The oldest unapproved goes first, and only ever an unapproved one: the
     # queue is a queue, and nothing arriving at the door may evict a display
     # somebody hung on a wall.
-    while pending and (len(pending) >= MAX_PENDING
-                       or len(displays) >= MAX_DISPLAYS):
+    while pending and (len(pending) >= cfg["max_pending"]
+                       or len(displays) >= cfg["max_displays"]):
         displays.pop(pending.pop(0), None)
-    if len(displays) >= MAX_DISPLAYS:
-        return None, ("that is %d displays already — remove one before adding "
-                      "another" % MAX_DISPLAYS)
+    if len(displays) >= cfg["max_displays"]:
+        return None, ("that is %d displays already — remove one, or raise the "
+                      "limit on the DISPLAYS tab" % cfg["max_displays"])
     did = "d" + secrets.token_hex(6)
     secret = secrets.token_urlsafe(32)
     salt, dk = hash_key(secret)
@@ -1179,9 +1334,10 @@ def invite_display(name, by):
     token, so nothing can BE it until somebody types the code into the screen
     itself."""
     displays = read_displays()
-    if len(displays) >= MAX_DISPLAYS:
-        return None, ("that is %d displays already — remove one before adding "
-                      "another" % MAX_DISPLAYS)
+    limit = display_settings()["max_displays"]
+    if len(displays) >= limit:
+        return None, ("that is %d displays already — remove one, or raise the "
+                      "limit on the DISPLAYS tab" % limit)
     did = "d" + secrets.token_hex(6)
     now_ = int(time.time())
     rec = dict(DISPLAY_DEFAULTS)
@@ -1273,6 +1429,107 @@ def note_display_refused(disp, route_name):
     rec[2] = route_name
 
 
+def display_expired(disp):
+    """Guest access runs out. An admin-issued display's `expires` is zero and
+    never does — see the field."""
+    e = (disp or {}).get("expires") or 0
+    return bool(e) and e < time.time()
+
+
+def is_guest(rec):
+    """A row that asked to be here, as opposed to one an admin created and sent
+    a code for. Only the first kind expires."""
+    return bool(rec.get("requested_at"))
+
+
+def request_access(did, answers):
+    """A device putting its hand up. Runs against the row it already has, so a
+    second ask is a RENEWAL of one row rather than a second device — what
+    somebody typed the first time survives, and how often they have asked is
+    visible to whoever decides."""
+    displays = read_displays()
+    rec = displays.get(did)
+    if not rec:
+        return None, "no such display"
+    if rec.get("denied") and not rec.get("deny_repeat", True):
+        return None, "this device was refused, and may not ask again"
+    if rec.get("approved") and not display_expired(rec):
+        # It already has what it would be asking for. Refused rather than
+        # accepted quietly, because accepting would take its access away and
+        # put it back at the end of a queue for no reason anybody chose.
+        return None, "this device already has access"
+    rec["requested_at"] = int(time.time())
+    # Asking puts the row back in front of somebody, which means it is no
+    # longer granted anything: an expired grant that still read `approved`
+    # showed in the panel as "access expired" when what had actually just
+    # happened was that they asked again. Waiting on a decision is a state of
+    # its own and has to look like one, at both ends.
+    rec["approved"] = False
+    rec["expires"] = 0
+    # The refusal comes off the row's face — it is being asked again — but the
+    # reason and the internal note stay as history, because whoever decides
+    # this time is better off knowing it was turned down before and why.
+    rec["denied"] = False
+    if answers is not None:
+        rec["answers"] = answers
+    write_displays(displays)
+    return dict(rec, id=did), None
+
+
+def set_display_endpoints(did, rids):
+    """Which endpoints this display may use, as one gesture: added where it is
+    named, removed everywhere else. The ticks are the whole truth rather than
+    an addition to something invisible.
+
+    Only ever the allow-lists. Naming an endpoint that is open to any display
+    does not restrict it — that would lock everybody else out as a side effect
+    of granting one person access, which is the opposite of what was asked."""
+    doc = read_routes()
+    want = set(rids or [])
+    changed = False
+    for rid, rec in doc["routes"].items():
+        has = did in (rec.get("displays") or [])
+        if rid in want and not has:
+            rec["displays"] = list(rec.get("displays") or []) + [did]
+            changed = True
+        elif rid not in want and has:
+            rec["displays"] = [d for d in rec["displays"] if d != did]
+            changed = True
+    if changed:
+        write_routes(doc)
+    return changed
+
+
+def open_default(doc):
+    """The endpoint a device with no grant of any kind reaches: the default, if
+    it is answering and open to any display. Blank means a guest has nowhere to
+    go — fine while they can ask for access, and a server that answers nobody
+    the moment they cannot."""
+    rid = doc.get("default")
+    rec = doc["routes"].get(rid)
+    return rid if rec and rec.get("enabled", True) and not rec.get("restricted") else ""
+
+
+#: Said in both directions, because the rule has two ends: it refuses to switch
+#: guest requests off with nothing open, and refuses to close the last open
+#: default while they are off. Enforced only in one, it holds until the next
+#: edit and then breaks silently — approval off, guests reaching nothing, and
+#: no error anywhere to say why.
+GUEST_PATH_MSG = ("guest requests are switched off, so the default endpoint is "
+                  "the only thing an uninvited device can reach — it has to "
+                  "stay answering and open to any display. Turn guest requests "
+                  "back on under DISPLAYS first, or make another endpoint the "
+                  "default.")
+
+
+def guest_path_broken(doc):
+    """Whether this route document would leave a guest with nowhere to go.
+    Asked of the RESULT of an edit rather than of the edit itself: the default
+    moves on its own when one is switched off or deleted, so the only honest
+    question is what the document says once the change has been applied."""
+    return not display_settings()["guest_requests"] and not open_default(doc)
+
+
 def display_may(disp, route):
     """May this display use this endpoint?
 
@@ -1292,7 +1549,11 @@ def display_may(disp, route):
     # demonstrate half the endpoints would be lying in the other direction.
     if disp.get("preview"):
         return True
-    return bool(disp.get("approved")) and disp["id"] in (route.get("displays") or [])
+    # Expiry is checked here rather than at the door, which is what makes a
+    # grant run out cleanly mid-conversation: the turn already in flight was
+    # allowed when it started and finishes, and the next one is refused.
+    return (bool(disp.get("approved")) and not display_expired(disp)
+            and disp["id"] in (route.get("displays") or []))
 
 
 def admin_displays():
@@ -1305,10 +1566,13 @@ def admin_displays():
     for did, rec in sorted(displays.items(), key=lambda kv: kv[1]["created"]):
         row = {k: rec.get(k) for k in
                ("name", "asked", "approved", "hint", "created", "last_seen",
-                "approved_by", "approved_at")}
+                "approved_by", "approved_at", "answers", "requested_at",
+                "expires", "renewals", "denied", "deny_reason", "deny_note",
+                "deny_repeat")}
         ref = _display_refusals.get(did)
         live = bool(rec.get("code")) and (rec.get("code_expires") or 0) > now_
         row.update(id=did, label=display_label(rec),
+                   guest=is_guest(rec), expired=display_expired(rec),
                    # Three states, and the panel needs to tell them apart:
                    # INVITED is a row waiting for somebody to type its code
                    # into a screen, WAITING is a device that turned up on its
@@ -1974,7 +2238,8 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      # Everything an ADMIN does to a display sits under
                      # /displays, one letter and a whole boundary apart.
                      "/displays", "/displays/approve", "/displays/rename",
-                     "/displays/delete", "/displays/new", "/displays/reissue")
+                     "/displays/delete", "/displays/new", "/displays/reissue",
+                     "/displays/decide", "/displays/settings")
 #: where an enrolment code is typed. On the display listeners only — it hands
 #: out a display's token, and the admin listener is not a display.
 ENROL_PREFIX = "/e/"
@@ -2167,6 +2432,44 @@ class Handler(SimpleHTTPRequestHandler):
             return None
         morsel = jar.get(DISPLAY_COOKIE)
         return find_display(morsel.value) if morsel else None
+
+    def _display_state(self, rec):
+        """Everything the display page needs to know about itself, in one
+        object: whether it may use anything, whether it may ask, what the form
+        asks, and — where it was refused — what it was told.
+
+        Built once and returned from every path that touches a display, so the
+        page never has to assemble its own state from two half-answers."""
+        cfg = display_settings()
+        expired = display_expired(rec)
+        working = bool(rec.get("approved")) and not expired
+        # Refused, and told so; waiting on a decision; running on a grant that
+        # has run out; or simply here, with whatever is open to everyone.
+        state = ("denied" if rec.get("denied")
+                 else "expired" if expired
+                 else "approved" if working
+                 else "requested" if rec.get("requested_at")
+                 else "none")
+        may_ask = (cfg["guest_requests"] and not working
+                   and not (rec.get("denied") and not rec.get("deny_repeat", True)))
+        out = {"id": rec.get("id", ""), "name": display_label(rec),
+               "approved": working, "state": state,
+               "can_request": bool(may_ask),
+               # A renewal does not ask the form again — what they told you is
+               # already on the row, and making somebody retype it every month
+               # is how a form stops being answered honestly.
+               "answered": bool(rec.get("answers")),
+               "renewals": rec.get("renewals") or 0}
+        if may_ask:
+            out["form"] = cfg["form"]
+        if rec.get("denied"):
+            # Only the message written FOR them. The internal note is for
+            # whoever comes to this row in six months, and never leaves here.
+            out["reason"] = rec.get("deny_reason") or ""
+            out["may_ask_again"] = bool(rec.get("deny_repeat", True))
+        if working and rec.get("expires"):
+            out["expires_in"] = max(0, int(rec["expires"] - time.time()))
+        return out
 
     def _set_display_cookie(self, token):
         # Secure only where the connection actually is: bound to loopback this
@@ -2395,9 +2698,20 @@ class Handler(SimpleHTTPRequestHandler):
             # guess. The port is the display's, not this listener's.
             host = re.sub(r":\d+$", "", self.headers.get("Host") or "") or LOOPBACK
             secure = RUNNING.get("https_port")
+            doc = read_routes()
             return self._json(200, {"displays": admin_displays(),
-                                    "max": MAX_DISPLAYS,
-                                    "max_pending": MAX_PENDING,
+                                    "settings": display_settings(),
+                                    "limits": DISPLAY_LIMITS,
+                                    "max_fields": MAX_FORM_FIELDS,
+                                    # Which endpoints there are to grant, and
+                                    # whether an uninvited device has anywhere
+                                    # to go — the panel needs the second to
+                                    # explain why the switch will not move.
+                                    "endpoints": [{"id": r, "name": doc["routes"][r]["name"],
+                                                   "restricted": doc["routes"][r].get("restricted"),
+                                                   "is_default": r == doc["default"]}
+                                                  for r in route_order(doc)],
+                                    "open_default": open_default(doc),
                                     "enrol_base": "%s://%s:%d/e/"
                                                   % ("https" if secure else "http", host,
                                                      secure or RUNNING.get("http_port") or 0)})
@@ -2708,6 +3022,13 @@ class Handler(SimpleHTTPRequestHandler):
                 rec.update(created=current.get("created"),
                            created_by=current.get("created_by"))
             doc["routes"][rid] = rec
+            # Asked of the document as it would stand, before it is written.
+            # _settle_default may move the default as a consequence of this
+            # edit, so the only honest question is what a guest reaches
+            # afterwards — not what this field was set to.
+            _settle_default(doc)
+            if guest_path_broken(doc):
+                return self._json(409, {"error": GUEST_PATH_MSG})
             write_routes(doc)
             # The wake word and the adapter kind, and never the key or the
             # URL it points at: a log is read by more people than the panel.
@@ -2747,6 +3068,9 @@ class Handler(SimpleHTTPRequestHandler):
                         if o.get("fallthrough") == rid]
             for r in orphaned:
                 doc["routes"][r]["fallthrough"] = ""
+            _settle_default(doc)
+            if guest_path_broken(doc):
+                return self._json(409, {"error": GUEST_PATH_MSG})
             write_routes(doc)             # which settles the default, if it was this one
             print("route %s (%s) deleted by %s%s"
                   % (rid, name, s["user"],
@@ -2773,6 +3097,9 @@ class Handler(SimpleHTTPRequestHandler):
                                         "answering — the display would have "
                                         "nowhere to send anything"})
             doc["routes"][rid]["enabled"] = on
+            _settle_default(doc)
+            if guest_path_broken(doc):
+                return self._json(409, {"error": GUEST_PATH_MSG})
             write_routes(doc)
             print("route %s %s by %s" % (rid, "enabled" if on else "disabled",
                                          s["user"]), flush=True)
@@ -2794,6 +3121,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(409, {"error": "a route that is not "
                                         "answering cannot be the default"})
             doc["default"] = rid
+            if guest_path_broken(doc):
+                return self._json(409, {"error": GUEST_PATH_MSG})
             write_routes(doc)
             print("default route is now %s (%s), set by %s"
                   % (rid, doc["routes"][rid]["name"], s["user"]), flush=True)
@@ -3007,23 +3336,153 @@ class Handler(SimpleHTTPRequestHandler):
                 rec = dict(disp)
                 if asked:
                     rec["asked"] = asked
-                return self._json(200, {"display": {
-                    "id": disp["id"], "name": display_label(rec),
-                    "approved": bool(disp["approved"])}})
+                return self._json(200, {"display": self._display_state(rec)})
             token, rec = new_display(asked, hint)
             if not token:
                 return self._json(409, {"error": rec})
             print("display %s arrived as %r — not approved"
                   % (rec["id"], asked or "(no name)"), flush=True)
-            body = json.dumps({"display": {
-                "id": rec["id"], "name": display_label(rec),
-                "approved": False}}).encode()
+            body = json.dumps({"display": self._display_state(rec)}).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
             self._set_display_cookie(token)
             self.end_headers()
             return self.wfile.write(body)
+
+        if parsed.path == "/display/request":
+            # A device asking for access, in the admin's own words. Same-origin
+            # for the same reason hello is: nothing here should be reachable
+            # from a page in another tab.
+            if self.admin_port:
+                return self._json(404, {"error": "not found"})
+            if not self._same_origin():
+                return self._json(403, {"error": "cross-origin request refused"})
+            cfg = display_settings()
+            if not cfg["guest_requests"]:
+                return self._json(409, {"error": "this server does not take "
+                                                 "requests for access"})
+            disp = self._display()
+            if not disp:
+                return self._json(401, {"error": "this device has no identity "
+                                                 "yet — reload the page"})
+            obj = self._json_body()
+            if obj is None:
+                return
+            # A renewal sends nothing: the answers are already on the row, and
+            # asking somebody to retype them every month is how a form stops
+            # being answered honestly.
+            answers = None
+            if not obj.get("renew"):
+                answers, err = [], None
+                given = obj.get("answers")
+                given = given if isinstance(given, dict) else {}
+                for i, f in enumerate(cfg["form"]):
+                    v = str(given.get(str(i)) or "").strip()
+                    v = v[:2000] if f["message"] else v[:200]
+                    if f["required"] and not v:
+                        err = "%s is required" % f["label"]
+                        break
+                    if v:
+                        answers.append({"label": f["label"], "value": v})
+                if err:
+                    return self._json(400, {"error": err})
+            elif not disp.get("answers"):
+                return self._json(400, {"error": "nothing to renew — this "
+                                                 "device has never asked"})
+            rec, err = request_access(disp["id"], answers)
+            if err:
+                return self._json(409, {"error": err})
+            print("display %s (%s) asked for access%s"
+                  % (rec["id"], display_label(rec),
+                     " again" if obj.get("renew") else ""), flush=True)
+            return self._json(200, {"display": self._display_state(rec)})
+
+        if parsed.path == "/displays/settings":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            cfg, err = validate_display_settings(obj, display_settings())
+            if err:
+                return self._json(400, {"error": err})
+            # The other end of the rule. Switching requests off leaves the
+            # default endpoint as the only thing an uninvited device can reach,
+            # so it has to BE something — and the matching refusal, when an
+            # endpoint edit would close that door from the other side, lives in
+            # the /routes handlers.
+            if not cfg["guest_requests"] and not open_default(read_routes()):
+                return self._json(409, {"error":
+                    "there is nowhere for a guest to go: the default endpoint "
+                    "is restricted or switched off, so turning requests off "
+                    "would leave an uninvited device unable to reach anything. "
+                    "Make an endpoint that is open to any display the default "
+                    "first."})
+            write_display_settings(cfg)
+            print("display settings saved by %s: requests=%s max=%d "
+                  "pending=%d guest=%dd form=%d field(s)"
+                  % (s["user"], "on" if cfg["guest_requests"] else "off",
+                     cfg["max_displays"], cfg["max_pending"], cfg["guest_days"],
+                     len(cfg["form"])), flush=True)
+            return self._json(200, {"ok": True, "settings": cfg,
+                                    "displays": admin_displays()})
+
+        if parsed.path == "/displays/decide":
+            # Approve or refuse, in one gesture with the endpoints it gets.
+            # Two steps in two places was the wrong shape: the whole reason to
+            # approve somebody is to give them a particular assistant, so
+            # deciding and granting are one decision.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            did = str(obj.get("id") or "")
+            displays = read_displays()
+            rec = displays.get(did)
+            if not rec:
+                return self._json(404, {"error": "no such display"})
+            now_ = int(time.time())
+            approve = bool(obj.get("approved"))
+            name = str(obj.get("name") or "").strip()[:40]
+            if name:
+                rec["name"] = name
+            if approve:
+                # Ever granted before, which is what makes this one a renewal.
+                # Not `approved`: asking again clears that, so by the time a
+                # decision is made the flag says nothing about the history.
+                again = bool(rec.get("approved_at"))
+                rec.update(approved=True, denied=False, deny_reason="",
+                           approved_by=s["user"], approved_at=now_)
+                # A grant to something that asked runs out; one to a display an
+                # admin created and sent a code for does not.
+                if is_guest(rec):
+                    days = display_settings()["guest_days"]
+                    rec["expires"] = now_ + days * 86400
+                    if again:
+                        rec["renewals"] = (rec.get("renewals") or 0) + 1
+                else:
+                    rec["expires"] = 0
+            else:
+                rec.update(approved=False, denied=True, expires=0,
+                           deny_reason=str(obj.get("reason") or "").strip()[:300],
+                           deny_note=str(obj.get("note") or "").strip()[:500],
+                           deny_repeat=bool(obj.get("repeat", True)))
+            write_displays(displays)
+            # The allow-lists, whichever way it went: a refusal has to take
+            # back anything a previous approval gave, or "denied" is a word on
+            # a row rather than a thing that happened.
+            set_display_endpoints(did, obj.get("endpoints") if approve else [])
+            print("display %s (%s) %s by %s%s"
+                  % (did, display_label(rec),
+                     "approved" if approve else "refused", s["user"],
+                     "" if approve else
+                     (" — may ask again" if rec["deny_repeat"] else " — final")),
+                  flush=True)
+            return self._json(200, {"ok": True, "displays": admin_displays()})
 
         if parsed.path == "/displays/new":
             s = self._require("admin")

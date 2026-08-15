@@ -528,6 +528,71 @@
   }
   .erow input.nm:focus{border-color:var(--hue-dim)}
   /* Name it and get a code: one row, because it is one gesture. */
+  /* Three short numbers, side by side rather than stacked full width: they are
+     one setting each and reading them as a row is how you notice the pending
+     limit is larger than the total. */
+  .cols2{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 0}
+  .cols2 > div{flex:1 1 110px;min-width:0}
+  .cols2 input{
+    width:100%;margin:4px 0;padding:5px 6px;font:inherit;
+    font-size:calc(9.5px * var(--fs));
+    background:rgba(0,0,0,.6);color:var(--text);
+    border:1px solid rgba(var(--glass),.16);outline:0;
+  }
+  .cols2 input:focus{border-color:var(--hue-dim)}
+  /* One row per field of the request form: what it is called, whether it has
+     to be answered, whether it is a paragraph, and a way to remove it. */
+  .fldrow{display:flex;align-items:center;gap:8px;margin:4px 0}
+  .fldrow input[type=text]{
+    flex:1;min-width:0;padding:5px 6px;font:inherit;
+    font-size:calc(9.5px * var(--fs));
+    background:rgba(0,0,0,.6);color:var(--text);
+    border:1px solid rgba(var(--glass),.16);outline:0;
+  }
+  .fldrow input[type=text]:focus{border-color:var(--hue-dim)}
+  .fldrow label{
+    display:flex;align-items:center;gap:4px;white-space:nowrap;
+    font-size:calc(8.5px * var(--fs));letter-spacing:.08em;
+    color:rgba(var(--paper),.72);
+  }
+  .fldrow input[type=checkbox]{accent-color:var(--hue);margin:0}
+  .fldrow button{
+    font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.1em;
+    padding:3px 6px;cursor:pointer;background:none;
+    color:rgba(var(--paper),.8);border:1px solid rgba(var(--glass),.2);
+  }
+  /* The answers somebody gave, on their row. Indented under a rule so a long
+     reason reads as a quotation rather than as more metadata. */
+  .erow .said{
+    margin:6px 0 2px;padding:4px 0 4px 9px;
+    border-left:2px solid rgba(var(--glass),.28);
+    font-size:calc(9px * var(--fs));line-height:1.65;
+    color:rgba(var(--paper),.8);
+  }
+  .erow .said b{display:block;color:rgba(var(--paper),.5);font-weight:400;
+                letter-spacing:.1em;font-size:calc(8px * var(--fs))}
+  .erow .said div + div{margin-top:5px}
+  /* The grant being decided: which endpoints this device gets, ticked in the
+     same gesture as the approval. */
+  .erow .grant{margin:7px 0 2px}
+  .erow .grant > b{
+    display:block;margin-bottom:3px;font-weight:400;letter-spacing:.1em;
+    font-size:calc(8px * var(--fs));color:rgba(var(--paper),.5);
+  }
+  /* The decision, opened under the row it is about. Boxed, because it holds
+     controls that do something when pressed and it must not read as more of
+     the row's own description. */
+  .erow .decide{
+    margin:8px 0 2px;padding:8px 10px;
+    background:rgba(var(--glass),.05);
+    border:1px solid rgba(var(--glass),.24);
+  }
+  .erow .deny{display:flex;flex-direction:column;gap:4px;margin:7px 0 2px}
+  .erow .deny input[type=text]{
+    padding:5px 6px;font:inherit;font-size:calc(9px * var(--fs));
+    background:rgba(0,0,0,.6);color:var(--text);
+    border:1px solid rgba(var(--glass),.16);outline:0;
+  }
   #dispadd{display:flex;gap:4px;margin:4px 0 10px}
   #dispadd input{
     flex:1;min-width:0;padding:5px 6px;font:inherit;
@@ -1381,7 +1446,65 @@ Short by default — this session configures what everyone else is looking at.
   <section class="grp" data-tab="displays">
     <h4>Displays</h4>
     <div class="grpbody">
-  <label class="bklab" style="margin-top:2px">add a display — name it, then type the code into the screen</label>
+  <label class="bklab" style="margin-top:2px">may an uninvited device ask for access?</label>
+  <div class="seg" id="dp_guest">
+    <button data-v="1" class="on">CAN ASK</button>
+    <button data-v="0">CANNOT ASK</button>
+  </div>
+  <div class="note help">CANNOT ASK means the only way in is a code you issued,
+and anything else that opens the page just uses the endpoints open to every
+display — no queue, nothing to decide. It can only be set that way while such
+an endpoint is the default: otherwise an uninvited device reaches nothing at
+all, silently, and there would be no way for anybody to say so.
+
+CAN ASK gives an unapproved device the form below in place of its transcript
+and composer. Either way every device that opens the page is listed here —
+asking is a row putting its hand up, not a row appearing.</div>
+
+  <div class="cols2">
+    <div>
+      <label class="bklab">how long a granted request lasts, days</label>
+      <input id="dp_days" type="number" min="1" max="3650">
+    </div>
+    <div>
+      <label class="bklab">displays in total</label>
+      <input id="dp_max" type="number" min="2" max="5000">
+    </div>
+    <div>
+      <label class="bklab">how many may wait at once</label>
+      <input id="dp_pending" type="number" min="1" max="1000">
+    </div>
+  </div>
+  <div class="note help">A granted request runs out and the person asks again —
+one click for them, because what they told you is kept. <b>Displays you issued
+a code for never expire</b>, whatever this says: a screen on a wall going dark
+on a timer is not a security property, it is an outage.
+
+When more than the waiting limit are queued, the oldest one waiting is dropped
+to make room — so set it high enough that a real request cannot be pushed out
+by noise.</div>
+
+  <label class="bklab">what the request asks for</label>
+  <div id="dp_form"></div>
+  <div class="seg" style="margin-top:6px">
+    <button id="b_addfield">ADD A FIELD</button>
+  </div>
+  <div class="note help">Up to five, and they are yours — this server has no
+opinion about what a request should ask. Somebody running a campus wants a name
+and a department; somebody running a house wants none of it. Tick <b>message</b>
+on one field to make it a box big enough for a reason, and mark the ones that
+must be answered.
+
+If you do not ask for a name, rows arrive labelled by their id and you approve
+them on whatever you did ask for.</div>
+
+  <div class="seg" style="margin-top:8px">
+    <button id="b_dpsave" class="act-save">SAVE THESE SETTINGS</button>
+    <button id="b_dprevert" class="act-undo">REVERT</button>
+  </div>
+  <div class="note" id="dpnote"></div>
+
+  <label class="bklab" style="margin-top:14px">add a display — name it, then type the code into the screen</label>
   <div class="seg" id="dispadd">
     <input id="dp_name" type="text" spellcheck="false" autocomplete="off"
            placeholder="kitchen wall">
@@ -3198,6 +3321,9 @@ function paintBlocks(keepOpen){
    name it, and take it away again. */
 let DISPLAYS = [];
 let ENROL_BASE = '';
+let DPCFG = null;                // the displays document's own settings
+let DPEND = [];                  // endpoints, for the grant ticks
+let DPOPEN = '';                 // the default, if it is open to any display
 
 const dispWhen = (ts)=> ts ? new Date(ts * 1000).toLocaleString() : 'never';
 /* Printed with a dash in the middle. Six characters read off a screen and
@@ -3213,15 +3339,117 @@ async function loadDisplays(){
     const j = await api('/displays');
     DISPLAYS = j.displays || [];
     ENROL_BASE = j.enrol_base || '';
+    DPCFG = j.settings || null;
+    DPEND = j.endpoints || [];
+    DPOPEN = j.open_default || '';
   }catch(e){ DISPLAYS = []; }
   return DISPLAYS;
 }
+
+/* ---- the settings above the list ---- */
+function paintDpSettings(){
+  if (!DPCFG) return;
+  segSet('dp_guest', DPCFG.guest_requests ? '1' : '0');
+  $('dp_days').value = DPCFG.guest_days;
+  $('dp_max').value = DPCFG.max_displays;
+  $('dp_pending').value = DPCFG.max_pending;
+  paintDpForm(DPCFG.form || []);
+}
+
+/* One row per field. Rebuilt from an array rather than read off the DOM,
+   because ADD and REMOVE both change the list and a builder that edits itself
+   in place loses a field the moment two things happen at once. */
+let DPFORM = [];
+function paintDpForm(fields){
+  DPFORM = (fields || []).map(f=> ({label: f.label || '',
+                                    required: !!f.required,
+                                    message: !!f.message}));
+  const box = $('dp_form');
+  box.innerHTML = '';
+  if (!DPFORM.length){
+    const em = document.createElement('div');
+    em.className = 'note';
+    em.textContent = 'No fields — a request would arrive with nothing on it '
+                   + 'but the device id.';
+    box.appendChild(em);
+  }
+  DPFORM.forEach((f, i)=>{
+    const row = document.createElement('div');
+    row.className = 'fldrow';
+    const t = document.createElement('input');
+    t.type = 'text'; t.value = f.label; t.spellcheck = false;
+    t.placeholder = 'what it asks for';
+    t.oninput = ()=>{ DPFORM[i].label = t.value; };
+    row.appendChild(t);
+    [['required', 'must answer'], ['message', 'message']].forEach(([k, word])=>{
+      const lab = document.createElement('label');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.checked = !!f[k];
+      cb.onchange = ()=>{
+        DPFORM[i][k] = cb.checked;
+        // Only one paragraph box. Two is a form somebody built by accident.
+        if (k === 'message' && cb.checked)
+          DPFORM.forEach((g, j)=>{ if (j !== i) g.message = false; });
+        paintDpForm(DPFORM);
+      };
+      lab.appendChild(cb);
+      lab.appendChild(document.createTextNode(word));
+      row.appendChild(lab);
+    });
+    const del = document.createElement('button');
+    del.textContent = 'REMOVE';
+    del.onclick = ()=>{ DPFORM.splice(i, 1); paintDpForm(DPFORM); };
+    row.appendChild(del);
+    box.appendChild(row);
+  });
+  const btn = $('b_addfield');
+  if (btn) btn.disabled = DPFORM.length >= 5;
+}
+
+function dpNote(m, bad){
+  const el = $('dpnote');
+  if (!el) return;
+  el.className = 'note' + (bad ? ' bad' : '');
+  el.textContent = m || '';
+}
+
+$('b_addfield').addEventListener('click', ()=>{
+  if (DPFORM.length >= 5) return;
+  DPFORM.push({label:'', required:false, message:false});
+  paintDpForm(DPFORM);
+});
+$('dp_guest').addEventListener('click', e=>{
+  const b = e.target.closest('button');
+  if (b) segSet('dp_guest', b.dataset.v);
+});
+$('b_dprevert').addEventListener('click', ()=>{ paintDpSettings(); dpNote('back to what is saved'); });
+$('b_dpsave').addEventListener('click', async ()=>{
+  dpNote('saving…');
+  const on = document.querySelector('#dp_guest button.on');
+  const body = {
+    guest_requests: !!on && on.dataset.v === '1',
+    guest_days: parseInt($('dp_days').value, 10),
+    max_displays: parseInt($('dp_max').value, 10),
+    max_pending: parseInt($('dp_pending').value, 10),
+    form: DPFORM.filter(f=> (f.label || '').trim()),
+  };
+  try{
+    const j = await api('/displays/settings', {method:'POST', body: JSON.stringify(body)});
+    DPCFG = j.settings;
+    paintDpSettings();
+    await refreshDisplays();
+    dpNote('saved');
+  }catch(e){ dpNote(e.message, true); }
+});
 
 async function refreshDisplays(){
   const box = $('displist');
   if (!box || ME.role !== 'admin'){ if (box) box.textContent = ''; return; }
   const note = $('dispnote');
   await loadDisplays();
+  // The settings above the list are painted from the same fetch, so the two
+  // can never be describing different states of the same document.
+  paintDpSettings();
   box.innerHTML = '';
   if (!DISPLAYS.length){
     box.className = 'note';
@@ -3235,8 +3463,12 @@ async function refreshDisplays(){
      steady state this list is read once a year; the moment somebody is
      actually looking at it, they have just added something. */
   const state = (d)=> !d.enrolled ? (d.code ? 'code' : 'stale')
+                    : d.denied    ? 'denied'
+                    : d.requested_at && !d.approved ? 'asked'
+                    : d.expired   ? 'expired'
                     : d.approved  ? 'live' : 'waiting';
-  const rank = {code: 0, waiting: 1, stale: 2, live: 3};
+  const rank = {asked: 0, expired: 1, code: 2, waiting: 3, denied: 4,
+                stale: 5, live: 6};
   const rows = DISPLAYS.slice().sort((a, b)=>
     rank[state(a)] - rank[state(b)] || (b.created || 0) - (a.created || 0));
   rows.forEach(d=>{
@@ -3264,20 +3496,37 @@ async function refreshDisplays(){
     if (st === 'code')    badge('WAITING FOR ITS CODE');
     if (st === 'stale')   badge('CODE EXPIRED');
     if (st === 'waiting') badge('WAITING');
+    if (st === 'asked')   badge(d.renewals ? 'ASKING AGAIN' : 'ASKED FOR ACCESS');
+    if (st === 'expired') badge('ACCESS EXPIRED');
+    if (st === 'denied')  badge(d.deny_repeat ? 'REFUSED' : 'REFUSED — FINAL');
+    if (d.renewals) badge('RENEWED ' + d.renewals + '×');
     if (d.refused) badge(d.refused + (d.refused === 1 ? ' REFUSAL' : ' REFUSALS'));
 
     const r = document.createElement('span'); r.className = 'r';
-    /* Approving is for a device that turned up on its own. A row created here
-       was approved by being created, and has no device yet to approve. */
-    if (d.enrolled){
+    /* Deciding is for a device that turned up on its own. A row created here
+       was approved by being created, and has no device yet to decide about. */
+    const deciding = d.enrolled && (st === 'asked' || st === 'waiting');
+    if (deciding){
+      const yes = document.createElement('button');
+      yes.textContent = 'APPROVE';
+      yes.className = 'act-save';
+      yes.onclick = ()=> decide(d, true, nm.value.trim(), row);
+      const no = document.createElement('button');
+      no.textContent = 'REFUSE';
+      no.className = 'act-danger';
+      no.onclick = ()=> decide(d, false, nm.value.trim(), row);
+      r.appendChild(yes); r.appendChild(no);
+    }else if (d.enrolled && d.approved){
       const flip = document.createElement('button');
-      flip.textContent = d.approved ? 'WITHDRAW' : 'APPROVE';
-      if (!d.approved) flip.className = 'act-save';
-      // Approving and naming in one gesture: whatever is in the box goes too.
-      flip.onclick = ()=> displayAction('/displays/approve',
-                                        {id: d.id, approved: !d.approved,
-                                         name: nm.value.trim()});
+      flip.textContent = 'WITHDRAW';
+      flip.onclick = ()=> decide(d, false, nm.value.trim(), row);
       r.appendChild(flip);
+    }else if (d.enrolled && (st === 'denied' || st === 'expired')){
+      const yes = document.createElement('button');
+      yes.textContent = 'APPROVE';
+      yes.className = 'act-save';
+      yes.onclick = ()=> decide(d, true, nm.value.trim(), row);
+      r.appendChild(yes);
     }
     const again = document.createElement('button');
     again.textContent = st === 'code' ? 'NEW CODE' : 'REISSUE';
@@ -3318,6 +3567,24 @@ async function refreshDisplays(){
       row.appendChild(top);
     }
 
+    /* What they told you, in your own words — the labels are the ones you put
+       on the form. This is the whole of what an admin who cannot see the
+       device has to go on, so it sits above the machine detail rather than
+       under it. */
+    if ((d.answers || []).length){
+      const said = document.createElement('div');
+      said.className = 'said';
+      d.answers.forEach(a=>{
+        const wrap = document.createElement('div');
+        const b = document.createElement('b');
+        b.textContent = a.label;
+        wrap.appendChild(b);
+        wrap.appendChild(document.createTextNode(a.value));
+        said.appendChild(wrap);
+      });
+      row.appendChild(said);
+    }
+
     const meta = document.createElement('div');
     meta.className = 'meta';
     const named = (RT.routes || []).filter(x=> x.restricted
@@ -3336,6 +3603,16 @@ async function refreshDisplays(){
     if (d.approved)
       lines.push(['approved', dispWhen(d.approved_at) +
                               (d.approved_by ? ' by ' + d.approved_by : '')]);
+    if (d.requested_at) lines.push(['asked', dispWhen(d.requested_at)]);
+    if (d.expires)
+      lines.push(['access ' + (d.expired ? 'ran out' : 'runs out'),
+                  dispWhen(d.expires)]);
+    if (d.denied || d.deny_note || d.deny_reason){
+      if (d.deny_reason) lines.push(['they were told', d.deny_reason]);
+      if (d.deny_note) lines.push(['your note', d.deny_note]);
+      if (d.denied)
+        lines.push(['may ask again', d.deny_repeat ? 'yes' : 'no']);
+    }
     if (named.length)
       lines.push(['may use', named.map(x=> x.name).join(', ')]);
     if (d.refused)
@@ -3356,12 +3633,15 @@ async function refreshDisplays(){
     row.appendChild(meta);
     box.appendChild(row);
   });
-  const waiting = DISPLAYS.filter(d=> d.enrolled && !d.approved).length;
+  const asked = DISPLAYS.filter(d=> d.requested_at && !d.approved && !d.denied).length;
+  const waiting = DISPLAYS.filter(d=> d.enrolled && !d.approved && !d.denied
+                                   && !d.requested_at).length;
   const coded = DISPLAYS.filter(d=> !d.enrolled && d.code).length;
   if (note){
     const bits = [DISPLAYS.length + (DISPLAYS.length === 1 ? ' display' : ' displays')];
+    if (asked) bits.push(asked + ' asking for access');
     if (coded) bits.push(coded + ' waiting for a code to be typed in');
-    if (waiting) bits.push(waiting + ' waiting to be approved');
+    if (waiting) bits.push(waiting + ' here but not approved');
     note.className = 'note';
     note.textContent = bits.join(' · ');
   }
@@ -3386,6 +3666,89 @@ $('b_adddisp').addEventListener('click', async ()=>{
 $('dp_name').addEventListener('keydown', e=>{
   if (e.key === 'Enter') $('b_adddisp').click();
 });
+
+/* Approving is granting, so both happen in one gesture. Two steps in two
+   places was the wrong shape: the reason to approve somebody at all is to give
+   them a particular assistant, and an approval that grants nothing is a row
+   that changed colour.
+
+   Refusing opens the same panel with the two messages instead — one they read,
+   one for whoever comes back to this row in six months. */
+function decide(d, approve, name, row){
+  const old = row.querySelector('.decide');
+  if (old){ old.remove(); return; }              // pressing it again closes it
+  const box = document.createElement('div');
+  box.className = 'decide';
+
+  let ticks = [];
+  if (approve){
+    const grant = document.createElement('div');
+    grant.className = 'grant';
+    const b = document.createElement('b');
+    b.textContent = 'which endpoints it may use';
+    grant.appendChild(b);
+    const cks = document.createElement('div');
+    cks.className = 'cks';
+    DPEND.forEach(e=>{
+      const lab = document.createElement('label');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.dataset.r = e.id;
+      cb.checked = (RT.routes || []).some(x=> x.id === e.id && x.restricted
+                                           && (x.displays || []).indexOf(d.id) >= 0);
+      lab.appendChild(cb);
+      /* An endpoint open to any display needs no tick to be reachable, and
+         ticking it grants nothing — say so rather than let somebody believe
+         the tick is what did it. */
+      lab.appendChild(document.createTextNode(
+        ' ' + e.name + (e.restricted ? '' : ' — open to all anyway')));
+      cks.appendChild(lab);
+    });
+    grant.appendChild(cks);
+    box.appendChild(grant);
+    ticks = [...cks.querySelectorAll('input')];
+  }
+
+  let reason, note, repeat;
+  if (!approve){
+    const deny = document.createElement('div');
+    deny.className = 'deny';
+    reason = document.createElement('input');
+    reason.type = 'text'; reason.placeholder = 'what they are told — shown on their screen';
+    note = document.createElement('input');
+    note.type = 'text'; note.placeholder = 'your own note — never leaves this panel';
+    deny.appendChild(reason); deny.appendChild(note);
+    repeat = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = true;
+    repeat.appendChild(cb);
+    repeat.appendChild(document.createTextNode(' may ask again'));
+    repeat.style.cssText = 'display:flex;align-items:center;gap:5px;'
+                         + 'font-size:calc(8.5px * var(--fs));'
+                         + 'color:rgba(var(--paper),.72)';
+    deny.appendChild(repeat);
+    box.appendChild(deny);
+  }
+
+  const acts = document.createElement('div');
+  acts.className = 'acts';
+  const go = document.createElement('button');
+  go.textContent = approve ? 'APPROVE' : 'REFUSE';
+  go.className = approve ? 'act-save' : 'act-danger';
+  go.onclick = ()=> displayAction('/displays/decide', {
+    id: d.id, approved: approve, name,
+    endpoints: ticks.filter(c=> c.checked).map(c=> c.dataset.r),
+    reason: reason ? reason.value.trim() : '',
+    note: note ? note.value.trim() : '',
+    repeat: repeat ? repeat.querySelector('input').checked : true,
+  });
+  const cancel = document.createElement('button');
+  cancel.textContent = 'CANCEL';
+  cancel.onclick = ()=> box.remove();
+  acts.appendChild(go); acts.appendChild(cancel);
+  box.appendChild(acts);
+  row.appendChild(box);
+  if (!approve) reason.focus();
+}
 
 async function displayAction(path, body){
   const note = $('dispnote');

@@ -806,6 +806,7 @@ On every listener:
 | `GET` | `/routes` | the routes: presentation to anyone, the routing half only to a caller holding a display token, and `allowed` per route for that caller |
 | `POST` | `/ask` | a question — `{"route": …}` picks one, absent means the default. `{"conversation_id": …}` continues one the endpoint is keeping, and the reply carries that id back. `403 {"refused": "display"}` where this display may not use that route |
 | `POST` | `/display/hello` | a display announcing itself: declared name in, its identity out, and a token in an `HttpOnly` cookie if it had none. Same-origin only |
+| `POST` | `/display/request` | a device asking for access, answering the form the admin built — or `{"renew": true}`, which asks again on the answers already held. Same-origin only |
 | `GET` | `/e/<code>` | an enrolment code, typed into the device being enrolled. Spends the code, sets the cookie, and redirects to the display with `?enrol=` saying how it went. Display listeners only |
 
 Display listeners only — the embed does not exist on the admin port:
@@ -841,6 +842,8 @@ Admin listener only — everything below returns 404 on the public ports:
 | `GET` | `/displays` | every display, plus the address an enrolment code is typed into — `admin` role |
 | `POST` | `/displays/new` | create a row before its device exists, and issue its code — `admin` role |
 | `POST` | `/displays/reissue` | kill the row's live token now and issue a new code; name and permissions kept — `admin` role |
+| `POST` | `/displays/decide` | approve — with the endpoints it may use, in the same call — or refuse, with a message for them, a note for you, and whether it may ask again — `admin` role |
+| `POST` | `/displays/settings` | whether guests may ask, how long a grant lasts, the two limits, and the request form — `admin` role |
 | `POST` | `/displays/approve` | approve one, or withdraw it; may name it in the same call — `admin` role |
 | `POST` | `/displays/rename` | change what it is listed as; blank hands the row back to the name the device declares — `admin` role |
 | `POST` | `/displays/delete` | revoke: its token stops matching, and it is removed from every route's allow-list — `admin` role |
@@ -1392,6 +1395,50 @@ it. Each entry below carries its own panel scope.
   another (`O`/`0`, `I`/`1` and `l` are simply absent). Case, dashes and spaces
   are ignored, so the panel can print `K7QP-4M` and `k7qp4m` still works.
 
+  **And a device can ask, which is the other half of the same problem.** The
+  wall-screen case has an admin who knew the screen was coming. The case that
+  drives everything else is an endpoint restricted because it *costs* — a
+  hosted model given to some people and not to everyone — where the person
+  turning up is a colleague on a laptop in another building and the admin has
+  never seen the device.
+
+  So: a switch, and a form.
+
+  **Whether an uninvited device may ask at all is a setting**, and turning it
+  *off* has a precondition — the default endpoint must be open to any display,
+  because that is the only thing an uninvited device can then reach. Enforced
+  from both ends: it refuses to switch off with nothing open, and refuses to
+  close that door afterwards while it is off. One end only, and it holds until
+  the next edit and then breaks silently.
+
+  **The form is the admin's, field for field** — up to five, each labelled and
+  optionally required, one of them a box big enough for a reason. This server
+  has no opinion about what a request should ask: a campus wants a name and a
+  department, a house wants none of it. The answers are what an admin who
+  cannot see the device decides on, which is the whole reason the form exists.
+
+  **Approving is granting.** The endpoints are ticked in the same gesture as
+  the approval, because the reason to approve anybody is to give them a
+  particular assistant — an approval that grants nothing is a row that changed
+  colour. Refusing carries two messages, one shown to them and one that never
+  leaves the panel, plus a choice of whether that device may ask again, and it
+  takes back anything a previous approval gave.
+
+  **A grant to something that asked runs out; a grant to a screen an admin
+  invited does not.** Guest access is a lifecycle rather than a session: it
+  expires, the person presses ASK AGAIN — not the form again, because their
+  answers are held — and the row counts the renewals. A wall screen going dark
+  on a timer is not a security property, it is an outage, so an invited display
+  never expires whatever the setting says.
+
+  Expiry is read where the request is answered rather than at the door, which
+  is what makes a grant run out cleanly mid-conversation: the turn already in
+  flight finishes, and the next one is refused.
+
+  **A refusal is per device, not per person** — the same human on their phone
+  is a new row with a fresh ask. That is what device identity is, and anything
+  stronger needs an identity a person carries.
+
   **REISSUE is the same mechanism pointed at a row that already exists** — a
   browser that wiped its data, a screen replaced in the same place. The row is
   the *place*: its name and every endpoint that names it survive, and the
@@ -1844,6 +1891,15 @@ browser settings.
   already exists, for a wiped browser or a replaced screen: the name and the
   permissions stay, the device is swapped, and the old token dies on the button
   press rather than when the new code is used.
+- **Then a third way, because the reason to restrict an endpoint is not always
+  a room with microphones in it.** It is often what the endpoint *costs*: a
+  hosted model some people get and others do not. There the person turning up
+  is on a laptop in another building and nobody can walk over and read an id
+  off their screen — so a device can ask, on a form the admin built, and the
+  answers are what the decision is made on. Approving ticks the endpoints in
+  the same gesture; refusing carries a message for them, a note for you, and
+  whether they may ask again. A grant of that kind expires and is renewed with
+  one press, because a guest is a lifecycle and a wall screen is not.
 - **Deleting a display is the revocation**, and it takes the id out of every
   route's allow-list on the way — a permission naming a device that no longer
   exists is one nobody can see and nobody can withdraw. The same reasoning that

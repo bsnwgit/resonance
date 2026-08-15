@@ -236,6 +236,74 @@
     padding:0 26px;font-size:calc(9px * var(--fs));letter-spacing:.06em;
     color:rgba(var(--paper),.42);
   }
+
+  /* ---- the request page ----
+     Where the transcript and the composer would be. The figure above it is
+     untouched: a device waiting on a decision should look like the product it
+     is about to become, not like an error page with a logo. */
+  #request{display:none}
+  body[data-request] #log,
+  body[data-request] #bar{display:none}
+  body[data-request] #request{
+    position:relative;z-index:3;flex:1 1 auto;overflow-y:auto;
+    display:flex;flex-direction:column;gap:12px;padding:22px 26px 18px;
+    max-width:560px;
+  }
+  #reqhead{
+    font-size:calc(12px * var(--fs));line-height:1.6;
+    color:rgba(var(--paper),.88);
+  }
+  #reqhead b{font-weight:400;color:var(--text)}
+  #reqform{display:flex;flex-direction:column;gap:10px}
+  #reqform label{
+    display:flex;flex-direction:column;gap:4px;
+    font-size:calc(9px * var(--fs));letter-spacing:.14em;
+    text-transform:uppercase;color:rgba(var(--paper),.55);
+  }
+  #reqform input,#reqform textarea{
+    font:inherit;font-size:calc(12px * var(--fs));padding:7px 9px;
+    background:rgba(0,0,0,.45);color:var(--text);
+    border:1px solid rgba(var(--glass),.18);outline:0;border-radius:0;
+  }
+  #reqform input:focus,#reqform textarea:focus{border-color:rgba(var(--glass),.5)}
+  #reqform textarea{resize:vertical;min-height:74px;line-height:1.5}
+  #reqform .req{color:rgba(var(--paper),.4)}
+  #request .seg,#verdictbox .seg{display:flex;gap:6px}
+  #request button,#verdictbox button{
+    font:inherit;font-size:calc(10px * var(--fs));letter-spacing:.16em;
+    padding:8px 14px;cursor:pointer;background:none;
+    color:rgba(var(--paper),.9);border:1px solid rgba(var(--glass),.35);
+  }
+  #request button:hover:not(:disabled),
+  #verdictbox button:hover{border-color:var(--text);color:var(--text)}
+  #request button:disabled{opacity:.45;cursor:default}
+  #reqnote{
+    font-size:calc(10px * var(--fs));line-height:1.6;
+    color:rgba(var(--paper),.6);
+  }
+  #reqnote.bad{color:#e8a0a0}
+
+  /* The answer, whichever way it went. A modal rather than a status line: the
+     person asked a question and walked away, and this is the reply — it should
+     interrupt, once, and then get out of the way. */
+  #verdict{
+    display:none;position:fixed;inset:0;z-index:40;
+    align-items:center;justify-content:center;padding:24px;
+    background:rgba(0,0,0,.72);
+  }
+  #verdict.on{display:flex}
+  #verdictbox{
+    max-width:440px;width:100%;padding:22px 24px;
+    background:#0b0e12;border:1px solid rgba(var(--glass),.4);
+    display:flex;flex-direction:column;gap:12px;
+  }
+  #verdicttitle{
+    font-size:calc(13px * var(--fs));letter-spacing:.1em;color:var(--text);
+  }
+  #verdictbody{
+    font-size:calc(11px * var(--fs));line-height:1.65;
+    color:rgba(var(--paper),.82);white-space:pre-wrap;
+  }
   #status span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #micnote{flex:1 1 60%}
   #ttsnote{flex:1 1 40%;text-align:right}
@@ -335,6 +403,26 @@
   </div>
 
   <div id="log"></div>
+
+  <!-- What a device that may not use anything gets instead of a transcript and
+       a composer: the figure above, unchanged, and a form. There is nothing to
+       transcribe and nowhere to send what you type, so drawing either would be
+       two controls wired to a refusal. Built from the fields an admin defined —
+       this server has no opinion about what a request should ask. -->
+  <div id="request">
+    <div id="reqhead"></div>
+    <form id="reqform" autocomplete="off"></form>
+    <div class="seg"><button id="reqsend" type="button">REQUEST ACCESS</button></div>
+    <div id="reqnote"></div>
+  </div>
+
+  <div id="verdict">
+    <div id="verdictbox">
+      <div id="verdicttitle"></div>
+      <div id="verdictbody"></div>
+      <div class="seg"><button id="verdictok" type="button">OK</button></div>
+    </div>
+  </div>
 
   <!-- What just happened, for the person standing in front of it. Every one of
        these messages already existed and was written to elements that were not
@@ -491,6 +579,11 @@ if (ENROL && window.history && history.replaceState)
    which is a better first five minutes than a screen that looks broken. */
 const Display = {
   id: '', name: DISPLAY_NAME, approved: false, known: false,
+  /* What the server last said about this device. `state` is one of none,
+     requested, approved, expired, denied — and the page is built from it
+     rather than from three booleans that can disagree with each other. */
+  state: 'none', canRequest: false, form: [], answered: false,
+  reason: '', mayAskAgain: true, renewals: 0,
 
   /* A coarse description of the device, and it is a HINT FOR THE PERSON
      APPROVING — "this matches your approved kitchen display" — for the one
@@ -519,12 +612,30 @@ const Display = {
       });
       const j = await r.json().catch(()=>({}));
       if (!r.ok || !j.display) return false;
-      this.id = j.display.id || '';
-      this.name = j.display.name || DISPLAY_NAME;
-      this.approved = !!j.display.approved;
-      this.known = true;
+      this.take(j.display);
       return true;
     }catch(e){ return false; }
+  },
+
+  /* One place where the server's answer becomes this object, because every
+     path that touches a display — hello, the request, the poll — returns the
+     same shape and none of them should be assembling it differently. */
+  take(d){
+    this.id = d.id || '';
+    this.name = d.name || DISPLAY_NAME;
+    this.approved = !!d.approved;
+    this.state = d.state || 'none';
+    this.canRequest = !!d.can_request;
+    this.form = d.form || [];
+    this.answered = !!d.answered;
+    this.reason = d.reason || '';
+    this.mayAskAgain = d.may_ask_again !== false;
+    this.renewals = d.renewals || 0;
+    /* Seconds, from the server, so a device with a wrong clock cannot talk
+       itself into more access than it was given. Zero means it never runs
+       out, which is every display an admin issued a code for. */
+    this.expiresIn = d.expires_in || 0;
+    this.known = true;
   },
 
   /* An admin approves it over in the panel, and nothing about that reaches
@@ -537,21 +648,165 @@ const Display = {
      whatever this page believes. */
   _t: 0,
   watch(){
-    if (EMBED || PREVIEW || this.approved || !this.known) return;
+    if (EMBED || PREVIEW || !this.known) return;
     clearInterval(this._t);
+    /* Approved and never expiring is the one state with nothing left to find
+       out. Everything else is waiting on somebody: a decision, a refusal being
+       lifted, or a grant running out. */
+    if (this.state === 'approved' && !this.expiresIn) return;
     this._t = setInterval(async ()=>{
-      const was = this.approved;
+      const was = this.state;
       await this.hello();
-      if (this.approved === was) return;
-      clearInterval(this._t);
+      if (this.state === was) return;
       await Routes.load();
       syncWake();
-      micNote(Routes.spoken()
-        ? 'approved as ' + this.name + ' — say ' + Routes.spoken()
-        : 'approved as ' + this.name);
+      paintRequest();
+      if (this.state === 'approved'){
+        clearInterval(this._t);
+        verdict('Approved', 'This device may now use '
+          + (Routes.spoken() ? 'the assistants it was granted. Say '
+                               + Routes.spoken() + ' to start.'
+                             : 'what it was granted.'));
+        micNote('approved as ' + this.name
+                + (Routes.spoken() ? ' — say ' + Routes.spoken() : ''));
+      }else if (this.state === 'denied'){
+        clearInterval(this._t);
+        verdict('Not approved', this.reason
+          || 'This device was not given access, and no reason was given.');
+      }else if (this.state === 'expired'){
+        clearInterval(this._t);
+        verdict('Access expired', 'This device’s access has run out. Ask '
+          + 'again and somebody will decide — you will not have to fill in '
+          + 'the form a second time.');
+      }
     }, 20000);
   },
 };
+
+/* ------------------------------------------------- asking for access
+   A device that may not use anything gets the figure and a form where the
+   transcript and the composer would be. Both of those are wired to endpoints
+   this device cannot reach, so drawing them would be two controls that only
+   ever refuse.
+
+   The form is the admin's, field for field. This server has no opinion about
+   what a request should ask for — somebody running a campus wants a name and a
+   department, somebody running a house wants nothing at all. */
+function paintRequest(){
+  const box = $('request');
+  if (!box || EMBED || PREVIEW) return;
+  const D = Display;
+  const show = D.known && D.canRequest && D.state !== 'approved';
+  document.body.toggleAttribute('data-request', show);
+  if (!show) return;
+
+  const head = $('reqhead'), form = $('reqform'), btn = $('reqsend');
+  /* Three ways to arrive here, and they are not the same conversation: never
+     asked, asked and waiting, or asked and turned down. */
+  const asking = D.state === 'requested';
+  const again = D.state === 'expired' || (D.answered && D.state !== 'denied');
+  head.innerHTML = '';
+  const line = document.createElement('div');
+  line.textContent =
+      D.state === 'denied'  ? 'This device was not given access.'
+    : D.state === 'expired' ? 'This device’s access has run out.'
+    : asking                ? 'Waiting for somebody to decide.'
+    : 'This device has not been given access yet.';
+  head.appendChild(line);
+  const sub = document.createElement('div');
+  sub.style.marginTop = '6px';
+  sub.style.opacity = '.72';
+  sub.textContent =
+      D.state === 'denied'  ? (D.reason || 'No reason was given.')
+                              + (D.mayAskAgain ? ' You can ask again.'
+                                               : ' It cannot ask again.')
+    : D.state === 'expired' ? 'Ask again — you will not have to fill this in '
+                              + 'a second time.'
+    : asking                ? 'Nothing else to do here. This screen will say '
+                              + 'so as soon as it is decided.'
+    : 'Fill this in and somebody will decide.';
+  head.appendChild(sub);
+
+  /* Only ever rebuilt when there is something new to draw. Re-rendering under
+     somebody's cursor would take the field they were typing in away from
+     them, and a form somebody is filling in is exactly the wrong thing to
+     replace on a twenty-second timer. */
+  const wantForm = !asking && !again && D.mayAskAgain && D.form.length;
+  if (wantForm && !form.contains(document.activeElement)
+      && form.dataset.built !== String(D.form.length)){
+    form.innerHTML = '';
+    D.form.forEach((f, i)=>{
+      const lab = document.createElement('label');
+      const cap = document.createElement('span');
+      cap.textContent = f.label;
+      if (!f.required){
+        const opt = document.createElement('span');
+        opt.className = 'req';
+        opt.textContent = '  optional';
+        cap.appendChild(opt);
+      }
+      lab.appendChild(cap);
+      const el = document.createElement(f.message ? 'textarea' : 'input');
+      el.dataset.i = i;
+      if (!f.message) el.type = 'text';
+      el.spellcheck = !!f.message;
+      lab.appendChild(el);
+      form.appendChild(lab);
+    });
+    form.dataset.built = String(D.form.length);
+  }
+  form.style.display = wantForm ? '' : 'none';
+
+  btn.style.display = (asking || !D.mayAskAgain) ? 'none' : '';
+  btn.textContent = again ? 'ASK AGAIN' : 'REQUEST ACCESS';
+  btn.disabled = false;
+  btn.dataset.renew = again ? '1' : '';
+}
+
+function reqNote(m, bad){
+  const el = $('reqnote');
+  if (!el) return;
+  el.className = bad ? 'bad' : '';
+  el.textContent = m || '';
+}
+
+async function sendRequest(){
+  const btn = $('reqsend');
+  const renew = btn.dataset.renew === '1';
+  const answers = {};
+  if (!renew)
+    $('reqform').querySelectorAll('[data-i]').forEach(el=>{
+      answers[el.dataset.i] = el.value;
+    });
+  btn.disabled = true;
+  reqNote('sending…');
+  try{
+    const r = await fetch('display/request', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(renew ? {renew:true} : {answers})
+    });
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok || !j.display) throw new Error(j.error || ('HTTP ' + r.status));
+    Display.take(j.display);
+    reqNote('');
+    paintRequest();
+    Display.watch();
+  }catch(e){
+    btn.disabled = false;
+    reqNote(e.message, true);
+  }
+}
+
+/* The answer, whichever way it went. It interrupts once and then gets out of
+   the way — the person asked and walked off, and a status line they are not
+   looking at is not a reply. */
+function verdict(title, body){
+  const box = $('verdict');
+  if (!box) return;
+  $('verdicttitle').textContent = title;
+  $('verdictbody').textContent = body || '';
+  box.classList.add('on');
+}
 
 /* ================================================================ ROUTES
    Three names reaching three destinations. A route is a name, a wake word
@@ -3518,8 +3773,10 @@ Promise.all([Settings.load(), Display.hello().then(()=> Routes.load())]).then(()
     : ENROL === 'expired' ? 'that code had expired — ask for a new one'
     : ENROL === 'blocked' ? 'too many wrong codes — wait a minute and try again'
     : 'that code was not recognised — check it and try again');
-  else if (Display.known && !Display.approved && !Routes.spoken())
+  else if (Display.known && !Display.approved && !Routes.spoken()
+           && !Display.canRequest)
     micNote('waiting to be approved — ' + Display.name + ' (' + Display.id + ')');
+  paintRequest();
   Display.watch();
   /* After the prefs, always: the grant decides what this surface is, and a
      preference stored against another page on the same site does not get to
@@ -3528,6 +3785,9 @@ Promise.all([Settings.load(), Display.hello().then(()=> Routes.load())]).then(()
   if (PREVIEW && window.parent !== window)
     window.parent.postMessage({rsn:1, kind:'ready', settings:S}, '*');
 });
+
+on('reqsend', 'click', sendRequest);
+on('verdictok', 'click', ()=> $('verdict').classList.remove('on'));
 
 setPalette('blue');
 setType();
