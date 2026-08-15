@@ -227,6 +227,20 @@
     padding:12px 26px;border-top:1px solid rgba(var(--glass),.12);
     background:linear-gradient(to top,rgba(0,0,0,.6),rgba(0,0,0,.15));
   }
+  /* Above the composer, below the transcript, and quiet enough to ignore
+     until you need it. One line each, clipped rather than wrapped: this must
+     never grow tall enough to push the conversation about. Empty spans
+     collapse, so a display with nothing to report shows nothing at all. */
+  #status{
+    position:relative;z-index:4;flex:0 0 auto;display:flex;gap:18px;
+    padding:0 26px;font-size:calc(9px * var(--fs));letter-spacing:.06em;
+    color:rgba(var(--paper),.42);
+  }
+  #status span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #micnote{flex:1 1 60%}
+  #ttsnote{flex:1 1 40%;text-align:right}
+  #status:empty{display:none}
+  body[data-noparts~="transcript"] #status{display:none}
   #bar .pr{color:rgba(var(--paper),.78);letter-spacing:.2em;font-size:calc(10px * var(--fs))}
   #q{
     flex:1;background:none;border:0;outline:0;color:var(--text);
@@ -321,6 +335,19 @@
   </div>
 
   <div id="log"></div>
+
+  <!-- What just happened, for the person standing in front of it. Every one of
+       these messages already existed and was written to elements that were not
+       on this page: micNote() and note() resolved to null here, and only ever
+       appeared inside the admin panel's preview, which relays them. So a
+       display that heard nothing, mis-heard you, could not reach its endpoint,
+       or had gone to sleep looked identical — silent — and the explanation was
+       thrown away at the one place it was needed. Dim and one line: it is a
+       status line, not a second transcript. -->
+  <div id="status">
+    <span id="micnote"></span>
+    <span id="ttsnote"></span>
+  </div>
 
   <div id="bar">
     <span class="pr">&gt;</span>
@@ -2676,7 +2703,10 @@ const Wake = {
     }
     const h = this.heard(text);
     if (!h){
-      micNote('asleep — say ' + Routes.spoken() + ' to wake me');
+      /* What was heard, in the same breath as the refusal. They used to be two
+         notes and the second overwrote the first, which threw away the one
+         fact that tells you whether a name was mis-heard or never said. */
+      micNote('asleep — heard “' + text + '”, which names none of ' + Routes.spoken());
       return null;
     }
     return this.wakeOn(h);

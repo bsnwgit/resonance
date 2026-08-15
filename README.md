@@ -466,10 +466,11 @@ so it has no preset — the provider button fills it. A key is required, and
 saving without one is refused rather than discovered later by whoever is
 standing in front of the screen.
 
-**HOME ASSISTANT** — the house as an endpoint. Also **verified against a stub
-speaking its wire format rather than against a real installation**, on the same
-terms as Anthropic above: every field is implemented from the published shape
-and exercised end to end against a server that answers in it.
+**HOME ASSISTANT** — the house as an endpoint. **Proven against a real
+installation, 2026-08-15**: spoken to by name, a real light switched on and off
+by voice, the reply read aloud in that endpoint's own voice. Unlike the
+Anthropic adapter above, this one no longer rests on a stub — though the stub
+came first and caught the wire-format faults before a house was ever involved.
 
 It is an adapter, not a second concept. Its conversation API is chat-shaped —
 `POST /api/conversation/process` with a bearer token, text in and
@@ -972,7 +973,7 @@ two people in one room with three listening microphones between them.
 | | phase | delivers | sits on | open decisions |
 |---|---|---|---|---|
 | 1a | ~~**Routes**~~ **— done** | three names reaching three destinations, verifiable with no Home Assistant involved | — | none |
-| 1b | ~~**The Home Assistant adapter**~~ **— built** | saying the house name switches a light on | 1a | none |
+| 1b | ~~**The Home Assistant adapter**~~ **— done** | saying the house name switches a light on | 1a | none |
 | 2 | **Displays, and binding a route to one** | only the tablets you approved can actuate the house, whatever anyone's browser is set to | 1b | none |
 | 3 | **What a wall display looks like** | voice only, and a screensaver that is still the product | 2 | none |
 | 4 | **Staying up unattended** | a tablet nobody touches for a year is still working | 3 | **all of it** · not designed |
@@ -997,14 +998,17 @@ names, and wake-word routing can be shaken out on a test box before Home
 Assistant is anywhere near it. If the refactor breaks something, that is when
 you find out, rather than while also debugging a new adapter.
 
-**1b is built and not yet proven.** Every field of the conversation API is
-implemented and exercised end to end against a stub that answers in it —
-commands, a question that stays open, the fallthrough, a rejected token, an
-unreachable house, and a Home Assistant old enough not to send
-`continue_conversation`. What a stub cannot tell you is whether a real
-installation agrees, so it is *built* in the table above rather than *done*:
-the first real token and a real light are the test. The same distinction the
-Anthropic adapter carries, for the same reason.
+**1b is done**, and the phrase that closed it was *"turn off couch lamps"*
+answered by *"Turned off the light"* — a real house, a real token, a real light,
+spoken to by name. It was built against a stub first, which was worth doing:
+the wire-format faults were all found there, and what the real installation
+then caught were things no stub could have — an intent engine that reports an
+unknown *device* where the design expected an unrecognised *sentence*, and a
+hang-up that was correct on paper and made the house the one endpoint you
+could not speak to twice.
+
+Both of those are in the log below. Neither was a coding error; both were
+assumptions, and only a house could refute them.
 
 **1a is done**, and closed out rather than left half-verified. Proven on real
 hardware with a real microphone: several names reaching several destinations,
@@ -1646,6 +1650,34 @@ on a desk. A tablet bolted to a wall, answering a household, moves them:
 ## Progress log
 
 Newest first.
+
+### 2026-08-15 — a real house, and what only a house could tell us
+
+Phase 1b closed on *"turn off couch lamps"* → *"Turned off the light"*: a real
+installation, a real token, a real light, addressed by name over a microphone.
+Everything the stub proved held. What it could not have proved, and what the
+house corrected in a morning:
+
+- **The fallthrough fires on the wrong sentences.** Designed around
+  `no_intent_match`; the built-in engine matches a sentence shape before it
+  looks for a device, so a general question returns `no_valid_targets` and
+  never reaches it. Left as it is, deliberately — see the note under the
+  provider. The two wordings are the tell: *"I couldn't understand that"* falls
+  through, *"I am not aware of any device called X"* does not.
+- **The hang-up had to go**, one day after it was written. Its own entry below.
+- **The display had no status line.** `micNote()` and `note()` had been
+  writing to elements that exist only in the admin panel's preview, so every
+  explanation a display could offer — what it heard, why it stayed asleep, why
+  a backend call failed — was discarded at the one place somebody was standing.
+  That is why two separate faults this morning both presented as *"it just
+  stops responding"*. A line above the composer now carries them, and the
+  refusal says what it heard: `asleep — heard "…", which names none of …`.
+- **Timings that only a real box shows.** 4.4s to decode one sentence on
+  `small.en`; 13–29s from local models with nothing resident in Ollama; a 7b
+  that will not fit beside two Whisper models and Piper voices in 7.6GB, whose
+  runner dies mid-request and surfaces as *"Remote end closed connection
+  without response"*. The house itself answers in 90–200ms — it is the fastest
+  thing in the chain by two orders of magnitude.
 
 ### 2026-08-15 — the house stopped hanging up
 

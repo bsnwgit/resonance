@@ -237,10 +237,10 @@ Only the **timeout** applies from the Limits box, and there is no system prompt:
 Home Assistant holds the conversation itself and its agent is instructed over
 there. Those controls hide themselves rather than sit on screen doing nothing.
 
-**Not yet tested against a real installation.** Implemented from the published
-API and exercised end to end against a server answering in it — which proves
-the request is well formed, not that a real house agrees. Press TEST first, and
-see the note under it below.
+**Tested against a real installation.** Spoken to by name and asked to switch a
+real light on and off, over voice, end to end. Press TEST first anyway — it
+tells you in one round trip whether the address, the token and the agent are
+right, which is three of the four things that go wrong.
 
 ## Fields that do not apply everywhere
 
