@@ -231,11 +231,17 @@
      until you need it. One line each, clipped rather than wrapped: this must
      never grow tall enough to push the conversation about. Empty spans
      collapse, so a display with nothing to report shows nothing at all. */
+  /* The status line. Bigger than it was: it is the answer to "why did nothing
+     happen?", read from across a room on a screen with no other text on it,
+     and 9px set it below everything it was competing with. */
   #status{
     position:relative;z-index:4;flex:0 0 auto;display:flex;gap:18px;
-    padding:0 26px;font-size:calc(9px * var(--fs));letter-spacing:.06em;
-    color:rgba(var(--paper),.42);
+    padding:2px 26px;font-size:calc(11px * var(--fs));letter-spacing:.05em;
+    line-height:1.5;color:rgba(var(--paper),.55);
   }
+  /* A refusal, in red, so "here is what happened" and "here is why nothing
+     happened" are tellable apart without reading the words. */
+  #status .bad{color:#e0716b}
 
   /* ---- the request page ----
      Where the transcript and the composer would be. The figure above it is
@@ -1693,14 +1699,14 @@ const Mic = {
        wake word reaches this method too, which is exactly why the gate is
        here rather than on the TALK button. */
     if (EMBED && !Embed.can('mic')){
-      micNote('this embed is not permitted to use a microphone');
+      micNote('this embed is not permitted to use a microphone', true);
       return;
     }
     if (!window.isSecureContext){
-      micNote('BLOCKED: mic needs a secure origin. Use the https:// URL (port 9701).');
+      micNote('BLOCKED: mic needs a secure origin. Use the https:// URL (port 9701).', true);
       return;
     }
-    if (!this.ok){ micNote('this browser exposes no getUserMedia'); return; }
+    if (!this.ok){ micNote('this browser exposes no getUserMedia', true); return; }
     try{
       /* I originally forced all processing OFF to keep the dynamics the
          visualiser feeds on. That is the wrong default once a human is
@@ -1836,7 +1842,7 @@ function meter(){
 
 /* Measure the room for 2s and put the gate just above it. */
 function calibrate(){
-  if (!Mic.active){ micNote('press TALK first, then calibrate'); return; }
+  if (!Mic.active){ micNote('press TALK first, then calibrate', true); return; }
   let peak = 0, n = 0;
   micNote('calibrating — stay quiet…');
   const id = setInterval(()=>{
@@ -1852,7 +1858,15 @@ function calibrate(){
   }, 50);
 }
 
-function micNote(m){ const el = $('micnote'); if (el) el.textContent = m; relay('micnote', m); }
+/* The status line, and whether what it says is a refusal.
+   `bad` is not decoration: this line carries both "here is what happened" and
+   "here is why nothing happened", and on a wall screen read from across a room
+   those two need to be tellable apart without reading the words. */
+function micNote(m, bad){
+  const el = $('micnote');
+  if (el){ el.textContent = m; el.classList.toggle('bad', !!bad); }
+  relay('micnote', m);
+}
 
 /* ============================================== PHASE 3b — SPEECH TO TEXT
    Local. Audio is recorded in the browser and POSTed to /stt on this same
@@ -1876,7 +1890,7 @@ const Listen = {
 
   start(stream){
     if (this.on || !stream) return;
-    if (!this.supported()){ micNote('no MediaRecorder in this browser'); return; }
+    if (!this.supported()){ micNote('no MediaRecorder in this browser', true); return; }
     this.on = true;
     this._arm(stream);
     syncTalk();
@@ -1887,11 +1901,11 @@ const Listen = {
     this.mime = want.find(t => MediaRecorder.isTypeSupported(t)) || '';
     let mr;
     try { mr = new MediaRecorder(stream, this.mime ? {mimeType:this.mime} : undefined); }
-    catch(e){ micNote('recorder failed: ' + e.message); this.on = false; syncTalk(); return; }
+    catch(e){ micNote('recorder failed: ' + e.message, true); this.on = false; syncTalk(); return; }
     this.chunks = []; this.sawSpeech = false; this.quietAt = 0; this.armedAt = now;
     mr.ondataavailable = e => { if (e.data && e.data.size) this.chunks.push(e.data); };
     mr.onstop = () => this._flush();
-    try { mr.start(); } catch(e){ micNote('recorder start failed: ' + e.message); }
+    try { mr.start(); } catch(e){ micNote('recorder start failed: ' + e.message, true); }
     this.mr = mr;
   },
 
@@ -1919,7 +1933,7 @@ const Listen = {
         body: blob
       });
       const j = await r.json();
-      if (j.error)      micNote('stt error: ' + j.error);
+      if (j.error)      micNote('stt error: ' + j.error, true);
       else if (j.text)  {
         if (Learn.on){ Learn.take(j.text); }
         else {
@@ -1930,9 +1944,9 @@ const Listen = {
           if (act) submit(act);
         }
       }
-      else              micNote('nothing recognised — try speaking a little louder');
+      else              micNote('nothing recognised — try speaking a little louder', true);
     }catch(e){
-      micNote('stt request failed: ' + e.message);
+      micNote('stt request failed: ' + e.message, true);
     }
     this.busy = false; syncTalk();
   },
@@ -1947,7 +1961,7 @@ const Listen = {
     if (heldFor < 0.3){               // stray tap, not an utterance
       this.sawSpeech = false;
       this._cut();
-      micNote('too short — hold SPACE while you speak');
+      micNote('too short — hold SPACE while you speak', true);
       return;
     }
     this.sawSpeech = true;            // they held the key; send it regardless
@@ -2322,9 +2336,9 @@ function unlockTTS(){ ttsUnlocked = true; }
 ['pointerdown','keydown','touchstart'].forEach(ev =>
   window.addEventListener(ev, unlockTTS, true));
 
-function note(msg){
+function note(msg, bad){
   const el = $('ttsnote');
-  if (el) el.textContent = msg;
+  if (el){ el.textContent = msg; el.classList.toggle('bad', !!bad); }
   relay('ttsnote', msg);
 }
 
@@ -2468,7 +2482,7 @@ async function askBackend(text, bare){
        silence. Not spoken, not in the transcript, and NOT the "I could not
        reach it" line below: this did reach it, and was refused. */
     if (j && j.refused){
-      note('refused: this display may not use ' + (who || 'that endpoint'));
+      note('refused: this display may not use ' + (who || 'that endpoint'), true);
       return {reply: '', refused: true};
     }
     // the route still being on demo is not an error, just not wired up yet
@@ -2487,7 +2501,7 @@ async function askBackend(text, bare){
        where "401 from the conversation API" tells them nothing and tells
        everyone in earshot what this box is wired to. The reason goes to the
        note, which is on the screen rather than in the air. */
-    note('backend: ' + e.message);
+    note('backend: ' + e.message, true);
     return {reply: "I could not reach " + (who || 'the assistant') + " just then."};
   }
 }
@@ -2911,7 +2925,7 @@ const PTT = {
 
   down(){
     if (this.held) return;
-    if (!Listen.on){ micNote('press TALK first to arm the microphone'); return; }
+    if (!Listen.on){ micNote('press TALK first to arm the microphone', true); return; }
     this.held = true; this.downAt = now;
     Mic.open = true;
     Speech.stop();                    // barge in over it mid-sentence
@@ -3030,7 +3044,7 @@ const Wake = {
     syncTalk(); syncWake();
     if (sayBye) farewell();
     else micNote(Routes.spoken() ? 'asleep — say ' + Routes.spoken() + ' to start again'
-                                 : 'asleep — ' + Routes.mute());
+                                 : 'asleep — ' + Routes.mute(), !Routes.spoken());
     this.route = '';
   },
 
@@ -3139,7 +3153,7 @@ const Wake = {
          fact that tells you whether a name was mis-heard or never said. */
       micNote(Routes.spoken()
         ? 'asleep — heard “' + text + '”, which names none of ' + Routes.spoken()
-        : 'asleep — heard “' + text + '”, and ' + Routes.mute());
+        : 'asleep — heard “' + text + '”, and ' + Routes.mute(), true);
       return null;
     }
     if (!Routes.usable(h.route)) return this.notMine(h);
@@ -3157,7 +3171,7 @@ const Wake = {
      else. The awake window is deliberately NOT refreshed either: this was not
      addressed here, so it should not keep this display awake. */
   notMine(h){
-    micNote('“' + h.word + '” is not for this display — ignored');
+    micNote('“' + h.word + '” is not for this display — ignored', true);
     return null;
   },
 
@@ -3777,7 +3791,8 @@ Promise.all([Settings.load(), Display.hello().then(()=> Routes.load())]).then(()
                             + (Routes.spoken() ? ' — say ' + Routes.spoken() : '')
     : ENROL === 'expired' ? 'that code had expired — ask for a new one'
     : ENROL === 'blocked' ? 'too many wrong codes — wait a minute and try again'
-    : 'that code was not recognised — check it and try again');
+    : 'that code was not recognised — check it and try again',
+    ENROL !== 'ok');
   else if (Display.known && !Display.approved && !Routes.spoken()
            && !Display.canRequest)
     micNote('waiting to be approved — ' + Display.name + ' (' + Display.id + ')');

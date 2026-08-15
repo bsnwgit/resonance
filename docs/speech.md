@@ -178,6 +178,13 @@ answer to *"why did nothing happen?"* now appears:
 | `refused: this display may not use house` | a question typed into the box went to an assistant this display is not allowed to use |
 | `backend: …` | why an endpoint failed, in full, where the spoken reply gives only the name |
 
+**A refusal is red.** The line carries both *here is what happened* and *here
+is why nothing happened* — what it heard and how long it took, against a wake
+word it will not act on, a microphone that would not open, a code that was
+wrong. On a screen read from across a room those two need to be tellable apart
+without reading the words, so anything reporting a refusal or a failure is in
+red and everything else is not.
+
 **It exists because the display used to discard all of it.** Those messages
 were written to elements that only existed inside the admin panel's preview,
 so a display that mis-heard you, went to sleep or could not reach its endpoint
