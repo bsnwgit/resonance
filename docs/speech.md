@@ -131,6 +131,17 @@ Activity extends it.
 its own. `{name}` is the word that was said to reach whoever answered, so one line
 written here reads correctly whichever one answers.
 
+## Commissioning check
+
+**RUN CHECK** walks every link in the chain and names whichever is broken:
+secure origin, the settings store, transcription, the voice service, the
+microphone, the recorder, the endpoints, and whether the default endpoint
+answers and can be rendered and spoken.
+
+It lives here rather than on the AI tab because most of what it checks is on
+this one. It is not an AI test — each endpoint has its own **TEST**, which
+puts a question to that endpoint's own service.
+
 ## Sleep word
 
 One word, shared by all of them: there is one way out of a conversation

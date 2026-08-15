@@ -5,9 +5,15 @@ placeholder to be rushed past — it is how you prove the whole chain works
 before any model exists, and how you tell later whether a fault is the
 front-end or the thing behind it. Keep it available.
 
-**RUN SELF-TEST** walks every link — secure origin, settings store,
-transcription, voices, microphone, recorder, the assistants, the one that
-would answer, render-and-speak — and names whichever is broken.
+Set an endpoint's service to **DEMO** and it answers from built-in text,
+reaching nothing. There is no display-wide demo switch — whether an endpoint
+is pretending is a property of that endpoint, and two places meaning the same
+thing is a setting nobody can reason about.
+
+**RUN CHECK**, on the SPEECH tab, walks the chain around the endpoints —
+secure origin, settings store, transcription, voices, microphone, recorder,
+and whether the default endpoint answers and can be spoken. It is not an AI
+test: that is the **TEST** inside each endpoint's own block.
 
 ## One display, several assistants
 
@@ -97,7 +103,9 @@ them.
 
 ### TEST
 
-Puts one short question to the endpoint whose block it is in. With several of
+Puts one short question to the endpoint whose block it is in, through that
+endpoint's own service — so DEMO is tested against the built-in replies and a
+connected service against itself, with nothing to keep in step. With several of
 them this stops being a convenience: "the assistant works" is no longer
 something that can be true or false about this server as a whole, and a test
 that quietly exercised a different one would be worse than none.

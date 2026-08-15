@@ -356,11 +356,16 @@ the network is already the boundary.
 ## Connecting a real assistant
 
 Out of the box it answers from built-in text, so the whole chain can be
-commissioned before any backend exists. **RUN SELF-TEST** in the settings panel
-walks each link — secure origin, settings store, transcription service, voices,
-microphone, recorder, routes, the route that would answer, render-and-speak —
-and names whichever one is broken. Keep demo mode permanently: it is how you
-tell whether a fault is the front-end or the model behind it.
+commissioned before any backend exists. **RUN CHECK** on the SPEECH tab walks
+each link — secure origin, settings store, transcription service, voices,
+microphone, recorder, routes, the default route answering, render-and-speak —
+and names whichever one is broken. Keep demo permanently: it is how you tell
+whether a fault is the front-end or the model behind it.
+
+**Demo is per route, and there is no display-wide switch for it.** There was
+one, and it duplicated the route's own `demo` provider while silently
+overriding it — two settings meaning the same thing, one of them invisible
+from where the other is configured.
 
 Configure the rest in the admin page under **AI → Assistants**. The panel is
 deliberately terse; the reasoning behind each field is here.

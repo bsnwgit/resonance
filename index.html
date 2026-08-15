@@ -592,7 +592,6 @@ const S = {
   ttsengine:'local', ttsvoice:'',      // local = neural voice on the server
   micgain:1.6, micgate:0.020, ptt:true, micdsp:'clean',   // clean | raw
   sttmodel:'small.en', hangover:0.55,
-  backend:'demo',              // demo | api  — demo answers from built-in text
   /* The wake WORD is not here any more, and its absence is the point: it
      belongs to a route now, because with several of them the word is what
      picks between them. What is left here is the gate's behaviour, which is
@@ -1987,7 +1986,11 @@ const LOCAL_TZ = (()=>{
    answered in that context, so it stops being a measurement of the backend
    and becomes a measurement of the backend plus the last ten minutes. */
 async function askBackend(text, bare){
-  if (S.backend === 'demo') return REPLIES[replyIx++ % REPLIES.length];
+  /* No display-wide demo switch any more. Whether an endpoint answers from
+     built-in text is a property OF that endpoint — the server replies
+     {demo:true} for one set to DEMO and the branch below handles it. Two
+     places meaning "demo", one of them overriding the other invisibly, is a
+     setting nobody could reason about. */
   try{
     const r = await fetch('ask', {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -2083,8 +2086,7 @@ async function selfTest(){
      would be worse than no self-test. */
   const reply = await askBackend(
     'Reply with one short sentence confirming you can hear me.', true);
-  say(!!reply, 'route “' + (cur ? cur.name : 'none') + '” (' + S.backend +
-      ') answered ' +
+  say(!!reply, 'default endpoint “' + (cur ? cur.name : 'none') + '” answered ' +
       (reply ? reply.length + ' chars: "' + reply.trim().slice(0, 60) +
                (reply.trim().length > 60 ? '…' : '') + '"'
              : 'nothing'));
@@ -2094,7 +2096,7 @@ async function selfTest(){
   say(document.querySelectorAll('.msg').length > before, 'reply rendered and spoken');
 
   lines.push(lines.some(l=>l.startsWith('  FAIL')) ? '\nsomething above needs fixing.'
-                                                   : '\nall green — safe to connect a real backend.');
+                                                   : '\nall green.');
   show(lines.join('\n'));
 }
 
@@ -3012,7 +3014,7 @@ function repaintNames(){
 function repaintAll(){
   SLIDERS.forEach(f=>f());
   FIELDS.forEach(f=>f());
-  ['mode','palette','layout','tmode','src','ptt','wake','micdsp','sttmodel','byeontimeout','backend','ttsengine','face','fs']
+  ['mode','palette','layout','tmode','src','ptt','wake','micdsp','sttmodel','byeontimeout','ttsengine','face','fs']
     .forEach(syncSeg);
   setPalette(S.palette);
   setType();

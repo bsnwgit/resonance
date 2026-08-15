@@ -559,6 +559,40 @@
     margin-left:8px;
   }
   .grp .rtsum b{color:rgba(var(--paper),.85);font-weight:400}
+
+  /* Inside an endpoint, small focused boxes rather than one long one. Two
+     levels of collapse, with deliberately different rules: exactly one
+     ENDPOINT is open at a time, because they are alternatives to each other;
+     as many of an endpoint's detail boxes as you like, because they are parts
+     of one thing and you are often comparing two of them.
+
+     Each carries a summary of what is inside it, so the whole configuration
+     reads off the closed headings and opening one is for changing it rather
+     than for finding out what it says. */
+  .subgrp{border:1px solid rgba(var(--glass),.13);margin-top:7px}
+  .subgrp > h5{
+    margin:0;padding:7px 9px 7px 22px;position:relative;cursor:pointer;
+    font:inherit;font-size:calc(9px * var(--fs));font-weight:400;
+    letter-spacing:.16em;text-transform:uppercase;
+    color:rgba(var(--paper),.82);display:flex;align-items:baseline;gap:8px;
+  }
+  .subgrp > h5:hover{color:var(--hue)}
+  .subgrp > h5::before{                    /* the same caret as a section */
+    content:'';position:absolute;left:9px;top:11px;
+    border-left:4px solid rgba(var(--paper),.6);
+    border-top:3.5px solid transparent;border-bottom:3.5px solid transparent;
+    transform:rotate(0deg);transform-origin:2px 3.5px;transition:transform .12s;
+  }
+  .subgrp.open > h5::before{transform:rotate(90deg)}
+  .subgrp .subsum{
+    margin-left:auto;text-transform:none;letter-spacing:.04em;
+    font-size:calc(8.5px * var(--fs));color:rgba(var(--paper),.55);
+    text-align:right;
+  }
+  .subgrp > .subbody{display:none;padding:2px 9px 9px}
+  .subgrp.open > .subbody{display:block}
+  /* The first control in a box should not sit tight under its heading. */
+  .subgrp > .subbody > .bklab:first-child{margin-top:2px}
   .grp.isdefault > h4{border-left:2px solid rgba(122,201,160,.9);padding-left:7px}
   .grp.isoff > h4{opacity:.55}
   /* A divider inside a block: the wake word half above, the connection half
@@ -974,26 +1008,12 @@ recognised is left standing so a typo is visible rather than silent.</div>
   <div class="sl"><label>scanlines</label><output id="o_scan"></output><input id="s_scan" type="range" min="0" max="1" step=".01"></div>
   <div class="sl"><label>line weight</label><output id="o_lw"></output><input id="s_lw" type="range" min=".3" max="3" step=".05"></div></div>
   </section>
-  <!-- One block per AI endpoint, built at runtime by paintBlocks().
-       They are inserted before this comment's next sibling, so the
-       self-test stays at the foot of the tab where it belongs. -->
+  <!-- One block per AI endpoint, built at runtime by paintBlocks(), inserted
+       before this anchor. The AI tab holds nothing else: testing an endpoint
+       is the TEST inside that endpoint's own block, which uses its own
+       adapter — so it tests demo against demo and a real service against
+       that service, with nothing to keep in step. -->
   <div id="ai_anchor" hidden></div>
-
-  <section class="grp" data-tab="ai">
-    <h4>Setup &amp; self-test</h4>
-    <div class="grpbody">
-  <div class="seg" data-set="backend">
-    <button data-v="demo" class="on">DEMO REPLIES</button>
-    <button data-v="api">CONNECTED AI</button>
-  </div>
-  <div style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5">
-    DEMO answers from built-in text, so you can prove the whole chain works
-    before connecting anything. Keep it here during setup.
-  </div>
-  <div class="seg" style="margin-top:8px"><button id="b_selftest">RUN SELF-TEST</button></div>
-  <div id="selftest" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.6;white-space:pre-line"></div>
-    </div>
-  </section>
 
     <section class="grp" data-tab="speech">
     <h4>Speech out (TTS)</h4>
@@ -1086,6 +1106,22 @@ itself; <b>{name}</b> is the word that was said to reach whoever answered.</div>
     <div id="sleepstate" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5"></div>
     </div>
 </section>
+<section class="grp" data-tab="speech">
+    <h4>Commissioning check</h4>
+    <div class="grpbody">
+  <div class="note help">Walks every link in the chain and names whichever is
+broken: secure origin, the settings store, transcription, the voice service,
+the microphone, the recorder, the endpoints, and whether the default one
+answers and can be rendered and spoken.
+
+It is not an AI test — each endpoint has its own TEST, on the AI tab, which
+puts a question to that endpoint's own service. This is for the parts around
+it, which is why it lives beside the microphone and the voices.</div>
+  <div class="seg" style="margin-top:8px"><button id="b_selftest">RUN CHECK</button></div>
+  <div id="selftest" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.6;white-space:pre-line"></div>
+    </div>
+  </section>
+
 <section class="grp" data-tab="speech">
     <h4>Test drive</h4>
     <div class="grpbody">  <div class="seg">
@@ -2055,13 +2091,16 @@ function blockHTML(r){
   return `
   <h4><span class="rtname"></span><span class="rtsum"></span></h4>
   <div class="grpbody">
-  <label class="bklab">instance name</label>
+  <label class="bklab" style="margin-top:2px">instance name</label>
   <input data-f="name" type="text" spellcheck="false" autocomplete="off"
          placeholder="House">
   <div class="note help">Labels this endpoint — in the heading above, in the
 server log, and wherever a transcript label uses <b>{assistant}</b>. It is
 never spoken and never matched against.</div>
 
+  <div class="subgrp" data-g="wake">
+    <h5>Wake word<span class="subsum"></span></h5>
+    <div class="subbody">
   <label class="bklab">wake word</label>
   <input data-f="wakeword" type="text" spellcheck="false" autocomplete="off"
          placeholder="house">
@@ -2069,46 +2108,53 @@ never spoken and never matched against.</div>
   <div data-r="learnnote" class="learnnote"></div>
   <label class="bklab">also answers to</label>
   <textarea data-f="aliases" rows="3" spellcheck="false" placeholder="one per line"></textarea>
-  <div class="note help">What somebody says to reach this endpoint. It follows
-the instance name until you edit it, then stays where you put it — the two are
-the same word by default and differ when they need to, since an endpoint named
-<b>Kitchen Lights</b> is not a phrase anybody wants to say.
-
-Pick words that sound <b>far apart</b>, not merely different: differing
-syllable counts, vowels and stress survive a noisy room, two words one letter
-apart do not. LEARN records how you actually say it, three times, and adds
-what the transcriber returns.</div>
-
-  <label class="bklab">wake word matching</label>
+  <label class="bklab">matching</label>
   <div class="seg" data-f="strict">
     <button data-v="0" class="on">CLOSE ENOUGH</button>
     <button data-v="1">THE EXACT WORD</button>
   </div>
-  <div class="note help">CLOSE ENOUGH forgives a mishearing, which is what an
-endpoint that answers questions wants. THE EXACT WORD is for one that
-<i>does</i> things — the same near-miss costs a few tokens on one and switches
-on the lights on the other.</div>
+  <div class="note help">What somebody says to reach this endpoint. It follows
+the instance name until you edit it, then stays where you put it — an endpoint
+named <b>Kitchen Lights</b> is a good label and a poor thing to say out loud.
 
+Pick words that sound <b>far apart</b>, not merely different: differing
+syllable counts, vowels and stress survive a noisy room, two words one letter
+apart do not. LEARN records how you actually say it, three times, and adds
+what the transcriber returns.
+
+CLOSE ENOUGH forgives a mishearing, which is what an endpoint that answers
+questions wants. THE EXACT WORD is for one that <i>does</i> things — the same
+near-miss costs a few tokens on one and switches on the lights on the
+other.</div>
+    </div>
+  </div>
+
+  <div class="subgrp" data-g="voice">
+    <h5>Greeting &amp; voice<span class="subsum"></span></h5>
+    <div class="subbody">
   <label class="bklab">greeting</label>
   <input data-f="greeting" type="text" spellcheck="false" autocomplete="off"
          placeholder="leave blank for the shared phrases">
   <label class="bklab">voice</label>
   <select data-f="voice"></select>
-  <div class="note help">Spoken when its wake word is said and nothing else.
-Blank falls back to the greeting phrases on the SPEECH tab. Give the endpoints
-different voices and you can tell which replied without looking at the
-screen.</div>
+  <div class="note help">The greeting is spoken when its wake word is said and
+nothing else; blank falls back to the phrases on the SPEECH tab. Give the
+endpoints different voices and you can tell which replied without looking at
+the screen — which is all a wall display offers.</div>
+    </div>
+  </div>
 
-  <div class="rtsplit">the assistant</div>
+  <div class="subgrp" data-g="conn">
+    <h5>Connection<span class="subsum"></span></h5>
+    <div class="subbody">
   <div class="note help">OPENAI-COMPATIBLE is a shape, not a company: Ollama,
 OpenClaw, LM Studio and vLLM all speak it and differ only by base URL. DEMO
 answers from built-in text and reaches nothing.</div>
-  <div class="seg" data-f="provider" style="margin-top:8px">
+  <div class="seg" data-f="provider">
     <button data-v="demo" class="on">DEMO</button>
     <button data-v="openai">OPENAI-COMPATIBLE</button>
     <button data-v="anthropic">ANTHROPIC</button>
   </div>
-
   <div data-r="conn">
   <div data-r="presetrow">
   <label class="bklab">preset</label>
@@ -2119,7 +2165,6 @@ answers from built-in text and reaches nothing.</div>
     <button data-v="openai">OPENAI</button>
   </div>
   </div>
-
   <label class="bklab">base URL</label>
   <input data-f="base_url" type="text" spellcheck="false" autocomplete="off"
          placeholder="http://127.0.0.1:11434/v1">
@@ -2127,44 +2172,49 @@ answers from built-in text and reaches nothing.</div>
   <input data-f="model" type="text" spellcheck="false" autocomplete="off"
          placeholder="qwen2.5:3b">
   <div class="note" data-r="models"></div>
-
   <label class="bklab">API key</label>
   <input data-f="api_key" type="password" spellcheck="false" autocomplete="off"
          placeholder="unchanged">
   <div class="note" data-r="keynote"></div>
+  </div>
+    </div>
+  </div>
 
+  <div class="subgrp" data-g="limits">
+    <h5>Limits<span class="subsum"></span></h5>
+    <div class="subbody">
   <div class="sl"><label>reply limit (tokens)</label><output data-o="max_tokens"></output><input data-s="max_tokens" type="range" min="16" max="2000" step="16"></div>
   <div class="sl" data-r="temprow"><label>temperature</label><output data-o="temperature"></output><input data-s="temperature" type="range" min="0" max="1.5" step=".05"></div>
   <div class="sl"><label>turns of context</label><output data-o="history_turns"></output><input data-s="history_turns" type="range" min="0" max="24" step="1"></div>
   <div class="sl"><label>timeout</label><output data-o="timeout"></output><input data-s="timeout" type="range" min="5" max="600" step="5"></div>
-  <div class="note help">A cold model can take half a minute to load before it
-says anything, so keep the timeout generous — one tuned to a warm model looks
-like a dead server every morning. <b>turns of context</b> is how much of the
-conversation goes back with each question: at zero, "and the other one?" means
-nothing.</div>
-
   <div data-r="keepaliverow">
   <label class="bklab">keep model loaded</label>
   <input data-f="keep_alive" type="text" spellcheck="false" autocomplete="off"
          placeholder="30m">
-  <div class="note help">An Ollama extension: holds the model in memory so the
-next question isn't the slow one. Blank it for a hosted provider.</div>
   </div>
-
   <div class="note" data-r="anthnote" style="display:none">Temperature and
 keep-alive are not sent to Anthropic — steer it with the system prompt.</div>
+  <div class="note help">A cold model can take half a minute to load before it
+says anything, so keep the timeout generous — one tuned to a warm model looks
+like a dead server every morning. <b>turns of context</b> is how much of the
+conversation goes back with each question: at zero, "and the other one?" means
+nothing. <b>keep model loaded</b> is an Ollama extension that holds it in
+memory so the next question isn't the slow one.</div>
+    </div>
   </div>
 
-  <div data-r="promptblock">
-  <div class="rtsplit">system prompt</div>
+  <div class="subgrp" data-g="prompt">
+    <h5>System prompt<span class="subsum"></span></h5>
+    <div class="subbody">
+  <textarea data-f="system" rows="7" spellcheck="false"></textarea>
+  <div class="seg" style="margin-top:6px">
+    <button data-a="resetprompt" class="act-undo" title="back to the wording this ships with">RESET</button>
+  </div>
   <div class="note help">Sent ahead of every question this endpoint is asked.
 Each has its own — a house controller and a general assistant want different
 instructions, and one wording covering both suits neither. The reply is read
 out loud, so ask for plain prose.</div>
-  <textarea data-f="system" rows="7" spellcheck="false"></textarea>
-  <div class="seg" style="margin-top:6px">
-    <button data-a="resetprompt" class="act-undo" title="back to the wording this ships with">RESET PROMPT</button>
-  </div>
+    </div>
   </div>
 
   <div class="seg" style="margin-top:12px">
@@ -2209,6 +2259,15 @@ function blockSyncProvider(blk){
   show('models', connected && !anth);      // that listing is an Ollama trick
   const t = blk.querySelector('[data-a="test"]');
   if (t) t.disabled = !connected;
+  /* DEMO reaches nothing, so its limits and its prompt are inert. Dimmed and
+     closed rather than removed: they keep their place, so connecting a
+     service does not rearrange the block under you. */
+  ['limits','prompt'].forEach(g=>{
+    const box = blk.querySelector('[data-g="' + g + '"]');
+    if (!box) return;
+    box.style.opacity = connected ? '' : '.45';
+    if (!connected) box.classList.remove('open');
+  });
   const url = F(blk, 'base_url');
   if (url) url.placeholder = anth ? 'https://api.anthropic.com'
                                   : 'http://127.0.0.1:11434/v1';
@@ -2263,6 +2322,29 @@ function blockPaint(blk, r){
   });
   const key = F(blk, 'api_key');
   if (key) key.placeholder = r.has_key ? 'unchanged — a key is stored' : 'none stored';
+
+  /* What each closed box holds, so the whole endpoint reads off the headings
+     and opening one is for changing it rather than for finding out. */
+  const words = (r.aliases || []).length;
+  const sums = {
+    wake: (r.wakeword ? '“' + r.wakeword + '”' : 'not set')
+        + (words ? ' +' + words + ' more' : '')
+        + (r.strict ? ' · exact' : ''),
+    voice: (r.greeting ? '“' + r.greeting.slice(0, 28)
+                       + (r.greeting.length > 28 ? '…' : '') + '” · ' : 'shared greeting · ')
+         + (r.voice || 'shared voice'),
+    conn: r.provider === 'demo' ? 'demo — built-in replies'
+        : (r.model || 'no model') + (r.has_key ? ' · key stored' : ''),
+    limits: r.max_tokens + ' tokens · '
+          + (r.history_turns ? r.history_turns + ' turns' : 'no context') + ' · '
+          + r.timeout + 's',
+    prompt: r.provider === 'demo' ? 'not used in demo'
+          : ((r.system || '').trim().split(/\s+/).filter(Boolean).length + ' words'),
+  };
+  Object.keys(sums).forEach(g=>{
+    const h = blk.querySelector('[data-g="' + g + '"] .subsum');
+    if (h) h.textContent = sums[g];
+  });
   const voice = F(blk, 'voice');
   if (voice){
     const want = r.voice || '';
@@ -2350,6 +2432,11 @@ function wireBlock(blk){
     }
   });
   blk.addEventListener('click', e=>{
+    /* Independent, unlike the endpoints themselves: these are parts of one
+       thing rather than alternatives to each other, and you are often
+       comparing two of them. */
+    const h5 = e.target.closest('.subgrp > h5');
+    if (h5){ h5.parentNode.classList.toggle('open'); return; }
     const b = e.target.closest('button');
     if (!b) return;
     const seg = b.closest('.seg[data-f], .seg[data-r="preset"]');
@@ -2474,6 +2561,9 @@ function paintBlocks(keepOpen){
       blk.innerHTML = blockHTML(r);
       anchor.parentNode.insertBefore(blk, anchor);
       wireBlock(blk);
+      // a new endpoint opens on the two boxes you have to fill in
+      if (!rid) blk.querySelectorAll('[data-g="wake"],[data-g="conn"]')
+                   .forEach(x=> x.classList.add('open'));
     }
     order.push(blk);
     kept.add(blk);
@@ -3083,10 +3173,14 @@ function panelNav(){
      belongs on the tabs that edit it. App settings and accounts each save
      their own thing with their own button, and offering a second save that
      means something else is how somebody presses the wrong one. */
-  /* AI is a settings tab too: the DEMO / CONNECTED AI choice lives in the
-     shared document, so it needs the same save button the others use. The
-     assistant's own connection details save separately, with their own. */
-  const SETTINGS_TABS = new Set(['look', 'motion', 'speech', 'ai']);
+  /* AI is NOT one of these any more. It was, while the DEMO / CONNECTED AI
+     choice lived in the shared document — that choice is gone, because each
+     endpoint's own provider already says whether it answers from built-in
+     text, and two places meaning "demo" is a setting nobody can reason
+     about. Nothing on the AI tab writes the shared document now, so
+     SAVE FOR EVERYONE there would be a button that saves nothing on the tab
+     it is sitting on. Each endpoint saves itself, from inside its block. */
+  const SETTINGS_TABS = new Set(['look', 'motion', 'speech']);
   function syncSaveRow(){
     const show = SETTINGS_TABS.has(tab) ? '' : 'none';
     ['saverow', 'savestate', 'saverule'].forEach(id=>{
