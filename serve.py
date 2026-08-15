@@ -1111,7 +1111,49 @@ DISPLAY_DEFAULTS = {
     # phone is a new row with a fresh ask. Anything stronger needs an identity,
     # which is what a dedicated URL is for.
     "deny_repeat": True,
+    # ---- what makes this one a wall display rather than a browser tab ----
+    #
+    # Both of these are a POLICY FOR A PLACE, which is why they live on the row
+    # rather than in the shared settings: the tablet in the hall and the laptop
+    # somebody enrolled last week are the same document and not remotely the
+    # same object. Neither changes what this server will answer — they are
+    # presentation, and a display that sets both wrong is ugly, not exposed.
+    #
+    # Voice only: the geometry alone, no transcript and no composer. It is the
+    # one setting that OUTRANKS the viewer's own control, because a hallway is
+    # not a workstation and a screen of scrolling text in one is neither useful
+    # nor discreet. Where it applies the TEXT button is removed rather than
+    # disabled — a control that is present and ignores you is worse than one
+    # that was never offered.
+    "voice_only": False,
+    # The screensaver, which is still the product: the same face, every
+    # appearance setting still applied, scaled down and drifting. Seconds of
+    # nobody speaking to it and nobody touching it before it starts, and ZERO
+    # IS OFF — the same default-nothing-changes rule that made ANY DISPLAY the
+    # default on a route. An upgrade that quietly started moving every screen
+    # in the building would be this phase deciding something nobody asked it to.
+    "saver_delay": 0,
+    # How far down it shrinks, as a percentage of the frame. Shrinking is what
+    # creates the margin to move within: drawn full-bleed there is nowhere to
+    # go, and translating only clips the edges.
+    "saver_scale": 70,
+    # …and how much light comes off it while it drifts. This does more against
+    # burn-in than the movement does, and it is independently what a hallway
+    # screen should do at two in the morning.
+    "saver_dim": 45,
 }
+
+#: (low, high) for the three numbers on a row. saver_delay takes 0 as well, and
+#: means off by it — see the field.
+WALL_LIMITS = {"saver_delay": (15, 24 * 3600),
+               # Under a third of the frame is a postage stamp somebody has to
+               # walk up to; over nine tenths there is no margin left to drift
+               # within and the shrink has bought nothing.
+               "saver_scale": (30, 90),
+               # Not 100: a screen dimmed the whole way is switched off, and
+               # switching a screen off is a different feature with different
+               # consequences — you cannot see that it is still working.
+               "saver_dim": (0, 85)}
 
 #: The displays document's own settings, as opposed to the rows in it. Set in
 #: the panel, and none of them needs a restart.
@@ -1303,6 +1345,63 @@ def display_label(rec):
         if a.get("value"):
             return str(a["value"])[:40]
     return "unnamed display"
+
+
+def wall_of(rec):
+    """The presentation policy for the place this display sits in, clamped.
+
+    Read through this rather than off the record, because a row written before
+    these fields existed has none of them and a hand-edited one can have
+    anything. A screensaver that scales to 4000% because a number was typed
+    into a file is a screen somebody has to drive to."""
+    out = {"voice_only": bool(rec.get("voice_only"))}
+    saver = {}
+    for k, (lo, hi) in WALL_LIMITS.items():
+        try:
+            v = int(rec.get(k, DISPLAY_DEFAULTS[k]))
+        except (TypeError, ValueError):
+            v = DISPLAY_DEFAULTS[k]
+        # Zero is off, and only for the delay — it is the one field with a
+        # meaning below its own range rather than a value clamped up into it.
+        out[k] = 0 if (k == "saver_delay" and v <= 0) else min(hi, max(lo, v))
+    for k in ("saver_delay", "saver_scale", "saver_dim"):
+        saver[k[6:]] = out.pop(k)
+    out["saver"] = saver
+    return out
+
+
+WALL_FIELDS = ("voice_only", "saver_delay", "saver_scale", "saver_dim")
+
+
+def validate_wall(obj, rec):
+    """Returns (the four fields, error). Same shape as
+    validate_display_settings, and separate from it for the same reason the
+    panel has two SAVE buttons: these belong to one screen, those to the
+    deployment, and one commit writing both would publish a half-made edit.
+
+    Out of range is REFUSED rather than clamped, because this is somebody
+    typing a number and pressing save — silently saving 90 when they asked for
+    900 is the panel lying about what it did. wall_of clamps instead, and it is
+    reading a file rather than answering a person."""
+    out = {k: rec.get(k, DISPLAY_DEFAULTS[k]) for k in WALL_FIELDS}
+    if "voice_only" in obj:
+        out["voice_only"] = bool(obj["voice_only"])
+    for k, (lo, hi) in WALL_LIMITS.items():
+        if k not in obj:
+            continue
+        try:
+            v = int(obj[k])
+        except (TypeError, ValueError):
+            return None, "%s must be a whole number" % k[6:]
+        if k == "saver_delay" and v <= 0:
+            out[k] = 0                       # off, said in the only field there is
+            continue
+        if not (lo <= v <= hi):
+            return None, ("%s must be between %d and %d"
+                          % (k[6:], lo, hi)
+                          + (" — or 0 for never" if k == "saver_delay" else ""))
+        out[k] = v
+    return out, None
 
 
 def find_display(token):
@@ -1601,6 +1700,11 @@ def admin_displays():
                 "approved_by", "approved_at", "answers", "requested_at",
                 "expires", "renewals", "denied", "deny_reason", "deny_note",
                 "deny_repeat")}
+        # Through the same clamp the display gets, so the panel is never
+        # showing a number the screen is not using.
+        w = wall_of(rec)
+        row.update(voice_only=w["voice_only"], saver_delay=w["saver"]["delay"],
+                   saver_scale=w["saver"]["scale"], saver_dim=w["saver"]["dim"])
         ref = _display_refusals.get(did)
         live = bool(rec.get("code")) and (rec.get("code_expires") or 0) > now_
         row.update(id=did, label=display_label(rec),
@@ -2387,7 +2491,7 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      # /displays, one letter and a whole boundary apart.
                      "/displays", "/displays/approve", "/displays/rename",
                      "/displays/delete", "/displays/new", "/displays/reissue",
-                     "/displays/decide", "/displays/settings",
+                     "/displays/decide", "/displays/settings", "/displays/wall",
                      "/groups", "/groups/save", "/groups/delete")
 #: where an enrolment code is typed. On the display listeners only — it hands
 #: out a display's token, and the admin listener is not a display.
@@ -2608,7 +2712,14 @@ class Handler(SimpleHTTPRequestHandler):
                # already on the row, and making somebody retype it every month
                # is how a form stops being answered honestly.
                "answered": bool(rec.get("answers")),
-               "renewals": rec.get("renewals") or 0}
+               "renewals": rec.get("renewals") or 0,
+               # …and what this place looks like. Sent whatever the state is:
+               # a tablet nobody has approved yet is still a tablet on a wall,
+               # and the panel that has not been opened is exactly the case
+               # where a screen sits burning an image into itself. It is also
+               # this display's own row and nobody else's, so there is nothing
+               # here to leak — it went out through the token that asked.
+               "wall": wall_of(rec)}
         if may_ask:
             out["form"] = cfg["form"]
         if rec.get("denied"):
@@ -2672,6 +2783,17 @@ class Handler(SimpleHTTPRequestHandler):
         # the honest answer, because on this listener it genuinely is not.
         if not self.admin_port and (path in ADMIN_ONLY_FILES
                                     or path in ADMIN_ONLY_ROUTES
+                                    # A PREFIX, not a list, and it is the list
+                                    # above that is the belt. Adding
+                                    # /displays/wall and forgetting to name it
+                                    # there left one admin route answering 401
+                                    # on a listener where every one of its
+                                    # siblings answers 404 — which is the route
+                                    # announcing it exists. The next one added
+                                    # is covered whether anybody remembers or
+                                    # not. `/display/hello` is one letter and a
+                                    # whole boundary away, and unaffected.
+                                    or path.startswith("/displays/")
                                     or path.startswith("/auth/")
                                     or path == "/docs"
                                     or path.startswith("/docs/")):
@@ -3780,6 +3902,30 @@ class Handler(SimpleHTTPRequestHandler):
                      "approved" if on else "approval withdrawn", s["user"]),
                   flush=True)
             return self._json(200, {"ok": True, "displays": admin_displays()})
+
+        if parsed.path == "/displays/wall":
+            # What this screen looks like where it hangs. Its own endpoint
+            # rather than a field on rename, because they are saved by
+            # different gestures at different moments: a name is typed once
+            # when a device arrives, and these are tuned while watching a
+            # preview move.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            did = str(obj.get("id") or "")
+            displays = read_displays()
+            if did not in displays:
+                return self._json(404, {"error": "no such display"})
+            fields, err = validate_wall(obj, displays[did])
+            if err:
+                return self._json(400, {"error": err})
+            displays[did].update(fields)
+            write_displays(displays)
+            return self._json(200, {"ok": True, "id": did,
+                                    "displays": admin_displays()})
 
         if parsed.path == "/displays/rename":
             s = self._require("admin")

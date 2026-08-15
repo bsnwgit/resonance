@@ -194,6 +194,28 @@
   body[data-text="off"] #screen{flex:1 1 auto}
   body[data-text="off"] #bar{justify-content:flex-end}
 
+  /* ---------- what a wall display looks like ----------
+     VOICE ONLY has no rules of its own, deliberately. It is the rule above
+     made into a policy for a place: the display page sets data-text="off" and
+     will not let it back on, and the TEXT button is removed from the document
+     rather than hidden — a control that is present and ignores you is worse
+     than one that was never offered, and a rule that merely hid it would
+     leave the button one line of CSS away from working again.
+
+     What it does NOT take away is the rest of the bar. TALK is how a
+     microphone gets started at all: a browser will not open one without
+     somebody asking it to, so a display with no TALK button is a display that
+     can never hear its own wake word. Voice only means no text, not no
+     controls.
+
+     THE SCREENSAVER takes the whole lot away, for a different reason and only
+     while it drifts. Its rules are NOT here — they are at the end of this
+     sheet, below the request overlay and the verdict, because they have to
+     beat both and they carry the same specificity as the rules that show
+     them. Placed here, `body[data-request] #request` won on source order and
+     an unanswered request stayed on screen through the whole drift, which is
+     the one stationary bright rectangle worth moving. */
+
   /* ---------- the embed's chrome ----------
      An embedded copy draws only the parts its token grants. data-noparts
      lists what is ABSENT rather than what is present, so an ordinary display
@@ -398,6 +420,29 @@
     opacity:.72;
   }
   #posturebanner button:hover{opacity:1}
+
+  /* ---------- the screensaver, last on purpose ----------
+     While it drifts there is nothing on the screen but the figure. The
+     transcript and the composer go because text sliding around a panel is
+     worse than either state on its own; the status line, an unanswered
+     request and an undismissed verdict go because a small bright rectangle
+     that never moves is the exact thing being drifted away from.
+
+     LAST IN THE SHEET, and that is the whole reason these three lines are
+     down here rather than up with the rest of the wall rules. Every rule that
+     puts one of these on screen carries the same specificity as the rule that
+     takes it away, so source order is the only thing deciding — and higher up,
+     `body[data-request] #request` won.
+
+     None of it is a decision the viewer has to undo: everything here comes
+     back the instant the screen is touched, before the geometry has finished
+     easing home. */
+  body[data-saver] #log,
+  body[data-saver] #bar,
+  body[data-saver] #status,
+  body[data-saver] #request,
+  body[data-saver] #verdict{display:none}
+  body[data-saver] #screen{flex:1 1 auto}
 </style>
 </head>
 <body data-layout="hero">
@@ -646,6 +691,12 @@ const Display = {
        itself into more access than it was given. Zero means it never runs
        out, which is every display an admin issued a code for. */
     this.expiresIn = d.expires_in || 0;
+    /* What this place looks like, as opposed to what it may do. It arrives on
+       the same answer because it belongs to the same row, and it is applied
+       whatever the state is: a tablet waiting to be approved is already on a
+       wall, and the panel nobody has opened yet is exactly the case where a
+       screen sits burning an image into itself. */
+    Wall.take(d.wall);
     this.known = true;
   },
 
@@ -691,6 +742,63 @@ const Display = {
           + 'the form a second time.');
       }
     }, 20000);
+  },
+};
+
+/* ================================================================== WALL
+   What makes a tablet bolted to a wall a different object from a browser
+   tab. Two settings, both hanging off the display record above, and neither
+   of them touching what this server will answer — this is entirely canvas
+   and presentation.
+
+   VOICE ONLY is the geometry alone: no transcript, no composer. A hallway is
+   not a workstation, and a screen of scrolling text in one is neither useful
+   nor discreet.
+
+   It OUTRANKS the viewer's own control, which is a reversal worth stating.
+   The three controls in the bar were built to beat the shared settings
+   deliberately, because a person in front of a screen knows better than a
+   document does. This is the exception: it is a policy for a PLACE rather
+   than the preference of a passer-by. And where it applies the TEXT button is
+   REMOVED, not disabled — a control that is present and ignores you is worse
+   than one that was never offered.
+
+   What it does not do is overwrite what the viewer chose. The preference
+   stays in localStorage untouched, so a display taken off the wall and turned
+   back into an ordinary tab gets that person's own choice back rather than
+   the policy's. */
+const Wall = {
+  voiceOnly: false,
+  /* The button and the place it came from, so removing it is REVERSIBLE.
+     Turning the policy off has to give the control back without somebody
+     walking to the tablet and reloading it — and the panel's preview turns it
+     on and off while an admin makes their mind up. */
+  _btn: null, _slot: null,
+
+  take(w){
+    w = w || {};
+    this.voiceOnly = !!w.voice_only;
+    Saver.configure(w.saver);
+    this.apply();
+  },
+
+  apply(){
+    document.body.toggleAttribute('data-voiceonly', this.voiceOnly);
+    if (!this._btn){
+      this._btn = $('textbtn');
+      if (this._btn) this._slot = this._btn.parentNode;
+    }
+    if (this.voiceOnly){
+      if (this._btn) this._btn.remove();
+      setTextVisible(false);            // no `remember` — see above
+    }else{
+      if (this._btn && !this._btn.parentNode && this._slot)
+        this._slot.appendChild(this._btn);
+      /* Back to the viewer's own choice, which was never overwritten. A
+         preview takes the fresh-viewer default instead: the admin is looking
+         at what somebody else gets, not at their own habits. */
+      setTextVisible(PREVIEW ? true : Prefs.get('text', true));
+    }
   },
 };
 
@@ -817,6 +925,9 @@ function verdict(title, body){
   $('verdicttitle').textContent = title;
   $('verdictbody').textContent = body || '';
   box.classList.add('on');
+  // The screensaver hides this while it drifts, and an answer somebody has
+  // been waiting days for must not arrive behind it.
+  Saver.poke();
 }
 
 /* ================================================================ ROUTES
@@ -1523,8 +1634,13 @@ function render(){
               : S.mode==='orb'   ? buildOrb : buildKnot;
   const polys = build();
 
-  const cx = W/2, cy = H/2, f = S.persp*DPR;
-  const zoom = Math.min(W,H) / (760*DPR) * DPR;
+  /* The screensaver moves the whole projection rather than the canvas: the
+     figure is built in the same place it always was, and only where it lands
+     changes. Doing it with a canvas transform instead would scale the line
+     WEIGHTS as well, and a screensaver that also thins the strokes is a
+     second appearance setting nobody asked for. */
+  const cx = W/2 + Saver.dx*W, cy = H/2 + Saver.dy*H, f = S.persp*DPR;
+  const zoom = Math.min(W,H) / (760*DPR) * DPR * Saver.scale;
 
   chunks.length = 0;
   for (const poly of polys){
@@ -1593,9 +1709,13 @@ function render(){
   ctx.globalAlpha = 0.92;
   ctx.drawImage(off,0,0);
 
-  /* milk — the opaque-screen wash that sells it as glass, not vector art */
+  /* milk — the opaque-screen wash that sells it as glass, not vector art.
+     It travels with the figure, and has to: a lit patch that stayed where it
+     was would be the one stationary bright region left on the panel, which is
+     the exact thing the drift exists to prevent. */
   if (S.milk > 0.01){
-    const g = ctx.createRadialGradient(W*0.5,H*0.45,0, W*0.5,H*0.45, Math.max(W,H)*0.62);
+    const mx = W*0.5 + Saver.dx*W, my = H*0.45 + Saver.dy*H;
+    const g = ctx.createRadialGradient(mx,my,0, mx,my, Math.max(W,H)*0.62*Saver.scale);
     g.addColorStop(0,   'rgba('+pal.glass+','+(0.052*S.milk)+')');
     g.addColorStop(0.5, 'rgba('+pal.glass+','+(0.020*S.milk)+')');
     g.addColorStop(1,   'rgba('+pal.glass+',0)');
@@ -1613,6 +1733,17 @@ function render(){
     ctx.restore();
   }
   ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
+
+  /* …and the dim, last, over everything including the grain. Black rather
+     than the palette's own ink: it is the panel's light output that burns and
+     that a hallway at two in the morning is too bright with, and blending
+     toward a pale ink would raise both. */
+  if (Saver.dim > 0.002){
+    ctx.globalAlpha = Saver.dim;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0,0,W,H);
+    ctx.globalAlpha = 1;
+  }
 }
 
 /* grain tile */
@@ -1627,6 +1758,117 @@ let grainPat = null;
   c.putImageData(d,0,0);
   grainPat = ctx.createPattern(g,'repeat');
 })();
+
+/* =========================================================== SCREENSAVER
+   A tablet showing a mostly-stationary field for years will burn it into the
+   panel. The usual answer replaces the screen with something else; this one
+   keeps the same face — every appearance setting still applied — and moves
+   it. The screensaver is still the product.
+
+   SCALE DOWN, THEN DRIFT, rather than drift alone. Drawn full-bleed there is
+   nowhere to go and translating only clips the edges; shrinking first creates
+   the margin to move within, and lights fewer pixels while it is at it. The
+   travel is exactly the margin the shrink bought, so nothing is ever cut off.
+
+   SLOW CONTINUOUS DRIFT rather than a bouncing path. Two sines at rates that
+   do not divide into each other trace a figure that covers more of the panel
+   over a night than a rectangle bouncing between four corners, and it is
+   calmer to share a room with. The clock behind them never resets, so two
+   nights running do not light the same pixels in the same order.
+
+   A DIM LEVEL BESIDE IT, as its own number, because reducing brightness does
+   more against burn-in than movement does — and it is independently what a
+   hallway screen should do at two in the morning. Painted as black over the
+   finished frame rather than by scaling the palette: it is the panel's output
+   that burns, so what has to fall is absolute light, on a light palette as
+   much as a dark one.
+
+   IT ENDS ON THE WAKE WORD OR ON TOUCH. On a voice-only display touch is the
+   only signal that is not speech, so it has to count. The chrome comes back
+   at once — somebody just asked for it — and only the geometry eases, back to
+   the centre rather than snapping. */
+const Saver = {
+  /* From the display's row. delay 0 is off, and off is the default. */
+  delay: 0, scaleTo: 0.70, dimTo: 0.45,
+  armed: false,           // may it ever start
+  on: false,              // is it drifting now, or easing out of it
+  forced: false,          // the panel is demonstrating it
+  idle: 0,                // seconds since anybody did anything
+  t: 0,                   // drift clock, never reset — see above
+  p: 0,                   // raw ease progress 0..1
+
+  /* What render() reads, and the whole of what this object publishes.
+     amount 0 is the ordinary page; dx/dy are fractions of the frame. */
+  scale: 1, dx: 0, dy: 0, dim: 0, amount: 0,
+
+  /* Seconds to ease in, and to ease back out. Not the same number: arriving
+     has to be slow enough that nobody catches it starting, and leaving has to
+     be quick enough that somebody who just touched the screen believes it
+     answered them. */
+  IN: 6, OUT: 0.45,
+
+  configure(s){
+    s = s || {};
+    this.delay   = Math.max(0, s.delay | 0);
+    this.scaleTo = Math.min(0.95, Math.max(0.2, (s.scale | 0) / 100 || 0.70));
+    this.dimTo   = Math.min(0.95, Math.max(0, (s.dim | 0) / 100));
+    /* Never in an embed. A surface inside somebody else's product that
+       shrank and dimmed itself after three minutes would be a bug in their
+       application, and they have their own screensaver. */
+    this.armed = !EMBED && this.delay > 0;
+    this.idle = 0;
+    if (!this.armed) this.on = false;
+  },
+
+  /* Somebody is there. Called from the wake word, from the conversation
+     continuing, and from any touch, key or pointer. */
+  poke(){
+    this.idle = 0;
+    this.forced = false;
+    this.on = false;
+  },
+
+  /* The panel, showing an admin what these numbers do without making them
+     stand and wait out the idle delay. */
+  demo(on){ this.forced = !!on; if (!on) this.poke(); },
+
+  step(dt){
+    this.t += dt;
+    if (this.forced) this.on = true;
+    else if (!this.armed) this.on = false;
+    else if (!this.on){
+      /* A screen in the middle of answering somebody is not an idle screen,
+         whatever the wake gate happens to be doing. Read off Drive rather
+         than off the wake word, because a display with no wake word at all
+         still thinks and still speaks — and that path never touches Wake. */
+      if (Drive.phase === 'idle') this.idle += dt; else this.idle = 0;
+      if (this.idle >= this.delay) this.on = true;
+    }
+    this.p = Math.min(1, Math.max(0, this.p + dt / (this.on ? this.IN : -this.OUT)));
+    // smoothstep, so it leaves and arrives at zero velocity in both
+    // directions — an ease that starts abruptly reads as a fault
+    this.amount = this.p * this.p * (3 - 2 * this.p);
+    this.scale = 1 + (this.scaleTo - 1) * this.amount;
+    /* The margin the shrink just bought, each side, as a fraction of the
+       frame. It collapses to nothing as the ease runs out, which is what
+       carries the figure back to the centre without a second animation. */
+    const m = (1 - this.scale) / 2;
+    this.dx = Math.sin(this.t * 0.0314) * m;
+    this.dy = Math.sin(this.t * 0.0193 + 1.7) * m;
+    this.dim = this.dimTo * this.amount;
+    /* Text sliding around a screen is worse than either state on its own, so
+       the transcript, the composer and the status line go while it drifts.
+       Keyed on `on` rather than on `amount`: chrome asked for should come
+       back the instant it is asked for, and only the geometry eases. */
+    document.body.toggleAttribute('data-saver', this.on);
+  },
+};
+
+/* Every signal that is not speech. Passive, so none of it costs a frame, and
+   on the window rather than the canvas because a voice-only display is mostly
+   canvas but the request form and the verdict are not. */
+['pointerdown', 'touchstart', 'keydown', 'wheel'].forEach(ev=>
+  window.addEventListener(ev, ()=> Saver.poke(), {passive: true}));
 
 /* ================================================================ LOOP */
 let now=0, last=performance.now(), frames=0, fpsT=0;
@@ -1644,6 +1886,7 @@ function frame(t){
   stepVoice(dt);          // decays the bins…
   Mic.step();             // …so the mic must overwrite them after, not before
   Drive.step(dt);
+  Saver.step(dt);         // after Drive: it moves the finished figure, not the signal
   /* An embed that does not draw the figure should not pay for it. Everything
      above this line still runs — the mic, the voice and the wake word are
      not the visualiser, and a `chat` embed that stopped listening because it
@@ -2752,6 +2995,14 @@ const CMD = {
   idle:     ()=>{ clearTimeout(streamTimer); Speech.stop(); Drive.phase='idle'; },
   thinking: ()=>{ clearTimeout(streamTimer); Speech.stop(); Drive.phase='thinking'; },
   speak:    ()=> respond(REPLIES[replyIx++ % REPLIES.length]),
+  /* The wall settings, applied without saving — the same live-preview
+     contract the appearance settings have. The panel is the only caller: a
+     real display gets these from its own row, over its own token. */
+  wall:     (w)=> Wall.take(w),
+  /* …and start the drift now, so an admin picking a scale and a dim can see
+     what they are picking instead of standing in front of a screen waiting
+     out three minutes of idle to find out. */
+  drift:    (on)=> Saver.demo(on !== false),
 };
 
 /* ------------------------------------------------------------ first run */
@@ -3129,7 +3380,11 @@ const Wake = {
     return near;
   },
 
-  touch(){ this.until = wallNow() + S.wakewindow; },
+  /* Every path that keeps this display awake comes through here — waking on a
+     name, another utterance inside the window, and every frame of an answer
+     being spoken. So this is the one place the screensaver has to hear about
+     the wake word, rather than three. */
+  touch(){ this.until = wallNow() + S.wakewindow; Saver.poke(); },
 
   /* returns text to act on, or null to ignore the utterance entirely */
   // is the gate in effect right now?
@@ -3491,6 +3746,11 @@ muteBtn.addEventListener('click', ()=> setMuted(!muted, true));
    everyone else looking at the same URL. */
 const textBtn = $('textbtn');
 function setTextVisible(on, remember){
+  /* …except where the display itself is voice only, which is the one place a
+     policy beats a preference. Enforced here rather than at each caller so
+     there is no path — the button, the stored preference, an embed grant —
+     that can put a transcript back on a screen in a hallway. */
+  if (Wall.voiceOnly) on = false;
   document.body.dataset.text = on ? 'on' : 'off';
   if (remember) Prefs.set('text', !!on);
   if (textBtn){

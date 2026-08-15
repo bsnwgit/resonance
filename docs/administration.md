@@ -193,6 +193,75 @@ laptop can open the page on their phone and ask again from a clean row. That is
 what device identity is — anything stronger needs an identity that person
 carries, which is what a dedicated URL will be.
 
+### On the wall
+
+Two settings inside each row, and they are what makes a tablet bolted to a wall
+a different object from a browser tab. Neither changes what this server will
+answer — this is entirely what the screen looks like — and both are **per
+device**, because the screen in the hall and the laptop somebody enrolled last
+week are not remotely the same thing. They have their own SAVE, like every other
+block in the panel.
+
+**Voice only** is the geometry alone: no transcript and no composer. That is
+what a screen in a hallway wants. It is not a workstation, and a page of
+scrolling text on a wall is neither useful nor discreet.
+
+This is the one setting that **beats the viewer's own control.** The three
+buttons in the bar were built to override the shared settings deliberately,
+because somebody standing in front of a screen knows better than a document
+does. This is the exception: it is a policy for a *place* rather than the
+preference of whoever walked past last. Where it applies, the TEXT button is
+**removed from that screen rather than disabled** — a control that is present
+and ignores you is worse than one that was never offered. What it does not do is
+overwrite anyone's stored choice, so a tablet taken off the wall and used as an
+ordinary tab gets that person's own setting back.
+
+TALK, AUDIO and SPACE stay. A browser will not open a microphone without
+somebody asking it to, so a display with no TALK button is a display that could
+never hear its own wake word. Voice only means no text, not no controls.
+
+**The screensaver** is the other one, and it exists because a tablet showing a
+mostly-stationary figure for years will burn it into the panel. The usual answer
+replaces the screen with something else. This one keeps the same face — every
+appearance setting still applied — and moves it.
+
+| | what it does |
+| --- | --- |
+| **Idle seconds before it drifts** | how long with nobody speaking to it and nobody touching it. **0 is off**, and off is where every device starts |
+| **Shrinks to %** | how far down it scales first. Shrinking is what creates the margin to move within: drawn edge to edge there is nowhere to go, and moving it would only clip the sides |
+| **Dims by %** | how much light comes off it while it drifts |
+
+Three things worth knowing about the behaviour:
+
+- **It scales down, then drifts** — slowly and continuously rather than bouncing
+  between corners. It covers more of the panel over a night that way, and it is
+  calmer to share a room with. The travel is exactly the margin the shrink
+  bought, so nothing is ever cut off, and the path does not repeat: two nights
+  running do not light the same pixels in the same order.
+- **The dim does more than the movement does.** Reducing brightness is the
+  strongest thing available against burn-in, and it is independently what a
+  screen in a hallway should do at two in the morning. It is not the same as
+  switching the screen off: you can still see across a room that it is working.
+- **It ends on the wake word or on a touch**, easing back to the centre rather
+  than snapping. On a voice-only display touch is the only signal that is not
+  speech, so it has to count. The transcript, the composer and the status line
+  hide while it drifts — text sliding around a screen is worse than either state
+  on its own — and they come back the instant you touch it. It also never starts
+  while an answer is being thought about or spoken.
+
+**PREVIEW tries the values without saving them.** Nobody can pick a scale and a
+dim by reading two numbers, and nobody should have to stand in front of a screen
+waiting out three minutes of idle to find out what they chose. It drives the
+live preview on the right with whatever is in the boxes; SAVE is what gives them
+to the device.
+
+**When a device picks them up.** One still waiting on a decision is asking this
+server every twenty seconds and takes them within seconds. One that is already
+working has nothing left to ask about, so it takes them the next time its page
+loads — reload it on the screen, or use OPEN DISPLAY here. Making a working
+screen poll continuously for a setting that changes twice a year would be the
+wrong trade.
+
 ### The settings above the list
 
 **Does a general user require approval?**

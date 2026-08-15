@@ -600,6 +600,17 @@
     border:1px solid rgba(var(--glass),.16);outline:0;
   }
   .cols2 input:focus{border-color:var(--hue-dim)}
+  /* What a device looks like where it hangs, inside its own row. Set off by a
+     rule rather than a box: it is the one part of a row that is a SETTING
+     somebody changes rather than a fact about the device they are reading, and
+     it wants to be told apart from the lines above it at a glance. */
+  .wall{margin:9px 0 2px;padding-top:8px;
+        border-top:1px solid rgba(var(--glass),.10)}
+  .wall .vo{display:flex;align-items:flex-start;gap:7px;margin:4px 0 2px;
+            font-size:calc(9px * var(--fs));line-height:1.5;
+            color:rgba(var(--paper),.8);cursor:pointer}
+  .wall .vo input{margin-top:2px;flex:0 0 auto}
+  .wall .acts{margin-top:7px}
   /* One row per field of the request form: what it is called, whether it has
      to be answered, whether it is a paragraph, and a way to remove it. */
   .fldrow{display:flex;align-items:center;gap:8px;margin:4px 0}
@@ -3819,6 +3830,140 @@ $('b_formsave').addEventListener('click', ()=>{
   saveDp({form: DPFORM.filter(f=> (f.label || '').trim())}, 'formnote');
 });
 
+/* ---- what a device looks like where it hangs ----
+   Two settings on each row, and neither touches what this server will answer:
+   they are the difference between a tablet bolted to a wall and a browser tab,
+   and they are per device because the screen in the hall and the laptop
+   somebody enrolled last week are not remotely the same object.
+
+   Its own SAVE, like every other block in this panel. One commit across the
+   whole row would mean fixing a typo in a name also published a screensaver
+   somebody was halfway through choosing. */
+function wallBlock(d){
+  const box = document.createElement('div');
+  box.className = 'wall';
+  const h = document.createElement('div');
+  h.className = 'bklab';
+  h.textContent = 'ON THE WALL';
+  box.appendChild(h);
+
+  const vo = document.createElement('label');
+  vo.className = 'vo';
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = !!d.voice_only;
+  vo.appendChild(cb);
+  vo.appendChild(document.createTextNode(
+    'Voice only — the geometry alone, no transcript and no composer. The TEXT '
+    + 'button is removed on that screen, not disabled: this is a policy for a '
+    + 'place, and it beats whatever the last person to touch it chose.'));
+  box.appendChild(vo);
+
+  /* Two to a line for the same reason the settings above the list are: three
+     short numbers squeezed onto one row are three numbers nobody can read at
+     this width. */
+  const cols = document.createElement('div');
+  cols.className = 'cols2';
+  const num = (label, val, min, max)=>{
+    const w = document.createElement('div');
+    const l = document.createElement('label');
+    l.className = 'bklab';
+    l.textContent = label;
+    const i = document.createElement('input');
+    i.type = 'number'; i.min = min; i.max = max; i.value = val;
+    w.appendChild(l); w.appendChild(i);
+    cols.appendChild(w);
+    return i;
+  };
+  const delay = num('Idle seconds before it drifts', d.saver_delay, 0, 86400);
+  const scale = num('Shrinks to %', d.saver_scale, 30, 90);
+  const dim   = num('Dims by %', d.saver_dim, 0, 85);
+  box.appendChild(cols);
+
+  const note = document.createElement('div');
+  note.className = 'note';
+  note.textContent = 'A screensaver that is still the product: the same face, '
+    + 'every appearance setting still applied, scaled down and drifting slowly '
+    + 'so the panel is never lit the same way twice. It ends on the wake word '
+    + 'or on a touch. 0 seconds is off, and off is where every device starts — '
+    + 'nothing here changes until you set a delay.';
+  box.appendChild(note);
+
+  /* Said plainly rather than left to be discovered. A device still waiting on
+     a decision is asking this server every twenty seconds and takes these
+     immediately; one that is already working has nothing left to ask about, so
+     it takes them the next time its page loads. Making a working screen poll
+     for a setting that changes twice a year is the wrong trade, and a display
+     that keeps itself current through a restart is what phase 4 is for. */
+  const when = document.createElement('div');
+  when.className = 'note';
+  when.textContent = d.enrolled && d.approved
+    ? 'This device is working, so it picks these up the next time its page '
+      + 'loads — RELOAD on the screen, or OPEN DISPLAY here.'
+    : 'This device is still checking in, so it picks these up within seconds.';
+  box.appendChild(when);
+
+  const acts = document.createElement('div');
+  acts.className = 'acts';
+  const said = document.createElement('div');
+  said.className = 'note';
+  const read = ()=> ({
+    id: d.id,
+    voice_only: cb.checked,
+    saver_delay: parseInt(delay.value, 10),
+    saver_scale: parseInt(scale.value, 10),
+    saver_dim: parseInt(dim.value, 10),
+  });
+
+  const save = document.createElement('button');
+  save.className = 'act-save';
+  save.textContent = 'SAVE';
+  save.onclick = async ()=>{
+    said.className = 'note';
+    said.textContent = 'saving…';
+    try{
+      const j = await api('/displays/wall',
+                          {method:'POST', body: JSON.stringify(read())});
+      /* The cache, not the list. Rebuilding the rows here would throw away
+         the row somebody has open, the boxes they were reading, and this
+         message — and nothing else in the panel draws these four values, so
+         there is nothing on screen that would be stale. */
+      if (j.displays) DISPLAYS = j.displays;
+      said.textContent = 'saved';
+    }catch(e){
+      said.className = 'note bad';
+      said.textContent = e.message;
+    }
+  };
+  acts.appendChild(save);
+
+  /* Nobody can pick a scale and a dim by reading two numbers. The preview is
+     the real display page, so this drives the real thing with the values in
+     the boxes — before they are saved, and without standing in front of a
+     screen waiting out the idle delay to find out what they do. */
+  let drifting = false;
+  const show = document.createElement('button');
+  show.textContent = 'PREVIEW';
+  show.title = 'try these values in the preview, without saving them';
+  show.onclick = ()=>{
+    drifting = !drifting;
+    show.textContent = drifting ? 'STOP' : 'PREVIEW';
+    const v = read();
+    cmd('wall', {voice_only: v.voice_only,
+                 saver: {delay: v.saver_delay, scale: v.saver_scale,
+                         dim: v.saver_dim}});
+    cmd('drift', drifting);
+    said.className = 'note';
+    said.textContent = drifting
+      ? 'in the preview only — press SAVE to give it to this device'
+      : '';
+  };
+  acts.appendChild(show);
+  box.appendChild(acts);
+  box.appendChild(said);
+  return box;
+}
+
 /* What a row IS, and it decides which of the two lists it belongs in as well
    as what the row says. `live` is a device that is working; everything else
    wants something from somebody. */
@@ -4066,6 +4211,10 @@ async function refreshDisplays(){
     });
 
     row.appendChild(meta);
+    /* Under the facts and above the buttons that end the row's life. A screen
+       can be told what it will look like before it has ever been switched on,
+       the same way its endpoints can be ticked before it arrives. */
+    row.appendChild(wallBlock(d));
     row.appendChild(r);
     (st === 'live' ? conn : box).appendChild(row);
   });

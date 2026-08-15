@@ -63,6 +63,30 @@ Hides the transcript and gives the space to the figure. The conversation still
 happens — this only affects what is on screen. Turn it off for a display that
 is mostly being looked at rather than read.
 
+**On some screens this button is not there.** A display mounted on a wall can be
+set to voice only by whoever runs it, and then there is no transcript and no
+typing on that screen at all — only the figure and your voice. The button is
+taken away rather than left there refusing you, because a control that ignores
+you is worse than one that was never offered. Everything else works exactly as
+it does anywhere else.
+
+## When the screen shrinks and dims
+
+Leave a display alone for long enough and the figure gets smaller, dims, and
+begins to drift slowly around the screen. Nothing is wrong: this is the
+screensaver, and it is the same picture with the same settings, moved.
+
+Screens that show the same bright shape in the same place for years end up
+keeping a ghost of it permanently. Making it smaller, darker and slowly moving
+is what prevents that. It is also simply what a screen in a hallway should be
+doing in the middle of the night.
+
+**Say the wake word or touch the screen and it comes straight back**, easing
+back to the middle rather than snapping. The transcript and the buttons return
+the moment you touch it. It will not start while it is thinking about an answer
+or speaking one, and if nothing happens when you leave a screen alone, then
+whoever runs it has not switched it on for that display.
+
 ## Typing instead of talking
 
 The field along the bottom takes typed questions. Press Enter to send. Talking

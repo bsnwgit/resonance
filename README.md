@@ -1859,6 +1859,83 @@ on a desk. A tablet bolted to a wall, answering a household, moves them:
 
 Newest first.
 
+### 2026-08-15 — the screensaver is still the product
+
+Phase 3: what a wall display looks like. Two settings on each device's row,
+neither of which touches what this server will answer — it is entirely canvas
+and presentation, which is the whole reason it was split from phase 2.
+
+- **Voice only is the one setting that beats the viewer.** The three controls in
+  the bar were built to override the shared settings deliberately, because
+  somebody standing in front of a screen knows better than a document does. This
+  is the exception: a policy for a *place*, not the preference of a passer-by.
+  Where it applies the TEXT button is removed from the document rather than
+  hidden, and enforced in `setTextVisible` rather than at each caller, so there
+  is no path — the button, the stored preference, an embed grant — that can put
+  a transcript back on a screen in a hallway. The viewer's own stored choice is
+  never overwritten, so a tablet taken off the wall gets it back.
+- **It does not take the rest of the bar with it.** The first cut hid `#bar`
+  entirely, which reads correctly — *the geometry alone* — and would have made
+  every voice-only display permanently deaf: a browser will not open a
+  microphone without somebody asking it to, and TALK is the only thing that
+  asks. Voice only means no text, not no controls.
+- **Scale down, then drift.** Drawn full bleed there is nowhere to go and
+  translating only clips the edges. The travel is *exactly* the margin the
+  shrink bought — `(1 - scale) / 2` of the frame — so the figure reaches the
+  edge of the panel and never crosses it. Verified over eight simulated hours:
+  peak offset equals the available margin to four decimal places.
+- **Two sines that do not divide into each other**, rather than a rectangle
+  bouncing between four corners. It covers more of the panel over a night and is
+  calmer to share a room with, and the clock behind it never resets — so two
+  nights running do not light the same pixels in the same order.
+- **The margin collapsing IS the ease back to the centre.** The drift is the
+  sine times that margin, and the margin is a function of the same smoothstep
+  the scale is. One number eases and the figure returns to the middle at full
+  size with nothing animating it there. Six seconds in, so nobody catches it
+  starting; under half a second out, so somebody who just touched the screen
+  believes it answered them.
+- **The dim is black over the finished frame**, not a scaled palette. It is the
+  panel's light output that burns in and that is too bright at two in the
+  morning, so what has to fall is absolute light — on a pale palette as much as
+  a dark one. Capped below 100: a screen dimmed the whole way is a screen
+  switched off, and you cannot see that one is still working.
+- **The milk wash travels with the figure.** It is drawn from a fixed point in
+  the frame, so left alone it would have been the one stationary bright region
+  left on the panel — the exact thing the drift exists to prevent.
+- **Idle is read off `Drive.phase`, not off the wake word.** A display with no
+  wake word at all still thinks and still speaks, and that path never touches
+  `Wake`. Every path that keeps a display awake does come through `Wake.touch`,
+  though, which is why that is the single place the wake word ends the drift.
+- **Off is the default, on every device.** Same rule that made `ANY DISPLAY` the
+  default on a route: an upgrade that quietly started moving every screen in a
+  building would be this phase deciding something nobody asked it to.
+- **PREVIEW drives the real preview with unsaved values.** Nobody picks a scale
+  and a dim by reading two numbers, and nobody should stand in front of a screen
+  waiting out three minutes of idle to find out what they chose.
+- **A new admin route is not admin-only because it calls `_require("admin")`.**
+  `/displays/wall` did, and answered **401** on the display listeners where
+  every one of its siblings answers **404** — which is the route confirming it
+  exists on a listener it is supposed to be absent from. The gate is a
+  hand-maintained list of paths, and a list is a thing somebody forgets. Named
+  it, then made the list a belt and `/displays/` a prefix rule underneath it, so
+  the next route added is covered whether anybody remembers or not. `/display/`
+  singular — how a display gets its token — is one letter and a whole boundary
+  away, and untouched.
+- **Two CSS rules of equal specificity, and the later one wins.** The
+  screensaver's rules sat with the rest of the wall rules near the top of the
+  sheet, above `body[data-request] #request`. Both are one id, one attribute and
+  one element, so source order decided it and an unanswered request stayed lit
+  through the entire drift — the one stationary bright rectangle actually worth
+  moving. They are now last in the sheet, with a comment saying why they are
+  not where they look like they belong.
+- **What it does not do is push to a screen already on the wall.** A device
+  waiting on a decision polls every twenty seconds and takes these immediately;
+  one that is working has nothing left to ask about and takes them on its next
+  load. Making a working screen poll for a setting that changes twice a year is
+  the wrong trade, and a display that keeps itself current across a restart is
+  what phase 4 is for. The panel says which case a row is in rather than leaving
+  it to be discovered.
+
 ### 2026-08-15 — a name for a set of them, and a panel that reads as one
 
 Groups, and the tidying that came with using the thing for an hour.
