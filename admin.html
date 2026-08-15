@@ -532,7 +532,10 @@
      one setting each and reading them as a row is how you notice the pending
      limit is larger than the total. */
   .cols2{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 0}
-  .cols2 > div{flex:1 1 110px;min-width:0}
+  /* Two to a line, deliberately: the days a grant lasts and the total number
+     of displays are read together, and a basis that let three squeeze onto one
+     row made all three unreadable at a narrow panel width. */
+  .cols2 > div{flex:1 1 calc(50% - 4px);min-width:0}
   .cols2 input{
     width:100%;margin:4px 0;padding:5px 6px;font:inherit;
     font-size:calc(9.5px * var(--fs));
@@ -1465,7 +1468,7 @@ nothing.</div>
 
   <div class="cols2">
     <div>
-      <label class="bklab">how long a granted request lasts, days</label>
+      <label class="bklab">days a granted request lasts</label>
       <input id="dp_days" type="number" min="1" max="3650">
     </div>
     <div>
