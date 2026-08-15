@@ -263,20 +263,30 @@
   #panelhead > .findrow,
   #panelhead > .tabgroup,
   #panelhead > .tabs,
-  #panelhead > #savestate,
-  #panelhead > #saverow{max-width:560px}
 
   /* The app tab's own commit row, at the foot of the box. Hidden outright
      on every other tab: a save button that belongs to settings you cannot
      currently see is a save button somebody will eventually press. */
-  #approw,#airow{display:none;margin-top:14px;padding-top:10px;
+  #approw,#airow,.uirow{display:none;margin-top:14px;padding-top:10px;
           border-top:1px solid rgba(var(--glass),.30)}
-  #approw.on,#airow.on{display:block}
-  #approw .seg,#airow .seg{justify-content:flex-end;margin-top:8px}
-  #approw .seg button,#airow .seg button{border-width:2px;border-style:solid;padding:6px 10px}
+  #approw.on,#airow.on,.uirow.on{display:block}
+  #approw .seg,#airow .seg,.uirow .seg{justify-content:flex-end;margin-top:8px}
+  #approw .seg button,#airow .seg button,
+  .uirow .seg button{border-width:2px;border-style:solid;padding:6px 10px}
+  /* What this row's scope actually is. Worth a line, because "shared" is the
+     property that separates these from the three controls a viewer keeps. */
+  .uirow .scope{
+    font-size:calc(8.5px * var(--fs));letter-spacing:.08em;
+    color:rgba(var(--paper),.6);
+  }
+  .uirow .state{
+    font-size:calc(9px * var(--fs));letter-spacing:.06em;margin-top:4px;
+    color:rgba(var(--paper),.8);
+  }
+  .uirow .state.alert{color:#eaa8a8}
   /* Spans every column once the topics tile, so it reads as the foot of the
      whole box rather than the tail of whichever column it landed in. */
-  @container (min-width:700px){ #approw,#airow{grid-column:1/-1} }
+  @container (min-width:700px){ #approw,#airow,.uirow{grid-column:1/-1} }
 
   /* The caption over a row of tabs. Quieter than anything it labels — it is
      there to be read once and then ignored, not to compete with the tabs
@@ -299,15 +309,7 @@
   #panelfoot > *{max-width:560px}
   /* nothing but the tab row lives here now — the identity moved to the bar
      at the top of the panel, where it does not scroll away */
-  #savestate{
-    font-size:calc(9px * var(--fs));letter-spacing:.06em;line-height:1.5;
-    color:rgba(var(--paper),.88);margin:8px 0 0;min-height:0;
-  }
   /* the one state where the admin's view and everyone else's disagree */
-  #savestate.alert{
-    color:#ff6b6b;letter-spacing:.1em;
-    border-left:2px solid #ff6b6b;padding-left:7px;
-  }
   /* Both dividers read at the same strength: one closes the panel header,
      the other separates saving the interface from configuring the server.
      Brighter than the hairline between topics, so they group rather than
@@ -391,16 +393,11 @@
   /* Saving is the consequential act on this page — everything else previews,
      this is what reaches other people. Heavier border and brighter text so it
      does not read as one more control in a column of them. */
-  #saverow{margin:10px 0 0}
   /* The weight, not the colour. Saving is the consequential act on this page
      — everything else previews, this is what reaches other people — so the
      pair keeps its heavier border. What colour that border is now comes from
      the .act-save / .act-undo classes below, so this rule must not name one
      or it would override them from a more specific selector. */
-  #saverow button{
-    border-width:2px;border-style:solid;
-    padding:6px 10px;letter-spacing:.12em;
-  }
 
   #saverule{margin:10px 0 2px}
   /* AI sits in the tab row itself now, and the four pinned entries are a row
@@ -569,7 +566,20 @@
      Each carries a summary of what is inside it, so the whole configuration
      reads off the closed headings and opening one is for changing it rather
      than for finding out what it says. */
-  .subgrp{border:1px solid rgba(var(--glass),.13);margin-top:7px}
+  /* The sections of an endpoint are separate boxes, laid out as boxes rather
+     than stacked into one long form. An OPEN endpoint takes the full width of
+     the panel to give them room to sit side by side; closed, it is one line
+     again and tiles with the others. */
+  #grpbox .grp[data-rid]:not(.shut){grid-column:1/-1}
+  .subwrap{
+    display:grid;gap:8px;margin-top:10px;
+    grid-template-columns:repeat(auto-fill, minmax(215px, 1fr));
+    align-items:start;
+  }
+  .subgrp{
+    border:1px solid rgba(var(--glass),.16);
+    background:rgba(var(--glass),.025);
+  }
   .subgrp > h5{
     margin:0;padding:7px 9px 7px 22px;position:relative;cursor:pointer;
     font:inherit;font-size:calc(9px * var(--fs));font-weight:400;
@@ -591,6 +601,16 @@
   }
   .subgrp > .subbody{display:none;padding:2px 9px 9px}
   .subgrp.open > .subbody{display:block}
+  /* Every action for this endpoint on one line along the foot of its box,
+     clear of the section boxes above it — they belong to the endpoint, not to
+     whichever section happens to be open. */
+  .rtacts{
+    display:flex;flex-wrap:wrap;gap:5px;
+    margin-top:12px;padding-top:10px;
+    border-top:1px solid rgba(var(--glass),.22);
+  }
+  .rtacts button{border-width:2px;border-style:solid;padding:6px 10px}
+  .rtacts .spacer{flex:1}
   /* The first control in a box should not sit tight under its heading. */
   .subgrp > .subbody > .bklab:first-child{margin-top:2px}
   .grp.isdefault > h4{border-left:2px solid rgba(122,201,160,.9);padding-left:7px}
@@ -884,14 +904,7 @@
     <button data-tab="speech">SPEECH</button>
     <button id="tab_ai" data-tab="ai">AI</button>
   </div>
-  <div id="savestate"></div>
   <div class="rule"></div>
-
-  <div class="seg" id="saverow">
-    <button id="b_save" class="act-save">SAVE FOR EVERYONE</button>
-    <button id="b_revert" class="act-undo">REVERT</button>
-  </div>
-  <div class="rule" id="saverule"></div>
   </div><!-- /panelhead -->
 
   <div id="grpbox">
@@ -1361,6 +1374,15 @@ button to download it as a PDF.</div>
        belonging to everything above it rather than to the last topic — and
        so it does not become one more collapsible section you have to open
        to find out how to save. -->
+  <!-- One commit row per tab, each writing only the settings on that tab.
+       There was a single SAVE FOR EVERYONE across all of them, which meant
+       pressing it while looking at MOTION also published whatever had been
+       left half-adjusted on LOOK — a save whose scope was wider than the
+       thing you were looking at. -->
+  <div id="uirow_look" class="uirow" data-uitab="look"></div>
+  <div id="uirow_motion" class="uirow" data-uitab="motion"></div>
+  <div id="uirow_speech" class="uirow" data-uitab="speech"></div>
+
   <div id="airow">
     <div class="note" id="rtlistnote"></div>
     <div class="seg">
@@ -1735,17 +1757,28 @@ function fmtOf(key){
   return v=> v;
 }
 
+/* Which tab each shared setting lives on, learned from where its control
+   actually sits rather than from a list kept in step by hand. A control moved
+   between tabs takes its setting with it, and a new one is covered the moment
+   it is bound. */
+const KEY_TAB = {};
+function ownTab(el, key){
+  const g = el.closest('.grp');
+  if (g && g.dataset.tab) KEY_TAB[key] = g.dataset.tab;
+}
+
 function bindSlider(el){
   const id  = el.id.slice(2);
   const key = SLIDER_KEY[id] || id;
   if (!(key in S)) return;
+  ownTab(el, key);
   const out = $('o_' + id);
   const fmt = key === 'hangover' ? (v=> Math.round(v*1000)+'ms') : fmtOf(key);
   const paint = ()=>{ el.value = S[key]; if (out) out.textContent = fmt(S[key]); };
   el.addEventListener('input', ()=>{
     S[key] = parseFloat(el.value);
     if (out) out.textContent = fmt(S[key]);
-    push(); dirty();
+    push(); dirty(key);
   });
   paint(); SLIDERS.push(paint);
 }
@@ -1753,8 +1786,9 @@ function bindSlider(el){
 function bindField(el, key){
   key = key || el.id;
   if (!(key in S)) return;
+  ownTab(el, key);
   const paint = ()=>{ el.value = S[key] == null ? '' : S[key]; };
-  el.addEventListener('input', ()=>{ S[key] = el.value; push(); dirty(); });
+  el.addEventListener('input', ()=>{ S[key] = el.value; push(); dirty(key); });
   paint(); FIELDS.push(paint);
 }
 
@@ -1773,12 +1807,13 @@ function buildControls(){
 
   document.querySelectorAll('.seg[data-set]').forEach(seg=>{
     const key = seg.dataset.set;
+    ownTab(seg, key);
     syncSeg(key);
     seg.addEventListener('click', e=>{
       const b = e.target.closest('button');
       if (!b || b.disabled) return;
       S[key] = BOOL_KEYS.has(key) ? b.dataset.v === '1' : b.dataset.v;
-      syncSeg(key); push(); dirty();
+      syncSeg(key); push(); dirty(key);
     });
   });
 
@@ -1800,7 +1835,17 @@ function buildControls(){
     cmd('selftest');
   });
 
+  /* Claimed by hand, and unconditionally: this select is filled from the
+     server rather than bound through bindField, and on a box with no voices
+     installed that fill never happens — which would leave the setting owned
+     by no tab, saved by nothing, on exactly the installs least likely to
+     notice. */
+  ownTab($('neuralvoice'), 'ttsvoice');
   voiceLists();
+  /* The rows count what each tab owns, and they cannot know that until every
+     control has been bound — which is here, not at sign-in where they are
+     first drawn. */
+  paintUiRows();
 }
 
 /* Neural voices come from the server; browser voices from this browser,
@@ -1816,7 +1861,7 @@ async function voiceLists(){
         o.value = v; o.textContent = v; nv.appendChild(o);
       });
       if (S.ttsvoice) nv.value = S.ttsvoice;
-      nv.addEventListener('change', ()=>{ S.ttsvoice = nv.value; push(); dirty(); });
+      nv.addEventListener('change', ()=>{ S.ttsvoice = nv.value; push(); dirty('ttsvoice'); });
     }catch(e){ nv.innerHTML = '<option>— server unreachable —</option>'; }
   }
   const bv = $('voicesel');
@@ -1834,40 +1879,115 @@ async function voiceLists(){
 }
 
 /* -------------------------------------------------------------- saving */
-function dirty(){
-  isDirty = true;
-  /* Red, because this is the one state where what the admin is looking at
-     and what everyone else is looking at have come apart. It is easy to tune
-     something, be satisfied by the preview, and walk away having changed
-     nothing for anybody. */
-  status('UNSAVED — the preview shows these changes, viewers do not', true);
+/* Per tab, because each tab now commits itself. `dirty` used to be one flag
+   for the whole shared document; a single flag cannot say which of three
+   commit buttons is the one that has work waiting behind it. */
+const DIRTY = new Set();
+
+function dirty(key){
+  const tab = KEY_TAB[key] || CURRENT_TAB;
+  if (tab) DIRTY.add(tab);
+  isDirty = DIRTY.size > 0;      // still what beforeunload asks
+  paintUiRows();
 }
-function status(m, bad){
-  const el = $('savestate');
-  if (!el) return;
-  el.textContent = m;
-  el.classList.toggle('alert', !!bad);
+/* Each tab's last word, held per tab. Kept in a map rather than read back off
+   the element, because painting one row must not depend on what another row
+   happens to be saying — repainting after a save on LOOK was wiping the
+   message MOTION had just put up. */
+const SAID = {};
+function status(m, bad, tab){
+  const t = tab || CURRENT_TAB;
+  SAID[t] = {m, bad};
+  paintUiRows();
 }
 
-$('b_save').addEventListener('click', async ()=>{
-  if (ME.role !== 'admin') return status('this account is read-only', true);
-  status('saving…');
+/* Each row says what it covers and whether it has anything waiting. Red on
+   unsaved, because this is the one state where what the admin is looking at
+   and what everyone else is looking at have come apart — it is easy to tune
+   something, be satisfied by the preview, and walk away having changed
+   nothing for anybody. */
+const UI_TABS = ['look', 'motion', 'speech'];
+function paintUiRows(){
+  UI_TABS.forEach(t=>{
+    const row = $('uirow_' + t);
+    if (!row) return;
+    if (!row.dataset.built){
+      row.dataset.built = '1';
+      row.innerHTML = '<div class="scope"></div>'
+                    + '<div class="seg">'
+                    + '<button class="act-save" data-do="save">SAVE FOR EVERYONE</button>'
+                    + '<button class="act-undo" data-do="revert">REVERT</button></div>'
+                    + '<div class="state"></div>';
+      row.querySelector('[data-do="save"]').addEventListener('click', ()=> saveTab(t));
+      row.querySelector('[data-do="revert"]').addEventListener('click', ()=> revertTab(t));
+    }
+    const n = Object.keys(KEY_TAB).filter(k=> KEY_TAB[k] === t).length;
+    const orphans = unclaimedSettings();
+    row.querySelector('.scope').textContent =
+      n + ' setting' + (n === 1 ? '' : 's') + ' on this tab, shared with every viewer'
+      + (orphans.length ? '  ·  ' + orphans.length + ' on no tab and saved by nothing: '
+                          + orphans.join(', ') : '');
+    /* Unsaved outranks whatever was last said: it is the one state where what
+       the admin is looking at and what everyone else is looking at have come
+       apart, and it must not be buried under a stale "saved". */
+    const st = row.querySelector('.state');
+    const said = SAID[t];
+    if (DIRTY.has(t)){
+      st.textContent = 'UNSAVED — the preview shows these changes, viewers do not';
+      st.classList.add('alert');
+    } else {
+      st.textContent = said ? said.m : '';
+      st.classList.toggle('alert', !!(said && said.bad));
+    }
+  });
+}
+
+/* Anything the panel can change but no tab claims would be silently dropped
+   by every SAVE. Cheap to check, and it fails loudly in the one place
+   somebody would look. */
+function unclaimedSettings(){
+  // S arrives from the preview, which reports after this page has signed in —
+  // so this runs at least once with nothing to check.
+  return S ? Object.keys(S).filter(k=> !(k in KEY_TAB)) : [];
+}
+
+function tabKeys(tab){
+  const out = {};
+  if (!S) return out;
+  Object.keys(KEY_TAB).forEach(k=>{ if (KEY_TAB[k] === tab) out[k] = S[k]; });
+  return out;
+}
+
+async function saveTab(tab){
+  if (ME.role !== 'admin') return status('this account is read-only', true, tab);
+  status('saving…', false, tab);
   try{
-    const j = await api('/settings', {method:'POST', body: JSON.stringify(S)});
-    isDirty = false;
-    status('saved for everyone · ' + j.keys + ' settings');
-  }catch(e){ status(e.message, true); }
-});
+    const body = {settings: tabKeys(tab), merge: true};
+    const j = await api('/settings', {method:'POST', body: JSON.stringify(body)});
+    DIRTY.delete(tab);
+    isDirty = DIRTY.size > 0;
+    status('saved for everyone · ' + Object.keys(body.settings).length
+           + ' settings on this tab', false, tab);
+  }catch(e){ status(e.message, true, tab); }
+}
 
-/* Reload the preview rather than patch this page: the display re-reads the
-   server and announces what it actually ended up with, which is the only
-   version worth trusting. */
-$('b_revert').addEventListener('click', ()=>{
-  status('reloading from the server…');
-  reverting = true;
-  ready = false;
-  frame.src = '/index.html?preview=1';
-});
+/* Only this tab's settings go back to what the server holds. Everything else
+   somebody has in flight on another tab stays in flight — reverting LOOK
+   should not throw away an hour spent on SPEECH. */
+async function revertTab(tab){
+  status('reloading this tab from the server…', false, tab);
+  try{
+    const j = await fetch('/settings', {cache:'no-store'}).then(r=>r.json());
+    const stored = (j && j.settings) || {};
+    Object.keys(tabKeys(tab)).forEach(k=>{ if (k in stored) S[k] = stored[k]; });
+    repaintControls();
+    applyType();
+    push();
+    DIRTY.delete(tab);
+    isDirty = DIRTY.size > 0;
+    status('back to what the server holds', false, tab);
+  }catch(e){ status(e.message, true, tab); }
+}
 
 $('b_reload').addEventListener('click', ()=>{ ready = false; frame.src = '/index.html?preview=1'; });
 $('b_open').addEventListener('click', ()=> window.open('/index.html', '_blank'));
@@ -2098,6 +2218,7 @@ function blockHTML(r){
 server log, and wherever a transcript label uses <b>{assistant}</b>. It is
 never spoken and never matched against.</div>
 
+  <div class="subwrap">
   <div class="subgrp" data-g="wake">
     <h5>Wake word<span class="subsum"></span></h5>
     <div class="subbody">
@@ -2217,11 +2338,14 @@ out loud, so ask for plain prose.</div>
     </div>
   </div>
 
-  <div class="seg" style="margin-top:12px">
+  </div><!-- /subwrap -->
+
+  <div class="rtacts">
     <button data-a="save" class="act-save">SAVE</button>
     <button data-a="test">TEST</button>
     <button data-a="default">MAKE DEFAULT</button>
     <button data-a="enable">SWITCH OFF</button>
+    <span class="spacer"></span>
     <button data-a="forget" class="act-undo">FORGET KEY</button>
     <button data-a="delete" class="act-danger">DELETE</button>
   </div>
@@ -3108,6 +3232,7 @@ $('b_docpdf').addEventListener('click', async ()=>{
    replaced in the same tab, and calling this twice would stack a second set
    of listeners on every tab button and heading — so each click would toggle
    twice and appear to do nothing. */
+let CURRENT_TAB = 'look';
 let navBuilt = false;
 function panelNav(){
   if (navBuilt) return;
@@ -3183,8 +3308,10 @@ function panelNav(){
   const SETTINGS_TABS = new Set(['look', 'motion', 'speech']);
   function syncSaveRow(){
     const show = SETTINGS_TABS.has(tab) ? '' : 'none';
-    ['saverow', 'savestate', 'saverule'].forEach(id=>{
-      const el = $(id); if (el) el.style.display = show;
+    UI_TABS.forEach(t=>{
+      const el = $('uirow_' + t);
+      if (el) el.classList.toggle('on', tab === t && !(findEl.value || '').trim()
+                                        && !!ME && ME.role === 'admin');
     });
     /* The app tab's own commit row. Only on that tab, and only when nothing
        is being filtered — a filter mixes sections from every tab, so a row
@@ -3202,6 +3329,7 @@ function panelNav(){
   }
   function selectTab(b){
     tab = b.dataset.tab;
+    CURRENT_TAB = tab;
     tabButtons.forEach(x=> x.classList.toggle('on', x === b));
     // arriving at a tab shows its topics closed, not whatever was left open
     groups.forEach(g=>{ if (g.dataset.tab === tab) shut.set(g, true); });
@@ -3265,7 +3393,7 @@ function start(){
      only way to change account was a reload. */
   const admin = ME.role === 'admin';
   document.body.classList.toggle('ro', !admin);
-  $('b_save').style.display = admin ? '' : 'none';
+  paintUiRows();
   // /app is admin-only on the server, so a viewer would open an empty panel
   // and be left wondering. Don't offer it. Same for the embed keys, which
   // are credentials rather than configuration.

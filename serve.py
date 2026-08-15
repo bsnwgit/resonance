@@ -2347,9 +2347,30 @@ class Handler(SimpleHTTPRequestHandler):
             obj = self._json_body()
             if obj is None:
                 return
-            write_settings(obj)
-            print("settings saved (%d keys) by %s" % (len(obj), s["user"]), flush=True)
-            return self._json(200, {"ok": True, "keys": len(obj)})
+            # Two shapes. A bare object replaces the document, which is what
+            # this route has always done. `{"settings": …, "merge": true}`
+            # writes only the keys it carries and leaves the rest alone —
+            # what a panel needs once each part of it commits separately,
+            # because a full replace from one part would quietly publish
+            # every unsaved edit made in another.
+            if isinstance(obj.get("settings"), dict):
+                incoming = obj["settings"]
+                merge = bool(obj.get("merge"))
+            else:
+                incoming, merge = obj, False
+            if merge:
+                # Re-read inside the write lock's shadow rather than trusting
+                # a copy this browser loaded minutes ago: two admins on two
+                # tabs must not undo each other's untouched settings.
+                stored = read_settings()
+                stored.update(incoming)
+                incoming = stored
+            write_settings(incoming)
+            print("settings saved (%d key%s%s) by %s"
+                  % (len(obj.get("settings", obj)),
+                     "" if len(obj.get("settings", obj)) == 1 else "s",
+                     ", merged" if merge else "", s["user"]), flush=True)
+            return self._json(200, {"ok": True, "keys": len(incoming)})
 
         if parsed.path == "/tts":
             if self._cap("speak")[1]:
