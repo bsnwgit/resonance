@@ -80,6 +80,11 @@ BACKEND_DEFAULTS = {
     # one. Blank it for a hosted provider, which will reject unknown fields.
     "keep_alive": "30m",
     "history_turns": 8,
+    # Which of Home Assistant's conversation agents answers. Blank is its
+    # configured default. It belongs to the connection rather than to the
+    # route because it is part of the address: the same box with two agents
+    # is two destinations.
+    "agent_id": "",
 }
 OPENAI_DIALECT = ("openai",)            # one shape, many vendors — see ask_backend
 # Anthropic is its own shape, not a dialect of the above: the system prompt is a
@@ -87,7 +92,13 @@ OPENAI_DIALECT = ("openai",)            # one shape, many vendors — see ask_ba
 # the reply is a list of content blocks. It gets its own branch.
 ANTHROPIC_VERSION = "2023-06-01"
 ANTHROPIC_BASE = "https://api.anthropic.com"
-PROVIDERS = ("demo", "anthropic") + OPENAI_DIALECT
+# Home Assistant is an adapter, not a second concept. Its conversation API is
+# chat-shaped — one POST with a bearer token, text in and text out — so it
+# reaches the display through the same machinery as everything else. Inventing
+# an "action target" beside the adapter would be a second mechanism for
+# something the first one already does.
+HOMEASSISTANT = "homeassistant"
+PROVIDERS = ("demo", "anthropic", HOMEASSISTANT) + OPENAI_DIALECT
 MAX_HISTORY = 24                        # hard ceiling regardless of configuration
 
 # ------------------------------------------------------------ app settings
@@ -283,7 +294,8 @@ def validate_backend(obj, current):
     of them or six. validate_route calls this for a route's connection half
     and adds the name and the wake word on top."""
     cfg = dict(current)
-    for k in ("provider", "base_url", "model", "system", "keep_alive"):
+    for k in ("provider", "base_url", "model", "system", "keep_alive",
+              "agent_id"):
         if k in obj:
             cfg[k] = str(obj[k] or "").strip()
     if cfg["provider"] not in PROVIDERS:
@@ -319,13 +331,29 @@ def validate_backend(obj, current):
     # That is worse than any error, because it looks like it worked.
     if cfg["provider"] != (current.get("provider") or "demo"):
         if "base_url" not in obj:
-            cfg["base_url"] = (ANTHROPIC_BASE if cfg["provider"] == "anthropic"
+            # Home Assistant has no default address — it is wherever this
+            # house put it — so switching to it clears the field rather than
+            # leaving a model's endpoint sitting under a new label.
+            cfg["base_url"] = ("" if cfg["provider"] == HOMEASSISTANT else
+                               ANTHROPIC_BASE if cfg["provider"] == "anthropic"
                                else BACKEND_DEFAULTS["base_url"])
         if not str(obj.get("api_key") or "").strip():
             cfg["api_key"] = ""
 
     if cfg["provider"] != "demo":
-        if not cfg["model"]:
+        if cfg["provider"] == HOMEASSISTANT:
+            # No model field: Home Assistant has no model of its own. What it
+            # has is the harness — a conversation agent, and behind an
+            # LLM-backed one a model that HA is configured with, not this
+            # server. Asking for one here would be a field with nowhere to go.
+            if not cfg["base_url"]:
+                return None, ("Home Assistant needs its address, e.g. "
+                              "http://homeassistant.local:8123")
+            # Unreachable and rejected are the two ways this fails in front of
+            # somebody, and the second one is preventable here.
+            if not cfg["api_key"]:
+                return None, "Home Assistant needs a long-lived access token"
+        elif not cfg["model"]:
             return None, "a model is required"
         if cfg["provider"] == "anthropic":
             # There is exactly one endpoint, so an empty field is a blank to
@@ -430,12 +458,18 @@ def effective_system(cfg, tz=None):
     return (base + "\n\n" + tail) if base else tail
 
 
-def ask_backend(text, history, cfg, tz=None):
+def ask_backend(text, history, cfg, tz=None, conversation_id=""):
     """One turn against whichever assistant is configured.
 
     `openai` is the dialect, not the vendor: Ollama, OpenClaw, LM Studio and
     vLLM all speak it, so one adapter reaches all of them and the difference
-    is a base URL."""
+    is a base URL.
+
+    Returns a dict rather than the reply string it used to. Home Assistant
+    says three things about the conversation itself — whether to hang up,
+    which conversation this was, and why it could not answer — and each of
+    them changes what the display does next. A second return channel bolted
+    on beside the string would have been the same data with a worse name."""
     turns = [m for m in history if isinstance(m, dict)
              and m.get("role") in ("user", "assistant") and m.get("content")]
     keep = max(0, min(int(cfg.get("history_turns") or 0), MAX_HISTORY))
@@ -459,7 +493,8 @@ def ask_backend(text, history, cfg, tz=None):
         choices = j.get("choices") or []
         if not choices:
             raise RuntimeError("the model returned no choices")
-        return ((choices[0].get("message") or {}).get("content") or "").strip()
+        return {"reply": ((choices[0].get("message") or {}).get("content")
+                          or "").strip()}
 
     if cfg["provider"] == "anthropic":
         base = (cfg.get("base_url") or ANTHROPIC_BASE).rstrip("/")
@@ -488,9 +523,66 @@ def ask_backend(text, history, cfg, tz=None):
         reply = "\n".join(p for p in parts if p).strip()
         if not reply and j.get("stop_reason") == "refusal":
             raise RuntimeError("the model declined to answer that")
-        return reply
+        return {"reply": reply}
+
+    if cfg["provider"] == HOMEASSISTANT:
+        return ask_homeassistant(text, cfg, conversation_id)
 
     raise RuntimeError("provider '%s' has no adapter" % cfg["provider"])
+
+
+def ha_url(base, path):
+    """Home Assistant's API under whatever was typed in the address field.
+
+    Somebody setting this up has that URL in another tab, and what they copy
+    is as likely to be `…:8123/api` — or the conversation path itself, from
+    the documentation — as the bare origin. All three mean the same house."""
+    base = (base or "").rstrip("/")
+    base = re.sub(r"/api(/conversation/process)?$", "", base)
+    return base + path
+
+
+def ask_homeassistant(text, cfg, conversation_id=""):
+    """One turn against Home Assistant's conversation agent.
+
+    No history, no system prompt, no token or temperature limits: HA holds
+    the conversation itself against `conversation_id`, and what the agent is
+    told is configured in HA. Sending our own would be this server's idea of
+    the conversation arriving beside HA's, and the fields are hidden in the
+    panel for the same reason."""
+    body = {"text": text}
+    if conversation_id:
+        body["conversation_id"] = conversation_id
+    if (cfg.get("agent_id") or "").strip():
+        body["agent_id"] = cfg["agent_id"].strip()
+    j = _post_json(ha_url(cfg.get("base_url"), "/api/conversation/process"),
+                   body, {"Authorization": "Bearer " + (cfg.get("api_key") or "").strip()},
+                   int(cfg.get("timeout") or 120))
+    resp = j.get("response") or {}
+    speech = (((resp.get("speech") or {}).get("plain") or {})
+              .get("speech") or "").strip()
+    kind = str(resp.get("response_type") or "")
+    # The fallthrough signal, and structured so that acting on it is a branch
+    # rather than string-matching an apology. Only an error carries a code
+    # worth reading; `data` on a successful action is a list of targets.
+    code = str((resp.get("data") or {}).get("code") or "") if kind == "error" else ""
+
+    # An action that succeeded and said nothing is not a failure, but silence
+    # is indistinguishable from one on a display somebody is standing in
+    # front of — and a command that quietly did nothing is the failure this
+    # adapter most needs to not have.
+    if not speech and kind == "action_done":
+        speech = "Done."
+
+    # continue_conversation decides whether to hang up, and it belongs to the
+    # reply rather than to the configuration: a command should acknowledge and
+    # close, but "turn on the lights" answered with "which room?" has to stay
+    # open, and a route configured one-shot would hang up on the question it
+    # just asked. Absent — an older Home Assistant that does not send it — is
+    # not false: staying awake is the behaviour every other adapter has.
+    return {"reply": speech, "code": code,
+            "hangup": j.get("continue_conversation") is False,
+            "conversation_id": str(j.get("conversation_id") or "")}
 
 
 # ------------------------------------------------------------------- routes
@@ -536,6 +628,14 @@ ROUTE_DEFAULTS.update({
     # hardware on the other.
     "strict": False,
     "enabled": True,
+    # Another route's id, or blank. Nobody remembers which name owns which
+    # capability, so asking the house something it cannot answer will be
+    # constant: the house reports that it recognised no intent, the named
+    # route gets the question instead, and the person is never told they used
+    # the wrong word. A relationship between routes rather than part of an
+    # adapter's configuration, which is why it lives here and not in
+    # BACKEND_DEFAULTS.
+    "fallthrough": "",
 })
 MAX_ROUTES = 24                  # a household, not a directory service
 
@@ -667,6 +767,17 @@ def admin_routes(doc):
     return out
 
 
+def route_dest(cfg):
+    """What a route reaches, for the console and the log. A model name where
+    there is one; a house has none, and printing an empty field there reads
+    as a configuration somebody forgot to finish."""
+    if cfg["provider"] == HOMEASSISTANT:
+        return "home assistant" + (" · " + cfg["agent_id"] if cfg.get("agent_id") else "")
+    if cfg["provider"] == "demo":
+        return "demo"
+    return "%s/%s" % (cfg["provider"], cfg["model"] or "(no model)")
+
+
 def resolve_route(doc, rid):
     """Which route answers. An id nobody recognises falls back to the default
     rather than failing: a display holding a route that was deleted while it
@@ -699,6 +810,17 @@ def validate_route(obj, current, doc, rid=None):
         rec["strict"] = bool(obj["strict"])
     if "enabled" in obj:
         rec["enabled"] = bool(obj["enabled"])
+    if "fallthrough" in obj:
+        rec["fallthrough"] = str(obj["fallthrough"] or "").strip()[:32]
+    if rec.get("fallthrough"):
+        # Both of these are a route that silently answers nothing: one is a
+        # loop, the other is a name that no longer exists. A deleted target
+        # is left to the route that pointed at it rather than rewritten
+        # here — see /routes/delete.
+        if rec["fallthrough"] == rid:
+            return None, "a route cannot fall through to itself"
+        if rec["fallthrough"] not in doc["routes"]:
+            return None, "the route to fall through to no longer exists"
     if "wakeword" in obj:
         rec["wakeword"] = _norm_word(obj["wakeword"])[:40]
     if not rec["wakeword"]:
@@ -2088,8 +2210,21 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(409, {"error": "this is the only route — "
                                         "make another before removing it"})
             name = doc["routes"].pop(rid)["name"]
+            # Anything that fell through to it now falls through to nothing.
+            # Cleared here rather than left dangling: a stored id that names
+            # no route is a setting the panel cannot show and nobody can
+            # correct, and the behaviour it produces — the house answering
+            # "I don't understand" where it used to hand over — has no visible
+            # cause.
+            orphaned = [r for r, o in doc["routes"].items()
+                        if o.get("fallthrough") == rid]
+            for r in orphaned:
+                doc["routes"][r]["fallthrough"] = ""
             write_routes(doc)             # which settles the default, if it was this one
-            print("route %s (%s) deleted by %s" % (rid, name, s["user"]), flush=True)
+            print("route %s (%s) deleted by %s%s"
+                  % (rid, name, s["user"],
+                     (" — %d no longer fall through to it" % len(orphaned))
+                     if orphaned else ""), flush=True)
             return self._json(200, {"ok": True, "routes": admin_routes(doc),
                                     "default": doc["default"]})
 
@@ -2157,17 +2292,38 @@ class Handler(SimpleHTTPRequestHandler):
             if rec["provider"] == "demo":
                 return self._json(200, {"demo": True, "name": rec["name"],
                                         "reply": "", "ms": 0})
+            # Deliberately not a command, on a route that may be wired to a
+            # house: a test button that switches something on is a test button
+            # nobody presses twice.
             text = (str(obj.get("text") or "").strip()
                     or "Reply with one short sentence confirming you can hear me.")
             t0 = time.time()
             try:
-                reply = ask_backend(text[:500], [], rec)
+                out = ask_backend(text[:500], [], rec)
             except Exception as exc:                       # noqa: BLE001
-                print("route test failed (%s %s/%s): %s"
-                      % (rid, rec["provider"], rec["model"], exc), flush=True)
+                print("route test failed (%s %s): %s"
+                      % (rid, route_dest(rec), exc), flush=True)
                 return self._json(502, {"error": str(exc), "name": rec["name"]})
-            return self._json(200, {"reply": reply, "name": rec["name"],
-                                    "ms": int((time.time() - t0) * 1000)})
+            res = {"reply": out.get("reply") or "", "name": rec["name"],
+                   "ms": int((time.time() - t0) * 1000)}
+            if rec["provider"] == HOMEASSISTANT:
+                # A round trip that comes back "I don't understand" is a PASS
+                # here, and an admin cannot be expected to know that: the
+                # built-in intent engine matches sentences, and a test
+                # sentence is not one of them. What the round trip proves is
+                # the address, the token and the agent — three of the four
+                # things that go wrong. The fourth, whether the right entities
+                # are exposed, only a real command answers.
+                res["check"] = ("no command was recognised in the test "
+                                "sentence, which is what the built-in intent "
+                                "engine does with anything that is not one — "
+                                "the address, the token and the agent are all "
+                                "good. Ask it to switch something on to test "
+                                "what is exposed."
+                                if out.get("code") == "no_intent_match" else
+                                "the agent answered — address, token and agent "
+                                "are all good.")
+            return self._json(200, res)
 
         if parsed.path == "/embed/session":
             # A host application's SERVER calling this one. No cookie, no
@@ -2299,7 +2455,8 @@ class Handler(SimpleHTTPRequestHandler):
             # Which name was spoken decides where this goes. Nothing spoke a
             # name at all when it was typed into the composer or pushed
             # through an embed, and that is what the default route is for.
-            rid, cfg = resolve_route(read_routes(), str(obj.get("route") or "")[:32])
+            doc = read_routes()
+            rid, cfg = resolve_route(doc, str(obj.get("route") or "")[:32])
             if not cfg:
                 return self._json(503, {"error": "no route is answering"})
             # The route is named back on every reply, not just when it
@@ -2311,25 +2468,73 @@ class Handler(SimpleHTTPRequestHandler):
                 # The display owns the demo replies; say so plainly rather
                 # than inventing a second set that drifts from the first.
                 return self._json(200, dict(about, reply="", demo=True))
+            history = obj.get("history") or []
+            tz = str(obj.get("tz") or "")[:64]
             t0 = time.time()
             try:
-                reply = ask_backend(text, obj.get("history") or [], cfg,
-                                    tz=str(obj.get("tz") or "")[:64])
+                out = ask_backend(text, history, cfg, tz=tz,
+                                  # Held by the display for exactly as long as
+                                  # the route binding, and handed back on every
+                                  # turn: it is what makes "which room?" →
+                                  # "the kitchen" work.
+                                  conversation_id=str(obj.get("conversation_id")
+                                                      or "")[:64])
             except Exception as exc:                       # noqa: BLE001
-                print("ask failed (%s %s/%s): %s"
-                      % (rid, cfg["provider"], cfg["model"], exc), flush=True)
+                print("ask failed (%s %s): %s"
+                      % (rid, route_dest(cfg), exc), flush=True)
                 # The message names the route rather than the adapter. A
                 # display says this out loud, and "openai returned 401" tells
                 # the person standing in front of it nothing they can act on
                 # while telling anyone in earshot what this box is wired to.
                 return self._json(502, dict(about, error=str(exc)))
+
+            # Nobody remembers which name owns which capability. Asked
+            # something it has no intent for, a house hands the question to
+            # the route it was told to, and the person is never told they used
+            # the wrong word — so the answer keeps the house's name and voice.
+            #
+            # One hop, and never the target's own fallthrough: a chain of them
+            # is a question travelling somewhere nobody chose, at a cost per
+            # link, and two routes pointing at each other would do it for ever.
+            fell_to = ""
+            if out.get("code") == "no_intent_match" and cfg.get("fallthrough"):
+                ft = cfg["fallthrough"]
+                alt = doc["routes"].get(ft)
+                # Strictly this route, not resolve_route's fallback to the
+                # default: falling back there could hand the question to the
+                # house that just declined it, or to somewhere nobody named.
+                if alt and alt.get("enabled", True) and alt["provider"] != "demo":
+                    try:
+                        second = ask_backend(text, history, alt, tz=tz)
+                    except Exception as exc:               # noqa: BLE001
+                        print("fallthrough failed (%s -> %s): %s"
+                              % (rid, ft, exc), flush=True)
+                    else:
+                        fell_to = alt["name"]
+                        # The house's conversation id survives — the binding is
+                        # still to the house and the next turn goes there. Its
+                        # hang-up does not: it was refusing a sentence, and
+                        # closing the conversation on an answer somebody is
+                        # still listening to is the one thing that would make
+                        # this visible.
+                        out = dict(out, reply=second.get("reply") or "",
+                                   hangup=False, code="")
+
             ms = int((time.time() - t0) * 1000)
+            reply = out.get("reply") or ""
             if not reply:
                 return self._json(502, dict(about, ms=ms,
                                             error="that route returned nothing"))
-            print("ask ok (%s %s %s) %dms" % (rid, cfg["provider"], cfg["model"], ms),
+            print("ask ok (%s %s) %dms%s"
+                  % (rid, route_dest(cfg), ms,
+                     " — fell through to " + fell_to if fell_to else ""),
                   flush=True)
-            return self._json(200, dict(about, reply=reply, ms=ms))
+            # `hangup` and `conversation_id` are the display's to act on: it
+            # owns the awake window, and the server has no idea a conversation
+            # is in progress between two requests.
+            return self._json(200, dict(about, reply=reply, ms=ms,
+                                        hangup=bool(out.get("hangup")),
+                                        conversation_id=out.get("conversation_id") or ""))
 
         if parsed.path == "/app":
             s = self._require("admin")
@@ -2538,7 +2743,7 @@ def main():
         print("route %-10s “%s”%s%s%s" % (
             _r["name"], _r["wakeword"],
             "" if _r["provider"] == "demo" else
-            " · %s · %s" % (_r["model"] or "(no model)", _r["base_url"]),
+            " · %s · %s" % (route_dest(_r), _r["base_url"]),
             "  (default)" if _rid == _doc["default"] else "",
             "" if _r.get("enabled", True) else "  — not answering"), flush=True)
 

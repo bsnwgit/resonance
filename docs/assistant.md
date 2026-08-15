@@ -50,7 +50,7 @@ rather than leaving the display with nowhere to send anything.
 |---|---|---|
 | what it looks like | name, greeting, voice | anyone who can reach the port |
 | what it answers to | the words, and how closely they must match | the same, today |
-| **what it is connected to** | service, address, key, instructions | **nobody, through any browser** |
+| **what it is connected to** | service, address, key or house token, conversation agent, instructions, where it falls through to | **nobody, through any browser** |
 
 The words have to reach the browser because that is where the listening
 happens. **What it is connected to does not, at any tier** — nothing needs it,
@@ -110,7 +110,15 @@ them this stops being a convenience: "the assistant works" is no longer
 something that can be true or false about this server as a whole, and a test
 that quietly exercised a different one would be worse than none.
 
-## The three providers
+**On a Home Assistant endpoint, "Sorry, I couldn't understand that" is a
+pass.** The built-in agent matches commands, and the test question is not one —
+so the reply that proves the address, the token and the agent are all correct
+is the one that sounds like a failure. TEST spells that out underneath. The
+test question is never a command: a TEST button that switches something on is
+one nobody presses twice. To check that the right devices are exposed, ask it
+to switch something on out loud.
+
+## The four providers
 
 ### DEMO
 
@@ -158,6 +166,77 @@ answers in it — which proves the request is well formed, not that the real
 endpoint accepts every assumption in it. If you are the first to point one at
 a real key, press TEST before trusting it in a room.
 
+### HOME ASSISTANT
+
+The house as an endpoint. Say its wake word and what follows goes to Home
+Assistant's conversation agent, which answers in words the display reads out —
+*"Turned on the kitchen light."*
+
+Set up in three fields:
+
+| Field | What to put in it |
+|---|---|
+| Home Assistant address | where it lives, e.g. `http://homeassistant.local:8123`. Pasting `…/api` or the full conversation path works too |
+| long-lived access token | made in Home Assistant, under a user's profile |
+| conversation agent | blank uses whichever agent is set as default over there |
+
+**Make it a Home Assistant user of its own, and not an administrator.** The
+token carries that user's permissions and never expires, and every action shows
+up in the logbook as that user whoever actually spoke. One account for this
+display is the difference between a logbook that tells you something and one
+that says the same name for everything.
+
+**What voice may touch is decided in Home Assistant**, by exposing entities to
+Assist. There is deliberately no list of allowed devices here — the control
+over there already holds no matter what is talking to it, and a second copy
+would only be a weaker one that can disagree with the first.
+
+**Start with few entities exposed.** Most of the wait on an LLM-backed agent is
+the list of exposed entities going into the prompt on every call, and choosing
+among four lights is where a small model succeeds and among sixty is where it
+starts guessing.
+
+**Which agent answers changes what to expect.** The built-in intent engine
+matches sentences: it is fast — a tenth of a second — does exactly what it is
+told, and says it does not understand anything that is not a command. An
+LLM-backed one interprets, so *"it's a bit dark in here"* works, and each
+request is two model passes rather than one. Set the **timeout** to the agent
+you actually have; one chosen for the intent engine will cut off an LLM agent
+just before it succeeds.
+
+**It ends the conversation when it is finished.** A command that completed
+closes the conversation and the display goes back to sleep without a farewell;
+a reply that asks something — *"which room?"* — stays awake, so the answer needs
+no wake word. Home Assistant decides that per reply, not you.
+
+**When it recognises nothing, ask** hands the question to another assistant.
+Somebody will ask the house what the capital of France is, and this is meant to
+stop that being a dead end: the model answers, in the house's name and voice,
+and nobody is told they used the wrong word.
+
+**Expect it to fire rarely on the built-in agent.** That agent matches the
+*shape* of a sentence before it looks for a device, so "what's the capital of
+France" comes back as *"Sorry, I am not aware of any device called capital of
+France"* — an unknown device, not an unrecognised sentence, and the fallthrough
+does not apply. It catches sentences that match no pattern at all, such as "how
+are you". This is a known limit rather than a fault, and widening it is held
+back on purpose: an unknown device and a general question are indistinguishable
+in the reply, so a command for a device you do not have would be answered by a
+model that may claim to have done it.
+
+Leave it at *nothing* for an LLM-backed agent, which interprets rather than
+matches, answers general questions itself, and so almost never reports that it
+recognised nothing.
+
+Only the **timeout** applies from the Limits box, and there is no system prompt:
+Home Assistant holds the conversation itself and its agent is instructed over
+there. Those controls hide themselves rather than sit on screen doing nothing.
+
+**Not yet tested against a real installation.** Implemented from the published
+API and exercised end to end against a server answering in it — which proves
+the request is well formed, not that a real house agrees. Press TEST first, and
+see the note under it below.
+
 ## Fields that do not apply everywhere
 
 **temperature is not sent to Anthropic at all.** The current Claude models
@@ -195,6 +274,10 @@ Never in `settings.json`. That document is world-readable by design — every
 viewer's browser fetches it to build the interface — so a key placed there
 would be handed to anyone who opened the page.
 
+A Home Assistant token is a key like any other here, and lives in the same
+place under the same rules — the field is labelled differently because that is
+what Home Assistant calls it, not because it is treated differently.
+
 Keys live in `routes.json`, admin-only, mode 600, one per assistant. A key is
 **never returned to a browser**: the field shows whether one is stored, not
 what it is. Leaving the field blank keeps the stored key; **FORGET KEY**
@@ -217,8 +300,10 @@ Sent ahead of every question, and it matters more here than in a chat box: the
 reply is **read aloud**. Markdown, bullets, headings and emoji are all noise
 when spoken, and a bulleted answer read out is unusable.
 
-Each assistant has its own. A house and a general assistant want different
-instructions, and one wording covering both suits neither.
+Each assistant has its own. A local model and a hosted one want different
+instructions, and one wording covering both suits neither. A Home Assistant
+endpoint has none at all — its agent is instructed in Home Assistant — so the
+box is closed on those.
 
 The shipped prompt asks for one or two sentences of plain prose. **RESET**
 returns to it. That single instruction is the largest difference between a
@@ -273,7 +358,9 @@ earshot what the box is wired to.
 | "cannot reach ..." | wrong base URL or port, or the model server is not running |
 | "404 ... model" | model name does not match what is installed |
 | "401" / "invalid api key" | key wrong, or missing for a hosted provider |
-| "timed out after ..." | cold model; raise the timeout |
+| "timed out after ..." | cold model; raise the timeout — or an LLM-backed house agent doing two passes over a long entity list |
+| the house says it does not understand | that is a pass for the built-in agent on a test sentence; on a real command, the device is not exposed to Assist or is named something else |
+| the house heard a command and did nothing audible | it did not fail silently — an action with nothing to say is spoken as "Done." If you hear nothing at all, look at the note on screen |
 | still on DEMO | that one is set to DEMO — nothing was asked of a model |
 | the wrong one answered | a near-miss; set the other to THE EXACT WORD, or move the words further apart |
 | nothing woke at all | the word belongs to none of them, or the gate is off — SPEECH tab |

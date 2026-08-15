@@ -82,6 +82,13 @@ can also end the conversation deliberately with the sleep word, if one is
 configured — one word, whichever assistant you were talking to. Ask your
 administrator which words are set.
 
+**An assistant that controls something may hang up by itself.** Ask one wired
+to a house to switch a light on and it will confirm, then stop listening
+straight away — the job is done, and there is nothing to follow up. If instead
+it asks you something back — *"which room?"* — it stays awake for the answer, so
+just say it. You never have to work out which of the two just happened; say the
+name again if it has gone quiet.
+
 **Going to sleep clears the conversation.** This is deliberate — see below.
 
 ## What it remembers

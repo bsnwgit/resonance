@@ -405,7 +405,7 @@ while the wake gate is off.
 | --- | --- | --- |
 | **presentation** | name, greeting, voice | anyone who can reach the port |
 | **routing** | wake word, aliases, matching | the same today; behind the device token when displays land |
-| **connection** | adapter kind, base URL, API key, prompt | nobody, through any browser |
+| **connection** | adapter kind, base URL, API key or house token, conversation agent, prompt, where it falls through to | nobody, through any browser |
 
 The wake words must reach the browser because that is where matching happens.
 The adapter kind must not: nothing needs it, replies come back already
@@ -432,7 +432,7 @@ answers to the same word afterwards as before. Both source documents are left
 on disk: an upgrade that deletes what it read from has no way back if the
 migration was wrong.
 
-### The three providers
+### The four providers
 
 **DEMO** answers from the display's own built-in text. Nothing is sent
 anywhere, no key is needed, and the system prompt is ignored.
@@ -466,6 +466,128 @@ so it has no preset — the provider button fills it. A key is required, and
 saving without one is refused rather than discovered later by whoever is
 standing in front of the screen.
 
+**HOME ASSISTANT** — the house as an endpoint. Also **verified against a stub
+speaking its wire format rather than against a real installation**, on the same
+terms as Anthropic above: every field is implemented from the published shape
+and exercised end to end against a server that answers in it.
+
+It is an adapter, not a second concept. Its conversation API is chat-shaped —
+`POST /api/conversation/process` with a bearer token, text in and
+`response.speech.plain.speech` out — which is the same shape the other two
+produce, so it reaches the display through the machinery that was already
+there. An "action target" beside the adapter would have been a second
+mechanism for something the first one does.
+
+Address is the Home Assistant origin, e.g. `http://homeassistant.local:8123`.
+Pasting `…/api`, or the conversation path itself out of the documentation,
+works too — what is typed is stored, and the path is normalised per request.
+
+Three fields of the reply do more than carry the words:
+
+- **`continue_conversation` decides whether to hang up**, and it belongs to
+  the reply rather than to the configuration. A command should acknowledge and
+  close, but *"turn on the lights"* answered with *"which room?"* has to stay
+  open, and an endpoint configured one-shot would hang up on the question it
+  just asked. The display sleeps when the flag is `false`, silently — the
+  reply is already being spoken and a farewell on top of it is one sentence
+  too many. Absent, on a Home Assistant predating the flag, is **not** false:
+  staying awake is what every other endpoint does.
+- **`conversation_id`** is held for exactly as long as the route binding —
+  handed back on every turn, dropped on sleep and on switching endpoints. It
+  is what makes *"which room?" → "the kitchen"* mean anything. The display
+  treats it as opaque: it never reads one and never invents one.
+- **`data.code == "no_intent_match"`** is the fallthrough signal, below.
+
+**Give it a non-admin Home Assistant user of its own.** A long-lived token
+carries that user's permissions and never expires, and every action appears in
+the logbook as that user regardless of who spoke.
+
+**What voice may touch is configured in Home Assistant**, by exposing entities
+to Assist. This deliberately grows no allow-list of its own: that would be a
+second, weaker copy of a control that already holds no matter what talks to
+HA. The house's logic belongs to the house — which is the same reason the
+system prompt is not sent, and why an LLM-backed agent's interpretation
+belongs over there.
+
+**Expose few entities to start with.** It shrinks the prompt on every call,
+which is most of the latency, and it makes the choice easier, which is where a
+small model actually fails. Choosing among four lights tests the design;
+choosing among sixty tests the model.
+
+**Home Assistant has no model of its own.** What it has is the harness: a
+conversation-agent framework, integrations pointing at a model *you* supply,
+and the exposure layer that turns entities into tools that model may call. So
+adopting this still costs a model and somewhere to run it — a *second* one,
+beside whatever endpoint Resonance already points at, and the two want
+different things: conversational quality on one side, reliable tool calling on
+the other.
+
+**Not taken: the Wyoming satellite route.** It is HA's expected way to
+integrate a voice device, and it inverts this product — HA would own wake word,
+transcription and speech, leaving a microphone with a screen. The conversation
+API keeps the seam at text, which is the one place these two systems agree.
+
+### When a house recognises nothing
+
+Nobody remembers which name owns which capability, so somebody will ask the
+house a general question. **when it recognises nothing, ask** names another
+endpoint to hand it to: the house reports `no_intent_match`, the model answers
+instead, and the person is never told they used the wrong word. Structured, so
+this is a branch rather than string-matching an apology.
+
+The answer keeps the **house's name and voice** — the person addressed the
+house, and an answer arriving in a different voice would announce the mistake
+the fallthrough exists to hide. The house's `conversation_id` survives, so the
+next turn still goes to the house; its hang-up does not, because it was
+refusing a sentence rather than finishing a job, and closing the conversation
+on an answer somebody is still listening to is the one thing that would make
+this visible.
+
+**One hop, and never the target's own fallthrough.** A chain is a question
+travelling somewhere nobody chose, at a cost per link, and two endpoints
+pointing at each other would do it for ever. Deleting an endpoint clears
+whatever pointed at it, rather than leaving an id naming nothing.
+
+**With an LLM-backed agent this is an option you leave off.** That agent
+interprets rather than matches, so `no_intent_match` essentially never fires
+and the fallthrough is dead weight. It is the built-in intent engine that
+needs it.
+
+**And on the built-in engine it fires far less than this design assumed.**
+Measured against a real installation, 2026-08-14:
+
+| said | code |
+|---|---|
+| "how are you" | `no_intent_match` |
+| "what's the capital of France?" | `no_valid_targets` |
+| "tell me a joke" | `no_valid_targets` |
+| "turn on the purple flamingo lantern" | `no_valid_targets` |
+
+The engine matches a sentence *shape* before it looks for a device, so
+*"what's the X"* and *"tell me a X"* both parse as **get the state of a device
+called X** — and a general question comes back as an unknown device rather than
+an unrecognised sentence. `no_intent_match` is left with the sentences that
+match no pattern at all, which is a much smaller set than "things the house
+cannot answer".
+
+**Widening it to `no_valid_targets` is not free, which is why it has not been
+done.** The last two rows of that table are byte-for-byte identical replies —
+same code, same wording, same shape. So a command for a device the house does
+not have cannot be told apart from a general question, and falling through
+would hand *"turn on the garden fountain"* to a language model, which may
+answer *"I've turned it on"*. Somebody then walks away believing the house
+acted, which is the one failure this adapter exists not to have.
+
+**Left as it is, deliberately, 2026-08-14.** What the person hears in the
+meantime is the house's own *"I am not aware of any device called capital of
+France"* — confusing, but true, and audible. If it is revisited, the shape is:
+fall through on both codes, and append one line to the target's prompt for that
+call only — *you cannot control any devices; if asked to, say you were unable
+to* — which turns a mis-routed command into an honest refusal rather than a
+claim. That reduces the hazard; it does not remove it, because a small model
+can ignore an instruction. The real answer is an LLM-backed agent, where
+neither code fires.
+
 ### Fields that do not apply everywhere
 
 **temperature** is not sent to Anthropic at all. The current Claude models
@@ -484,6 +606,30 @@ sent to Anthropic.
 `/api/tags` on the same host and lists what is actually there, so a model name
 is chosen rather than typed from memory. Nothing else answers that path, so
 the line stays empty for everyone else.
+
+**Home Assistant takes only the timeout.** No model, no prompt, no reply limit,
+no context length, no temperature, no keep-alive: it holds the conversation
+itself against a `conversation_id`, and what its agent is told is configured
+over there. Those controls hide themselves rather than sit on screen wired to
+nothing — the same rule that hides temperature for Anthropic.
+
+**Set that timeout to the agent, not to "Home Assistant".** The two agents are
+orders of magnitude apart: the built-in intent engine answers in about a tenth
+of a second, while an LLM-backed one is *two* model passes — one to emit the
+tool call, another to write the reply once HA has executed it — each carrying
+the exposed-entity tool definitions in its prompt. On modest or CPU-only
+hardware that is tens of seconds, and a timeout chosen for the first cuts off
+requests that were about to succeed.
+
+**A failure has to be audible.** A chat backend failing quietly is an
+annoyance; a light command that failed quietly is indistinguishable from one
+that worked, and somebody walks away believing the house did something.
+Unreachable, rejected token and HA-side error are all spoken — as *"I could not
+reach the house just then"*, naming the endpoint and never the reason. The
+reason goes to the note on screen, because `401 from the conversation API`
+tells the person standing there nothing they can act on while telling everyone
+in earshot what this box is wired to. An action that succeeds and says nothing
+is spoken as **"Done."** for the same reason: silence is how a failure sounds.
 
 ### What the model knows
 
@@ -597,7 +743,7 @@ On every listener:
 | `GET` | `/tts/voices` | installed neural voices |
 | `GET` | `/settings` | the shared interface configuration |
 | `GET` | `/routes` | the routes, presentation and routing halves only |
-| `POST` | `/ask` | a question — `{"route": …}` picks one, absent means the default |
+| `POST` | `/ask` | a question — `{"route": …}` picks one, absent means the default. `{"conversation_id": …}` continues one the endpoint is keeping; the reply carries that id back, plus `hangup` when the endpoint has finished |
 
 Display listeners only — the embed does not exist on the admin port:
 
@@ -823,7 +969,7 @@ two people in one room with three listening microphones between them.
 | | phase | delivers | sits on | open decisions |
 |---|---|---|---|---|
 | 1a | ~~**Routes**~~ **— done** | three names reaching three destinations, verifiable with no Home Assistant involved | — | none |
-| 1b | **The Home Assistant adapter** | saying the house name switches a light on | 1a | none |
+| 1b | ~~**The Home Assistant adapter**~~ **— built** | saying the house name switches a light on | 1a | none |
 | 2 | **Displays, and binding a route to one** | only the tablets you approved can actuate the house, whatever anyone's browser is set to | 1b | none |
 | 3 | **What a wall display looks like** | voice only, and a screensaver that is still the product | 2 | none |
 | 4 | **Staying up unattended** | a tablet nobody touches for a year is still working | 3 | **all of it** · not designed |
@@ -847,6 +993,15 @@ a local model and a hosted one are three destinations reachable by three
 names, and wake-word routing can be shaken out on a test box before Home
 Assistant is anywhere near it. If the refactor breaks something, that is when
 you find out, rather than while also debugging a new adapter.
+
+**1b is built and not yet proven.** Every field of the conversation API is
+implemented and exercised end to end against a stub that answers in it —
+commands, a question that stays open, the fallthrough, a rejected token, an
+unreachable house, and a Home Assistant old enough not to send
+`continue_conversation`. What a stub cannot tell you is whether a real
+installation agrees, so it is *built* in the table above rather than *done*:
+the first real token and a real light are the test. The same distinction the
+Anthropic adapter carries, for the same reason.
 
 **1a is done**, and closed out rather than left half-verified. Proven on real
 hardware with a real microphone: several names reaching several destinations,
@@ -1038,6 +1193,14 @@ it. Each entry below carries its own panel scope.
   connection together, saved together, with its own TEST. For a house route
   that test is worth more than usual, since it answers whether the token, the
   agent and the exposure are all right at once. Built; see the progress log.
+
+  *Built, with one thing the design did not anticipate:* a round trip that
+  comes back **"Sorry, I couldn't understand that"** is a **pass**. The
+  built-in intent engine matches sentences, and a test sentence is not a
+  command — so the reply that proves the address, the token and the agent are
+  all correct is the one that reads like a failure. TEST says so in as many
+  words rather than leaving an admin to conclude it is broken. The fourth
+  thing, whether the right entities are exposed, only a real command answers.
 
 - **Displays, and binding a route to one.** The problem this exists for: two
   people in a room, one of them addressing the wall tablet, and everybody
@@ -1480,6 +1643,54 @@ on a desk. A tablet bolted to a wall, answering a household, moves them:
 ## Progress log
 
 Newest first.
+
+### 2026-08-14 — the house is an endpoint
+
+Roadmap phase 1b. Saying the house name switches a light on, and it took no
+new mechanism to do it: Home Assistant's conversation API is text in and text
+out, so it is a fourth provider beside `demo`, the OpenAI dialect and
+Anthropic.
+
+- **Three fields of the reply do more than carry words.**
+  `continue_conversation` decides whether to hang up, and it belongs to the
+  reply rather than the configuration — *"turn on the lights"* answered with
+  *"which room?"* must stay open, and an endpoint configured one-shot would
+  hang up on the question it just asked. `conversation_id` is held for exactly
+  the route binding and handed back each turn, which is what makes the answer
+  to that question land. `data.code` is what makes the fallthrough a branch
+  rather than string-matching an apology.
+- **A missing flag is not a false one.** An older Home Assistant sends no
+  `continue_conversation` at all, and reading absent as "hang up" would end
+  every conversation on those installations. Absent means what every other
+  endpoint means: stay awake.
+- **When the house recognises nothing, another endpoint answers** — in the
+  house's own name and voice, so nobody is told they used the wrong word. One
+  hop only, and never the target's own: a chain is a question travelling
+  somewhere nobody chose, at a cost per link. The house's conversation id
+  survives the hand-off and its hang-up does not, because it was refusing a
+  sentence rather than finishing a job.
+- **Silence is how a failure sounds**, which is the difference between this
+  adapter and a chat one. A command that quietly did nothing is
+  indistinguishable from one that worked, so an unreachable house, a rejected
+  token and an HA-side error are all spoken — naming the endpoint, never the
+  reason, which stays on the screen rather than going into the air. An action
+  that succeeds and says nothing is spoken as "Done."
+- **"Sorry, I couldn't understand that" is a passing test.** The built-in
+  intent engine matches sentences and a test sentence is not a command, so the
+  round trip that proves the address, the token and the agent are all right is
+  the one that reads like a failure. TEST now says so in as many words.
+- **The house's logic belongs to the house.** No entity allow-list here, no
+  system prompt, no reply limit, no context length: HA already gates what voice
+  may touch no matter what talks to it, and a copy here would be a second
+  weaker version of a control that already holds. Those fields hide themselves
+  rather than sit on screen wired to nothing.
+- **A panel that always sent the base URL back defeated a server-side guard.**
+  Changing an endpoint's provider is supposed to drop its address and key —
+  otherwise a hosted key goes to whatever is listening on the old URL, which
+  is the failure that looks like success. The server refused to carry them
+  across; the panel handed the old value back with every save, so the guard
+  never fired. Cleared in the panel now, where it can be seen happening.
+  Found while adding a third provider to the same switch.
 
 ### 2026-08-14 — the panel stopped being written for its implementer
 
