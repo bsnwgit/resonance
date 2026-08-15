@@ -547,6 +547,27 @@
      long label never wraps a row into a ragged block. */
   .erow .acts{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
 
+  /* Each endpoint keeps a full edge whether it is open or closed. The other
+     topics are parts of one tab, and a hairline between neighbours is enough
+     to separate them; endpoints are alternatives to each other, so each wants
+     to read as its own object in a column of them.
+
+     BRIGHTER than the ordinary section edge, not darker. On a panel this
+     close to black a darker line is a line nobody can see — what makes a box
+     stand out here is contrast against the ground, and the ground is already
+     at the bottom. */
+  #grpbox .grp[data-rid]{
+    border:1px solid rgba(var(--glass),.34);
+    margin-top:9px;padding:0 11px 5px;
+  }
+  #grpbox .grp[data-rid]:not(.shut){
+    border-color:rgba(var(--glass),.66);
+    background:rgba(var(--glass),.05);
+    padding-bottom:11px;
+  }
+  /* Its heading sits inside that edge rather than carrying one of its own. */
+  #grpbox .grp[data-rid] > h4{border-bottom:0}
+
   /* One block per endpoint. The heading carries what you say to reach it and
      what it is wired to, because that is the pair somebody is scanning for
      and it saves opening three blocks to find the right one. */
