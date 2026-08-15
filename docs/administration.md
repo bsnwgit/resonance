@@ -41,9 +41,9 @@ At the top:
 At the foot, pinned so they are always reachable:
 
 - **APP SETTINGS** — how the server itself is wired.
+- **ACCOUNTS** — who can sign in, and the groups access is granted to.
 - **DEVICES** — what may use this server, and what each may reach.
 - **EMBEDS** — keys that let another application frame this interface.
-- **ACCOUNTS** — who can sign in, and the groups access is granted to.
 - **DOCUMENTATION** — these documents.
 - Your own name, your role, and **SIGN OUT**.
 
