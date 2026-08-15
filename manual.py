@@ -38,13 +38,14 @@ DOCS = [
                 "does to the figure."},
     {"id": "speech",  "file": "speech.md",
      "title": "Speech in & out",       "audience": "admin",
-     "summary": "Transcription, voices, wake and sleep words, and why HTTPS is "
-                "not optional."},
+     "summary": "Transcription models, voices, wake and sleep words, what the "
+                "display's status line is telling you, and why HTTPS is not "
+                "optional."},
     {"id": "backend", "file": "assistant.md",
      "title": "Assistants", "audience": "admin",
      "summary": "One display, several assistants: the name you say to reach "
                 "each, what a browser is told about them, and the services "
-                "behind them."},
+                "behind them — models, hosted providers, and Home Assistant."},
     {"id": "app",     "file": "app-settings.md",
      "title": "App settings & accounts", "audience": "admin",
      "summary": "Ports, restarts, session lifetime, and the two roles."},

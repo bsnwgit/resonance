@@ -155,6 +155,13 @@ what the server will answer, not in what the page carries.
 | `users.json` | accounts and password hashes | nobody over HTTP |
 | `app.json` | ports, binding and session lifetime | admin only |
 | `backend.json` | the single assistant this server had before endpoints | read once, at the migration, then never again |
+| `embeds.json` | embed keys, hashed, and what each one grants | admin only, mode 600 |
+
+**Two things live outside this directory.** Piper voices are in `voices/`, and
+the transcription models are cached by faster-whisper under
+`~/.cache/huggingface`. That second one is where the disk goes if you work
+through the model list: `small.en` is ~250MB and `large-v3` ~1.6GB, and each
+one you select is kept once it has been fetched. Nothing removes them for you.
 
 The split matters. `settings.json` is world-readable by design, because every
 viewer's browser has to fetch it to build the interface. Anything secret must

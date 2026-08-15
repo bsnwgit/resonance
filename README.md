@@ -97,6 +97,12 @@ on the server. Push-to-talk (hold space) or hands-free.
 rendered server-side and played through Web Audio. The browser's own voices
 remain available as a fallback.
 
+**It says why nothing happened.** A line above the input carries what was
+heard and how long each stage took, that a recording came back empty, that it
+is asleep and what it heard instead of a name, or why an endpoint failed. A
+voice interface that goes quiet is indistinguishable from a broken one, and
+that applies to its diagnostics as much as to its answers.
+
 **Wake and sleep words.** Both editable, both with a *learn* mode that records
 what the transcriber actually returns for your pronunciation and accepts those
 forms thereafter. A conversation stays open for a configurable window,
@@ -141,6 +147,14 @@ Measured on six CPU cores, no GPU:
 | --- | --- |
 | `base.en` | ~450 ms, sloppier on technical vocabulary |
 | `small.en` | ~1.4 s, accurate |
+
+Those two are what a modest box wants, and they are the ones measured here.
+**The panel offers every model faster-whisper can fetch** — `tiny.en` through
+`large-v3`, the distilled variants, and the multilingual models, which are the
+only way this transcribes anything other than English. Nothing here knows what
+hardware somebody will run it on, so the list is not curated down to this one.
+A model that is not already on disk is downloaded inside the first request
+that asks for it.
 
 ## Run
 
@@ -767,7 +781,7 @@ On every listener:
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `POST` | `/stt` | audio in, `{"text": …}` out. `?model=`, `?hint=` |
-| `GET` | `/stt/status` | which transcription models are resident |
+| `GET` | `/stt/status` | which transcription models are resident, and which this server will accept |
 | `POST` | `/tts` | text in, WAV out. `?voice=`, `?rate=` |
 | `GET` | `/tts/voices` | installed neural voices |
 | `GET` | `/settings` | the shared interface configuration |
