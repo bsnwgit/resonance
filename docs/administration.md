@@ -124,11 +124,11 @@ The DISPLAYS tab holds four topics:
 | | |
 |---|---|
 | **Displays** | the queue: everything waiting on a decision, on a code being typed in, or on somebody asking again — and where you add one |
-| **Connected devices** | everything that is simply working, most recently heard from first |
 | **Guest access** | whether uninvited devices may ask, and what a grant to one is worth once given |
+| **Connected devices** | everything that is simply working, most recently heard from first |
 | **The request form** | what a request asks for |
 
-The first two are separate lists on purpose. One is a to-do list and empties as
+Displays and Connected devices are separate lists on purpose. One is a to-do list and empties as
 you work through it; the other is a register you read when somebody asks what
 is out there. Three rows that need attention buried among fifty that do not is
 how a request sits unanswered for a week.
