@@ -452,7 +452,10 @@
   }
   #panelbar .right{margin-left:auto}
   #whobox{display:flex;align-items:center;gap:8px;min-width:0}
-  #whoname{font-size:calc(10px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.92);
+  #whoname{font:inherit;background:none;border:0;padding:0;cursor:pointer;
+    text-decoration:underline;text-decoration-color:rgba(var(--glass),.45);
+    text-underline-offset:3px;
+    font-size:calc(10px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.92);
            overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #whorole{font-size:calc(8px * var(--fs));letter-spacing:.14em;padding:2px 5px;white-space:nowrap;
            border:1px solid rgba(var(--glass),.25);color:rgba(var(--paper),.8)}
@@ -483,6 +486,28 @@
   .note{font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);
         margin-top:8px;line-height:1.6;white-space:pre-line}
   .note.bad{color:#ff8a8a}
+  #whoname:hover{color:var(--hue);text-decoration-color:var(--hue)}
+  /* Your own account, over the panel rather than inside it. */
+  #mine{
+    display:none;position:fixed;inset:0;z-index:60;
+    align-items:center;justify-content:center;padding:24px;
+    background:rgba(0,0,0,.72);
+  }
+  #mine.on{display:flex}
+  #minebox{
+    width:100%;max-width:360px;padding:20px 22px;
+    background:#0b0e12;border:1px solid rgba(var(--glass),.4);
+  }
+  #minehead{
+    font-size:calc(11px * var(--fs));letter-spacing:.16em;text-transform:uppercase;
+    color:rgba(var(--paper),.6);margin-bottom:10px;
+  }
+  #minebox input{
+    width:100%;margin:4px 0;font:inherit;font-size:calc(9.5px * var(--fs));
+    padding:5px 6px;background:rgba(0,0,0,.6);color:var(--text);
+    border:1px solid rgba(var(--glass),.16);outline:0;
+  }
+  #minebox input:focus{border-color:var(--hue-dim)}
   .whoami{font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.92);
           padding-bottom:6px}
   .bklab{display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;
@@ -514,8 +539,145 @@
      them as one teaches the operator the wrong model. */
   .erow{display:block;padding:8px 0;
         border-bottom:1px solid rgba(var(--glass),.08)}
-  .erow .top{display:flex;align-items:center;gap:8px}
+  .erow .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .erow .nm{font-size:calc(10px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.96)}
+  /* Each row collapses by its name, one open at a time — a register of fifty
+     devices that you scroll through is one nobody reads. The header keeps the
+     name and the badges, so a shut row still says what state it is in. */
+  .erow > .top{cursor:pointer;position:relative;padding-left:13px}
+  .erow > .top::before{                    /* the panel's own caret */
+    content:'';position:absolute;left:0;top:50%;margin-top:-3.5px;
+    border-left:4px solid rgba(var(--paper),.6);
+    border-top:3.5px solid transparent;border-bottom:3.5px solid transparent;
+    transform:rotate(90deg);transform-origin:2px 3.5px;transition:transform .12s;
+  }
+  .erow.shut > .top::before{transform:rotate(0deg)}
+  .erow.shut > *:not(.top){display:none}
+  .erow > .top:hover .nm{color:var(--hue)}
+  /* Renaming lives inside the row, where there is room for it to be a
+     labelled field rather than a box somebody clicks by accident while trying
+     to open the thing. */
+  .erow .namerow{display:flex;align-items:center;gap:8px;margin:7px 0 2px}
+  .erow .namerow > b{
+    font-weight:400;letter-spacing:.1em;font-size:calc(8px * var(--fs));
+    color:rgba(var(--paper),.5);white-space:nowrap;
+  }
+  .erow input.nmedit{
+    flex:0 1 220px;min-width:110px;padding:4px 6px;font:inherit;
+    font-size:calc(9.5px * var(--fs));letter-spacing:.06em;
+    background:rgba(0,0,0,.55);color:rgba(var(--paper),.96);
+    border:1px solid rgba(var(--glass),.16);outline:0;
+  }
+  .erow input.nmedit:focus{border-color:var(--hue-dim)}
+  /* Name it and get a code: one row, because it is one gesture. */
+  /* Three short numbers, side by side rather than stacked full width: they are
+     one setting each and reading them as a row is how you notice the pending
+     limit is larger than the total. */
+  /* A label and its control on one line, for the settings that are a question
+     with two answers. Under it, a two-button segment reads as a heading with a
+     row of options below rather than as the answer to the words beside it. */
+  .labrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:2px 0 0}
+  .labrow .bklab{margin:0}
+  .labrow .seg{margin:0}
+  .cols2{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 0;align-items:stretch}
+  /* Two to a line, deliberately: the days a grant lasts and the total number
+     of displays are read together, and a basis that let three squeeze onto one
+     row made all three unreadable at a narrow panel width.
+
+     Each column is itself a flex column with the field pushed to the bottom,
+     so the boxes line up whatever their labels do. One label wrapping to two
+     lines and the other not was leaving the two numbers at different heights,
+     which reads as a mistake even when both values are right. */
+  .cols2 > div{
+    flex:1 1 calc(50% - 4px);min-width:0;
+    display:flex;flex-direction:column;
+  }
+  .cols2 > div input{margin-top:auto}
+  .cols2 input{
+    width:100%;margin:4px 0;padding:5px 6px;font:inherit;
+    font-size:calc(9.5px * var(--fs));
+    background:rgba(0,0,0,.6);color:var(--text);
+    border:1px solid rgba(var(--glass),.16);outline:0;
+  }
+  .cols2 input:focus{border-color:var(--hue-dim)}
+  /* One row per field of the request form: what it is called, whether it has
+     to be answered, whether it is a paragraph, and a way to remove it. */
+  .fldrow{display:flex;align-items:center;gap:8px;margin:4px 0}
+  .fldrow input[type=text]{
+    flex:1;min-width:0;padding:5px 6px;font:inherit;
+    font-size:calc(9.5px * var(--fs));
+    background:rgba(0,0,0,.6);color:var(--text);
+    border:1px solid rgba(var(--glass),.16);outline:0;
+  }
+  .fldrow input[type=text]:focus{border-color:var(--hue-dim)}
+  .fldrow label{
+    display:flex;align-items:center;gap:4px;white-space:nowrap;
+    font-size:calc(8.5px * var(--fs));letter-spacing:.08em;
+    color:rgba(var(--paper),.72);
+  }
+  .fldrow input[type=checkbox]{accent-color:var(--hue);margin:0}
+  .fldrow button{
+    font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.1em;
+    padding:3px 6px;cursor:pointer;background:none;
+    color:rgba(var(--paper),.8);border:1px solid rgba(var(--glass),.2);
+  }
+  /* The answers somebody gave, on their row. Indented under a rule so a long
+     reason reads as a quotation rather than as more metadata. */
+  .erow .said{
+    margin:6px 0 2px;padding:4px 0 4px 9px;
+    border-left:2px solid rgba(var(--glass),.28);
+    font-size:calc(9px * var(--fs));line-height:1.65;
+    color:rgba(var(--paper),.8);
+  }
+  .erow .said b{display:block;color:rgba(var(--paper),.5);font-weight:400;
+                letter-spacing:.1em;font-size:calc(8px * var(--fs))}
+  .erow .said div + div{margin-top:5px}
+  /* The grant being decided: which endpoints this device gets, ticked in the
+     same gesture as the approval. */
+  .erow .grant{margin:7px 0 2px}
+  .erow .grant > b{
+    display:block;margin-bottom:3px;font-weight:400;letter-spacing:.1em;
+    font-size:calc(8px * var(--fs));color:rgba(var(--paper),.5);
+  }
+  /* The decision, opened under the row it is about. Boxed, because it holds
+     controls that do something when pressed and it must not read as more of
+     the row's own description. */
+  .erow .decide{
+    margin:8px 0 2px;padding:8px 10px;
+    background:rgba(var(--glass),.05);
+    border:1px solid rgba(var(--glass),.24);
+  }
+  .erow .deny{display:flex;flex-direction:column;gap:4px;margin:7px 0 2px}
+  .erow .deny input[type=text]{
+    padding:5px 6px;font:inherit;font-size:calc(9px * var(--fs));
+    background:rgba(0,0,0,.6);color:var(--text);
+    border:1px solid rgba(var(--glass),.16);outline:0;
+  }
+  #dispadd{display:flex;gap:4px;margin:4px 0 10px}
+  #dispadd input{
+    flex:1;min-width:0;padding:5px 6px;font:inherit;
+    font-size:calc(9.5px * var(--fs));
+    background:rgba(0,0,0,.6);color:var(--text);
+    border:1px solid rgba(var(--glass),.16);outline:0;
+  }
+  #dispadd input:focus{border-color:var(--hue-dim)}
+  /* The address somebody has to TYPE into a television, from across the room,
+     with a remote. Bigger than anything else in the row on purpose — it is the
+     one thing on this tab that gets read at a distance — and selectable in one
+     click for the screens that do have a keyboard. It takes the panel's "this
+     is the live thing" green, the same as the commit buttons. */
+  .erow .dcode{
+    margin:6px 0 2px;padding:6px 8px;user-select:all;
+    background:rgba(122,201,160,.07);
+    border:1px solid rgba(122,201,160,.5);
+    font-size:calc(12px * var(--fs));letter-spacing:.1em;
+    color:#d2f2e2;word-break:break-all;
+  }
+  .erow .dcode span{
+    display:block;margin-top:3px;user-select:none;
+    font-size:calc(8.5px * var(--fs));letter-spacing:.06em;
+    color:rgba(var(--paper),.62);
+  }
   .erow .r{margin-left:auto;display:flex;gap:4px}
   .erow button{font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.1em;padding:3px 6px;
                cursor:pointer;background:none;color:rgba(var(--paper),.87);
@@ -673,6 +835,12 @@
     flex:1;font:inherit;font-size:calc(9px * var(--fs));letter-spacing:.18em;padding:6px 4px;cursor:pointer;
     background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.85);
   }
+  /* Five in the foot now, and the widest of them is DOCUMENTATION. A row with
+     no room for all five wraps to a second line rather than squeezing the
+     letter-spacing out of the labels: these are the navigation, and navigation
+     you have to squint at is worse than navigation on two lines. */
+  #foottabs{flex-wrap:wrap}
+  #foottabs button{min-width:86px}
   .tabs button.on{border-color:var(--hue-dim);color:var(--hue);background:rgba(var(--glass),.08)}
   .findrow{display:flex;margin:0 0 4px}
   #rigfind{
@@ -902,7 +1070,7 @@
   <div id="panelbar">
     <span>SETTINGS</span>
     <span class="right" id="whobox">
-      <span id="whoname">—</span>
+      <button id="whoname" title="your account">—</button>
       <span id="whorole"></span>
       <button id="b_signout" title="end this session">SIGN OUT</button>
     </span>
@@ -959,13 +1127,13 @@
   <section class="grp" data-tab="look">
     <h4>Typography</h4>
     <div class="grpbody">
-  <label class="bklab">face</label>
+  <label class="bklab">Face</label>
   <div class="seg" data-set="face">
     <button data-v="mono" class="on">MONO</button>
     <button data-v="sans">SANS</button>
     <button data-v="wide">WIDE</button>
   </div>
-  <label class="bklab">size</label>
+  <label class="bklab">Size</label>
   <div class="seg" data-set="fs">
     <button data-v="1" class="on">NORMAL</button>
     <button data-v="1.12">LARGE</button>
@@ -984,9 +1152,9 @@ size it is setting, so you read the choice while making it.</div>
   <section class="grp" data-tab="look">
     <h4>Who is speaking</h4>
     <div class="grpbody">
-  <label class="bklab">the person</label>
+  <label class="bklab">The person</label>
   <input id="opname" type="text" spellcheck="false" placeholder="operator">
-  <label class="bklab">the assistant</label>
+  <label class="bklab">The assistant</label>
   <input id="ainame" type="text" spellcheck="false" placeholder="resonance">
   <div class="note help">The two labels down the left of the transcript.
 
@@ -1001,11 +1169,18 @@ label that can be right: a fixed word attributes every answer to the same
 name. Each line keeps the name of whoever gave it, so switching endpoints
 mid-conversation does not rewrite what is already on screen.
 
-<b>{display}</b> — the name of the display this is being viewed at, from
-<b>?display=</b> on the URL. Put it in <i>the person</i> and each dedicated
-display attributes the transcript to itself, without a setting per display.
-An admin-set label per URL arrives with identity; this is the identifier it
-will hang off, so what you write now keeps meaning the same thing.
+<b>{display}</b> — the name of the device this is being viewed at. Put it in
+<i>the person</i> and every device attributes the transcript to itself, with no
+setting per device.
+
+It resolves to the first of these that exists: the name you gave that row under
+DEVICES, then <b>?display=</b> from its URL, then the first thing typed on its
+request form. So a laptop you approved as <i>Sarah laptop</i> labels her lines
+with that, and a wall screen named <i>Kitchen</i> labels its own.
+
+A person's name as distinct from the device they are at — the same name
+following somebody from laptop to phone — needs an identity they carry, and
+does not exist yet.
 
 Mix them with ordinary text — <b>{display} shift lead</b> is fine. A variable
 that resolves to nothing falls back to the default, and one that is not
@@ -1014,12 +1189,12 @@ recognised is left standing so a typo is visible rather than silent.</div>
   </section>
   <section class="grp" data-tab="look">
     <h4>Form &amp; size</h4>
-    <div class="grpbody">  <div class="sl"><label>amplitude</label><output id="o_amp"></output><input id="s_amp" type="range" min="0" max="2.5" step=".01"></div>
-  <div class="sl"><label>lines</label><output id="o_lines"></output><input id="s_lines" type="range" min="1" max="40" step="1"></div>
-  <div class="sl"><label>layer phase</label><output id="o_lag"></output><input id="s_lag" type="range" min="0" max="14" step=".1"></div>
-  <div class="sl"><label>depth</label><output id="o_depth"></output><input id="s_depth" type="range" min="0" max="600" step="5"></div>
-  <div class="sl"><label>spread</label><output id="o_spread"></output><input id="s_spread" type="range" min="200" max="1100" step="10"></div>
-  <div class="sl"><label>perspective</label><output id="o_persp"></output><input id="s_persp" type="range" min="260" max="3000" step="20"></div></div>
+    <div class="grpbody">  <div class="sl"><label>Amplitude</label><output id="o_amp"></output><input id="s_amp" type="range" min="0" max="2.5" step=".01"></div>
+  <div class="sl"><label>Lines</label><output id="o_lines"></output><input id="s_lines" type="range" min="1" max="40" step="1"></div>
+  <div class="sl"><label>Layer phase</label><output id="o_lag"></output><input id="s_lag" type="range" min="0" max="14" step=".1"></div>
+  <div class="sl"><label>Depth</label><output id="o_depth"></output><input id="s_depth" type="range" min="0" max="600" step="5"></div>
+  <div class="sl"><label>Spread</label><output id="o_spread"></output><input id="s_spread" type="range" min="200" max="1100" step="10"></div>
+  <div class="sl"><label>Perspective</label><output id="o_persp"></output><input id="s_persp" type="range" min="260" max="3000" step="20"></div></div>
   </section>
   <section class="grp" data-tab="motion">
     <h4>Rotation</h4>
@@ -1027,24 +1202,24 @@ recognised is left standing so a typo is visible rather than silent.</div>
     <button data-v="turntable" class="on">TURNTABLE</button>
     <button data-v="free">FREE TUMBLE</button>
   </div>
-  <div class="sl"><label>spin (platter)</label><output id="o_spin"></output><input id="s_spin" type="range" min="0" max="4" step=".01"></div>
-  <div class="sl"><label>tilt / view height</label><output id="o_tilt"></output><input id="s_tilt" type="range" min="0" max="1.2" step=".001"></div>
-  <div class="sl"><label>wobble</label><output id="o_wobble"></output><input id="s_wobble" type="range" min="0" max="4" step=".01"></div>
-  <div class="sl"><label>roll / lean</label><output id="o_roll"></output><input id="s_roll" type="range" min="0" max="4" step=".01"></div>
-  <div class="sl"><label>master rate</label><output id="o_tumble"></output><input id="s_tumble" type="range" min="0" max="3" step=".01"></div>
-  <div class="sl"><label>re-aim every</label><output id="o_reo"></output><input id="s_reo" type="range" min="3" max="40" step="1"></div>
+  <div class="sl"><label>Spin (platter)</label><output id="o_spin"></output><input id="s_spin" type="range" min="0" max="4" step=".01"></div>
+  <div class="sl"><label>Tilt / view height</label><output id="o_tilt"></output><input id="s_tilt" type="range" min="0" max="1.2" step=".001"></div>
+  <div class="sl"><label>Wobble</label><output id="o_wobble"></output><input id="s_wobble" type="range" min="0" max="4" step=".01"></div>
+  <div class="sl"><label>Roll / lean</label><output id="o_roll"></output><input id="s_roll" type="range" min="0" max="4" step=".01"></div>
+  <div class="sl"><label>Master rate</label><output id="o_tumble"></output><input id="s_tumble" type="range" min="0" max="3" step=".01"></div>
+  <div class="sl"><label>Re-aim every</label><output id="o_reo"></output><input id="s_reo" type="range" min="3" max="40" step="1"></div>
   <div class="seg" style="margin-top:8px">
     <button id="b_reo">RE-AIM NOW</button>
   </div></div>
   </section>
   <section class="grp" data-tab="look">
     <h4>Glass</h4>
-    <div class="grpbody">  <div class="sl"><label>bloom</label><output id="o_bloom"></output><input id="s_bloom" type="range" min="0" max="2" step=".01"></div>
-  <div class="sl"><label>blur radius</label><output id="o_blur"></output><input id="s_blur" type="range" min="0" max="30" step="1"></div>
-  <div class="sl"><label>milk</label><output id="o_milk"></output><input id="s_milk" type="range" min="0" max="2" step=".01"></div>
-  <div class="sl"><label>grain</label><output id="o_grain"></output><input id="s_grain" type="range" min="0" max="1.5" step=".01"></div>
-  <div class="sl"><label>scanlines</label><output id="o_scan"></output><input id="s_scan" type="range" min="0" max="1" step=".01"></div>
-  <div class="sl"><label>line weight</label><output id="o_lw"></output><input id="s_lw" type="range" min=".3" max="3" step=".05"></div></div>
+    <div class="grpbody">  <div class="sl"><label>Bloom</label><output id="o_bloom"></output><input id="s_bloom" type="range" min="0" max="2" step=".01"></div>
+  <div class="sl"><label>Blur radius</label><output id="o_blur"></output><input id="s_blur" type="range" min="0" max="30" step="1"></div>
+  <div class="sl"><label>Milk</label><output id="o_milk"></output><input id="s_milk" type="range" min="0" max="2" step=".01"></div>
+  <div class="sl"><label>Grain</label><output id="o_grain"></output><input id="s_grain" type="range" min="0" max="1.5" step=".01"></div>
+  <div class="sl"><label>Scanlines</label><output id="o_scan"></output><input id="s_scan" type="range" min="0" max="1" step=".01"></div>
+  <div class="sl"><label>Line weight</label><output id="o_lw"></output><input id="s_lw" type="range" min=".3" max="3" step=".05"></div></div>
   </section>
   <!-- One block per AI endpoint, built at runtime by paintBlocks(), inserted
        before this anchor. The AI tab holds nothing else: testing an endpoint
@@ -1062,9 +1237,9 @@ recognised is left standing so a typo is visible rather than silent.</div>
   <select id="neuralvoice"></select>
   <div id="browservoice">
   <select id="voicesel"></select>
-  <div class="sl"><label>pitch</label><output id="o_vpitch"></output><input id="s_vpitch" type="range" min=".5" max="2" step=".05"></div>
+  <div class="sl"><label>Pitch</label><output id="o_vpitch"></output><input id="s_vpitch" type="range" min=".5" max="2" step=".05"></div>
   </div>
-  <div class="sl"><label>speech rate</label><output id="o_vrate"></output><input id="s_vrate" type="range" min=".5" max="2" step=".05"></div>
+  <div class="sl"><label>Speech rate</label><output id="o_vrate"></output><input id="s_vrate" type="range" min=".5" max="2" step=".05"></div>
   <div id="voicenote" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin:2px 0 8px;line-height:1.5"></div>
   <div class="seg" data-set="src">
     <button data-v="token">TOKEN</button>
@@ -1080,24 +1255,24 @@ recognised is left standing so a typo is visible rather than silent.</div>
   <section class="grp" data-tab="speech">
     <h4>Speech in (mic, STT)</h4>
     <div class="grpbody">
-  <label class="bklab" style="margin-top:2px">how it decides you have finished</label>
+  <label class="bklab" style="margin-top:2px">How it decides you have finished</label>
   <div class="seg" data-set="ptt">
     <button data-v="1" class="on">PUSH TO TALK</button>
     <button data-v="0">AUTO (voice detect)</button>
   </div>
   <div class="seg" style="margin-top:6px"><button id="b_mic">MIC ONLY (no transcript)</button></div>
-  <div class="sl"><label>mic gain</label><output id="o_micgain"></output><input id="s_micgain" type="range" min=".2" max="5" step=".05"></div>
-  <div class="sl"><label>noise gate</label><output id="o_micgate"></output><input id="s_micgate" type="range" min="0" max=".15" step=".002"></div>
-  <label class="bklab" style="margin-top:8px">transcription model (STT)</label>
+  <div class="sl"><label>Mic gain</label><output id="o_micgain"></output><input id="s_micgain" type="range" min=".2" max="5" step=".05"></div>
+  <div class="sl"><label>Noise gate</label><output id="o_micgate"></output><input id="s_micgate" type="range" min="0" max=".15" step=".002"></div>
+  <label class="bklab" style="margin-top:8px">Transcription model (STT)</label>
   <select id="sttmodel"></select>
   <div class="note" id="sttnote"></div>
-  <div class="sl"><label>end-of-speech wait</label><output id="o_hangover"></output><input id="s_hangover" type="range" min=".2" max="1.5" step=".05"></div>
-  <label class="bklab" style="margin-top:8px">signal processing</label>
+  <div class="sl"><label>End-of-speech wait</label><output id="o_hangover"></output><input id="s_hangover" type="range" min=".2" max="1.5" step=".05"></div>
+  <label class="bklab" style="margin-top:8px">Signal processing</label>
   <div class="seg" data-set="micdsp">
     <button data-v="clean" class="on">CLEAN (best recognition)</button>
     <button data-v="raw">RAW (best visuals)</button>
   </div>
-  <label class="bklab" style="margin-top:8px">background noise</label>
+  <label class="bklab" style="margin-top:8px">Background noise</label>
   <div class="seg"><button id="b_cal">CALIBRATE (stay quiet 2s)</button></div>
   <div class="note help">Everything here runs on this server — no audio leaves
 the box for transcription, whichever model is chosen.
@@ -1124,7 +1299,7 @@ model actually returns.
 <b>CLEAN</b> filters the input for recognition; <b>RAW</b> leaves it alone, so
 the figure moves more and transcription is slightly worse. <b>CALIBRATE</b>
 measures the room rather than asking you to guess at the gate.</div>
-  <label class="bklab" style="margin-top:8px">live from the preview</label>
+  <label class="bklab" style="margin-top:8px">Live from the preview</label>
   <div id="miclevel" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);line-height:1.5">level —</div>
   <div id="micnote" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:8px;line-height:1.5">off</div></div>
   </section>
@@ -1141,7 +1316,7 @@ picks.</div>
     <button data-v="always">ALWAYS</button>
   </div>
 
-<div class="sl"><label>stays awake for</label><output id="o_wakewindow"></output><input id="s_wakewindow" type="range" min="3" max="60" step="1"></div>
+<div class="sl"><label>Stays awake for</label><output id="o_wakewindow"></output><input id="s_wakewindow" type="range" min="3" max="60" step="1"></div>
   <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:8px">when that time runs out</label>
   <div class="seg" data-set="byeontimeout">
     <button data-v="1" class="on">SAY FAREWELL</button>
@@ -1196,20 +1371,20 @@ it, which is why it lives beside the microphone and the voices.</div>
     <button id="b_think">THINKING</button>
     <button id="b_speak">SPEAK SAMPLE</button>
   </div>
-  <div class="sl" style="margin-top:10px"><label>token rate ms</label><output id="o_rate"></output><input id="s_rate" type="range" min="15" max="180" step="5"></div></div>
+  <div class="sl" style="margin-top:10px"><label>Token rate ms</label><output id="o_rate"></output><input id="s_rate" type="range" min="15" max="180" step="5"></div></div>
   </section>
   <section class="grp" data-tab="motion">
     <h4>Spectrum</h4>
-    <div class="grpbody">  <div class="sl"><label>spike width</label><output id="o_spike"></output><input id="s_spike" type="range" min=".004" max=".09" step=".001"></div>
-  <div class="sl"><label>spike decay</label><output id="o_decay"></output><input id="s_decay" type="range" min=".25" max="4" step=".05"></div>
-  <div class="sl"><label>body / swell</label><output id="o_body"></output><input id="s_body" type="range" min="0" max="1.5" step=".01"></div>
-  <div class="sl"><label>peak colour</label><output id="o_grad"></output><input id="s_grad" type="range" min="0" max="1.5" step=".01"></div>
-  <div class="sl"><label>heat threshold</label><output id="o_hot"></output><input id="s_hot" type="range" min=".1" max="2.5" step=".01"></div></div>
+    <div class="grpbody">  <div class="sl"><label>Spike width</label><output id="o_spike"></output><input id="s_spike" type="range" min=".004" max=".09" step=".001"></div>
+  <div class="sl"><label>Spike decay</label><output id="o_decay"></output><input id="s_decay" type="range" min=".25" max="4" step=".05"></div>
+  <div class="sl"><label>Body / swell</label><output id="o_body"></output><input id="s_body" type="range" min="0" max="1.5" step=".01"></div>
+  <div class="sl"><label>Peak colour</label><output id="o_grad"></output><input id="s_grad" type="range" min="0" max="1.5" step=".01"></div>
+  <div class="sl"><label>Heat threshold</label><output id="o_hot"></output><input id="s_hot" type="range" min=".1" max="2.5" step=".01"></div></div>
   </section>
   <section class="grp" data-tab="motion">
     <h4>Noise floor</h4>
-    <div class="grpbody">  <div class="sl"><label>static level</label><output id="o_floor"></output><input id="s_floor" type="range" min="0" max="2" step=".01"></div>
-  <div class="sl"><label>crackle</label><output id="o_crackle"></output><input id="s_crackle" type="range" min="0" max="1.5" step=".01"></div></div>
+    <div class="grpbody">  <div class="sl"><label>Static level</label><output id="o_floor"></output><input id="s_floor" type="range" min="0" max="2" step=".01"></div>
+  <div class="sl"><label>Crackle</label><output id="o_crackle"></output><input id="s_crackle" type="range" min="0" max="1.5" step=".01"></div></div>
   </section>
 
   <!-- Two settings, not one mode. A single label covering both starts lying
@@ -1220,14 +1395,14 @@ it, which is why it lives beside the microphone and the voices.</div>
     <div class="grpbody">
   <div class="pending" id="posturewarn" hidden></div>
 
-  <label class="bklab">reachable at</label>
+  <label class="bklab">Reachable at</label>
   <div class="seg" id="ap_bind">
     <button data-v="loopback">THIS MACHINE ONLY</button>
     <button data-v="address">ONE ADDRESS</button>
     <button data-v="everything">EVERYTHING</button>
   </div>
   <div id="row_bindaddr" hidden>
-    <label class="bklab">which address</label>
+    <label class="bklab">Which address</label>
     <select id="ap_bindaddr"></select>
   </div>
   <div class="note help">Which addresses the server answers on. Binding one
@@ -1238,7 +1413,7 @@ laptop that later joins another network does not follow you onto it.
 http://localhost as a secure origin, so the microphone works unprompted and
 nothing crosses a network. Start it, open localhost, talk to it.</div>
 
-  <label class="bklab" style="margin-top:12px">to get in</label>
+  <label class="bklab" style="margin-top:12px">To get in</label>
   <div class="seg" id="ap_auth">
     <button data-v="none">NOTHING</button>
     <button data-v="pin" disabled title="arrives with identity">A SINGLE PIN</button>
@@ -1284,7 +1459,7 @@ root, and the server runs as an ordinary user.</div>
   <section class="grp" data-tab="app">
     <h4>Sessions</h4>
     <div class="grpbody">
-  <label class="bklab">sign-in lasts (minutes of inactivity)</label>
+  <label class="bklab">Sign-in lasts (minutes of inactivity)</label>
   <input id="ap_session" type="number" inputmode="numeric" min="5" max="480">
   <div class="note help">Idle minutes before an admin has to sign in again.
 Activity pushes the deadline out; the panel checks every 45 seconds and
@@ -1295,21 +1470,29 @@ Short by default — this session configures what everyone else is looking at.
     </div>
   </section>
 
-  <section class="grp" data-tab="accounts">
-    <h4>Your account</h4>
+
+  <section class="grp" data-tab="accounts" data-signin>
+    <h4>Add an account</h4>
     <div class="grpbody">
-  <div class="whoami" id="whoami"></div>
-  <label class="bklab">current password</label>
-  <input id="pw_cur" type="password" autocomplete="current-password">
-  <label class="bklab">new password</label>
-  <input id="pw_new" type="password" autocomplete="new-password">
-  <div class="seg" style="margin-top:8px"><button id="b_pw" class="act-save">CHANGE PASSWORD</button></div>
-  <div class="note" id="pwnote"></div>
+  <label class="bklab">Username</label>
+  <input id="nu_name" type="text" spellcheck="false" autocomplete="off">
+  <label class="bklab">Password</label>
+  <input id="nu_pw" type="password" autocomplete="new-password">
+  <label class="bklab">Role</label>
+  <div class="seg" id="nu_role">
+    <button data-v="viewer" class="on">VIEWER</button>
+    <button data-v="admin">ADMIN</button>
+  </div>
+  <div class="seg" style="margin-top:8px"><button id="b_adduser" class="act-save">CREATE</button></div>
+  <div class="note" id="usernote"></div>
     </div>
   </section>
-
-  <section class="grp" data-tab="accounts">
-    <h4>Accounts</h4>
+  <!-- Whether uninvited devices may ask at all, and what a grant to one is
+       worth once given. Its own topic rather than a preamble to the list: the
+       list is read when somebody is deciding about a device, and these are
+       settled once and then left alone for months. -->
+  <section class="grp" data-tab="accounts" data-signin>
+    <h4>Users</h4>
     <div class="grpbody">
   <div id="userlist"></div>
   <div class="note help" style="margin-top:10px">
@@ -1319,22 +1502,192 @@ Short by default — this session configures what everyone else is looking at.
     </div>
   </section>
 
+  <!-- A name for a set of them, so a grant is made once instead of ticked
+       twelve times and re-ticked every time somebody gets a new phone. Two
+       kinds, and they do not mix: people who asked to be here, and devices an
+       admin put somewhere. Named wherever access is granted — today an
+       endpoint's allow-list, and anything later that grants something can name
+       them the same way. -->
   <section class="grp" data-tab="accounts">
-    <h4>Add an account</h4>
+    <h4>Groups</h4>
     <div class="grpbody">
-  <label class="bklab">username</label>
-  <input id="nu_name" type="text" spellcheck="false" autocomplete="off">
-  <label class="bklab">password</label>
-  <input id="nu_pw" type="password" autocomplete="new-password">
-  <label class="bklab">role</label>
-  <div class="seg" id="nu_role">
-    <button data-v="viewer" class="on">VIEWER</button>
-    <button data-v="admin">ADMIN</button>
+  <div id="grouplist"></div>
+  <div class="labrow" style="margin-top:10px">
+    <input id="gr_name" type="text" spellcheck="false" autocomplete="off"
+           placeholder="Physics department">
+    <div class="seg" id="gr_kind">
+      <button data-v="user" class="on">PEOPLE</button>
+      <button data-v="device">DEVICES</button>
+    </div>
+    <button id="b_addgroup" class="act-save">CREATE</button>
   </div>
-  <div class="seg" style="margin-top:8px"><button id="b_adduser" class="act-save">CREATE</button></div>
-  <div class="note" id="usernote"></div>
+  <div class="note" id="groupnote"></div>
+  <div class="note help" style="margin-top:10px">A group of <b>people</b> holds
+those who asked for access and were approved. A group of <b>devices</b> holds
+the screens you created and sent a code to. They are separate populations
+answering separate questions — <i>the physics department</i> and <i>the screens
+in the east wing</i> — so a group holds one or the other, and its kind cannot
+be changed once it exists.
+
+Name a group under an endpoint's <b>who may use it</b> and everyone in it may
+reach that endpoint. <b>Grants add up:</b> a group never takes away a grant
+made to one device on its own, and somebody whose access has run out is still
+refused whatever group they are in.
+
+Deleting a group removes it from every endpoint that named it. The devices and
+people in it are untouched — a group is a way of referring to them, not a
+thing they belong to.</div>
     </div>
   </section>
+
+  <section class="grp" data-tab="displays">
+    <h4>Requested Access</h4>
+    <div class="grpbody">
+  <div class="labrow">
+    <label class="bklab">General users require approval</label>
+    <div class="seg" id="dp_guest">
+      <button data-v="1" class="on">YES</button>
+      <button data-v="0">NO</button>
+    </div>
+  </div>
+  <div class="note help"><b>YES</b> — they get the request form instead of the
+transcript and composer, and reach nothing until you decide.
+
+<b>NO</b> — they open the page and use the default endpoint straight away.
+Restricted endpoints still need a code you issued. Only settable while an
+endpoint open to any display is the default, or NO would mean access to
+nothing.</div>
+
+  <div class="cols2">
+    <div>
+      <label class="bklab">Days a grant lasts</label>
+      <input id="dp_days" type="number" min="1" max="3650">
+    </div>
+    <div>
+      <label class="bklab">Displays in total</label>
+      <input id="dp_max" type="number" min="2" max="5000">
+    </div>
+    <div>
+      <label class="bklab">How many may wait at once</label>
+      <input id="dp_pending" type="number" min="1" max="1000">
+    </div>
+  </div>
+  <div class="note help">A granted request runs out and the person asks again —
+one press for them, because what they told you is kept. <b>Displays you issued
+a code for never expire</b>, whatever this says: a screen on a wall going dark
+on a timer is not a security property, it is an outage.
+
+When more than the waiting limit are queued, the oldest one waiting is dropped
+to make room — so set it high enough that a real request cannot be pushed out
+by noise.</div>
+
+  <div class="seg" style="margin-top:8px">
+    <button id="b_dpsave" class="act-save">SAVE GUEST ACCESS</button>
+    <button id="b_dprevert" class="act-undo">REVERT</button>
+  </div>
+  <div class="note" id="dpnote"></div>
+    </div>
+  </section>
+
+  <section class="grp" data-tab="displays">
+    <h4>Created Access</h4>
+    <div class="grpbody">
+  <label class="bklab" style="margin-top:2px">Add a display — name it, then type the code into the screen</label>
+  <div class="seg" id="dispadd">
+    <input id="dp_name" type="text" spellcheck="false" autocomplete="off"
+           placeholder="kitchen wall">
+    <button id="b_adddisp" class="act-save">GET A CODE</button>
+  </div>
+  <div id="displist"></div>
+  <div class="note" id="dispnote"></div>
+  <div class="note help" style="margin-top:10px">A display is one device — a
+screen on a wall, a TV, a laptop, somebody's phone — and this is every one that
+has loaded the page. Anything with a browser and a microphone counts.
+
+<b>Two ways one gets here.</b> Name it above and you are given a six-character
+code: type <b>&lt;this server&gt;/e/CODE</b> into that screen once and it is
+that display, already named, already holding whatever endpoints you ticked for
+it. The code lasts ten minutes, works once, and case and dashes do not matter —
+<b>k7qp4m</b> is the same as <b>K7QP-4M</b>. Or a device simply opens the
+display page, in which case it turns up below as WAITING and you approve it by
+hand.
+
+<b>REISSUE</b> is for a screen that lost its cookie, or was replaced by a
+different one in the same place. The row keeps its name and every endpoint that
+names it; you get a new code to type into the new screen. <b>The old device
+stops working the moment you press it</b> — a place is one device, so deciding
+to move it ends the old one there and then.
+
+<b>The name is not the credential.</b> Anybody can type
+<b>?display=kitchen</b> into a URL. The token is what says this really is that
+device, and it lives in a cookie the page itself cannot read. Somebody who
+types a wall screen's URL into their own phone is issued a <i>new</i> token,
+which nobody approved — and turns up here as a row you were not expecting.
+
+<b>Approve it and it works; leave it and it still renders.</b> The appearance
+settings are public, so a device that has just arrived looks right immediately
+and simply answers to nothing until you say otherwise.
+
+An endpoint consults this list only where it has been restricted to named
+displays — <b>who may use it</b>, on each endpoint under AI. Until you restrict
+one, every display reaches everything, which is what they all did before this
+existed.
+
+DELETE is the revocation: that token stops matching anything, and the device
+is back to being a browser that has never been here.</div>
+    </div>
+  </section>
+
+  <!-- Everything that is simply working. Its own topic, because the list
+       above is a queue — read when something needs deciding — and this one is
+       a register, read when somebody asks what is out there. Three rows that
+       need attention buried among fifty that do not is how a request sits
+       unanswered for a week. -->
+  <section class="grp" data-tab="displays">
+    <h4>Connected devices</h4>
+    <div class="grpbody">
+  <div id="connlist"></div>
+  <div class="note" id="connnote"></div>
+  <div class="note help" style="margin-top:10px">Every device that is working,
+most recently heard from first. <b>last seen</b> is the last time one asked
+this server anything, so a screen that has been unplugged for a week says so
+here before anybody notices the wall.
+
+Devices on a granted request carry <b>access runs out</b>; those you issued a
+code for do not, and never will.
+
+<b>WITHDRAW</b> takes access away and puts the row back under Created Access.
+<b>DELETE</b> goes further and forgets the device entirely.</div>
+    </div>
+  </section>
+
+  <!-- The form itself, which is a different job again: this one is written
+       once, in somebody's own words, and read by strangers. -->
+  <section class="grp" data-tab="displays">
+    <h4>The request form</h4>
+    <div class="grpbody">
+  <div id="dp_form"></div>
+  <div class="seg" style="margin-top:6px">
+    <button id="b_addfield">ADD A FIELD</button>
+  </div>
+  <div class="note help">Up to five fields, and they are yours — this server has
+no opinion about what a request should ask. Somebody running a campus wants a
+name and a department; somebody running a house wants none of it. Tick
+<b>message</b> on one field to make it a box big enough for a reason, and mark
+the ones that must be answered.
+
+If you do not ask for a name, rows arrive labelled by their id and you approve
+them on whatever you did ask for. Ask for nothing at all and a request carries
+nothing but that id.</div>
+
+  <div class="seg" style="margin-top:8px">
+    <button id="b_formsave" class="act-save">SAVE THE FORM</button>
+    <button id="b_formrevert" class="act-undo">REVERT</button>
+  </div>
+  <div class="note" id="formnote"></div>
+    </div>
+  </section>
+
   <section class="grp" data-tab="embeds">
     <h4>Embed keys</h4>
     <div class="grpbody">
@@ -1361,11 +1714,11 @@ Worked examples in DOCUMENTATION → Embedding it elsewhere.</div>
   <section class="grp" data-tab="embeds">
     <h4>Create an embed key</h4>
     <div class="grpbody">
-  <label class="bklab">name</label>
+  <label class="bklab">Name</label>
   <input id="em_name" type="text" spellcheck="false" autocomplete="off"
          placeholder="lobby kiosk">
 
-  <label class="bklab">start from</label>
+  <label class="bklab">Start from</label>
   <div class="seg" id="em_preset">
     <button data-v="full" class="on">FULL</button>
     <button data-v="console">CONSOLE</button>
@@ -1375,31 +1728,31 @@ Worked examples in DOCUMENTATION → Embedding it elsewhere.</div>
     <button data-v="signage">SIGNAGE</button>
   </div>
 
-  <label class="bklab">what it may do</label>
+  <label class="bklab">What it may do</label>
   <div class="cks" id="em_cap">
-    <label><input type="checkbox" data-c="ask"> ask</label>
-    <label><input type="checkbox" data-c="mic"> microphone</label>
-    <label><input type="checkbox" data-c="speak"> speak</label>
+    <label><input type="checkbox" data-c="ask"> Ask</label>
+    <label><input type="checkbox" data-c="mic"> Microphone</label>
+    <label><input type="checkbox" data-c="speak"> Speak</label>
   </div>
   <div class="note help">Permission, not furniture. Hiding the TALK button below
 does not withdraw the microphone.</div>
 
-  <label class="bklab">what it draws</label>
+  <label class="bklab">What it draws</label>
   <div class="cks" id="em_parts">
-    <label><input type="checkbox" data-p="visual"> figure</label>
-    <label><input type="checkbox" data-p="transcript"> transcript</label>
-    <label><input type="checkbox" data-p="input"> input field</label>
+    <label><input type="checkbox" data-p="visual"> Figure</label>
+    <label><input type="checkbox" data-p="transcript"> Transcript</label>
+    <label><input type="checkbox" data-p="input"> Input field</label>
     <label><input type="checkbox" data-p="mode"> SPACE/AUTO</label>
     <label><input type="checkbox" data-p="talk"> TALK</label>
     <label><input type="checkbox" data-p="audio"> AUDIO</label>
     <label><input type="checkbox" data-p="text"> TEXT</label>
   </div>
 
-  <label class="bklab">allowed to frame it — one origin a line</label>
+  <label class="bklab">Allowed to frame it — one origin a line</label>
   <textarea id="em_origins" rows="3" spellcheck="false"
             placeholder="https://app.example.com"></textarea>
 
-  <label class="bklab">session length, minutes</label>
+  <label class="bklab">Session length, minutes</label>
   <input id="em_ttl" type="number" min="5" max="1440" value="60">
 
   <div class="seg" style="margin-top:8px"><button id="b_addembed" class="act-save">CREATE</button></div>
@@ -1462,10 +1815,32 @@ button to download it as a PDF.</div>
     <div class="tabgroup">Admin settings</div>
     <div class="tabs" id="foottabs">
       <button id="tab_app" data-tab="app">APP SETTINGS</button>
-      <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
+      <!-- Accounts before devices: a group is made here and named over there,
+           so the order follows the order you do them in. -->
       <button id="tab_accounts" data-tab="accounts">ACCOUNTS</button>
+      <button id="tab_displays" data-tab="displays">DEVICES</button>
+      <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
       <button id="tab_docs" data-tab="docs">DOCUMENTATION</button>
     </div>
+  </div>
+</div>
+
+<!-- Your own account, opened from your name in the corner rather than
+     sitting as a topic on a tab about everybody else's. It is one thing you do
+     to yourself — change your password — and it belongs where your name is. -->
+<div id="mine">
+  <div id="minebox">
+    <div id="minehead">Your account</div>
+    <div class="whoami" id="whoami"></div>
+    <label class="bklab">Current password</label>
+    <input id="pw_cur" type="password" autocomplete="current-password">
+    <label class="bklab">New password</label>
+    <input id="pw_new" type="password" autocomplete="new-password">
+    <div class="seg" style="margin-top:8px">
+      <button id="b_pw" class="act-save">CHANGE PASSWORD</button>
+      <button id="b_mineclose" class="act-undo">CLOSE</button>
+    </div>
+    <div class="note" id="pwnote"></div>
   </div>
 </div>
 
@@ -1702,6 +2077,21 @@ document.addEventListener('keydown', e=>{
   if (!enter || e.isComposing) return;
   e.preventDefault();
   signIn();
+});
+
+/* Your own account, from your name in the corner. */
+$('whoname').addEventListener('click', ()=>{
+  if (ME && ME.no_auth) return;          // nothing to change
+  $('pwnote').textContent = '';
+  $('pw_cur').value = ''; $('pw_new').value = '';
+  $('mine').classList.add('on');
+  $('pw_cur').focus();
+});
+const closeMine = ()=> $('mine').classList.remove('on');
+$('b_mineclose').addEventListener('click', closeMine);
+$('mine').addEventListener('click', e=>{ if (e.target.id === 'mine') closeMine(); });
+document.addEventListener('keydown', e=>{
+  if (e.key === 'Escape' && $('mine').classList.contains('on')) closeMine();
 });
 
 $('b_signout').addEventListener('click', async ()=>{
@@ -2334,7 +2724,7 @@ function newInstance(){
           base_url:'http://127.0.0.1:11434/v1', model:'', system:SHIPPED_PROMPT,
           max_tokens:400, temperature:0.4, timeout:120, keep_alive:'30m',
           history_turns:8, has_key:false, is_default:false,
-          agent_id:'', fallthrough:''};
+          agent_id:'', fallthrough:'', restricted:false, displays:[], groups:[]};
 }
 
 // `esc` is already taken further down by the documentation renderer
@@ -2348,7 +2738,7 @@ function blockHTML(r){
   return `
   <h4><span class="rtname"></span><span class="rtsum"></span></h4>
   <div class="grpbody">
-  <label class="bklab" style="margin-top:2px">instance name</label>
+  <label class="bklab" style="margin-top:2px">Instance name</label>
   <input data-f="name" type="text" spellcheck="false" autocomplete="off"
          placeholder="House">
   <div class="note help">Labels this endpoint — in the heading above, in the
@@ -2359,14 +2749,14 @@ never spoken and never matched against.</div>
   <div class="subgrp" data-g="wake">
     <h5>Wake word<span class="subsum"></span></h5>
     <div class="subbody">
-  <label class="bklab">wake word</label>
+  <label class="bklab">Wake word</label>
   <input data-f="wakeword" type="text" spellcheck="false" autocomplete="off"
          placeholder="house">
   <div class="seg" style="margin-top:6px"><button data-a="learn">LEARN HOW I SAY IT (3x)</button></div>
   <div data-r="learnnote" class="learnnote"></div>
-  <label class="bklab">also answers to</label>
+  <label class="bklab">Also answers to</label>
   <textarea data-f="aliases" rows="3" spellcheck="false" placeholder="one per line"></textarea>
-  <label class="bklab">matching</label>
+  <label class="bklab">Matching</label>
   <div class="seg" data-f="strict">
     <button data-v="0" class="on">CLOSE ENOUGH</button>
     <button data-v="1">THE EXACT WORD</button>
@@ -2387,13 +2777,45 @@ other.</div>
     </div>
   </div>
 
+  <div class="subgrp" data-g="who">
+    <h5>Who may use it<span class="subsum"></span></h5>
+    <div class="subbody">
+  <div class="seg" data-f="restricted">
+    <button data-v="0" class="on">ANY DISPLAY</button>
+    <button data-v="1">ONLY THESE</button>
+  </div>
+  <label class="bklab" data-r="grouplab">Groups</label>
+  <div class="cks" data-r="groups"></div>
+  <label class="bklab" data-r="onelab">One at a time</label>
+  <div class="cks" data-r="displays"></div>
+  <div class="note" data-r="whonote"></div>
+  <div class="note help">Two reasons to restrict one. <b>A room with several
+microphones in it</b> — one person addresses the wall screen and every other
+device in earshot hears it too. And <b>what an endpoint costs</b> — a hosted
+model worth giving to some people and not to everyone.
+
+Either way the rule is enforced <b>here</b> rather than in anybody's browser
+settings, because push-to-talk on a phone is the right setting and is not a
+control: nothing makes anybody set it.
+
+ANY DISPLAY is what every endpoint was before this existed. ONLY THESE names
+the devices — a wall screen, a TV, a laptop, a phone — that may reach it.
+
+A display that hears a name it may not use <b>drops the utterance</b> — it
+does not answer, does not pass it to whatever it was already talking to, and
+says nothing out loud. The person was addressing another device.
+
+Devices enrol themselves and are approved under DEVICES.</div>
+    </div>
+  </div>
+
   <div class="subgrp" data-g="voice">
     <h5>Greeting &amp; voice<span class="subsum"></span></h5>
     <div class="subbody">
-  <label class="bklab">greeting</label>
+  <label class="bklab">Greeting</label>
   <input data-f="greeting" type="text" spellcheck="false" autocomplete="off"
          placeholder="leave blank for the shared phrases">
-  <label class="bklab">voice</label>
+  <label class="bklab">Voice</label>
   <select data-f="voice"></select>
   <div class="note help">The greeting is spoken when its wake word is said and
 nothing else; blank falls back to the phrases on the SPEECH tab. Give the
@@ -2418,7 +2840,7 @@ everything it can be asked to touch is decided over there.</div>
   </div>
   <div data-r="conn">
   <div data-r="presetrow">
-  <label class="bklab">preset</label>
+  <label class="bklab">Preset</label>
   <div class="seg" data-r="preset">
     <button data-v="ollama">OLLAMA</button>
     <button data-v="openclaw">OPENCLAW</button>
@@ -2426,11 +2848,11 @@ everything it can be asked to touch is decided over there.</div>
     <button data-v="openai">OPENAI</button>
   </div>
   </div>
-  <label class="bklab" data-r="urllabel">base URL</label>
+  <label class="bklab" data-r="urllabel">Base URL</label>
   <input data-f="base_url" type="text" spellcheck="false" autocomplete="off"
          placeholder="http://127.0.0.1:11434/v1">
   <div data-r="modelrow">
-  <label class="bklab">model</label>
+  <label class="bklab">Model</label>
   <input data-f="model" type="text" spellcheck="false" autocomplete="off"
          placeholder="qwen2.5:3b">
   </div>
@@ -2440,14 +2862,14 @@ everything it can be asked to touch is decided over there.</div>
          placeholder="unchanged">
   <div class="note" data-r="keynote"></div>
   <div data-r="harows">
-  <label class="bklab">conversation agent</label>
+  <label class="bklab">Conversation agent</label>
   <input data-f="agent_id" type="text" spellcheck="false" autocomplete="off"
          placeholder="leave blank for the configured default">
   <div class="note help">Which agent in Home Assistant answers. The built-in
 one matches sentences, so it does what it is told and nothing else; an
 LLM-backed one interprets, so "it's a bit dark in here" works and costs a model
 call. Blank uses whichever is set as default over there.</div>
-  <label class="bklab">when it recognises nothing, ask</label>
+  <label class="bklab">When it recognises nothing, ask</label>
   <select data-f="fallthrough"></select>
   <div class="note help">Nobody remembers which name owns which capability, so
 somebody will ask the house a general question. Name another endpoint here and
@@ -2463,12 +2885,12 @@ nothing for one of those.</div>
   <div class="subgrp" data-g="limits">
     <h5>Limits<span class="subsum"></span></h5>
     <div class="subbody">
-  <div class="sl" data-r="maxrow"><label>reply limit (tokens)</label><output data-o="max_tokens"></output><input data-s="max_tokens" type="range" min="16" max="2000" step="16"></div>
-  <div class="sl" data-r="temprow"><label>temperature</label><output data-o="temperature"></output><input data-s="temperature" type="range" min="0" max="1.5" step=".05"></div>
-  <div class="sl" data-r="ctxrow"><label>turns of context</label><output data-o="history_turns"></output><input data-s="history_turns" type="range" min="0" max="24" step="1"></div>
-  <div class="sl"><label>timeout</label><output data-o="timeout"></output><input data-s="timeout" type="range" min="5" max="600" step="5"></div>
+  <div class="sl" data-r="maxrow"><label>Reply limit (tokens)</label><output data-o="max_tokens"></output><input data-s="max_tokens" type="range" min="16" max="2000" step="16"></div>
+  <div class="sl" data-r="temprow"><label>Temperature</label><output data-o="temperature"></output><input data-s="temperature" type="range" min="0" max="1.5" step=".05"></div>
+  <div class="sl" data-r="ctxrow"><label>Turns of context</label><output data-o="history_turns"></output><input data-s="history_turns" type="range" min="0" max="24" step="1"></div>
+  <div class="sl"><label>Timeout</label><output data-o="timeout"></output><input data-s="timeout" type="range" min="5" max="600" step="5"></div>
   <div data-r="keepaliverow">
-  <label class="bklab">keep model loaded</label>
+  <label class="bklab">Keep model loaded</label>
   <input data-f="keep_alive" type="text" spellcheck="false" autocomplete="off"
          placeholder="30m">
   </div>
@@ -2630,6 +3052,9 @@ function blockPaint(blk, r){
   });
   blk.querySelectorAll('[data-f="strict"] button').forEach(b=>
     b.classList.toggle('on', (b.dataset.v === '1') === !!r.strict));
+  blk.querySelectorAll('[data-f="restricted"] button').forEach(b=>
+    b.classList.toggle('on', (b.dataset.v === '1') === !!r.restricted));
+  blockFillWho(blk, r);
   blk.querySelectorAll('[data-f="provider"] button').forEach(b=>
     b.classList.toggle('on', b.dataset.v === r.provider));
   /* Light the preset the base URL actually corresponds to, rather than
@@ -2674,6 +3099,14 @@ function blockPaint(blk, r){
     wake: (r.wakeword ? '“' + r.wakeword + '”' : 'not set')
         + (words ? ' +' + words + ' more' : '')
         + (r.strict ? ' · exact' : ''),
+    who: !r.restricted ? 'any display'
+       : ((r.groups || []).length + (r.displays || []).length)
+         ? [(r.groups || []).length
+              ? (r.groups || []).length + ' group' + ((r.groups || []).length === 1 ? '' : 's')
+              : '',
+            (r.displays || []).length
+              ? (r.displays || []).length + ' named' : ''].filter(Boolean).join(' + ')
+         : 'nobody',
     voice: (r.greeting ? '“' + r.greeting.slice(0, 28)
                        + (r.greeting.length > 28 ? '…' : '') + '” · ' : 'shared greeting · ')
          + (r.voice || 'shared voice'),
@@ -2723,6 +3156,113 @@ function blockPaint(blk, r){
   blockSyncProvider(blk);
 }
 
+/* One checkbox per display this server knows about, ticked where this endpoint
+   already names it. Built from the loaded list rather than from the endpoint's own
+   list, so a device that has been deleted stops being offered and one that
+   arrived a minute ago is there to tick. */
+function blockFillWho(blk, r){
+  const box = R(blk, 'displays'), gbox = R(blk, 'groups');
+  if (!box) return;
+  const want = r.displays || [], wantG = r.groups || [];
+  // Never rebuilt under somebody's cursor — replacing the nodes would drop
+  // the tick they were in the middle of making.
+  if (!box.contains(document.activeElement)
+      && !(gbox && gbox.contains(document.activeElement))){
+    /* Groups first, and in their own box. Naming a group is the grant you
+       want to make most of the time — twelve people who all get the same
+       thing — and a list that mixed them in among the individuals would bury
+       it among the exceptions. */
+    if (gbox){
+      gbox.innerHTML = '';
+      GROUPS.forEach(g=>{
+        const lab = document.createElement('label');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.dataset.g = g.id;
+        cb.checked = wantG.indexOf(g.id) >= 0;
+        lab.appendChild(cb);
+        lab.appendChild(document.createTextNode(
+          ' ' + g.name + ' (' + g.members.length + ')'));
+        gbox.appendChild(lab);
+      });
+      if (!GROUPS.length){
+        const em = document.createElement('span');
+        em.textContent = 'no groups yet — they are made under ACCOUNTS';
+        gbox.appendChild(em);
+      }
+    }
+    box.innerHTML = '';
+    DISPLAYS.forEach(d=>{
+      const lab = document.createElement('label');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.dataset.d = d.id;
+      cb.checked = want.indexOf(d.id) >= 0;
+      lab.appendChild(cb);
+      lab.appendChild(document.createTextNode(
+        ' ' + d.label + (d.approved ? '' : ' — not approved')));
+      box.appendChild(lab);
+    });
+    if (!DISPLAYS.length){
+      const em = document.createElement('span');
+      em.textContent = 'no displays have loaded the page yet';
+      box.appendChild(em);
+    }
+  }
+  blockSyncWho(blk);
+}
+
+/* The list only means anything under ONLY THESE, and the note under it says
+   what the current pair actually does — including the two arrangements that
+   are allowed and surprising. */
+function blockSyncWho(blk){
+  const on = blk.querySelector('[data-f="restricted"] button.on');
+  const restricted = !!on && on.dataset.v === '1';
+  ['groups', 'grouplab', 'onelab', 'displays'].forEach(n=>{
+    const el = R(blk, n);
+    if (el) el.style.display = restricted ? '' : 'none';
+  });
+  const box = R(blk, 'displays'), gbox = R(blk, 'groups');
+  const tickedG = gbox ? [...gbox.querySelectorAll('input:checked')] : [];
+  const ticked = box ? [...box.querySelectorAll('input:checked')] : [];
+  const live = ticked.filter(cb=>{
+    const d = DISPLAYS.find(x=> x.id === cb.dataset.d);
+    return d && d.approved;
+  });
+  const note = R(blk, 'whonote');
+  if (note){
+    let msg = '', bad = false;
+    if (!restricted){
+      msg = 'Any display, approved or not — the same as every endpoint before '
+          + 'displays existed.';
+    }else if (!ticked.length && !tickedG.length){
+      // Allowed rather than refused: restricting one before the tablet that
+      // will use it has been hung is a legitimate order to do things in.
+      msg = 'No display may use this endpoint — nothing reaches it until one '
+          + 'is ticked.';
+      bad = true;
+    }else{
+      const bits = [];
+      if (tickedG.length)
+        bits.push(tickedG.length + (tickedG.length === 1 ? ' group' : ' groups'));
+      if (ticked.length)
+        bits.push(ticked.length + (ticked.length === 1 ? ' display named on its own'
+                                                       : ' displays named on their own'));
+      msg = bits.join(' · ');
+      if (live.length !== ticked.length)
+        msg += ' — ' + (ticked.length - live.length) + ' of those not approved '
+             + 'yet, and refused until they are';
+    }
+    /* The composer sends typed questions to the DEFAULT endpoint with no wake
+       word behind them, so restricting that one means a display outside the
+       list can type and get nothing back. Worth saying where the setting is
+       made rather than leaving it to be discovered at a keyboard. */
+    if (restricted && blk._rec && blk._rec.is_default)
+      msg += ' · this is the default endpoint, so typed questions from any '
+           + 'other display are refused too';
+    note.className = 'note' + (bad ? ' bad' : '');
+    note.textContent = msg;
+  }
+}
+
 function blockCollect(blk){
   const body = {};
   RT_FIELDS.forEach(k=>{
@@ -2739,6 +3279,15 @@ function blockCollect(blk){
   body.provider = prov ? prov.dataset.v : 'demo';
   const strict = blk.querySelector('[data-f="strict"] button.on');
   body.strict = !!strict && strict.dataset.v === '1';
+  const who = blk.querySelector('[data-f="restricted"] button.on');
+  body.restricted = !!who && who.dataset.v === '1';
+  /* Sent whether or not the switch is on, so turning it off and on again
+     brings back the displays that were ticked rather than an empty list
+     somebody has to fill in twice. */
+  body.displays = [...blk.querySelectorAll('[data-r="displays"] input:checked')]
+                    .map(cb=> cb.dataset.d);
+  body.groups = [...blk.querySelectorAll('[data-r="groups"] input:checked')]
+                  .map(cb=> cb.dataset.g);
   const ft = F(blk, 'fallthrough');
   if (ft) body.fallthrough = ft.value;
   const key = F(blk, 'api_key');
@@ -2764,6 +3313,11 @@ async function listModels(blk){
 }
 
 function wireBlock(blk){
+  /* Ticking a display changes what the note under the list says, and a tick
+     is a change rather than an input. */
+  blk.addEventListener('change', e=>{
+    if (e.target.closest('[data-r="displays"]')) blockSyncWho(blk);
+  });
   blk.addEventListener('input', e=>{
     const f = e.target.closest('[data-f]');
     if (f) f.dataset.touched = '1';
@@ -2820,6 +3374,7 @@ function wireBlock(blk){
         }
         blockSyncProvider(blk);
       }
+      if (seg.dataset.f === 'restricted') blockSyncWho(blk);
       if (seg.dataset.r === 'preset'){
         const pre = BK_PRESETS[b.dataset.v];
         if (pre){
@@ -2976,9 +3531,695 @@ function paintBlocks(keepOpen){
     : 'no endpoints yet — ADD INSTANCE to make one');
 }
 
+/* ----------------------------------------------------------- displays
+   One device each — a wall screen, a TV, a laptop, a phone — enrolled by
+   turning up rather than created here. What this page can do to one is approve it,
+   name it, and take it away again. */
+let DISPLAYS = [];
+let ENROL_BASE = '';
+//: which row is open. One at a time, and it survives a refresh so approving
+//: something does not shut the row you were working in.
+let OPENROW = '';
+let DPCFG = null;                // the displays document's own settings
+let DPEND = [];                  // endpoints, for the grant ticks
+let DPOPEN = '';                 // the default, if it is open to any display
+
+const dispWhen = (ts)=> ts ? new Date(ts * 1000).toLocaleString() : 'never';
+/* Printed with a dash in the middle. Six characters read off a screen and
+   typed into another one across the room are easier in two groups of three,
+   and the server ignores the dash — so this is presentation, not format. */
+const dispCode = (c)=> c ? c.slice(0, 3) + '-' + c.slice(3) : '';
+
+/* Just the fetch. The endpoint blocks name displays in their allow-lists, so
+   this has to have run before one is painted — and painting a block is not
+   something to do from inside the list's own refresh. */
+async function loadDisplays(){
+  try{
+    const j = await api('/displays');
+    DISPLAYS = j.displays || [];
+    ENROL_BASE = j.enrol_base || '';
+    DPCFG = j.settings || null;
+    DPEND = j.endpoints || [];
+    DPOPEN = j.open_default || '';
+  }catch(e){ DISPLAYS = []; }
+  return DISPLAYS;
+}
+
+/* ----------------------------------------------------------- groups
+   A name for a set of displays, so a grant is made once instead of ticked
+   twelve times. Two kinds, two populations, and a group holds one of them. */
+let GROUPS = [], GRPEOPLE = [], GRDEVICES = [];
+
+async function loadGroups(){
+  try{
+    const j = await api('/groups');
+    GROUPS = j.groups || [];
+    GRPEOPLE = j.people || [];
+    GRDEVICES = j.devices || [];
+  }catch(e){ GROUPS = []; }
+  return GROUPS;
+}
+
+function groupNote(m, bad){
+  const el = $('groupnote');
+  if (!el) return;
+  el.className = 'note' + (bad ? ' bad' : '');
+  el.textContent = m || '';
+}
+
+async function refreshGroups(){
+  const box = $('grouplist');
+  if (!box || ME.role !== 'admin'){ if (box) box.textContent = ''; return; }
+  await loadGroups();
+  box.innerHTML = '';
+  if (!GROUPS.length){
+    box.className = 'note';
+    box.textContent = 'No groups yet. Name one below and pick which population '
+                    + 'it is drawn from.';
+    return;
+  }
+  box.className = '';
+  GROUPS.forEach(g=>{
+    const row = document.createElement('div');
+    row.className = 'erow';
+
+    const top = document.createElement('div'); top.className = 'top';
+    const nm = document.createElement('input');
+    nm.type = 'text'; nm.className = 'nm'; nm.value = g.name; nm.spellcheck = false;
+    nm.onkeydown = (e)=>{ if (e.key === 'Enter') nm.blur(); };
+    nm.onchange = ()=> groupAction('/groups/save', {id: g.id, name: nm.value.trim()});
+    top.appendChild(nm);
+    const b = document.createElement('span');
+    b.className = 'badge';
+    b.textContent = g.kind === 'user' ? 'PEOPLE' : 'DEVICES';
+    top.appendChild(b);
+    row.appendChild(top);
+
+    /* Membership is the group. Ticked in place rather than behind an EDIT,
+       because the list is short and the whole reason to open a group is to
+       change who is in it. */
+    const pool = g.kind === 'user' ? GRPEOPLE : GRDEVICES;
+    const cks = document.createElement('div');
+    cks.className = 'cks';
+    if (!pool.length){
+      const em = document.createElement('span');
+      em.textContent = g.kind === 'user'
+        ? 'nobody has asked for access yet'
+        : 'no devices have been created yet';
+      cks.appendChild(em);
+    }
+    pool.forEach(m=>{
+      const lab = document.createElement('label');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.dataset.m = m.id;
+      cb.checked = g.members.indexOf(m.id) >= 0;
+      cb.onchange = ()=> groupAction('/groups/save', {
+        id: g.id,
+        members: [...cks.querySelectorAll('input:checked')].map(x=> x.dataset.m),
+      });
+      lab.appendChild(cb);
+      lab.appendChild(document.createTextNode(
+        ' ' + m.label + (m.approved ? '' : ' — not approved')));
+      cks.appendChild(lab);
+    });
+    row.appendChild(cks);
+
+    const named = (RT.routes || []).filter(x=> (x.groups || []).indexOf(g.id) >= 0);
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    [['Members', g.members.length ? g.labels.join(', ') : 'none yet'],
+     ['Used by', named.length ? named.map(x=> x.name).join(', ')
+                              : 'no endpoint names this group']].forEach(([k, v])=>{
+      const el = document.createElement('div');
+      const bb = document.createElement('b');
+      bb.textContent = k + ' ';
+      el.appendChild(bb);
+      el.appendChild(document.createTextNode(v));
+      meta.appendChild(el);
+    });
+    row.appendChild(meta);
+
+    const acts = document.createElement('div');
+    acts.className = 'acts';
+    const del = document.createElement('button');
+    del.textContent = 'DELETE';
+    del.className = 'act-danger';
+    del.onclick = ()=>{
+      if (confirm('Delete the group "' + g.name + '"? It is removed from every '
+                  + 'endpoint that names it. Nothing in it is deleted — a group '
+                  + 'is a way of referring to them, not a thing they belong to.'))
+        groupAction('/groups/delete', {id: g.id});
+    };
+    acts.appendChild(del);
+    row.appendChild(acts);
+    box.appendChild(row);
+  });
+}
+
+async function groupAction(path, body){
+  try{
+    await api(path, {method:'POST', body: JSON.stringify(body)});
+    await refreshGroups();
+    groupNote('');
+    // An endpoint's allow-list offers groups, so it has to be rebuilt too.
+    paintBlocks();
+  }catch(e){ groupNote(e.message, true); }
+}
+
+$('b_addgroup').addEventListener('click', async ()=>{
+  const el = $('gr_name');
+  const name = (el.value || '').trim();
+  if (!name){
+    groupNote('give it a name first', true);
+    el.focus();
+    return;
+  }
+  const kind = document.querySelector('#gr_kind button.on');
+  el.value = '';
+  await groupAction('/groups/save', {name, kind: kind ? kind.dataset.v : 'device'});
+});
+$('gr_name').addEventListener('keydown', e=>{
+  if (e.key === 'Enter') $('b_addgroup').click();
+});
+$('gr_kind').addEventListener('click', e=>{
+  const b = e.target.closest('button');
+  if (b) segSet('gr_kind', b.dataset.v);
+});
+
+/* ---- the settings above the list ---- */
+function paintDpSettings(){
+  if (!DPCFG) return;
+  segSet('dp_guest', DPCFG.guest_requests ? '1' : '0');
+  $('dp_days').value = DPCFG.guest_days;
+  $('dp_max').value = DPCFG.max_displays;
+  $('dp_pending').value = DPCFG.max_pending;
+  paintDpForm(DPCFG.form || []);
+}
+
+/* One row per field. Rebuilt from an array rather than read off the DOM,
+   because ADD and REMOVE both change the list and a builder that edits itself
+   in place loses a field the moment two things happen at once. */
+let DPFORM = [];
+function paintDpForm(fields){
+  DPFORM = (fields || []).map(f=> ({label: f.label || '',
+                                    required: !!f.required,
+                                    message: !!f.message}));
+  const box = $('dp_form');
+  box.innerHTML = '';
+  if (!DPFORM.length){
+    const em = document.createElement('div');
+    em.className = 'note';
+    em.textContent = 'No fields — a request would arrive with nothing on it '
+                   + 'but the device id.';
+    box.appendChild(em);
+  }
+  DPFORM.forEach((f, i)=>{
+    const row = document.createElement('div');
+    row.className = 'fldrow';
+    const t = document.createElement('input');
+    t.type = 'text'; t.value = f.label; t.spellcheck = false;
+    t.placeholder = 'What it asks for';
+    t.oninput = ()=>{ DPFORM[i].label = t.value; };
+    row.appendChild(t);
+    [['required', 'Must answer'], ['message', 'Message']].forEach(([k, word])=>{
+      const lab = document.createElement('label');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.checked = !!f[k];
+      cb.onchange = ()=>{
+        DPFORM[i][k] = cb.checked;
+        // Only one paragraph box. Two is a form somebody built by accident.
+        if (k === 'message' && cb.checked)
+          DPFORM.forEach((g, j)=>{ if (j !== i) g.message = false; });
+        paintDpForm(DPFORM);
+      };
+      lab.appendChild(cb);
+      lab.appendChild(document.createTextNode(word));
+      row.appendChild(lab);
+    });
+    const del = document.createElement('button');
+    del.textContent = 'REMOVE';
+    del.onclick = ()=>{ DPFORM.splice(i, 1); paintDpForm(DPFORM); };
+    row.appendChild(del);
+    box.appendChild(row);
+  });
+  const btn = $('b_addfield');
+  if (btn) btn.disabled = DPFORM.length >= 5;
+}
+
+/* Two topics, two commit rows, each writing only what is on it — the panel's
+   own rule. One SAVE across both would mean pressing it while looking at the
+   form also published a switch left half-changed above it. */
+function dpNote(m, bad, which){
+  const el = $(which || 'dpnote');
+  if (!el) return;
+  el.className = 'note' + (bad ? ' bad' : '');
+  el.textContent = m || '';
+}
+
+async function saveDp(body, slot){
+  dpNote('saving…', false, slot);
+  try{
+    const j = await api('/displays/settings', {method:'POST',
+                                               body: JSON.stringify(body)});
+    DPCFG = j.settings;
+    paintDpSettings();
+    await refreshDisplays();
+    dpNote('saved', false, slot);
+  }catch(e){ dpNote(e.message, true, slot); }
+}
+
+$('b_addfield').addEventListener('click', ()=>{
+  if (DPFORM.length >= 5) return;
+  DPFORM.push({label:'', required:false, message:false});
+  paintDpForm(DPFORM);
+});
+$('dp_guest').addEventListener('click', e=>{
+  const b = e.target.closest('button');
+  if (b) segSet('dp_guest', b.dataset.v);
+});
+$('b_dprevert').addEventListener('click', ()=>{
+  paintDpSettings();
+  dpNote('back to what is saved');
+});
+$('b_dpsave').addEventListener('click', ()=>{
+  const on = document.querySelector('#dp_guest button.on');
+  saveDp({
+    guest_requests: !!on && on.dataset.v === '1',
+    guest_days: parseInt($('dp_days').value, 10),
+    max_displays: parseInt($('dp_max').value, 10),
+    max_pending: parseInt($('dp_pending').value, 10),
+  }, 'dpnote');
+});
+
+$('b_formrevert').addEventListener('click', ()=>{
+  paintDpForm((DPCFG && DPCFG.form) || []);
+  dpNote('back to what is saved', false, 'formnote');
+});
+$('b_formsave').addEventListener('click', ()=>{
+  saveDp({form: DPFORM.filter(f=> (f.label || '').trim())}, 'formnote');
+});
+
+/* What a row IS, and it decides which of the two lists it belongs in as well
+   as what the row says. `live` is a device that is working; everything else
+   wants something from somebody. */
+const dispState = (d)=> !d.enrolled ? (d.code ? 'code' : 'stale')
+                      : d.denied    ? 'denied'
+                      : d.requested_at && !d.approved ? 'asked'
+                      : d.expired   ? 'expired'
+                      : d.approved  ? 'live' : 'waiting';
+
+async function refreshDisplays(){
+  const box = $('displist'), conn = $('connlist');
+  if (!box || ME.role !== 'admin'){
+    if (box) box.textContent = '';
+    if (conn) conn.textContent = '';
+    return;
+  }
+  const note = $('dispnote');
+  await loadDisplays();
+  // The settings above the list are painted from the same fetch, so the two
+  // can never be describing different states of the same document.
+  paintDpSettings();
+  box.innerHTML = '';
+  conn.innerHTML = '';
+  /* Two lists, because they are read for opposite reasons. This one is a
+     queue — everything in it is waiting on a decision, a code being typed, or
+     somebody asking again — and it is empty when there is nothing to do.
+     Devices that are simply working are not a to-do list, and burying three
+     rows that need attention among fifty that do not is how a request sits
+     unanswered for a week. */
+  const rank = {asked: 0, expired: 1, code: 2, waiting: 3, denied: 4, stale: 5};
+  const rows = DISPLAYS.slice().sort((a, b)=>
+    (rank[dispState(a)] - rank[dispState(b)]) || (b.created || 0) - (a.created || 0));
+  const pending = rows.filter(d=> dispState(d) !== 'live');
+  const live = DISPLAYS.slice()
+    .filter(d=> dispState(d) === 'live')
+    .sort((a, b)=> (b.last_seen || 0) - (a.last_seen || 0));
+  if (!pending.length){
+    box.className = 'note';
+    box.textContent = DISPLAYS.length
+      ? 'Nothing waiting. Every device here is working.'
+      : 'No displays yet. Name one above to get a code, or open the display '
+        + 'page on any device and it appears here.';
+  }else box.className = '';
+  if (!live.length){
+    conn.className = 'note';
+    conn.textContent = 'Nothing connected yet.';
+  }else conn.className = '';
+  /* Each list in its own order: the queue by how much it wants attention, the
+     connected list by what was heard from most recently. */
+  pending.concat(live).forEach(d=>{
+    const st = dispState(d);
+    const row = document.createElement('div');
+    row.className = 'erow' + (st === 'live' ? '' : ' off');
+
+    /* Shut unless it is the one being looked at. A list of fifty devices is a
+       register, and a register you scroll through is a register nobody reads —
+       one row open at a time keeps the whole of it on one screen. */
+    if (d.id !== OPENROW) row.classList.add('shut');
+
+    const top = document.createElement('div'); top.className = 'top';
+    /* The name, and the thing you press to open the row. It reads as the row's
+       title because that is what it is; renaming happens inside, where there
+       is room for it to be a labelled field rather than a box you might click
+       by accident while trying to look at something. */
+    const nmt = document.createElement('span');
+    nmt.className = 'nm';
+    nmt.textContent = d.label;
+    top.appendChild(nmt);
+    top.onclick = (e)=>{
+      if (e.target.closest('input, button, select, textarea')) return;
+      const opening = row.classList.contains('shut');
+      OPENROW = opening ? d.id : '';
+      // One at a time, across both lists: they are two halves of one register.
+      document.querySelectorAll('#displist .erow, #connlist .erow')
+              .forEach(x=> x.classList.add('shut'));
+      row.classList.toggle('shut', !opening);
+    };
+
+    const nm = document.createElement('input');
+    nm.type = 'text'; nm.className = 'nmedit'; nm.value = d.name || '';
+    nm.placeholder = d.asked || 'unnamed display';
+    nm.spellcheck = false;
+    nm.onkeydown = (e)=>{ if (e.key === 'Enter') nm.blur(); };
+    nm.onchange = ()=> displayAction('/displays/rename',
+                                     {id: d.id, name: nm.value.trim()});
+    const badge = (t)=>{
+      const b = document.createElement('span');
+      b.className = 'badge'; b.textContent = t;
+      top.appendChild(b);
+    };
+    if (st === 'code')    badge('WAITING FOR ITS CODE');
+    if (st === 'stale')   badge('CODE EXPIRED');
+    if (st === 'waiting') badge('WAITING');
+    if (st === 'asked')   badge(d.renewals ? 'ASKING AGAIN' : 'ASKED FOR ACCESS');
+    if (st === 'expired') badge('ACCESS EXPIRED');
+    if (st === 'denied')  badge(d.deny_repeat ? 'REFUSED' : 'REFUSED — FINAL');
+    if (d.renewals) badge('RENEWED ' + d.renewals + '×');
+    if (d.refused) badge(d.refused + (d.refused === 1 ? ' REFUSAL' : ' REFUSALS'));
+
+    /* A line of their own, under the row, rather than crowded onto the end of
+       the name. Four buttons plus a name box plus two badges do not fit a
+       425px column, and what they did instead was run over the edge of it. */
+    const r = document.createElement('div'); r.className = 'acts';
+    /* Deciding is for a device that turned up on its own. A row created here
+       was approved by being created, and has no device yet to decide about. */
+    const deciding = d.enrolled && (st === 'asked' || st === 'waiting');
+    const grant = (label)=>{
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.className = 'act-save';
+      b.onclick = ()=> decide(d, true, nm.value.trim(), row);
+      r.appendChild(b);
+    };
+    if (deciding){
+      // A guest coming back is a RENEWAL, and it is not the same word as the
+      // admin's REISSUE below — one grants somebody access again, the other
+      // replaces the device behind a row and kills what is there now.
+      grant(d.guest && d.approved_at ? 'RENEW' : 'APPROVE');
+      const no = document.createElement('button');
+      no.textContent = 'REFUSE';
+      no.className = 'act-danger';
+      no.onclick = ()=> decide(d, false, nm.value.trim(), row);
+      r.appendChild(no);
+    }else if (d.enrolled && d.approved){
+      const flip = document.createElement('button');
+      flip.textContent = 'WITHDRAW';
+      flip.onclick = ()=> decide(d, false, nm.value.trim(), row);
+      r.appendChild(flip);
+    }else if (d.enrolled && (st === 'denied' || st === 'expired')){
+      grant(st === 'expired' ? 'RENEW' : 'APPROVE');
+    }
+    /* Only for a display an admin issued a code for. On a guest's row it would
+       be the wrong mechanism entirely — killing their token and printing a
+       code for somebody to type into their laptop, where what was wanted was
+       to grant them access again. */
+    if (!d.guest){
+      const again = document.createElement('button');
+      again.textContent = st === 'code' ? 'NEW CODE' : 'REISSUE';
+      again.onclick = ()=>{
+        // Only worth stopping for where it takes a working screen off the air.
+        if (st !== 'live' || confirm('Reissue "' + d.label + '"?\n\nThe device '
+              + 'using it now stops working immediately, and the row waits for '
+              + 'somebody to type the new code into a screen. Its name and every '
+              + 'endpoint that names it are kept.'))
+          displayAction('/displays/reissue', {id: d.id});
+      };
+      r.appendChild(again);
+    }
+    const del = document.createElement('button');
+    del.textContent = 'DELETE';
+    del.className = 'act-danger';
+    del.onclick = ()=>{
+      if (confirm('Delete "' + d.label + '"? Its token stops working '
+                  + 'immediately, and it is removed from every endpoint that '
+                  + 'names it. If the device is still on the wall it will '
+                  + 'come back as a new row, unapproved.'))
+        displayAction('/displays/delete', {id: d.id});
+    };
+    r.appendChild(del);
+
+    /* The whole thing somebody has to type, on its own line and big enough to
+       read from across a room while typing it into a television with a
+       remote. The address as well as the code: nobody is typing half a URL. */
+    const namerow = document.createElement('div');
+    namerow.className = 'namerow';
+    const nlab = document.createElement('b');
+    nlab.textContent = 'Name';
+    namerow.appendChild(nlab);
+    namerow.appendChild(nm);
+
+    if (st === 'code'){
+      const c = document.createElement('div');
+      c.className = 'dcode';
+      c.textContent = ENROL_BASE + dispCode(d.code);
+      const mins = Math.max(1, Math.round((d.code_left || 0) / 60));
+      const sub = document.createElement('span');
+      sub.textContent = ' · ' + mins + ' min left · case and dashes do not matter';
+      c.appendChild(sub);
+      row.appendChild(top); row.appendChild(namerow); row.appendChild(c);
+    }else{
+      row.appendChild(top); row.appendChild(namerow);
+    }
+
+    /* What they told you, in your own words — the labels are the ones you put
+       on the form. This is the whole of what an admin who cannot see the
+       device has to go on, so it sits above the machine detail rather than
+       under it. */
+    if ((d.answers || []).length){
+      const said = document.createElement('div');
+      said.className = 'said';
+      d.answers.forEach(a=>{
+        const wrap = document.createElement('div');
+        const b = document.createElement('b');
+        b.textContent = a.label;
+        wrap.appendChild(b);
+        wrap.appendChild(document.createTextNode(a.value));
+        said.appendChild(wrap);
+      });
+      row.appendChild(said);
+    }
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const named = (RT.routes || []).filter(x=> x.restricted
+                                            && (x.displays || []).indexOf(d.id) >= 0);
+    const lines = [['ID', d.id]];
+    if (d.enrolled){
+      lines.unshift(['Calls itself', d.asked || 'nothing — no ?display= in its URL']);
+      lines.push(['First seen', dispWhen(d.created)],
+                 ['Last seen', dispWhen(d.last_seen)]);
+    }else{
+      lines.push(['Created', dispWhen(d.created)],
+                 ['Device', st === 'stale'
+                   ? 'none — the code expired before anybody typed it. REISSUE for another'
+                   : 'none yet — type the address above into the screen']);
+    }
+    if (d.approved)
+      lines.push(['Approved', dispWhen(d.approved_at) +
+                              (d.approved_by ? ' by ' + d.approved_by : '')]);
+    if (d.requested_at) lines.push(['Asked', dispWhen(d.requested_at)]);
+    if (d.expires)
+      lines.push(['Access ' + (d.expired ? 'ran out' : 'runs out'),
+                  dispWhen(d.expires)]);
+    if (d.denied || d.deny_note || d.deny_reason){
+      if (d.deny_reason) lines.push(['They were told', d.deny_reason]);
+      if (d.deny_note) lines.push(['Your note', d.deny_note]);
+      if (d.denied)
+        lines.push(['May ask again', d.deny_repeat ? 'yes' : 'no']);
+    }
+    if (named.length)
+      lines.push(['May use', named.map(x=> x.name).join(', ')]);
+    if (d.refused)
+      lines.push(['Refused', d.refused + ' × · last ' + dispWhen(d.refused_at) +
+                             (d.refused_from ? ' asking for ' + d.refused_from : '')]);
+    // A hint, never a credential — see the server. It is here to help somebody
+    // recognise a device, and it is forgeable from a console in one line.
+    if (d.hint) lines.push(['Looks like', d.hint]);
+    lines.forEach(([k, v])=>{
+      const el = document.createElement('div');
+      const b = document.createElement('b');
+      b.textContent = k + ' ';
+      el.appendChild(b);
+      el.appendChild(document.createTextNode(v));
+      meta.appendChild(el);
+    });
+
+    row.appendChild(meta);
+    row.appendChild(r);
+    (st === 'live' ? conn : box).appendChild(row);
+  });
+  const count = (st)=> pending.filter(d=> dispState(d) === st).length;
+  if (note){
+    const bits = [];
+    if (count('asked')) bits.push(count('asked') + ' asking for access');
+    if (count('expired')) bits.push(count('expired') + ' expired');
+    if (count('code')) bits.push(count('code') + ' waiting for a code to be typed in');
+    if (count('waiting')) bits.push(count('waiting') + ' here but not approved');
+    if (count('denied')) bits.push(count('denied') + ' refused');
+    if (count('stale')) bits.push(count('stale') + ' whose code ran out');
+    note.className = 'note';
+    note.textContent = bits.join(' · ');
+  }
+  const cnote = $('connnote');
+  if (cnote){
+    const guests = live.filter(d=> d.guest).length;
+    cnote.className = 'note';
+    cnote.textContent = !live.length ? ''
+      : live.length + (live.length === 1 ? ' device' : ' devices')
+        + (guests ? ' · ' + guests + ' on a grant that runs out' : '');
+  }
+}
+
+/* Name it, get a code. The row exists from this moment, so its endpoints can
+   be ticked before the screen it is for has ever been switched on. */
+$('b_adddisp').addEventListener('click', async ()=>{
+  const el = $('dp_name');
+  const name = (el.value || '').trim();
+  if (!name){
+    const note = $('dispnote');
+    note.className = 'note bad';
+    note.textContent = 'give it a name first — it is what the row is called '
+                     + 'and what you will look for when you restrict an endpoint';
+    el.focus();
+    return;
+  }
+  el.value = '';
+  await displayAction('/displays/new', {name});
+});
+$('dp_name').addEventListener('keydown', e=>{
+  if (e.key === 'Enter') $('b_adddisp').click();
+});
+
+/* Approving is granting, so both happen in one gesture. Two steps in two
+   places was the wrong shape: the reason to approve somebody at all is to give
+   them a particular assistant, and an approval that grants nothing is a row
+   that changed colour.
+
+   Refusing opens the same panel with the two messages instead — one they read,
+   one for whoever comes back to this row in six months. */
+function decide(d, approve, name, row){
+  const old = row.querySelector('.decide');
+  if (old){ old.remove(); return; }              // pressing it again closes it
+  const box = document.createElement('div');
+  box.className = 'decide';
+
+  let ticks = [];
+  if (approve){
+    const grant = document.createElement('div');
+    grant.className = 'grant';
+    const b = document.createElement('b');
+    b.textContent = 'Which endpoints it may use';
+    grant.appendChild(b);
+    const cks = document.createElement('div');
+    cks.className = 'cks';
+    DPEND.forEach(e=>{
+      const lab = document.createElement('label');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.dataset.r = e.id;
+      cb.checked = (RT.routes || []).some(x=> x.id === e.id && x.restricted
+                                           && (x.displays || []).indexOf(d.id) >= 0);
+      lab.appendChild(cb);
+      /* An endpoint open to any display needs no tick to be reachable, and
+         ticking it grants nothing — say so rather than let somebody believe
+         the tick is what did it. */
+      lab.appendChild(document.createTextNode(
+        ' ' + e.name + (e.restricted ? '' : ' — open to all anyway')));
+      cks.appendChild(lab);
+    });
+    grant.appendChild(cks);
+    box.appendChild(grant);
+    ticks = [...cks.querySelectorAll('input')];
+  }
+
+  let reason, note, repeat;
+  if (!approve){
+    const deny = document.createElement('div');
+    deny.className = 'deny';
+    reason = document.createElement('input');
+    reason.type = 'text'; reason.placeholder = 'what they are told — shown on their screen';
+    note = document.createElement('input');
+    note.type = 'text'; note.placeholder = 'your own note — never leaves this panel';
+    deny.appendChild(reason); deny.appendChild(note);
+    repeat = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = true;
+    repeat.appendChild(cb);
+    repeat.appendChild(document.createTextNode(' may ask again'));
+    repeat.style.cssText = 'display:flex;align-items:center;gap:5px;'
+                         + 'font-size:calc(8.5px * var(--fs));'
+                         + 'color:rgba(var(--paper),.72)';
+    deny.appendChild(repeat);
+    box.appendChild(deny);
+  }
+
+  const acts = document.createElement('div');
+  acts.className = 'acts';
+  const go = document.createElement('button');
+  go.textContent = approve ? 'APPROVE' : 'REFUSE';
+  go.className = approve ? 'act-save' : 'act-danger';
+  go.onclick = ()=> displayAction('/displays/decide', {
+    id: d.id, approved: approve, name,
+    endpoints: ticks.filter(c=> c.checked).map(c=> c.dataset.r),
+    reason: reason ? reason.value.trim() : '',
+    note: note ? note.value.trim() : '',
+    repeat: repeat ? repeat.querySelector('input').checked : true,
+  });
+  const cancel = document.createElement('button');
+  cancel.textContent = 'CANCEL';
+  cancel.onclick = ()=> box.remove();
+  acts.appendChild(go); acts.appendChild(cancel);
+  box.appendChild(acts);
+  row.appendChild(box);
+  if (!approve) reason.focus();
+}
+
+async function displayAction(path, body){
+  const note = $('dispnote');
+  try{
+    const j = await api(path, {method:'POST', body: JSON.stringify(body)});
+    /* A row that was just given a code is the row you want open — the code is
+       the whole reason you pressed the button, and hunting for it in a shut
+       list would be the panel hiding the thing it just made. */
+    if (j && j.id) OPENROW = j.id;
+    await refreshDisplays();
+    /* An allow-list that still offers a display somebody just deleted is a
+       permission nobody can see. The endpoint blocks are rebuilt from the
+       fresh list — harmless when the AI tab is not the one on screen. */
+    paintBlocks();
+  }catch(e){
+    if (note){ note.className = 'note bad'; note.textContent = e.message; }
+  }
+}
+
 async function loadBackend(){
   if (!ME || ME.role !== 'admin') return;
   try{
+    /* The displays and the groups before the endpoints, because each
+       endpoint's allow-list is drawn from both: painting a block first would
+       show an empty list and then blink it full. */
+    await loadDisplays();
+    await loadGroups();
     const j = await api('/routes/all');
     RT = {routes: j.routes || [], default: j.default || '', voices: j.voices || []};
     paintBlocks();
@@ -3193,12 +4434,12 @@ async function refreshEmbeds(){
       meta.className = 'meta';
       const cap = ['ask','mic','speak'].filter(k=> e.cap && e.cap[k]);
       const lines = [
-        ['may', cap.length ? cap.join(', ') : 'nothing'],
-        ['draws', (e.parts || []).join(', ') || 'nothing'],
-        ['frames', (e.origins || []).join('  ')],
-        ['session', e.ttl_minutes + ' min · ' + (e.cap && e.cap.rate_per_min)
+        ['May', cap.length ? cap.join(', ') : 'nothing'],
+        ['Draws', (e.parts || []).join(', ') || 'nothing'],
+        ['Frames', (e.origins || []).join('  ')],
+        ['Session', e.ttl_minutes + ' min · ' + (e.cap && e.cap.rate_per_min)
                     + '/min · id ' + e.id],
-        ['last used', e.last_used
+        ['Last used', e.last_used
           ? new Date(e.last_used * 1000).toLocaleString() : 'never'],
       ];
       lines.forEach(([k, v])=>{
@@ -3595,7 +4836,8 @@ function panelNav(){
     render();
     syncSaveRow();
     $('panelscroll').scrollTop = 0;
-    if (tab === 'accounts') refreshUsers();
+    if (tab === 'accounts'){ refreshUsers(); refreshGroups(); }
+    if (tab === 'displays') refreshDisplays();
     if (tab === 'embeds') refreshEmbeds();
     if (tab === 'app') loadApp();
     if (tab === 'ai') loadBackend();
@@ -3657,12 +4899,23 @@ function start(){
   // and be left wondering. Don't offer it. Same for the embed keys, which
   // are credentials rather than configuration.
   $('tab_app').style.display = admin ? '' : 'none';
+  // Approving a device is granting it something, which is not a thing a
+  // read-only account does — and the server refuses the routes anyway.
+  $('tab_displays').style.display = admin ? '' : 'none';
   $('tab_embeds').style.display = admin ? '' : 'none';
-  // Same argument for accounts when there is no sign-in: the tab manages a
-  // set of people who cannot sign in and are keeping nobody out. The server
-  // refuses those routes outright; the panel should not offer them either.
-  $('tab_accounts').style.display = ME.no_auth ? 'none' : '';
+  /* The accounts tab stays, because Groups live on it and a group has nothing
+     to do with signing in. What goes, where there is no sign-in, is the three
+     sections about accounts themselves: they would manage a set of people who
+     cannot sign in and are keeping nobody out, and the server refuses those
+     routes outright anyway. */
+  document.querySelectorAll('#panel .grp[data-signin]').forEach(g=>{
+    g.style.display = ME.no_auth ? 'none' : '';
+  });
   $('b_signout').style.display = ME.no_auth ? 'none' : '';
+  // No sign-in, no password, nothing to open — so the name stops looking like
+  // something you can press.
+  $('whoname').style.textDecoration = ME.no_auth ? 'none' : '';
+  $('whoname').style.cursor = ME.no_auth ? 'default' : '';
   if (!admin) status('read-only account — you can look, not change');
   // the create form opens on the preset its first button is already lit for
   if (ME.role === 'admin') emApplyPreset('full');

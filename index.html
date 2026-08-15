@@ -231,10 +231,89 @@
      until you need it. One line each, clipped rather than wrapped: this must
      never grow tall enough to push the conversation about. Empty spans
      collapse, so a display with nothing to report shows nothing at all. */
+  /* The status line. Bigger than it was: it is the answer to "why did nothing
+     happen?", read from across a room on a screen with no other text on it,
+     and 9px set it below everything it was competing with. */
   #status{
     position:relative;z-index:4;flex:0 0 auto;display:flex;gap:18px;
-    padding:0 26px;font-size:calc(9px * var(--fs));letter-spacing:.06em;
-    color:rgba(var(--paper),.42);
+    padding:2px 26px;font-size:calc(11px * var(--fs));letter-spacing:.05em;
+    line-height:1.5;color:rgba(var(--paper),.55);
+  }
+  /* A refusal, in red, so "here is what happened" and "here is why nothing
+     happened" are tellable apart without reading the words. */
+  #status .bad{color:#e0716b}
+
+  /* ---- the request page ----
+     Where the transcript and the composer would be. The figure above it is
+     untouched: a device waiting on a decision should look like the product it
+     is about to become, not like an error page with a logo. */
+  #request{display:none}
+  body[data-request] #log,
+  body[data-request] #bar{display:none}
+  /* Centred, because it is the whole of the page for as long as it is shown.
+     The transcript it replaces is a column of arriving text and belongs
+     against the edge; a form is one object and sitting it hard left with the
+     rest of the width empty reads as something that failed to load. */
+  body[data-request] #request{
+    position:relative;z-index:3;flex:1 1 auto;overflow-y:auto;
+    display:flex;flex-direction:column;justify-content:center;gap:12px;
+    padding:22px 26px 18px;
+    width:100%;max-width:560px;margin-inline:auto;
+  }
+  #reqhead{
+    font-size:calc(12px * var(--fs));line-height:1.6;
+    color:rgba(var(--paper),.88);
+  }
+  #reqhead b{font-weight:400;color:var(--text)}
+  #reqform{display:flex;flex-direction:column;gap:10px}
+  #reqform label{
+    display:flex;flex-direction:column;gap:4px;
+    font-size:calc(9px * var(--fs));letter-spacing:.14em;
+    text-transform:uppercase;color:rgba(var(--paper),.55);
+  }
+  #reqform input,#reqform textarea{
+    font:inherit;font-size:calc(12px * var(--fs));padding:7px 9px;
+    background:rgba(0,0,0,.45);color:var(--text);
+    border:1px solid rgba(var(--glass),.18);outline:0;border-radius:0;
+  }
+  #reqform input:focus,#reqform textarea:focus{border-color:rgba(var(--glass),.5)}
+  #reqform textarea{resize:vertical;min-height:74px;line-height:1.5}
+  #reqform .req{color:rgba(var(--paper),.4)}
+  #request .seg,#verdictbox .seg{display:flex;gap:6px}
+  #request button,#verdictbox button{
+    font:inherit;font-size:calc(10px * var(--fs));letter-spacing:.16em;
+    padding:8px 14px;cursor:pointer;background:none;
+    color:rgba(var(--paper),.9);border:1px solid rgba(var(--glass),.35);
+  }
+  #request button:hover:not(:disabled),
+  #verdictbox button:hover{border-color:var(--text);color:var(--text)}
+  #request button:disabled{opacity:.45;cursor:default}
+  #reqnote{
+    font-size:calc(10px * var(--fs));line-height:1.6;
+    color:rgba(var(--paper),.6);
+  }
+  #reqnote.bad{color:#e8a0a0}
+
+  /* The answer, whichever way it went. A modal rather than a status line: the
+     person asked a question and walked away, and this is the reply — it should
+     interrupt, once, and then get out of the way. */
+  #verdict{
+    display:none;position:fixed;inset:0;z-index:40;
+    align-items:center;justify-content:center;padding:24px;
+    background:rgba(0,0,0,.72);
+  }
+  #verdict.on{display:flex}
+  #verdictbox{
+    max-width:440px;width:100%;padding:22px 24px;
+    background:#0b0e12;border:1px solid rgba(var(--glass),.4);
+    display:flex;flex-direction:column;gap:12px;
+  }
+  #verdicttitle{
+    font-size:calc(13px * var(--fs));letter-spacing:.1em;color:var(--text);
+  }
+  #verdictbody{
+    font-size:calc(11px * var(--fs));line-height:1.65;
+    color:rgba(var(--paper),.82);white-space:pre-wrap;
   }
   #status span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #micnote{flex:1 1 60%}
@@ -335,6 +414,26 @@
   </div>
 
   <div id="log"></div>
+
+  <!-- What a device that may not use anything gets instead of a transcript and
+       a composer: the figure above, unchanged, and a form. There is nothing to
+       transcribe and nowhere to send what you type, so drawing either would be
+       two controls wired to a refusal. Built from the fields an admin defined —
+       this server has no opinion about what a request should ask. -->
+  <div id="request">
+    <div id="reqhead"></div>
+    <form id="reqform" autocomplete="off"></form>
+    <div class="seg"><button id="reqsend" type="button">REQUEST ACCESS</button></div>
+    <div id="reqnote"></div>
+  </div>
+
+  <div id="verdict">
+    <div id="verdictbox">
+      <div id="verdicttitle"></div>
+      <div id="verdictbody"></div>
+      <div class="seg"><button id="verdictok" type="button">OK</button></div>
+    </div>
+  </div>
 
   <!-- What just happened, for the person standing in front of it. Every one of
        these messages already existed and was written to elements that were not
@@ -451,16 +550,274 @@ const Embed = {
 };
 
 /* -------------------------------------------------- the display's name
-   `?display=workshop` is the declared name from the identity design: a name
-   survives a browser wipe where a token does not. None of the rest of that
-   design is built, so today this is the URL parameter and nothing more — but
-   it is the same identifier the admin-set label will hang off when it lands,
-   so a `{display}` written into a setting now keeps meaning the same thing.
+   `?display=workshop` is the declared name: a name survives a browser wipe
+   where a token does not, and it is what the admin's list calls this device
+   until somebody renames it.
+
+   It is a NAME AND NOT A KEY. Anything can type it, so nothing is granted on
+   the strength of it — see Display below, which is where the token that says
+   this really is that place comes from.
 
    Capped and stripped of markup characters: it is somebody else's string
    arriving from a URL, and it ends up rendered as a name. */
 const DISPLAY_NAME = (new URLSearchParams(location.search).get('display') || '')
   .replace(/[<>{}]/g, '').trim().slice(0, 40);
+
+/* How an enrolment went. Somebody typed /e/K7QP4M into this screen with a
+   remote; the server spent the code, set the cookie and sent them back here
+   with one word about it. Read once and taken straight out of the address bar
+   — a wall screen's URL should be the URL it was given, and the outcome of a
+   thing that happened once has no business surviving a reload. */
+const ENROL = (new URLSearchParams(location.search).get('enrol') || '')
+  .replace(/[^a-z]/g, '').slice(0, 12);
+if (ENROL && window.history && history.replaceState)
+  history.replaceState(null, '', location.pathname);
+
+/* ================================================================= DISPLAY
+   Which physical thing this page is running on, as far as the server is
+   concerned — the tablet in the kitchen rather than a browser tab.
+
+   The server issues an unguessable token on the first visit and holds it in
+   an HttpOnly cookie, so nothing here can read it, spend it anywhere else, or
+   hand it to a page that asks. This object holds only what came BACK: an id
+   to show somebody who is approving it, the name it is listed under, and
+   whether that has happened.
+
+   Unapproved is a working state, not an error. The appearance settings are
+   public, so a new tablet shows the geometry correctly the moment it is hung;
+   it holds no approved token, so no restricted endpoint will answer it. Hang
+   it, see it appear in the admin list, approve it, and it starts working —
+   which is a better first five minutes than a screen that looks broken. */
+const Display = {
+  id: '', name: DISPLAY_NAME, approved: false, known: false,
+  /* What the server last said about this device. `state` is one of none,
+     requested, approved, expired, denied — and the page is built from it
+     rather than from three booleans that can disagree with each other. */
+  state: 'none', canRequest: false, form: [], answered: false,
+  reason: '', mayAskAgain: true, renewals: 0,
+
+  /* A coarse description of the device, and it is a HINT FOR THE PERSON
+     APPROVING — "this matches your approved kitchen display" — for the one
+     case a token cannot survive, which is a browser wiping its data. It must
+     never become the credential, and nothing on the server reads it as one:
+     every field here is forgeable from the console in one line. */
+  hint(){
+    let zone = '';
+    try{ zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; }catch(e){}
+    return [(screen.width|0) + '×' + (screen.height|0),
+            (navigator.platform || ''), (navigator.language || ''), zone]
+           .filter(Boolean).join(' · ').slice(0, 120);
+  },
+
+  /* Said once, on load, before the endpoints are asked for — the answer
+     decides which of them come back with a word attached. An embed says
+     nothing: it is not a display, its rights came from its key, and letting
+     one enrol would put a row in somebody's approval queue every time a host
+     page loaded. */
+  async hello(){
+    if (EMBED) return false;
+    try{
+      const r = await fetch('display/hello', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name: DISPLAY_NAME, hint: this.hint()})
+      });
+      const j = await r.json().catch(()=>({}));
+      if (!r.ok || !j.display) return false;
+      this.take(j.display);
+      return true;
+    }catch(e){ return false; }
+  },
+
+  /* One place where the server's answer becomes this object, because every
+     path that touches a display — hello, the request, the poll — returns the
+     same shape and none of them should be assembling it differently. */
+  take(d){
+    this.id = d.id || '';
+    this.name = d.name || DISPLAY_NAME;
+    this.approved = !!d.approved;
+    this.state = d.state || 'none';
+    this.canRequest = !!d.can_request;
+    this.form = d.form || [];
+    this.answered = !!d.answered;
+    this.reason = d.reason || '';
+    this.mayAskAgain = d.may_ask_again !== false;
+    this.renewals = d.renewals || 0;
+    /* Seconds, from the server, so a device with a wrong clock cannot talk
+       itself into more access than it was given. Zero means it never runs
+       out, which is every display an admin issued a code for. */
+    this.expiresIn = d.expires_in || 0;
+    this.known = true;
+  },
+
+  /* An admin approves it over in the panel, and nothing about that reaches
+     this page on its own — so while it is waiting, it asks again. "Hang it,
+     see it appear in the list, approve it, and it starts working" has to mean
+     without somebody walking back to the tablet to reload it.
+
+     Only while waiting. Once approved there is nothing left to poll for, and
+     approval taken away is caught at the server, which refuses the request
+     whatever this page believes. */
+  _t: 0,
+  watch(){
+    if (EMBED || PREVIEW || !this.known) return;
+    clearInterval(this._t);
+    /* Approved and never expiring is the one state with nothing left to find
+       out. Everything else is waiting on somebody: a decision, a refusal being
+       lifted, or a grant running out. */
+    if (this.state === 'approved' && !this.expiresIn) return;
+    this._t = setInterval(async ()=>{
+      const was = this.state;
+      await this.hello();
+      if (this.state === was) return;
+      await Routes.load();
+      syncWake();
+      paintRequest();
+      if (this.state === 'approved'){
+        clearInterval(this._t);
+        verdict('Approved', 'This device may now use '
+          + (Routes.spoken() ? 'the assistants it was granted. Say '
+                               + Routes.spoken() + ' to start.'
+                             : 'what it was granted.'));
+        micNote('approved as ' + this.name
+                + (Routes.spoken() ? ' — say ' + Routes.spoken() : ''));
+      }else if (this.state === 'denied'){
+        clearInterval(this._t);
+        verdict('Not approved', this.reason
+          || 'This device was not given access, and no reason was given.');
+      }else if (this.state === 'expired'){
+        clearInterval(this._t);
+        verdict('Access expired', 'This device’s access has run out. Ask '
+          + 'again and somebody will decide — you will not have to fill in '
+          + 'the form a second time.');
+      }
+    }, 20000);
+  },
+};
+
+/* ------------------------------------------------- asking for access
+   A device that may not use anything gets the figure and a form where the
+   transcript and the composer would be. Both of those are wired to endpoints
+   this device cannot reach, so drawing them would be two controls that only
+   ever refuse.
+
+   The form is the admin's, field for field. This server has no opinion about
+   what a request should ask for — somebody running a campus wants a name and a
+   department, somebody running a house wants nothing at all. */
+function paintRequest(){
+  const box = $('request');
+  if (!box || EMBED || PREVIEW) return;
+  const D = Display;
+  const show = D.known && D.canRequest && D.state !== 'approved';
+  document.body.toggleAttribute('data-request', show);
+  if (!show) return;
+
+  const head = $('reqhead'), form = $('reqform'), btn = $('reqsend');
+  /* Three ways to arrive here, and they are not the same conversation: never
+     asked, asked and waiting, or asked and turned down. */
+  const asking = D.state === 'requested';
+  const again = D.state === 'expired' || (D.answered && D.state !== 'denied');
+  head.innerHTML = '';
+  const line = document.createElement('div');
+  line.textContent =
+      D.state === 'denied'  ? 'This device was not given access.'
+    : D.state === 'expired' ? 'This device’s access has run out.'
+    : asking                ? 'Waiting for somebody to decide.'
+    : 'This device has not been given access yet.';
+  head.appendChild(line);
+  const sub = document.createElement('div');
+  sub.style.marginTop = '6px';
+  sub.style.opacity = '.72';
+  sub.textContent =
+      D.state === 'denied'  ? (D.reason || 'No reason was given.')
+                              + (D.mayAskAgain ? ' You can ask again.'
+                                               : ' It cannot ask again.')
+    : D.state === 'expired' ? 'Ask again — you will not have to fill this in '
+                              + 'a second time.'
+    : asking                ? 'Nothing else to do here. This screen will say '
+                              + 'so as soon as it is decided.'
+    : 'Fill this in and somebody will decide.';
+  head.appendChild(sub);
+
+  /* Only ever rebuilt when there is something new to draw. Re-rendering under
+     somebody's cursor would take the field they were typing in away from
+     them, and a form somebody is filling in is exactly the wrong thing to
+     replace on a twenty-second timer. */
+  const wantForm = !asking && !again && D.mayAskAgain && D.form.length;
+  if (wantForm && !form.contains(document.activeElement)
+      && form.dataset.built !== String(D.form.length)){
+    form.innerHTML = '';
+    D.form.forEach((f, i)=>{
+      const lab = document.createElement('label');
+      const cap = document.createElement('span');
+      cap.textContent = f.label;
+      if (!f.required){
+        const opt = document.createElement('span');
+        opt.className = 'req';
+        opt.textContent = '  optional';
+        cap.appendChild(opt);
+      }
+      lab.appendChild(cap);
+      const el = document.createElement(f.message ? 'textarea' : 'input');
+      el.dataset.i = i;
+      if (!f.message) el.type = 'text';
+      el.spellcheck = !!f.message;
+      lab.appendChild(el);
+      form.appendChild(lab);
+    });
+    form.dataset.built = String(D.form.length);
+  }
+  form.style.display = wantForm ? '' : 'none';
+
+  btn.style.display = (asking || !D.mayAskAgain) ? 'none' : '';
+  btn.textContent = again ? 'ASK AGAIN' : 'REQUEST ACCESS';
+  btn.disabled = false;
+  btn.dataset.renew = again ? '1' : '';
+}
+
+function reqNote(m, bad){
+  const el = $('reqnote');
+  if (!el) return;
+  el.className = bad ? 'bad' : '';
+  el.textContent = m || '';
+}
+
+async function sendRequest(){
+  const btn = $('reqsend');
+  const renew = btn.dataset.renew === '1';
+  const answers = {};
+  if (!renew)
+    $('reqform').querySelectorAll('[data-i]').forEach(el=>{
+      answers[el.dataset.i] = el.value;
+    });
+  btn.disabled = true;
+  reqNote('sending…');
+  try{
+    const r = await fetch('display/request', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(renew ? {renew:true} : {answers})
+    });
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok || !j.display) throw new Error(j.error || ('HTTP ' + r.status));
+    Display.take(j.display);
+    reqNote('');
+    paintRequest();
+    Display.watch();
+  }catch(e){
+    btn.disabled = false;
+    reqNote(e.message, true);
+  }
+}
+
+/* The answer, whichever way it went. It interrupts once and then gets out of
+   the way — the person asked and walked off, and a status line they are not
+   looking at is not a reply. */
+function verdict(title, body){
+  const box = $('verdict');
+  if (!box) return;
+  $('verdicttitle').textContent = title;
+  $('verdictbody').textContent = body || '';
+  box.classList.add('on');
+}
 
 /* ================================================================ ROUTES
    Three names reaching three destinations. A route is a name, a wake word
@@ -483,13 +840,30 @@ const Routes = {
     try{
       const r = await fetch('routes', {cache:'no-store'});
       const j = await r.json();
-      this.list = (j && j.routes || []).filter(x=> x && x.id && x.wakeword);
+      /* A wake word is no longer required to be on the list. Without a
+         display token the routing half does not arrive at all, and an
+         endpoint with a name and no word is exactly what that looks like —
+         still worth holding, because {assistant} and the transcript's labels
+         are drawn from it and a page that has not enrolled should still read
+         correctly. It simply answers to nothing. */
+      this.list = (j && j.routes || []).filter(x=> x && x.id);
       this.defaultId = (j && j.default) || (this.list[0] || {}).id || '';
       return this.list.length;
     }catch(e){ return -1; }
   },
 
   byId(id){ return this.list.find(r=> r.id === id) || null; },
+
+  /* May this display use it? The server decides and sends the answer beside
+     each endpoint; absent means yes, so nothing here has to know what the
+     rule was. An endpoint arrives here whether or not the answer is yes — the
+     wake word of one this display may NOT use is exactly what the gate needs
+     in order to drop that utterance instead of passing it to somebody else's
+     conversation. */
+  usable(r){ return !!r && r.allowed !== false; },
+
+  /* Everything it can actually be woken by. */
+  wakeable(){ return this.list.filter(r=> r.wakeword && this.usable(r)); },
 
   /* Where a question goes. The wake word that woke it decides, and the route
      stays bound to the CONVERSATION rather than to the sentence — a
@@ -498,8 +872,15 @@ const Routes = {
      when it was typed into the composer or the wake gate is off, and that is
      what the default is for. */
   current(){
-    return (Wake.route && this.byId(Wake.route)) || this.byId(this.defaultId)
-           || this.list[0] || null;
+    if (Wake.route){ const r = this.byId(Wake.route); if (r) return r; }
+    const d = this.byId(this.defaultId);
+    if (this.usable(d)) return d;
+    /* The default is one this display may not use, so every question typed
+       into the composer would be refused at the server. Fall to the first it
+       may — which is what the server does with a default that has been
+       switched off, for the same reason: a composer that silently does
+       nothing is worse than one that answers from somewhere reachable. */
+    return this.list.find(r=> this.usable(r)) || d || this.list[0] || null;
   },
   currentId(){ const r = this.current(); return r ? r.id : ''; },
 
@@ -507,10 +888,25 @@ const Routes = {
   words(r){ return r ? [r.wakeword].concat(r.aliases || []).filter(Boolean) : []; },
 
   /* For the "say X to wake me" note. Wake words, not names: the word is what
-     somebody has to say, and on most routes the two are the same anyway. */
+     somebody has to say, and on most routes the two are the same anyway.
+     Only the ones this display may actually reach — telling somebody to say a
+     word that will be dropped is worse than telling them nothing.
+
+     Empty is a real answer now, so it is one rather than a made-up word: an
+     unapproved display answers to nothing at all, and printing “resonance”
+     at somebody standing in front of it would be a lie they can test. */
   spoken(){
-    const w = this.list.map(r=> '“' + r.wakeword + '”');
-    return w.length ? w.join(' or ') : '“' + FALLBACK_WAKEWORD + '”';
+    const w = this.wakeable().map(r=> '“' + r.wakeword + '”');
+    return w.length ? w.join(' or ') : '';
+  },
+
+  /* …and why, when it is empty. Two different silences: one is a display
+     waiting for somebody to approve it, the other is a server with no
+     endpoint that has a name. */
+  mute(){
+    return Display.known && !Display.approved
+      ? 'this display has not been approved yet, so no name reaches anything from it'
+      : 'nothing here has a name to answer to';
   },
 
   /* The voice this route answers in, falling back to the shared choice.
@@ -562,7 +958,11 @@ const VARS = {
     const r = forRoute(rid);
     return cap(((r && r.name) || FALLBACK_WAKEWORD).trim());
   },
-  display: ()=> DISPLAY_NAME,
+  /* The name it is listed under, which is the admin's once somebody has set
+     one and the declared name until then. The same place either way, so a
+     {display} written into a greeting before approval keeps meaning what it
+     meant after it. */
+  display: ()=> Display.name || DISPLAY_NAME,
 };
 function expand(s, rid){
   return String(s == null ? '' : s).replace(/\{(\w+)\}/g, (m, k)=>{
@@ -1299,14 +1699,14 @@ const Mic = {
        wake word reaches this method too, which is exactly why the gate is
        here rather than on the TALK button. */
     if (EMBED && !Embed.can('mic')){
-      micNote('this embed is not permitted to use a microphone');
+      micNote('this embed is not permitted to use a microphone', true);
       return;
     }
     if (!window.isSecureContext){
-      micNote('BLOCKED: mic needs a secure origin. Use the https:// URL (port 9701).');
+      micNote('BLOCKED: mic needs a secure origin. Use the https:// URL (port 9701).', true);
       return;
     }
-    if (!this.ok){ micNote('this browser exposes no getUserMedia'); return; }
+    if (!this.ok){ micNote('this browser exposes no getUserMedia', true); return; }
     try{
       /* I originally forced all processing OFF to keep the dynamics the
          visualiser feeds on. That is the wrong default once a human is
@@ -1442,7 +1842,7 @@ function meter(){
 
 /* Measure the room for 2s and put the gate just above it. */
 function calibrate(){
-  if (!Mic.active){ micNote('press TALK first, then calibrate'); return; }
+  if (!Mic.active){ micNote('press TALK first, then calibrate', true); return; }
   let peak = 0, n = 0;
   micNote('calibrating — stay quiet…');
   const id = setInterval(()=>{
@@ -1458,7 +1858,15 @@ function calibrate(){
   }, 50);
 }
 
-function micNote(m){ const el = $('micnote'); if (el) el.textContent = m; relay('micnote', m); }
+/* The status line, and whether what it says is a refusal.
+   `bad` is not decoration: this line carries both "here is what happened" and
+   "here is why nothing happened", and on a wall screen read from across a room
+   those two need to be tellable apart without reading the words. */
+function micNote(m, bad){
+  const el = $('micnote');
+  if (el){ el.textContent = m; el.classList.toggle('bad', !!bad); }
+  relay('micnote', m);
+}
 
 /* ============================================== PHASE 3b — SPEECH TO TEXT
    Local. Audio is recorded in the browser and POSTed to /stt on this same
@@ -1482,7 +1890,7 @@ const Listen = {
 
   start(stream){
     if (this.on || !stream) return;
-    if (!this.supported()){ micNote('no MediaRecorder in this browser'); return; }
+    if (!this.supported()){ micNote('no MediaRecorder in this browser', true); return; }
     this.on = true;
     this._arm(stream);
     syncTalk();
@@ -1493,11 +1901,11 @@ const Listen = {
     this.mime = want.find(t => MediaRecorder.isTypeSupported(t)) || '';
     let mr;
     try { mr = new MediaRecorder(stream, this.mime ? {mimeType:this.mime} : undefined); }
-    catch(e){ micNote('recorder failed: ' + e.message); this.on = false; syncTalk(); return; }
+    catch(e){ micNote('recorder failed: ' + e.message, true); this.on = false; syncTalk(); return; }
     this.chunks = []; this.sawSpeech = false; this.quietAt = 0; this.armedAt = now;
     mr.ondataavailable = e => { if (e.data && e.data.size) this.chunks.push(e.data); };
     mr.onstop = () => this._flush();
-    try { mr.start(); } catch(e){ micNote('recorder start failed: ' + e.message); }
+    try { mr.start(); } catch(e){ micNote('recorder start failed: ' + e.message, true); }
     this.mr = mr;
   },
 
@@ -1525,20 +1933,38 @@ const Listen = {
         body: blob
       });
       const j = await r.json();
-      if (j.error)      micNote('stt error: ' + j.error);
+      if (j.error)      micNote('stt error: ' + j.error, true);
       else if (j.text)  {
         if (Learn.on){ Learn.take(j.text); }
         else {
-            const trip = Math.round(performance.now() - t0);
-          micNote('heard "' + j.text + '"  ·  ' + j.ms + 'ms decode, ' +
-                  trip + 'ms round trip, +' + Math.round(S.hangover*1000) + 'ms silence wait');
+          /* NOTHING IS SHOWN UNTIL THE GATE HAS DECIDED IT WAS ADDRESSED.
+             This used to print what it heard first and let the gate overwrite
+             it, which meant a display in an occupied room put every private
+             conversation within earshot on screen — a transcript of people
+             who were not talking to it, in a corridor, on a wall. The whole
+             argument for a wake word is that what is said near it is none of
+             its business, and printing it is exactly as much of a breach as
+             answering it would have been.
+
+             What survives is the timing, which is about this device rather
+             than about anybody in the room, and it is only written once
+             somebody has addressed it. */
+          const state = !Wake.armed() ? 'gate off'
+                      : Wake.awake && wallNow() < Wake.until
+                        ? 'awake, ' + Math.max(0, Math.round(Wake.until - wallNow())) + 's left'
+                      : 'woken';
           const act = Wake.gate(j.text);
-          if (act) submit(act);
+          if (act){
+            const trip = Math.round(performance.now() - t0);
+            micNote('heard you  ·  ' + state + '  ·  ' + j.ms + 'ms decode, ' +
+                    trip + 'ms round trip, +' + Math.round(S.hangover*1000) + 'ms silence wait');
+            submit(act);
+          }
         }
       }
-      else              micNote('nothing recognised — try speaking a little louder');
+      else              micNote('nothing recognised — try speaking a little louder', true);
     }catch(e){
-      micNote('stt request failed: ' + e.message);
+      micNote('stt request failed: ' + e.message, true);
     }
     this.busy = false; syncTalk();
   },
@@ -1553,7 +1979,7 @@ const Listen = {
     if (heldFor < 0.3){               // stray tap, not an utterance
       this.sawSpeech = false;
       this._cut();
-      micNote('too short — hold SPACE while you speak');
+      micNote('too short — hold SPACE while you speak', true);
       return;
     }
     this.sawSpeech = true;            // they held the key; send it regardless
@@ -1928,9 +2354,9 @@ function unlockTTS(){ ttsUnlocked = true; }
 ['pointerdown','keydown','touchstart'].forEach(ev =>
   window.addEventListener(ev, unlockTTS, true));
 
-function note(msg){
+function note(msg, bad){
   const el = $('ttsnote');
-  if (el) el.textContent = msg;
+  if (el){ el.textContent = msg; el.classList.toggle('bad', !!bad); }
   relay('ttsnote', msg);
 }
 
@@ -2067,6 +2493,16 @@ async function askBackend(text, bare){
     });
     const j = await r.json().catch(()=>({}));
     who = j && j.name || '';
+    /* Refused because this display may not use that endpoint. The gate
+       upstairs drops these before they are ever sent, so arriving here means
+       either a question typed into the composer or a display running code
+       that is not the code we shipped — and the answer to both is the same
+       silence. Not spoken, not in the transcript, and NOT the "I could not
+       reach it" line below: this did reach it, and was refused. */
+    if (j && j.refused){
+      note('refused: this display may not use ' + (who || 'that endpoint'), true);
+      return {reply: '', refused: true};
+    }
     // the route still being on demo is not an error, just not wired up yet
     if (j && j.demo) return {reply: REPLIES[replyIx++ % REPLIES.length]};
     if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
@@ -2083,7 +2519,7 @@ async function askBackend(text, bare){
        where "401 from the conversation API" tells them nothing and tells
        everyone in earshot what this box is wired to. The reason goes to the
        note, which is on the screen rather than in the air. */
-    note('backend: ' + e.message);
+    note('backend: ' + e.message, true);
     return {reply: "I could not reach " + (who || 'the assistant') + " just then."};
   }
 }
@@ -2094,6 +2530,11 @@ function submit(text){
   remember('user', text);
   qEl.value = '';
   askBackend(text).then(out => {
+    /* A refusal is silent, so there is nothing to say and nothing to
+       remember. Putting an empty turn in the history would leave the next
+       question preceded by an assistant that said nothing, which is a thing
+       models try to make sense of. */
+    if (out.refused) return;
     remember('assistant', out.reply);
     respond(out.reply);
     /* Nothing here ends the conversation. A house reports that it has finished
@@ -2153,9 +2594,24 @@ async function selfTest(){
      passes, the transcript says something baffling. Ask it something it can
      actually answer, with no conversation behind it. */
   const cur = Routes.current();
-  say(Routes.list.length > 0, 'routes · ' +
-      (Routes.list.map(r=> r.name + ' (“' + r.wakeword + '”' +
-                           (r.strict ? ', exact' : '') + ')').join(', ')
+  /* Which device the server thinks this is. Not being approved is not a
+     failure — a personal install restricts nothing and never needs it — so
+     the check is whether a token was issued at all, and the state rides in
+     the text where somebody commissioning a wall display will read it. */
+  say(Display.known || PREVIEW || !!EMBED, 'display identity · ' +
+      (EMBED ? 'embedded — an embed is not a display and holds no token'
+       : PREVIEW ? 'preview — the panel, not a display'
+       : !Display.known ? 'no token issued — cookies may be blocked in this browser'
+       : Display.name + ' (' + Display.id + ') · ' +
+         (Display.approved ? 'approved'
+                           : 'not approved — endpoints restricted to named '
+                             + 'displays will refuse it')));
+
+  say(Routes.list.length > 0, 'endpoints · ' +
+      (Routes.list.map(r=> r.name +
+                           (r.wakeword ? ' (“' + r.wakeword + '”' +
+                                         (r.strict ? ', exact' : '') + ')' : '') +
+                           (Routes.usable(r) ? '' : ' — not for this display')).join(', ')
        || 'none — nothing has a name to answer to'));
 
   /* Against the route the display would actually use right now, which is the
@@ -2487,7 +2943,7 @@ const PTT = {
 
   down(){
     if (this.held) return;
-    if (!Listen.on){ micNote('press TALK first to arm the microphone'); return; }
+    if (!Listen.on){ micNote('press TALK first to arm the microphone', true); return; }
     this.held = true; this.downAt = now;
     Mic.open = true;
     Speech.stop();                    // barge in over it mid-sentence
@@ -2605,7 +3061,8 @@ const Wake = {
     this.convo = '';              // theirs goes the same way ours does
     syncTalk(); syncWake();
     if (sayBye) farewell();
-    else micNote('asleep — say ' + Routes.spoken() + ' to start again');
+    else micNote(Routes.spoken() ? 'asleep — say ' + Routes.spoken() + ' to start again'
+                                 : 'asleep — ' + Routes.mute(), !Routes.spoken());
     this.route = '';
   },
 
@@ -2697,6 +3154,12 @@ const Wake = {
          house route it is a description of a room being sent somewhere it
          was never addressed to. */
       const sw = this.heard(text);
+      /* The worse case, and the one this rule exists for. A display already
+         awake passes everything it hears straight through — so without this,
+         another person's house command lands in a stranger's conversation, is
+         paid for, and is answered aloud. Dropped: not passed to the endpoint
+         bound now, and not switched to. */
+      if (sw && !Routes.usable(sw.route)) return this.notMine(sw);
       if (sw && sw.route.id !== this.route) return this.wakeOn(sw);
       this.touch();
       return text;
@@ -2706,10 +3169,33 @@ const Wake = {
       /* What was heard, in the same breath as the refusal. They used to be two
          notes and the second overwrote the first, which threw away the one
          fact that tells you whether a name was mis-heard or never said. */
-      micNote('asleep — heard “' + text + '”, which names none of ' + Routes.spoken());
+      /* It says that something was said and that it named nothing — never
+         WHAT was said. Quoting it here is publishing a conversation nobody
+         addressed to this screen, which is the one thing a wake word exists
+         to prevent. A wake word that is being misheard is diagnosed with
+         LEARN, which asks first. */
+      micNote(Routes.spoken()
+        ? 'asleep — that named none of ' + Routes.spoken()
+        : 'asleep — ' + Routes.mute(), true);
       return null;
     }
+    if (!Routes.usable(h.route)) return this.notMine(h);
     return this.wakeOn(h);
+  },
+
+  /* Somebody in the room addressed a name this display may not use.
+     SILENT: nothing spoken, nothing in the transcript. That utterance was
+     addressed to a different device, and one nobody was talking to announcing
+     that it cannot help is noise laid over the answer somebody else is
+     waiting for.
+
+     The status line is neither of those things — it is on the screen, for
+     whoever is commissioning this — so the reason goes there and nowhere
+     else. The awake window is deliberately NOT refreshed either: this was not
+     addressed here, so it should not keep this display awake. */
+  notMine(h){
+    micNote('“' + h.word + '” is not for this display — ignored', true);
+    return null;
   },
 
   /* Bind, and hand back whatever was said after the name — or nothing, when
@@ -2895,6 +3381,7 @@ function syncWake(){
   const wakeTxt =
       S.wake === 'off'                 ? 'OFF — every utterance is acted on, and ' +
                                           'goes to the default route.'
+    : Wake.armed() && !Routes.spoken() ? 'ACTIVE — but ' + Routes.mute() + '. Now: ' + on
     : Wake.armed()                     ? 'ACTIVE — say ' + Routes.spoken() +
                                           ' to wake. Now: ' + on
     : 'NOT IN EFFECT — you are in SPACE mode, and AUTO ONLY skips the gate there. ' +
@@ -3303,10 +3790,37 @@ applyPrefs();
 /* Both documents before anything is drawn from either. The routes decide
    what {name} expands to and what this display answers to, so loading them
    after the first paint would flash the fallback name into the opening line
-   of the transcript. */
-Promise.all([Settings.load(), Routes.load()]).then(()=>{
+   of the transcript.
+
+   Hello first, and the endpoints after it — in that order rather than
+   alongside, because the token this display holds decides which of them come
+   back with a word attached. Asking for both at once would race, and the loser
+   would be a display that had just enrolled and could not hear its own name
+   until the next reload. The shared settings have no such dependency and
+   still load in parallel. */
+Promise.all([Settings.load(), Display.hello().then(()=> Routes.load())]).then(()=>{
   applyPrefs();
   syncWake();
+  /* Right-looking and inert, with the reason on the screen. The appearance
+     settings are public, so this drew correctly before anybody approved
+     anything; what it will not do is answer to a name, and somebody standing
+     in front of a newly hung tablet should be told that rather than left to
+     conclude it is broken. */
+  /* A code was just typed into this screen, and whoever typed it is standing
+     in front of it waiting to find out whether it worked. That answer outranks
+     everything else the status line had to say. */
+  if (ENROL) micNote(
+      ENROL === 'ok'      ? 'enrolled as ' + Display.name
+                            + (Routes.spoken() ? ' — say ' + Routes.spoken() : '')
+    : ENROL === 'expired' ? 'that code had expired — ask for a new one'
+    : ENROL === 'blocked' ? 'too many wrong codes — wait a minute and try again'
+    : 'that code was not recognised — check it and try again',
+    ENROL !== 'ok');
+  else if (Display.known && !Display.approved && !Routes.spoken()
+           && !Display.canRequest)
+    micNote('waiting to be approved — ' + Display.name + ' (' + Display.id + ')');
+  paintRequest();
+  Display.watch();
   /* After the prefs, always: the grant decides what this surface is, and a
      preference stored against another page on the same site does not get to
      argue with it. */
@@ -3314,6 +3828,9 @@ Promise.all([Settings.load(), Routes.load()]).then(()=>{
   if (PREVIEW && window.parent !== window)
     window.parent.postMessage({rsn:1, kind:'ready', settings:S}, '*');
 });
+
+on('reqsend', 'click', sendRequest);
+on('verdictok', 'click', ()=> $('verdict').classList.remove('on'));
 
 setPalette('blue');
 setType();

@@ -68,15 +68,18 @@ it is ready to be — as a consumer of this project, not as a part of it.
 **Settled:** the look, the interaction model, the local voice pipeline, the
 shared-settings model, administration — its own HTTPS listener behind local
 accounts with roles, with a live preview of the real display — the backend
-adapters that put a real assistant behind it, routes, so several names reach
-several destinations from one display, and the embed API that lets another
-application put this interface inside its own page.
+adapters that put a real assistant behind it, including a house through Home
+Assistant, routes, so several names reach several destinations from one
+display, displays the server knows about, so a name can be restricted to the
+tablets you approved, and the embed API that lets another application put this
+interface inside its own page.
 
-**Not done, in the order it matters:** the Home Assistant adapter, so one of
-those names reaches a house. Then displays the server knows about, which is
-what makes a route binding hold. Then identity and memory, so a conversation
-can mean something an hour later — the embed is deliberately memoryless until
-that lands. Then packaging it as a library other projects can install.
+**Not done, in the order it matters:** what a wall display actually looks like
+— voice only, and a screensaver that is still the product, because burn-in
+starts the day the first tablet goes up. Then staying up unattended. Then
+identity and memory, so a conversation can mean something an hour later — the
+embed is deliberately memoryless until that lands. Then packaging it as a
+library other projects can install.
 
 The [Roadmap](#roadmap) carries the reasoning for each, including the
 decisions already taken about how identity and memory should work.
@@ -238,10 +241,10 @@ ask at all**, and there are two mechanisms for that:
   displays on their own isolated VLAN. An unapproved device cannot open a
   connection, so there is nothing to authorise. This is available now and is
   the strongest of the two.
-- **The device token** (roadmap phase 2). Server-issued, `HttpOnly` so page
-  script genuinely cannot read it, and gated on an admin approving that
-  device. `curl` does not have the cookie. A guest's phone is issued a token
-  and refused because it was never approved.
+- **The device token** — built. Server-issued on the first visit, `HttpOnly` so
+  page script genuinely cannot read it, and an admin approves the device.
+  `curl` does not have the cookie. A guest's phone is issued a token of its own
+  and refused, because nobody approved that one.
 
 #### The limitations, stated exactly
 
@@ -262,11 +265,26 @@ clear about how little it costs:
 per device. Distinguishing the people using it needs the PIN, and even then it
 governs what is *remembered* rather than what may be *read*.
 
-**What is exposed today, before phase 2:** the whole settings document, to
-anything that can reach the port. It is appearance values now; it gains wake
-words and route names with routes. Until the device token lands, the network
-is the only boundary there is — which is the argument for the VLAN rather than
-an argument for waiting.
+**A display learns the wake word of a route it may not use, and that is
+deliberate.** It has to: recognising the house's name is the only way it can
+*drop* an utterance addressed to the house instead of passing it into whatever
+conversation it was already having. Withholding the word would not make the
+phone in the room safer — it would make it answer on the house's behalf. What
+the word buys whoever reads it is nothing: saying it into an unapproved device
+is refused at `/ask`, by this server, on every request.
+
+**What is exposed today:**
+
+| | to | |
+| --- | --- | --- |
+| the settings document | anything that can reach the port | appearance values |
+| a route's name, greeting and voice | anything that can reach the port | what makes a newly hung display look right before anybody approves it |
+| a route's wake words and strictness | any browser that has said hello, approved or not | the gate rule above |
+| a route's adapter, address and key | nobody, through any browser | not published at any tier |
+
+The network is still the stronger of the two boundaries, and the VLAN is still
+the right answer for wall displays. What the token changes is that reaching the
+port is no longer the same as being able to *use* what is on it.
 
 ### The admin interface
 
@@ -785,8 +803,11 @@ On every listener:
 | `POST` | `/tts` | text in, WAV out. `?voice=`, `?rate=` |
 | `GET` | `/tts/voices` | installed neural voices |
 | `GET` | `/settings` | the shared interface configuration |
-| `GET` | `/routes` | the routes, presentation and routing halves only |
-| `POST` | `/ask` | a question — `{"route": …}` picks one, absent means the default. `{"conversation_id": …}` continues one the endpoint is keeping, and the reply carries that id back |
+| `GET` | `/routes` | the routes: presentation to anyone, the routing half only to a caller holding a display token, and `allowed` per route for that caller |
+| `POST` | `/ask` | a question — `{"route": …}` picks one, absent means the default. `{"conversation_id": …}` continues one the endpoint is keeping, and the reply carries that id back. `403 {"refused": "display"}` where this display may not use that route |
+| `POST` | `/display/hello` | a display announcing itself: declared name in, its identity out, and a token in an `HttpOnly` cookie if it had none. Same-origin only |
+| `POST` | `/display/request` | a device asking for access, answering the form the admin built — or `{"renew": true}`, which asks again on the answers already held. Same-origin only |
+| `GET` | `/e/<code>` | an enrolment code, typed into the device being enrolled. Spends the code, sets the cookie, and redirects to the display with `?enrol=` saying how it went. Display listeners only |
 
 Display listeners only — the embed does not exist on the admin port:
 
@@ -818,6 +839,17 @@ Admin listener only — everything below returns 404 on the public ports:
 | `POST` | `/routes/enable` | enable or disable one — `admin` role |
 | `POST` | `/routes/delete` | remove one, and its key — `admin` role |
 | `POST` | `/routes/test` | one real round trip against that route — `admin` role |
+| `GET` | `/displays` | every display, plus the address an enrolment code is typed into — `admin` role |
+| `POST` | `/displays/new` | create a row before its device exists, and issue its code — `admin` role |
+| `POST` | `/displays/reissue` | kill the row's live token now and issue a new code; name and permissions kept — `admin` role |
+| `POST` | `/displays/decide` | approve — with the endpoints it may use, in the same call — or refuse, with a message for them, a note for you, and whether it may ask again — `admin` role |
+| `POST` | `/displays/settings` | whether guests may ask, how long a grant lasts, the two limits, and the request form — `admin` role |
+| `GET` | `/groups` | every group, plus the two populations one can be drawn from — `admin` role |
+| `POST` | `/groups/save` | create one, rename it, or set its membership — `admin` role |
+| `POST` | `/groups/delete` | remove one, and take it off every endpoint that named it — `admin` role |
+| `POST` | `/displays/approve` | approve one, or withdraw it; may name it in the same call — `admin` role |
+| `POST` | `/displays/rename` | change what it is listed as; blank hands the row back to the name the device declares — `admin` role |
+| `POST` | `/displays/delete` | revoke: its token stops matching, and it is removed from every route's allow-list — `admin` role |
 | `GET` | `/embeds` | list embed keys — `admin` role |
 | `POST` | `/embeds` | create one; the key is returned once — `admin` role |
 | `POST` | `/embeds/enable` | enable or disable one — `admin` role |
@@ -839,6 +871,11 @@ to nothing, recoverable only by editing JSON on the box.
 `/routes` is the one path with a public half and a private half, and every
 privileged operation sits under `/routes/…` precisely so the admin-only list
 can stay a list of paths rather than a list of paths and methods.
+
+`/display/hello` and `/displays` are one letter and a whole boundary apart, for
+the same reason. A display has to be able to reach the first from the listener
+it is served on; everything an *admin* does to a display is the second, and is
+absent from that listener entirely.
 
 ## Driving the visualiser directly
 
@@ -1022,7 +1059,7 @@ two people in one room with three listening microphones between them.
 |---|---|---|---|---|
 | 1a | ~~**Routes**~~ **— done** | three names reaching three destinations, verifiable with no Home Assistant involved | — | none |
 | 1b | ~~**The Home Assistant adapter**~~ **— done** | saying the house name switches a light on | 1a | none |
-| 2 | **Displays, and binding a route to one** | only the tablets you approved can actuate the house, whatever anyone's browser is set to | 1b | none |
+| 2 | ~~**Displays, and binding a route to one**~~ **— done** | only the tablets you approved can actuate the house, whatever anyone's browser is set to | 1b | none |
 | 3 | **What a wall display looks like** | voice only, and a screensaver that is still the product | 2 | none |
 | 4 | **Staying up unattended** | a tablet nobody touches for a year is still working | 3 | **all of it** · not designed |
 | 5 | **Identity and the PIN** | a person, as distinct from a place | 2 | **1** · whether an identity carries its own Home Assistant token |
@@ -1045,6 +1082,16 @@ a local model and a hosted one are three destinations reachable by three
 names, and wake-word routing can be shaken out on a test box before Home
 Assistant is anywhere near it. If the refactor breaks something, that is when
 you find out, rather than while also debugging a new adapter.
+
+**2 is done.** A display is issued an unguessable token on its first visit, an
+admin approves it, and a route can be restricted to the ones it names — where
+the refusal is silent, at the display and again at the server. What it turned
+up while being built is in the log below; the one design point worth having
+here is that **restricting a route is opt-in, per route**. Every route was
+reachable by anything before this existed, so an upgrade that quietly made them
+all refuse would take a working installation off the air to enforce a rule
+nobody had asked for yet. `ANY DISPLAY` is the default, and the panel says so
+on every route that has it.
 
 **1b is done**, and the phrase that closed it was *"turn off couch lamps"*
 answered by *"Turned off the light"* — a real house, a real token, a real light,
@@ -1081,8 +1128,9 @@ safety property waiting on a screensaver.
 
 **Three sits where it does because burn-in is a clock, not a backlog item.**
 Every day a tablet runs without it is damage that cannot be taken back, and
-that clock starts the day the first one goes on a wall — which is during
-phase 2. Everything after it can wait; this cannot wait as cheaply.
+that clock starts the day the first one goes on a wall — which, now that two
+has landed, is any day from here. Everything after it can wait; this cannot
+wait as cheaply.
 
 **The admin interface is part of each phase, not a phase of its own.** A route
 you cannot configure is not a feature, and a phase whose settings are only
@@ -1257,9 +1305,9 @@ it. Each entry below carries its own panel scope.
   words rather than leaving an admin to conclude it is broken. The fourth
   thing, whether the right entities are exposed, only a real command answers.
 
-- **Displays, and binding a route to one.** The problem this exists for: two
-  people in a room, one of them addressing the wall tablet, and everybody
-  else's microphone hearing it too.
+- **Displays, and binding a route to one — built 2026-08-15.** The problem this
+  exists for: two people in a room, one of them addressing the wall tablet, and
+  everybody else's microphone hearing it too.
 
   Push-to-talk on personal devices is the correct configuration and is already
   a per-browser setting — and it is not a control, because nothing makes
@@ -1336,9 +1384,121 @@ it. Each entry below carries its own panel scope.
   unstable across updates, and identical across two tablets bought together,
   which is every property you do not want in one.
 
+  **A display can also be enrolled deliberately, by a code typed into it.**
+  Added after the first build, because approving-what-turns-up is the wrong
+  shape when you *knew* the screen was coming: you create the row in the panel,
+  name it and tick its endpoints before the device is switched on, and the code
+  binds a device to it.
+
+  The constraint that decides everything about the code is that it is **typed,
+  on the device being enrolled** — a television with a remote, or an on-screen
+  keyboard. So it is six characters, and six characters are only safe because
+  of the four rules around them: one use, ten minutes, a back-off after five
+  wrong guesses, and an alphabet with no character that can be misread into
+  another (`O`/`0`, `I`/`1` and `l` are simply absent). Case, dashes and spaces
+  are ignored, so the panel can print `K7QP-4M` and `k7qp4m` still works.
+
+  **And a device can ask, which is the other half of the same problem.** The
+  wall-screen case has an admin who knew the screen was coming. The case that
+  drives everything else is an endpoint restricted because it *costs* — a
+  hosted model given to some people and not to everyone — where the person
+  turning up is a colleague on a laptop in another building and the admin has
+  never seen the device.
+
+  So: a switch, and a form.
+
+  **Whether an uninvited device may ask at all is a setting**, and turning it
+  *off* has a precondition — the default endpoint must be open to any display,
+  because that is the only thing an uninvited device can then reach. Enforced
+  from both ends: it refuses to switch off with nothing open, and refuses to
+  close that door afterwards while it is off. One end only, and it holds until
+  the next edit and then breaks silently.
+
+  **The form is the admin's, field for field** — up to five, each labelled and
+  optionally required, one of them a box big enough for a reason. This server
+  has no opinion about what a request should ask: a campus wants a name and a
+  department, a house wants none of it. The answers are what an admin who
+  cannot see the device decides on, which is the whole reason the form exists.
+
+  **Approving is granting.** The endpoints are ticked in the same gesture as
+  the approval, because the reason to approve anybody is to give them a
+  particular assistant — an approval that grants nothing is a row that changed
+  colour. Refusing carries two messages, one shown to them and one that never
+  leaves the panel, plus a choice of whether that device may ask again, and it
+  takes back anything a previous approval gave.
+
+  **A grant to something that asked runs out; a grant to a screen an admin
+  invited does not.** Guest access is a lifecycle rather than a session: it
+  expires, the person presses ASK AGAIN — not the form again, because their
+  answers are held — and the row counts the renewals. A wall screen going dark
+  on a timer is not a security property, it is an outage, so an invited display
+  never expires whatever the setting says.
+
+  Expiry is read where the request is answered rather than at the door, which
+  is what makes a grant run out cleanly mid-conversation: the turn already in
+  flight finishes, and the next one is refused.
+
+  **A refusal is per device, not per person** — the same human on their phone
+  is a new row with a fresh ask. That is what device identity is, and anything
+  stronger needs an identity a person carries.
+
+  **Groups, so a grant is made once.** Twelve people who all get the same
+  endpoint is twelve ticks and a re-tick every time somebody gets a new phone,
+  which is not a permission model, it is data entry. A group is a name for a
+  set of them, made under ACCOUNTS and named wherever access is granted.
+
+  **Two kinds, and they do not mix**: people who asked to be here, and devices
+  an admin created and sent a code to. They answer separate questions — *the
+  physics department*, *the screens in the east wing* — and one list that could
+  hold both would be a list nobody could describe. A group's kind is fixed at
+  creation, because changing it would silently empty it.
+
+  **Grants add up, and a group is not approval.** An endpoint reachable by a
+  group and by one device on its own is reachable by both; being in a group
+  never removes an individual grant. And somebody in a group who was never
+  approved, or whose access has run out, is still refused — the group decides
+  *which* endpoints, approval decides whether they reach anything at all.
+
+  **REISSUE is the same mechanism pointed at a row that already exists** — a
+  browser that wiped its data, a screen replaced in the same place. The row is
+  the *place*: its name and every endpoint that names it survive, and the
+  device behind it is swapped. **The live token dies when REISSUE is pressed**,
+  not when the new code is used — a place is one device, so the moment you
+  decide to move it, the old one stops being that place. Leaving it working
+  until somebody got round to typing the code would mean two devices holding
+  one place for as long as that took.
+
   *Panel:* a displays list — declared name, token, last seen, approve, rename,
   delete — unapproved requests with what they asked for, and an
   allowed-displays list on each route.
+
+  **What was decided while building it**, none of which changes the design
+  above:
+
+  - **Restriction is opt-in, per route, and off by default.** `ANY DISPLAY` is
+    what every route was before this existed; `ONLY THESE` names them. The
+    alternative — approval required everywhere the moment this ships — would
+    have taken every working installation off the air until somebody found the
+    panel, to enforce a rule they had not asked for on routes where it buys
+    nothing. A personal install on loopback never needs it at all.
+  - **A restricted route with an empty list is allowed**, and reads *no display
+    may use this endpoint* in the panel. Restricting one before the tablet that
+    will use it has been hung is a legitimate order to do things in.
+  - **The routing half goes to any browser holding a token, approved or not.**
+    See the limitations section: an unapproved display has to recognise the
+    house's name in order to drop it, and refusing to tell it the word would
+    make it answer on the house's behalf instead.
+  - **An embed is not a display and does not inherit one.** Its rights come
+    from its key, so it reaches unrestricted routes and no others — a host
+    application's page is not a place in your house.
+  - **The panel's live preview is not a display either.** It is the panel,
+    already signed in as an admin, and it is allowed every route: an admin can
+    reach any of them from the panel anyway, and a preview that refused half
+    of them would be lying in the other direction.
+  - **A waiting display asks again every 20 seconds.** "Hang it, see it appear,
+    approve it, and it starts working" has to mean without somebody walking
+    back to the tablet to reload it. Only while it is waiting — approval taken
+    away is caught at the server, which refuses whatever the page believes.
 
 - **What a wall display looks like.** The two settings that make a tablet on a
   wall a different object from a browser tab. Both hang off the display the
@@ -1698,6 +1858,159 @@ on a desk. A tablet bolted to a wall, answering a household, moves them:
 ## Progress log
 
 Newest first.
+
+### 2026-08-15 — a name for a set of them, and a panel that reads as one
+
+Groups, and the tidying that came with using the thing for an hour.
+
+- **Twelve ticks is not a permission model, it is data entry.** So a group is a
+  name for a set of devices, made under ACCOUNTS and named wherever access is
+  granted — today an endpoint's allow-list, and anything later that grants
+  something can name them the same way. That is why they live in a file of
+  their own rather than inside the thing that currently uses them.
+- **Two kinds, and they do not mix**: people who asked to be here, and devices
+  an admin created and sent a code to. Separate populations answering separate
+  questions — *the physics department*, *the screens in the east wing* — and
+  one list that could hold both would be a list nobody could describe. The kind
+  is fixed once the group exists, because changing it would silently empty it.
+- **Grants add up, and a group is not approval.** Named by a group and named on
+  its own is reachable by both. Somebody in a group who was never approved, or
+  whose grant has run out, is still refused: the group decides *which*
+  endpoints, approval decides whether they reach anything at all.
+- **One section became four**, because they are read at different times: the
+  queue, the register of what is working, the guest settings, and the form
+  builder. A to-do list and a register are not the same object, and three rows
+  needing attention buried among fifty that do not is how a request sits
+  unanswered for a week.
+- **Each row collapses to its name**, one open at a time across both lists,
+  which meant renaming had to move inside the row — an editable box in a header
+  is one somebody clicks by accident while trying to look underneath it.
+- **Your own account moved behind your own name**, out of a tab about
+  everybody else's, and the accounts tab now survives a server with no sign-in
+  because groups live on it and a group has nothing to do with signing in.
+- **Two labels that read backwards.** The guest switch said CAN ASK / CANNOT
+  ASK, which names the mechanism — and in those terms it was inverted, since
+  *cannot ask* is the open setting where somebody walks straight into the
+  default endpoint. It asks the question somebody came to answer now. And
+  REISSUE was offered on a guest's row, where it would have killed their token
+  and printed a code for them to type into their laptop; a guest coming back is
+  a RENEWAL, and they are not the same button.
+- **Every label starts with a capital**, which is a small thing that was wrong
+  in seventy-eight places.
+
+### 2026-08-15 — a code you type into the screen, and a device that can ask
+
+Two ways in that the first build did not have, both driven by the same
+observation: approving what turns up is the wrong shape when you *knew* the
+device was coming, or when you cannot see it at all.
+
+- **The constraint that designs the enrolment code is that it is typed** — on a
+  television, with a remote. Nobody pastes onto a TV. So it is six characters,
+  the whole address is what the panel shows, and six characters are safe only
+  because of the four rules around them: one use, ten minutes, a back-off after
+  five wrong guesses, and an alphabet with no character that can be misread
+  into another. `O`/`0`, `I`/`1` and `l` are simply absent, so a misread
+  character is not a different valid code, it is not a code at all.
+- **Every answer from `/e/` is a redirect back to the display**, never a status
+  code and a page of JSON. Somebody has just typed a URL into a television;
+  what they need next is the screen, with a line on it saying what happened.
+- **REISSUE points the same mechanism at a row that already exists** — a wiped
+  browser, a replaced screen. The row is the *place*: its name and every
+  endpoint that names it survive, and the device behind it is swapped. The live
+  token dies on the button press rather than when the new code is used, because
+  a place is one device and waiting would mean two of them holding it.
+- **The case that drives the rest is an endpoint restricted because it costs.**
+  A hosted model given to some people and not to everyone, where the person
+  turning up is on a laptop in another building and nobody can walk over and
+  read an id off their screen. So a device can ask, on a form the admin built —
+  up to five fields, one of them a box big enough for a reason — and the
+  answers are what the decision is made on. This server has no opinion about
+  what a request should ask.
+- **Approving is granting**: the endpoints are ticked in the same gesture,
+  because an approval that grants nothing is a row that changed colour.
+  Refusing carries two messages, one shown to them and one that never leaves
+  the panel, plus whether that device may ask again — and it takes back
+  anything a previous approval gave.
+- **A grant that was asked for runs out; one an admin issued does not.** Expiry
+  is read where the request is answered rather than at the door, so it lands
+  cleanly mid-conversation: the turn in flight finishes and the next is
+  refused. Asking again is one press against the same row, never a second
+  device, and the row counts the renewals.
+- **Whether anybody may ask at all is a setting with a precondition.** Off
+  means straight in, so the default endpoint must be open to any display —
+  enforced from both ends, because in one direction it holds until the next
+  edit and then breaks silently, with guests reaching nothing and no error
+  anywhere to say why.
+
+### 2026-08-15 — a display is a place, and a place has to be let in
+
+Phase 2. Two people in a room, one of them addressing the wall tablet, and
+everybody else's microphone hearing it too — so a route can now be restricted
+to the displays you have approved, and the enforcement is not in anybody's
+browser settings.
+
+- **A display earns a token by turning up.** Unguessable, server-issued on the
+  first visit, `HttpOnly` so nothing on the page can read it or hand it to a
+  page that asks. `?display=kitchen` remains a *name*: it says which place this
+  is and proves nothing, which is why it was never enough on its own. The
+  obvious attack answers itself — somebody who types a wall display's URL into
+  their own phone is issued a **new** token, which nobody approved, and the
+  kitchen tablet's token was never in the URL to copy.
+- **The gate is in two places and they are not redundant.** The display drops
+  the utterance, because that is where it can still be nobody's business; the
+  server refuses at `/ask`, because the browser is not the one we shipped.
+  Either alone is a hole: without the first a house command lands in a
+  stranger's conversation and is paid for, and without the second the whole
+  thing is a setting somebody can turn off.
+- **The refusal is silent, and the mid-conversation case is the one that
+  matters.** A display already awake passes everything it hears straight
+  through, so the rule had to be *hearing a name this display may not use
+  drops the utterance* — do not pass it on, do not switch to it, do not say
+  anything about it out loud. Stated that way it also gives the behaviour you
+  do want: where the display **is** allowed, that same name switches to it.
+- **Which meant publishing the wake word of a route a display may not use.**
+  That looks backwards and is not: recognising the house's name is the only
+  way to drop it. Withheld, the word does not stay secret — the phone simply
+  answers on the house's behalf. It buys a reader nothing anyway; saying it
+  into an unapproved device is refused at the server, every time.
+- **Restricting is opt-in, per route.** Every route was open to anything
+  before this existed, so shipping "approval required everywhere" would have
+  taken working installations off the air to enforce a rule on routes where it
+  buys nothing. `ANY DISPLAY` is the default and the panel says so; a light
+  switch is worth naming displays for, a general assistant usually is not.
+- **Unapproved is a working state.** The appearance settings are public, so a
+  newly hung tablet draws correctly the moment it is powered on and simply
+  answers to nothing — with the reason, and its own id, on the status line.
+  Right-looking and inert is a better first five minutes than wrong-looking and
+  refused. It asks again every twenty seconds, so approving it from the panel
+  is the whole of the commissioning.
+- **Then a second way in, because approving-what-turns-up is the wrong shape
+  when you knew the screen was coming.** Name it in the panel, tick its
+  endpoints, and type `…/e/K7QP-4M` into the device once. The code is six
+  characters because it is typed with a remote, and six characters are safe
+  only because of the four rules around them — one use, ten minutes, a back-off
+  after five wrong guesses, and an alphabet with nothing in it that can be
+  misread into something else. REISSUE points the same mechanism at a row that
+  already exists, for a wiped browser or a replaced screen: the name and the
+  permissions stay, the device is swapped, and the old token dies on the button
+  press rather than when the new code is used.
+- **Then a third way, because the reason to restrict an endpoint is not always
+  a room with microphones in it.** It is often what the endpoint *costs*: a
+  hosted model some people get and others do not. There the person turning up
+  is on a laptop in another building and nobody can walk over and read an id
+  off their screen — so a device can ask, on a form the admin built, and the
+  answers are what the decision is made on. Approving ticks the endpoints in
+  the same gesture; refusing carries a message for them, a note for you, and
+  whether they may ask again. A grant of that kind expires and is renewed with
+  one press, because a guest is a lifecycle and a wall screen is not.
+- **Deleting a display is the revocation**, and it takes the id out of every
+  route's allow-list on the way — a permission naming a device that no longer
+  exists is one nobody can see and nobody can withdraw. The same reasoning that
+  clears a deleted route's fallthrough.
+- **An embed is not a display.** Its rights came from its key, so it reaches
+  what anything can reach and nothing that is restricted. Nor is the panel's
+  live preview: that is an admin looking at a display, and it is allowed
+  everything, because an admin can reach any endpoint from the panel anyway.
 
 ### 2026-08-15 — a real house, and what only a house could tell us
 

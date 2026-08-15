@@ -96,6 +96,42 @@ Either way the conversation ends the usual way: the sleep word, or the pause.
 
 **Going to sleep clears the conversation.** This is deliberate — see below.
 
+**Some names are not for every screen.** An administrator can restrict an
+assistant — usually one that switches things on and off — to particular
+displays. A screen that is not on that list stays silent when it hears that
+name: it does not answer, and it does not hand what it heard to whatever it was
+already talking to, because you were addressing a different device. Its status
+line says so if you look. Speak to the display that owns the name, or ask your
+administrator to add this one.
+
+**A newly installed screen may be waiting to be approved.** It looks exactly
+right and answers to nothing; the line above the box says so, and gives the id
+an administrator needs. Approving it takes one click over in the panel, and the
+screen picks it up on its own within a few seconds — nobody needs to touch it.
+
+## Asking for access
+
+On some installations, opening the page on your own laptop or phone gives you
+the figure and a short form instead of the transcript and the input box. That
+means this device has not been given access to anything yet.
+
+Fill the form in — an administrator chose what it asks for — and press REQUEST
+ACCESS. Nothing else is needed from you: leave the page open, or come back to
+it later. When somebody decides, the screen tells you in a box you have to
+dismiss, so you find out whether you were approved even if you had walked away.
+
+**If you are turned down** you are shown the reason they wrote, and whether you
+may ask again.
+
+**Access can run out.** Where it does, the page comes back to the same screen
+saying so — but with an ASK AGAIN button rather than the form, because what you
+told them the first time is still on record. One press, and you wait for the
+same decision.
+
+**A refusal, and access itself, belong to the device you are using**, not to
+you. Your laptop being turned down says nothing about your phone: that is a
+separate device, and it asks separately.
+
 ## What it remembers
 
 Two different things, and it is worth knowing which is which.
