@@ -160,9 +160,9 @@ laptop or a phone, and it appears in the list as WAITING within seconds. Give it
 a name and press APPROVE. It does not need reloading: a display that is waiting
 asks again every twenty seconds and starts working on its own.
 
-**Or it asks.** With *can ask* switched on, a device that has not been given
-access gets the figure and, where its transcript and composer would be, your
-request form — because both of those are wired to endpoints it cannot reach,
+**Or it asks.** Where somebody has to ask first, a device that has not been
+given access gets the figure and, where its transcript and composer would be,
+your request form — because both of those are wired to endpoints it cannot reach,
 and drawing them would be two controls that only ever refuse. It fills the form
 in, the row appears here saying what they told you, and you approve or refuse
 it.
@@ -189,12 +189,22 @@ carries, which is what a dedicated URL will be.
 
 ### The settings above the list
 
-**Can ask / cannot ask.** *Cannot ask* means the only way in is a code you
-issued, and anything else that opens the page simply uses the endpoints open to
-every display — no queue, and nothing to decide. It can only be set that way
-while such an endpoint is the **default**: otherwise an uninvited device would
-reach nothing at all, silently. The rule is enforced from both ends, so you
-also cannot restrict or switch off that default while requests are off.
+**Does somebody have to ask before they can use anything?**
+
+*No — straight in.* Somebody opens the page and uses the default endpoint
+immediately: no form, no queue, nothing for you to decide. The only way to
+reach a **restricted** endpoint is then a code you issued deliberately. This is
+the setting for an installation where a general assistant is meant to be there
+for anyone, and only the expensive or the dangerous one is controlled.
+
+It can only be set while an endpoint open to any display is the **default** —
+otherwise "straight in" would be straight into nothing, with no form to explain
+it and nobody to ask. The rule is enforced from both ends, so you also cannot
+restrict or switch off that default while it is set.
+
+*Yes — they ask first.* A device that has been given nothing gets the request
+form, and reaches no endpoint at all — not even the open one — until you
+decide.
 
 **How long a granted request lasts.** Guest access is a lifecycle, not a
 session: it runs out and the person asks again. Their answers are kept, so

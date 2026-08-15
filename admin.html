@@ -1499,23 +1499,27 @@ is back to being a browser that has never been here.</div>
   <section class="grp" data-tab="displays">
     <h4>Guest access</h4>
     <div class="grpbody">
-  <label class="bklab" style="margin-top:2px">may an uninvited device ask for access?</label>
+  <label class="bklab" style="margin-top:2px">does somebody have to ask before they can use anything?</label>
   <div class="seg" id="dp_guest">
-    <button data-v="1" class="on">CAN ASK</button>
-    <button data-v="0">CANNOT ASK</button>
+    <button data-v="0">NO — STRAIGHT IN</button>
+    <button data-v="1" class="on">YES — THEY ASK FIRST</button>
   </div>
-  <div class="note help">CANNOT ASK means the only way in is a code you issued,
-and anything else that opens the page just uses the endpoints open to every
-display — no queue, nothing to decide. It can only be set that way while such
-an endpoint is the <b>default</b>: otherwise an uninvited device reaches
-nothing at all, silently, and there would be nowhere for anybody to be told
-why. The same rule refuses to restrict or switch off that default while this
-is off.
+  <div class="note help"><b>NO — STRAIGHT IN.</b> Somebody opens the page and
+uses the default endpoint immediately. No form, no queue, nothing for you to
+decide. The only way to reach a <i>restricted</i> endpoint is then a code you
+issued deliberately.
 
-CAN ASK gives a device that has been given nothing the request form in place
-of its transcript and composer. Either way every device that opens the page is
-listed under Displays — asking is a row putting its hand up, not a row
-appearing.</div>
+This can only be set while an endpoint open to any display is the
+<b>default</b> — otherwise "straight in" would be straight into nothing, with
+no form to explain it and nobody to ask. The same rule refuses to restrict or
+switch off that default while this is set.
+
+<b>YES — THEY ASK FIRST.</b> A device that has been given nothing gets the
+request form in place of its transcript and composer, and reaches no endpoint
+at all — not even the open one — until you decide.
+
+Either way, every device that opens the page is listed under Displays. Asking
+is a row putting its hand up, not a row appearing.</div>
 
   <div class="cols2">
     <div>
