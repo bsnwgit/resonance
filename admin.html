@@ -1152,11 +1152,18 @@ label that can be right: a fixed word attributes every answer to the same
 name. Each line keeps the name of whoever gave it, so switching endpoints
 mid-conversation does not rewrite what is already on screen.
 
-<b>{display}</b> — the name of the display this is being viewed at, from
-<b>?display=</b> on the URL. Put it in <i>the person</i> and each dedicated
-display attributes the transcript to itself, without a setting per display.
-An admin-set label per URL arrives with identity; this is the identifier it
-will hang off, so what you write now keeps meaning the same thing.
+<b>{display}</b> — the name of the device this is being viewed at. Put it in
+<i>the person</i> and every device attributes the transcript to itself, with no
+setting per device.
+
+It resolves to the first of these that exists: the name you gave that row under
+DEVICES, then <b>?display=</b> from its URL, then the first thing typed on its
+request form. So a laptop you approved as <i>Sarah laptop</i> labels her lines
+with that, and a wall screen named <i>Kitchen</i> labels its own.
+
+A person's name as distinct from the device they are at — the same name
+following somebody from laptop to phone — needs an identity they carry, and
+does not exist yet.
 
 Mix them with ordinary text — <b>{display} shift lead</b> is fine. A variable
 that resolves to nothing falls back to the default, and one that is not

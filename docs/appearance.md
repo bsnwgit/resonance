@@ -78,7 +78,7 @@ and **resonance**, and either can be a fixed word or a variable.
 |---|---|
 | `{name}` | the word you say to reach whoever is answering, capitalised |
 | `{assistant}` | what that assistant is called |
-| `{display}` | the name of the display being viewed, from `?display=` on the URL |
+| `{display}` | the name of the device being viewed at |
 
 `{assistant}` is the **default** for *the assistant*, and with more than one
 endpoint it is the only label that can be right — a fixed word attributes
@@ -98,13 +98,20 @@ it is correct instead of wrong.
 renaming what the assistant answers to can rename what it is called in the
 transcript — put `{name}` in *the assistant* and the two never drift apart.
 
-`{display}` is the useful one for *the person*. A single setting then
-attributes each transcript to the display it is being read at: open
-`?display=workshop` and the operator's lines are labelled **workshop**,
-without a setting per display. Nothing else of the identity design is built
-yet, so today this reads the URL parameter and nothing more — but it is the
-same identifier the admin-set label per URL will hang off when that lands, so
-a `{display}` written in now keeps meaning the same thing.
+`{display}` is the useful one for *the person*. One setting then attributes
+each transcript to the device it is being read at, with no setting per device:
+a laptop approved as *Sarah laptop* labels her lines with that, and a wall
+screen named *Kitchen* labels its own.
+
+It resolves to the first of these that exists:
+
+1. the name you gave that row under **DEVICES**
+2. `?display=` from the URL it was opened with
+3. the first thing typed on its request form
+
+A person's name as distinct from the device they are standing at — the same
+name following somebody from laptop to phone — needs an identity they carry,
+and does not exist yet.
 
 Variables mix with ordinary text: `{display} shift lead` is fine. A variable
 that resolves to nothing falls back to the default, so `{display}` on a URL
