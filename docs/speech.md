@@ -74,6 +74,15 @@ for transcription.
 
 If people report being misheard, change this before changing anything else.
 
+**The choice interacts with THE EXACT WORD.** An assistant set to match only
+its exact name refuses `"Magnolia's"` where a CLOSE ENOUGH one forgives it — so
+FAST buys speed at the cost of the occasional wake word that does not land, and
+the assistants most likely to be set to exact are the ones that switch things
+on. Measured on the reference box: ACCURATE took 4.4s to decode one sentence,
+which is felt on every single turn. If you want both, use FAST and press **LEARN
+HOW I SAY IT** on the strict assistant — it captures the spellings that model
+actually returns for you and adds them as alternatives.
+
 ### Levels
 
 | Control | What it does |
@@ -130,6 +139,34 @@ Activity extends it.
 **greeting phrases** are the fallback for every assistant with no greeting of
 its own. `{name}` is the word that was said to reach whoever answered, so one line
 written here reads correctly whichever one answers.
+
+## What the display tells you
+
+A dim line sits above the input box on the display, and it is where every
+answer to *"why did nothing happen?"* now appears:
+
+| It says | It means |
+|---|---|
+| `transcribing…` | the recording is with the server |
+| `heard "…" · 340ms decode, 512ms round trip` | what it transcribed, and how long each stage took |
+| `nothing recognised — try speaking a little louder` | the recording came back empty; nothing to match against |
+| `asleep — heard "…", which names none of "house" or "ada"` | it transcribed you and no assistant answers to what it heard |
+| `backend: …` | why an endpoint failed, in full, where the spoken reply gives only the name |
+
+**It exists because the display used to discard all of it.** Those messages
+were written to elements that only existed inside the admin panel's preview,
+so a display that mis-heard you, went to sleep or could not reach its endpoint
+looked identical from the front — silent. Two separate faults presented as *"it
+just stops responding"* before this line existed.
+
+The quoted text is the useful part. A wake word that is *nearly* right —
+`"Magnolia's"` for `magnolia` — is refused outright on an assistant set to THE
+EXACT WORD, and the line is the only place that distinguishes that from never
+having been heard.
+
+Turning the transcript off (**TEXT**) hides this line too: a display showing
+only the figure is a deliberate choice, and a running commentary under it is
+not what that choice asked for.
 
 ## Commissioning check
 

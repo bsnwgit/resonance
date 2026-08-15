@@ -187,6 +187,15 @@ route — no route. `admin.html` is not served on them either, and returns 404.
 Users keep exactly four controls: microphone, mute, push-to-talk versus
 hands-free, and whether the transcript is shown.
 
+**A display says why nothing happened**, on a dim line above the input: what it
+heard and how long each stage took, that a recording came back empty, that it
+is asleep and what it heard instead of a name, or the reason an endpoint
+failed. This is not a debug affordance bolted on — the messages already
+existed and were being written to elements present only in the admin panel's
+preview, so every explanation was discarded at the one place somebody was
+standing. A voice interface that goes quiet is indistinguishable from a broken
+one; that applies to its diagnostics as much as to its answers.
+
 ### What reaches a browser, and what never does
 
 Three tiers, and the boundary between them is the whole of the model:
@@ -900,8 +909,17 @@ interface users are not supposed to have was one guessed parameter away.
 
 **A deliberately inert feature must say it is inert.** The wake word applied
 only to hands-free mode and did nothing in push-to-talk, with no indication —
-it read as simply broken. Live status text now states whether each gate is in
-effect and why.
+it read as simply broken. The panel's live status text now states whether each
+gate is in effect and why, and the gate grew an ALWAYS mode for anyone who
+wants the word required in push-to-talk too.
+
+**And saying so in the panel is not saying so where it happens.** That status
+text was written for the admin sitting in front of the settings; the person
+standing in front of the *display* got nothing, for a year, because the two
+elements it writes to were never in `index.html` at all. The lesson is not
+"add a status line" — it is that a message is only delivered where the fault
+is experienced, and a panel that reports faults to their configurer instead of
+their witness has not reported them.
 
 **A deployment directory is not a document root.** `SimpleHTTPRequestHandler`
 serves what is beside it, and beside it were `key.pem`, `users.json`,
