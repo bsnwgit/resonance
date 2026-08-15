@@ -1499,27 +1499,18 @@ is back to being a browser that has never been here.</div>
   <section class="grp" data-tab="displays">
     <h4>Guest access</h4>
     <div class="grpbody">
-  <label class="bklab" style="margin-top:2px">does somebody have to ask before they can use anything?</label>
+  <label class="bklab" style="margin-top:2px">does a general user require approval?</label>
   <div class="seg" id="dp_guest">
-    <button data-v="0">NO — STRAIGHT IN</button>
-    <button data-v="1" class="on">YES — THEY ASK FIRST</button>
+    <button data-v="1" class="on">YES</button>
+    <button data-v="0">NO</button>
   </div>
-  <div class="note help"><b>NO — STRAIGHT IN.</b> Somebody opens the page and
-uses the default endpoint immediately. No form, no queue, nothing for you to
-decide. The only way to reach a <i>restricted</i> endpoint is then a code you
-issued deliberately.
+  <div class="note help"><b>YES</b> — they get the request form instead of the
+transcript and composer, and reach nothing until you decide.
 
-This can only be set while an endpoint open to any display is the
-<b>default</b> — otherwise "straight in" would be straight into nothing, with
-no form to explain it and nobody to ask. The same rule refuses to restrict or
-switch off that default while this is set.
-
-<b>YES — THEY ASK FIRST.</b> A device that has been given nothing gets the
-request form in place of its transcript and composer, and reaches no endpoint
-at all — not even the open one — until you decide.
-
-Either way, every device that opens the page is listed under Displays. Asking
-is a row putting its hand up, not a row appearing.</div>
+<b>NO</b> — they open the page and use the default endpoint straight away.
+Restricted endpoints still need a code you issued. Only settable while an
+endpoint open to any display is the default, or NO would mean access to
+nothing.</div>
 
   <div class="cols2">
     <div>

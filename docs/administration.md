@@ -189,22 +189,20 @@ carries, which is what a dedicated URL will be.
 
 ### The settings above the list
 
-**Does somebody have to ask before they can use anything?**
+**Does a general user require approval?**
 
-*No — straight in.* Somebody opens the page and uses the default endpoint
-immediately: no form, no queue, nothing for you to decide. The only way to
-reach a **restricted** endpoint is then a code you issued deliberately. This is
-the setting for an installation where a general assistant is meant to be there
-for anyone, and only the expensive or the dangerous one is controlled.
+*Yes* — somebody who has not been approved gets the request form instead of the
+transcript and composer, and reaches nothing until you decide.
 
-It can only be set while an endpoint open to any display is the **default** —
-otherwise "straight in" would be straight into nothing, with no form to explain
-it and nobody to ask. The rule is enforced from both ends, so you also cannot
-restrict or switch off that default while it is set.
+*No* — they open the page and use the default endpoint straight away. No form,
+no queue, nothing for you to decide, and a restricted endpoint still needs a
+code you issued. This is the setting for an installation where a general
+assistant is meant to be there for anyone and only the expensive or the
+dangerous one is controlled.
 
-*Yes — they ask first.* A device that has been given nothing gets the request
-form, and reaches no endpoint at all — not even the open one — until you
-decide.
+*No* can only be set while an endpoint open to any display is the **default**,
+or it would mean access to nothing. The rule holds from both ends, so you also
+cannot restrict or switch off that default while it is set.
 
 **How long a granted request lasts.** Guest access is a lifecycle, not a
 session: it runs out and the person asks again. Their answers are kept, so
