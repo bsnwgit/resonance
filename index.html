@@ -451,16 +451,97 @@ const Embed = {
 };
 
 /* -------------------------------------------------- the display's name
-   `?display=workshop` is the declared name from the identity design: a name
-   survives a browser wipe where a token does not. None of the rest of that
-   design is built, so today this is the URL parameter and nothing more — but
-   it is the same identifier the admin-set label will hang off when it lands,
-   so a `{display}` written into a setting now keeps meaning the same thing.
+   `?display=workshop` is the declared name: a name survives a browser wipe
+   where a token does not, and it is what the admin's list calls this device
+   until somebody renames it.
+
+   It is a NAME AND NOT A KEY. Anything can type it, so nothing is granted on
+   the strength of it — see Display below, which is where the token that says
+   this really is that place comes from.
 
    Capped and stripped of markup characters: it is somebody else's string
    arriving from a URL, and it ends up rendered as a name. */
 const DISPLAY_NAME = (new URLSearchParams(location.search).get('display') || '')
   .replace(/[<>{}]/g, '').trim().slice(0, 40);
+
+/* ================================================================= DISPLAY
+   Which physical thing this page is running on, as far as the server is
+   concerned — the tablet in the kitchen rather than a browser tab.
+
+   The server issues an unguessable token on the first visit and holds it in
+   an HttpOnly cookie, so nothing here can read it, spend it anywhere else, or
+   hand it to a page that asks. This object holds only what came BACK: an id
+   to show somebody who is approving it, the name it is listed under, and
+   whether that has happened.
+
+   Unapproved is a working state, not an error. The appearance settings are
+   public, so a new tablet shows the geometry correctly the moment it is hung;
+   it holds no approved token, so no restricted endpoint will answer it. Hang
+   it, see it appear in the admin list, approve it, and it starts working —
+   which is a better first five minutes than a screen that looks broken. */
+const Display = {
+  id: '', name: DISPLAY_NAME, approved: false, known: false,
+
+  /* A coarse description of the device, and it is a HINT FOR THE PERSON
+     APPROVING — "this matches your approved kitchen display" — for the one
+     case a token cannot survive, which is a browser wiping its data. It must
+     never become the credential, and nothing on the server reads it as one:
+     every field here is forgeable from the console in one line. */
+  hint(){
+    let zone = '';
+    try{ zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; }catch(e){}
+    return [(screen.width|0) + '×' + (screen.height|0),
+            (navigator.platform || ''), (navigator.language || ''), zone]
+           .filter(Boolean).join(' · ').slice(0, 120);
+  },
+
+  /* Said once, on load, before the endpoints are asked for — the answer
+     decides which of them come back with a word attached. An embed says
+     nothing: it is not a display, its rights came from its key, and letting
+     one enrol would put a row in somebody's approval queue every time a host
+     page loaded. */
+  async hello(){
+    if (EMBED) return false;
+    try{
+      const r = await fetch('display/hello', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name: DISPLAY_NAME, hint: this.hint()})
+      });
+      const j = await r.json().catch(()=>({}));
+      if (!r.ok || !j.display) return false;
+      this.id = j.display.id || '';
+      this.name = j.display.name || DISPLAY_NAME;
+      this.approved = !!j.display.approved;
+      this.known = true;
+      return true;
+    }catch(e){ return false; }
+  },
+
+  /* An admin approves it over in the panel, and nothing about that reaches
+     this page on its own — so while it is waiting, it asks again. "Hang it,
+     see it appear in the list, approve it, and it starts working" has to mean
+     without somebody walking back to the tablet to reload it.
+
+     Only while waiting. Once approved there is nothing left to poll for, and
+     approval taken away is caught at the server, which refuses the request
+     whatever this page believes. */
+  _t: 0,
+  watch(){
+    if (EMBED || PREVIEW || this.approved || !this.known) return;
+    clearInterval(this._t);
+    this._t = setInterval(async ()=>{
+      const was = this.approved;
+      await this.hello();
+      if (this.approved === was) return;
+      clearInterval(this._t);
+      await Routes.load();
+      syncWake();
+      micNote(Routes.spoken()
+        ? 'approved as ' + this.name + ' — say ' + Routes.spoken()
+        : 'approved as ' + this.name);
+    }, 20000);
+  },
+};
 
 /* ================================================================ ROUTES
    Three names reaching three destinations. A route is a name, a wake word
@@ -483,13 +564,30 @@ const Routes = {
     try{
       const r = await fetch('routes', {cache:'no-store'});
       const j = await r.json();
-      this.list = (j && j.routes || []).filter(x=> x && x.id && x.wakeword);
+      /* A wake word is no longer required to be on the list. Without a
+         display token the routing half does not arrive at all, and an
+         endpoint with a name and no word is exactly what that looks like —
+         still worth holding, because {assistant} and the transcript's labels
+         are drawn from it and a page that has not enrolled should still read
+         correctly. It simply answers to nothing. */
+      this.list = (j && j.routes || []).filter(x=> x && x.id);
       this.defaultId = (j && j.default) || (this.list[0] || {}).id || '';
       return this.list.length;
     }catch(e){ return -1; }
   },
 
   byId(id){ return this.list.find(r=> r.id === id) || null; },
+
+  /* May this display use it? The server decides and sends the answer beside
+     each endpoint; absent means yes, so nothing here has to know what the
+     rule was. An endpoint arrives here whether or not the answer is yes — the
+     wake word of one this display may NOT use is exactly what the gate needs
+     in order to drop that utterance instead of passing it to somebody else's
+     conversation. */
+  usable(r){ return !!r && r.allowed !== false; },
+
+  /* Everything it can actually be woken by. */
+  wakeable(){ return this.list.filter(r=> r.wakeword && this.usable(r)); },
 
   /* Where a question goes. The wake word that woke it decides, and the route
      stays bound to the CONVERSATION rather than to the sentence — a
@@ -498,8 +596,15 @@ const Routes = {
      when it was typed into the composer or the wake gate is off, and that is
      what the default is for. */
   current(){
-    return (Wake.route && this.byId(Wake.route)) || this.byId(this.defaultId)
-           || this.list[0] || null;
+    if (Wake.route){ const r = this.byId(Wake.route); if (r) return r; }
+    const d = this.byId(this.defaultId);
+    if (this.usable(d)) return d;
+    /* The default is one this display may not use, so every question typed
+       into the composer would be refused at the server. Fall to the first it
+       may — which is what the server does with a default that has been
+       switched off, for the same reason: a composer that silently does
+       nothing is worse than one that answers from somewhere reachable. */
+    return this.list.find(r=> this.usable(r)) || d || this.list[0] || null;
   },
   currentId(){ const r = this.current(); return r ? r.id : ''; },
 
@@ -507,10 +612,25 @@ const Routes = {
   words(r){ return r ? [r.wakeword].concat(r.aliases || []).filter(Boolean) : []; },
 
   /* For the "say X to wake me" note. Wake words, not names: the word is what
-     somebody has to say, and on most routes the two are the same anyway. */
+     somebody has to say, and on most routes the two are the same anyway.
+     Only the ones this display may actually reach — telling somebody to say a
+     word that will be dropped is worse than telling them nothing.
+
+     Empty is a real answer now, so it is one rather than a made-up word: an
+     unapproved display answers to nothing at all, and printing “resonance”
+     at somebody standing in front of it would be a lie they can test. */
   spoken(){
-    const w = this.list.map(r=> '“' + r.wakeword + '”');
-    return w.length ? w.join(' or ') : '“' + FALLBACK_WAKEWORD + '”';
+    const w = this.wakeable().map(r=> '“' + r.wakeword + '”');
+    return w.length ? w.join(' or ') : '';
+  },
+
+  /* …and why, when it is empty. Two different silences: one is a display
+     waiting for somebody to approve it, the other is a server with no
+     endpoint that has a name. */
+  mute(){
+    return Display.known && !Display.approved
+      ? 'this display has not been approved yet, so no name reaches anything from it'
+      : 'nothing here has a name to answer to';
   },
 
   /* The voice this route answers in, falling back to the shared choice.
@@ -562,7 +682,11 @@ const VARS = {
     const r = forRoute(rid);
     return cap(((r && r.name) || FALLBACK_WAKEWORD).trim());
   },
-  display: ()=> DISPLAY_NAME,
+  /* The name it is listed under, which is the admin's once somebody has set
+     one and the declared name until then. The same place either way, so a
+     {display} written into a greeting before approval keeps meaning what it
+     meant after it. */
+  display: ()=> Display.name || DISPLAY_NAME,
 };
 function expand(s, rid){
   return String(s == null ? '' : s).replace(/\{(\w+)\}/g, (m, k)=>{
@@ -2067,6 +2191,16 @@ async function askBackend(text, bare){
     });
     const j = await r.json().catch(()=>({}));
     who = j && j.name || '';
+    /* Refused because this display may not use that endpoint. The gate
+       upstairs drops these before they are ever sent, so arriving here means
+       either a question typed into the composer or a display running code
+       that is not the code we shipped — and the answer to both is the same
+       silence. Not spoken, not in the transcript, and NOT the "I could not
+       reach it" line below: this did reach it, and was refused. */
+    if (j && j.refused){
+      note('refused: this display may not use ' + (who || 'that endpoint'));
+      return {reply: '', refused: true};
+    }
     // the route still being on demo is not an error, just not wired up yet
     if (j && j.demo) return {reply: REPLIES[replyIx++ % REPLIES.length]};
     if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
@@ -2094,6 +2228,11 @@ function submit(text){
   remember('user', text);
   qEl.value = '';
   askBackend(text).then(out => {
+    /* A refusal is silent, so there is nothing to say and nothing to
+       remember. Putting an empty turn in the history would leave the next
+       question preceded by an assistant that said nothing, which is a thing
+       models try to make sense of. */
+    if (out.refused) return;
     remember('assistant', out.reply);
     respond(out.reply);
     /* Nothing here ends the conversation. A house reports that it has finished
@@ -2153,9 +2292,24 @@ async function selfTest(){
      passes, the transcript says something baffling. Ask it something it can
      actually answer, with no conversation behind it. */
   const cur = Routes.current();
-  say(Routes.list.length > 0, 'routes · ' +
-      (Routes.list.map(r=> r.name + ' (“' + r.wakeword + '”' +
-                           (r.strict ? ', exact' : '') + ')').join(', ')
+  /* Which device the server thinks this is. Not being approved is not a
+     failure — a personal install restricts nothing and never needs it — so
+     the check is whether a token was issued at all, and the state rides in
+     the text where somebody commissioning a wall display will read it. */
+  say(Display.known || PREVIEW || !!EMBED, 'display identity · ' +
+      (EMBED ? 'embedded — an embed is not a display and holds no token'
+       : PREVIEW ? 'preview — the panel, not a display'
+       : !Display.known ? 'no token issued — cookies may be blocked in this browser'
+       : Display.name + ' (' + Display.id + ') · ' +
+         (Display.approved ? 'approved'
+                           : 'not approved — endpoints restricted to named '
+                             + 'displays will refuse it')));
+
+  say(Routes.list.length > 0, 'endpoints · ' +
+      (Routes.list.map(r=> r.name +
+                           (r.wakeword ? ' (“' + r.wakeword + '”' +
+                                         (r.strict ? ', exact' : '') + ')' : '') +
+                           (Routes.usable(r) ? '' : ' — not for this display')).join(', ')
        || 'none — nothing has a name to answer to'));
 
   /* Against the route the display would actually use right now, which is the
@@ -2605,7 +2759,8 @@ const Wake = {
     this.convo = '';              // theirs goes the same way ours does
     syncTalk(); syncWake();
     if (sayBye) farewell();
-    else micNote('asleep — say ' + Routes.spoken() + ' to start again');
+    else micNote(Routes.spoken() ? 'asleep — say ' + Routes.spoken() + ' to start again'
+                                 : 'asleep — ' + Routes.mute());
     this.route = '';
   },
 
@@ -2697,6 +2852,12 @@ const Wake = {
          house route it is a description of a room being sent somewhere it
          was never addressed to. */
       const sw = this.heard(text);
+      /* The worse case, and the one this rule exists for. A display already
+         awake passes everything it hears straight through — so without this,
+         another person's house command lands in a stranger's conversation, is
+         paid for, and is answered aloud. Dropped: not passed to the endpoint
+         bound now, and not switched to. */
+      if (sw && !Routes.usable(sw.route)) return this.notMine(sw);
       if (sw && sw.route.id !== this.route) return this.wakeOn(sw);
       this.touch();
       return text;
@@ -2706,10 +2867,28 @@ const Wake = {
       /* What was heard, in the same breath as the refusal. They used to be two
          notes and the second overwrote the first, which threw away the one
          fact that tells you whether a name was mis-heard or never said. */
-      micNote('asleep — heard “' + text + '”, which names none of ' + Routes.spoken());
+      micNote(Routes.spoken()
+        ? 'asleep — heard “' + text + '”, which names none of ' + Routes.spoken()
+        : 'asleep — heard “' + text + '”, and ' + Routes.mute());
       return null;
     }
+    if (!Routes.usable(h.route)) return this.notMine(h);
     return this.wakeOn(h);
+  },
+
+  /* Somebody in the room addressed a name this display may not use.
+     SILENT: nothing spoken, nothing in the transcript. That utterance was
+     addressed to a different device, and one nobody was talking to announcing
+     that it cannot help is noise laid over the answer somebody else is
+     waiting for.
+
+     The status line is neither of those things — it is on the screen, for
+     whoever is commissioning this — so the reason goes there and nowhere
+     else. The awake window is deliberately NOT refreshed either: this was not
+     addressed here, so it should not keep this display awake. */
+  notMine(h){
+    micNote('“' + h.word + '” is not for this display — ignored');
+    return null;
   },
 
   /* Bind, and hand back whatever was said after the name — or nothing, when
@@ -2895,6 +3074,7 @@ function syncWake(){
   const wakeTxt =
       S.wake === 'off'                 ? 'OFF — every utterance is acted on, and ' +
                                           'goes to the default route.'
+    : Wake.armed() && !Routes.spoken() ? 'ACTIVE — but ' + Routes.mute() + '. Now: ' + on
     : Wake.armed()                     ? 'ACTIVE — say ' + Routes.spoken() +
                                           ' to wake. Now: ' + on
     : 'NOT IN EFFECT — you are in SPACE mode, and AUTO ONLY skips the gate there. ' +
@@ -3303,10 +3483,25 @@ applyPrefs();
 /* Both documents before anything is drawn from either. The routes decide
    what {name} expands to and what this display answers to, so loading them
    after the first paint would flash the fallback name into the opening line
-   of the transcript. */
-Promise.all([Settings.load(), Routes.load()]).then(()=>{
+   of the transcript.
+
+   Hello first, and the endpoints after it — in that order rather than
+   alongside, because the token this display holds decides which of them come
+   back with a word attached. Asking for both at once would race, and the loser
+   would be a display that had just enrolled and could not hear its own name
+   until the next reload. The shared settings have no such dependency and
+   still load in parallel. */
+Promise.all([Settings.load(), Display.hello().then(()=> Routes.load())]).then(()=>{
   applyPrefs();
   syncWake();
+  /* Right-looking and inert, with the reason on the screen. The appearance
+     settings are public, so this drew correctly before anybody approved
+     anything; what it will not do is answer to a name, and somebody standing
+     in front of a newly hung tablet should be told that rather than left to
+     conclude it is broken. */
+  if (Display.known && !Display.approved && !Routes.spoken())
+    micNote('waiting to be approved — ' + Display.name + ' (' + Display.id + ')');
+  Display.watch();
   /* After the prefs, always: the grant decides what this surface is, and a
      preference stored against another page on the same site does not get to
      argue with it. */

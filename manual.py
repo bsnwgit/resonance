@@ -31,7 +31,8 @@ DOCS = [
     {"id": "admin",   "file": "administration.md",
      "title": "Administration",        "audience": "admin",
      "summary": "Signing in, how the panel is laid out, saving and reverting, "
-                "and the live preview."},
+                "the live preview, and approving the displays that may use "
+                "each assistant."},
     {"id": "look",    "file": "appearance.md",
      "title": "Appearance & motion",   "audience": "admin",
      "summary": "The geometry, palette and motion controls, and what each one "

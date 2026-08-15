@@ -113,6 +113,60 @@ display is set up — and read these documents — without being able to alter i
 The server will not let you remove or demote the last admin account. An
 interface nobody can administer is a brick.
 
+## Displays
+
+A display is one physical thing — the tablet in the kitchen — as distinct from
+a browser tab somebody opened. The DISPLAYS tab lists every one that has loaded
+the page.
+
+**Commissioning one is three steps.** Hang it, open the display page on it —
+`https://<host>:9701/?display=kitchen` — and it appears in the list within
+seconds. Give it a name if the URL's is not the one you want, press APPROVE,
+and it starts working where it stands. It does not need reloading: a display
+that is waiting asks again every twenty seconds.
+
+**Until you approve it, it renders and answers to nothing.** The appearance
+settings are public, so a new tablet looks exactly right the moment it is
+powered on; what it does not have is the right to use any endpoint you have
+restricted. Its status line says so, and gives the id you will see in the list.
+
+**The name is not the credential.** Anybody can type `?display=kitchen` into a
+URL. What actually identifies a display is an unguessable token this server
+issues on its first visit and keeps in a cookie the page itself cannot read.
+Somebody who types a wall display's URL into their own phone gets a *new*
+token, which nobody approved — and turns up in this list as a row you were not
+expecting. That is the early warning; it is also, in the ordinary case, simply
+your own new tablet.
+
+**Restricting an endpoint to named displays** is on the endpoint, under AI →
+*who may use it*. `ANY DISPLAY` is the default and is what every endpoint did
+before displays existed. `ONLY THESE` names them, and is worth doing for an
+endpoint that *acts* — a house, a light switch — and rarely worth doing for one
+that answers questions.
+
+**What a restricted endpoint does to everybody else:** nothing audible. A
+display that hears a name it may not use drops the utterance — it does not
+answer, does not pass what it heard to whatever it was already talking to, and
+says nothing out loud. The person was addressing a different device, and a
+tablet nobody was talking to announcing that it cannot help is noise laid over
+somebody else's answer. The reason appears on that display's status line and in
+the server log, which are the two places it belongs.
+
+**The list also tells you** what each display calls itself, when it first
+arrived and was last seen, which restricted endpoints name it, and how many
+requests it has been refused. The *looks like* line — screen size, platform,
+language — is a hint to help you recognise a device whose browser has been
+wiped and which has therefore arrived as a new row. It is never a credential:
+every field in it is forgeable from a browser console in one line.
+
+**DELETE is the revocation.** The token stops matching anything immediately,
+and the display is removed from every endpoint that named it. If the device is
+still on the wall it will enrol again, as a new row, unapproved.
+
+A display's token has no expiry. A wall display is commissioned once, and one
+that stopped working a year later for a reason nobody standing in front of it
+could see would be worse than anything the expiry bought.
+
 ## Locking down a deployment
 
 `settings.json` is served to anything that can reach the display port. That is
@@ -120,7 +174,7 @@ deliberate — the display is built from it, and the browser needs it to render
 and to match wake words. It holds no credential: API keys, tokens and upstream
 addresses are in `backend.json`, which no browser ever sees.
 
-**The network is the boundary, and today it is the only one.** In order of
+**The network is still the stronger boundary.** In order of
 effect:
 
 1. **Put the wall displays on their own VLAN** and let nothing else onto it.
@@ -139,6 +193,12 @@ are allowed to talk to, they already know. They do not get a credential, an
 upstream address, or any way to reach Home Assistant except by asking this
 server, which they could already do by speaking.
 
+**A display is told the wake word of an endpoint it may not use.** That is
+deliberate and it is what makes the drop work: recognising the house's name is
+the only way a phone can *ignore* a command addressed to the house rather than
+passing it into its own conversation. The word buys whoever reads it nothing —
+saying it into an unapproved device is refused at the server, every time.
+
 **Two people sharing one device cannot be told apart.** Nothing here is
 per-person.
 
@@ -156,6 +216,7 @@ what the server will answer, not in what the page carries.
 | `app.json` | ports, binding and session lifetime | admin only |
 | `backend.json` | the single assistant this server had before endpoints | read once, at the migration, then never again |
 | `embeds.json` | embed keys, hashed, and what each one grants | admin only, mode 600 |
+| `displays.json` | every display, its token hashed, and whether it is approved | admin only, mode 600 |
 
 **Two things live outside this directory.** Piper voices are in `voices/`, and
 the transcription models are cached by faster-whisper under

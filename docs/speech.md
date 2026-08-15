@@ -169,6 +169,10 @@ answer to *"why did nothing happen?"* now appears:
 | `heard "…" · 340ms decode, 512ms round trip` | what it transcribed, and how long each stage took |
 | `nothing recognised — try speaking a little louder` | the recording came back empty; nothing to match against |
 | `asleep — heard "…", which names none of "house" or "ada"` | it transcribed you and no assistant answers to what it heard |
+| `"house" is not for this display — ignored` | somebody addressed an assistant this display is not allowed to use. Nothing was sent, nothing was answered, and the conversation it was already having was left alone |
+| `waiting to be approved — kitchen (d4a19…)` | this display has never been approved. It renders correctly and answers to nothing; the id is what an administrator looks for in DISPLAYS |
+| `approved as kitchen — say "house" or "ada"` | somebody just approved it, and it noticed on its own |
+| `refused: this display may not use house` | a question typed into the box went to an assistant this display is not allowed to use |
 | `backend: …` | why an endpoint failed, in full, where the spoken reply gives only the name |
 
 **It exists because the display used to discard all of it.** Those messages

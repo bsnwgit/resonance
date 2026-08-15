@@ -13,6 +13,8 @@ users.json
 users.json.tmp
 embeds.json
 embeds.json.tmp
+displays.json
+displays.json.tmp
 server.log
 voices/
 stt-venv/

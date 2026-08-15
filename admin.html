@@ -516,6 +516,17 @@
         border-bottom:1px solid rgba(var(--glass),.08)}
   .erow .top{display:flex;align-items:center;gap:8px}
   .erow .nm{font-size:calc(10px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.96)}
+  /* A display's name is editable in place. Renaming is the only edit one has,
+     and a RENAME button that opens a dialog for a single field is ceremony
+     around a word. It takes the row's own name styling rather than the
+     panel's full-width field, which would push the buttons off the line. */
+  .erow input.nm{
+    flex:0 1 200px;min-width:110px;padding:3px 6px;font:inherit;
+    font-size:calc(10px * var(--fs));letter-spacing:.08em;
+    background:rgba(0,0,0,.55);color:rgba(var(--paper),.96);
+    border:1px solid rgba(var(--glass),.16);outline:0;
+  }
+  .erow input.nm:focus{border-color:var(--hue-dim)}
   .erow .r{margin-left:auto;display:flex;gap:4px}
   .erow button{font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.1em;padding:3px 6px;
                cursor:pointer;background:none;color:rgba(var(--paper),.87);
@@ -673,6 +684,12 @@
     flex:1;font:inherit;font-size:calc(9px * var(--fs));letter-spacing:.18em;padding:6px 4px;cursor:pointer;
     background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.85);
   }
+  /* Five in the foot now, and the widest of them is DOCUMENTATION. A row with
+     no room for all five wraps to a second line rather than squeezing the
+     letter-spacing out of the labels: these are the navigation, and navigation
+     you have to squint at is worse than navigation on two lines. */
+  #foottabs{flex-wrap:wrap}
+  #foottabs button{min-width:86px}
   .tabs button.on{border-color:var(--hue-dim);color:var(--hue);background:rgba(var(--glass),.08)}
   .findrow{display:flex;margin:0 0 4px}
   #rigfind{
@@ -1335,6 +1352,36 @@ Short by default — this session configures what everyone else is looking at.
   <div class="note" id="usernote"></div>
     </div>
   </section>
+  <section class="grp" data-tab="displays">
+    <h4>Displays</h4>
+    <div class="grpbody">
+  <div id="displist"></div>
+  <div class="note" id="dispnote"></div>
+  <div class="note help" style="margin-top:10px">A display is one physical
+thing — the tablet in the kitchen — and this is every one that has loaded the
+page. Each is issued an unguessable token on its first visit and appears here
+the moment it does.
+
+<b>The name is not the credential.</b> Anybody can type
+<b>?display=kitchen</b> into a URL. The token is what says this really is that
+place, and it lives in a cookie the page itself cannot read. Somebody who
+types a wall display's URL into their own phone is issued a <i>new</i> token,
+which nobody approved — and turns up here as a row you were not expecting.
+
+<b>Approve it and it works; leave it and it still renders.</b> The appearance
+settings are public, so a newly hung tablet looks right immediately and simply
+answers to nothing until you say otherwise.
+
+An endpoint consults this list only where it has been restricted to named
+displays — <b>who may use it</b>, on each endpoint under AI. Until you restrict
+one, every display reaches everything, which is what they all did before this
+existed.
+
+DELETE is the revocation: that token stops matching anything, and the device
+is back to being a browser that has never been here.</div>
+    </div>
+  </section>
+
   <section class="grp" data-tab="embeds">
     <h4>Embed keys</h4>
     <div class="grpbody">
@@ -1462,6 +1509,7 @@ button to download it as a PDF.</div>
     <div class="tabgroup">Admin settings</div>
     <div class="tabs" id="foottabs">
       <button id="tab_app" data-tab="app">APP SETTINGS</button>
+      <button id="tab_displays" data-tab="displays">DISPLAYS</button>
       <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
       <button id="tab_accounts" data-tab="accounts">ACCOUNTS</button>
       <button id="tab_docs" data-tab="docs">DOCUMENTATION</button>
@@ -2334,7 +2382,7 @@ function newInstance(){
           base_url:'http://127.0.0.1:11434/v1', model:'', system:SHIPPED_PROMPT,
           max_tokens:400, temperature:0.4, timeout:120, keep_alive:'30m',
           history_turns:8, has_key:false, is_default:false,
-          agent_id:'', fallthrough:''};
+          agent_id:'', fallthrough:'', restricted:false, displays:[]};
 }
 
 // `esc` is already taken further down by the documentation renderer
@@ -2384,6 +2432,33 @@ CLOSE ENOUGH forgives a mishearing, which is what an endpoint that answers
 questions wants. THE EXACT WORD is for one that <i>does</i> things — the same
 near-miss costs a few tokens on one and switches on the lights on the
 other.</div>
+    </div>
+  </div>
+
+  <div class="subgrp" data-g="who">
+    <h5>Who may use it<span class="subsum"></span></h5>
+    <div class="subbody">
+  <div class="seg" data-f="restricted">
+    <button data-v="0" class="on">ANY DISPLAY</button>
+    <button data-v="1">ONLY THESE</button>
+  </div>
+  <div class="cks" data-r="displays"></div>
+  <div class="note" data-r="whonote"></div>
+  <div class="note help">Two people in a room, one of them addressing the wall
+tablet, and everybody else's microphone hearing it too. Push-to-talk on a
+phone is the right setting and is not a control, because nothing makes anybody
+set it — so the rule is enforced <b>here</b> instead, and a phone that wakes on
+this endpoint's name is refused however its browser is configured.
+
+ANY DISPLAY is what every endpoint was before this existed. ONLY THESE is for
+the ones that <i>do</i> things: a light switch is worth naming the displays
+for, a general assistant usually is not.
+
+A display that hears a name it may not use <b>drops the utterance</b> — it
+does not answer, does not pass it to whatever it was already talking to, and
+says nothing out loud. The person was addressing another device.
+
+Displays enrol themselves and are approved under DISPLAYS.</div>
     </div>
   </div>
 
@@ -2630,6 +2705,9 @@ function blockPaint(blk, r){
   });
   blk.querySelectorAll('[data-f="strict"] button').forEach(b=>
     b.classList.toggle('on', (b.dataset.v === '1') === !!r.strict));
+  blk.querySelectorAll('[data-f="restricted"] button').forEach(b=>
+    b.classList.toggle('on', (b.dataset.v === '1') === !!r.restricted));
+  blockFillWho(blk, r);
   blk.querySelectorAll('[data-f="provider"] button').forEach(b=>
     b.classList.toggle('on', b.dataset.v === r.provider));
   /* Light the preset the base URL actually corresponds to, rather than
@@ -2674,6 +2752,10 @@ function blockPaint(blk, r){
     wake: (r.wakeword ? '“' + r.wakeword + '”' : 'not set')
         + (words ? ' +' + words + ' more' : '')
         + (r.strict ? ' · exact' : ''),
+    who: !r.restricted ? 'any display'
+       : (r.displays || []).length
+         ? (r.displays || []).length + ' named'
+         : 'nobody',
     voice: (r.greeting ? '“' + r.greeting.slice(0, 28)
                        + (r.greeting.length > 28 ? '…' : '') + '” · ' : 'shared greeting · ')
          + (r.voice || 'shared voice'),
@@ -2723,6 +2805,80 @@ function blockPaint(blk, r){
   blockSyncProvider(blk);
 }
 
+/* One checkbox per display this server knows about, ticked where this endpoint
+   already names it. Built from DISPLAYS rather than from the endpoint's own
+   list, so a device that has been deleted stops being offered and one that
+   arrived a minute ago is there to tick. */
+function blockFillWho(blk, r){
+  const box = R(blk, 'displays');
+  if (!box) return;
+  const want = r.displays || [];
+  // Never rebuilt under somebody's cursor — replacing the nodes would drop
+  // the tick they were in the middle of making.
+  if (!box.contains(document.activeElement)){
+    box.innerHTML = '';
+    DISPLAYS.forEach(d=>{
+      const lab = document.createElement('label');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.dataset.d = d.id;
+      cb.checked = want.indexOf(d.id) >= 0;
+      lab.appendChild(cb);
+      lab.appendChild(document.createTextNode(
+        ' ' + d.label + (d.approved ? '' : ' — not approved')));
+      box.appendChild(lab);
+    });
+    if (!DISPLAYS.length){
+      const em = document.createElement('span');
+      em.textContent = 'no displays have loaded the page yet';
+      box.appendChild(em);
+    }
+  }
+  blockSyncWho(blk);
+}
+
+/* The list only means anything under ONLY THESE, and the note under it says
+   what the current pair actually does — including the two arrangements that
+   are allowed and surprising. */
+function blockSyncWho(blk){
+  const on = blk.querySelector('[data-f="restricted"] button.on');
+  const restricted = !!on && on.dataset.v === '1';
+  const box = R(blk, 'displays');
+  if (box) box.style.display = restricted ? '' : 'none';
+  const ticked = box ? [...box.querySelectorAll('input:checked')] : [];
+  const live = ticked.filter(cb=>{
+    const d = DISPLAYS.find(x=> x.id === cb.dataset.d);
+    return d && d.approved;
+  });
+  const note = R(blk, 'whonote');
+  if (note){
+    let msg = '', bad = false;
+    if (!restricted){
+      msg = 'Any display, approved or not — the same as every endpoint before '
+          + 'displays existed.';
+    }else if (!ticked.length){
+      // Allowed rather than refused: restricting one before the tablet that
+      // will use it has been hung is a legitimate order to do things in.
+      msg = 'No display may use this endpoint — nothing reaches it until one '
+          + 'is ticked.';
+      bad = true;
+    }else{
+      msg = ticked.length + (ticked.length === 1 ? ' display' : ' displays');
+      if (live.length !== ticked.length)
+        msg += ' — ' + (ticked.length - live.length) + ' of them not approved '
+             + 'yet, and refused until they are';
+    }
+    /* The composer sends typed questions to the DEFAULT endpoint with no wake
+       word behind them, so restricting that one means a display outside the
+       list can type and get nothing back. Worth saying where the setting is
+       made rather than leaving it to be discovered at a keyboard. */
+    if (restricted && blk._rec && blk._rec.is_default)
+      msg += ' · this is the default endpoint, so typed questions from any '
+           + 'other display are refused too';
+    note.className = 'note' + (bad ? ' bad' : '');
+    note.textContent = msg;
+  }
+}
+
 function blockCollect(blk){
   const body = {};
   RT_FIELDS.forEach(k=>{
@@ -2739,6 +2895,13 @@ function blockCollect(blk){
   body.provider = prov ? prov.dataset.v : 'demo';
   const strict = blk.querySelector('[data-f="strict"] button.on');
   body.strict = !!strict && strict.dataset.v === '1';
+  const who = blk.querySelector('[data-f="restricted"] button.on');
+  body.restricted = !!who && who.dataset.v === '1';
+  /* Sent whether or not the switch is on, so turning it off and on again
+     brings back the displays that were ticked rather than an empty list
+     somebody has to fill in twice. */
+  body.displays = [...blk.querySelectorAll('[data-r="displays"] input:checked')]
+                    .map(cb=> cb.dataset.d);
   const ft = F(blk, 'fallthrough');
   if (ft) body.fallthrough = ft.value;
   const key = F(blk, 'api_key');
@@ -2764,6 +2927,11 @@ async function listModels(blk){
 }
 
 function wireBlock(blk){
+  /* Ticking a display changes what the note under the list says, and a tick
+     is a change rather than an input. */
+  blk.addEventListener('change', e=>{
+    if (e.target.closest('[data-r="displays"]')) blockSyncWho(blk);
+  });
   blk.addEventListener('input', e=>{
     const f = e.target.closest('[data-f]');
     if (f) f.dataset.touched = '1';
@@ -2820,6 +2988,7 @@ function wireBlock(blk){
         }
         blockSyncProvider(blk);
       }
+      if (seg.dataset.f === 'restricted') blockSyncWho(blk);
       if (seg.dataset.r === 'preset'){
         const pre = BK_PRESETS[b.dataset.v];
         if (pre){
@@ -2976,9 +3145,157 @@ function paintBlocks(keepOpen){
     : 'no endpoints yet — ADD INSTANCE to make one');
 }
 
+/* ----------------------------------------------------------- displays
+   One physical thing each — the tablet in the kitchen — enrolled by turning
+   up rather than created here. What this page can do to one is approve it,
+   name it, and take it away again. */
+let DISPLAYS = [];
+
+const dispWhen = (ts)=> ts ? new Date(ts * 1000).toLocaleString() : 'never';
+
+/* Just the fetch. The endpoint blocks name displays in their allow-lists, so
+   this has to have run before one is painted — and painting a block is not
+   something to do from inside the list's own refresh. */
+async function loadDisplays(){
+  try{
+    const j = await api('/displays');
+    DISPLAYS = j.displays || [];
+  }catch(e){ DISPLAYS = []; }
+  return DISPLAYS;
+}
+
+async function refreshDisplays(){
+  const box = $('displist');
+  if (!box || ME.role !== 'admin'){ if (box) box.textContent = ''; return; }
+  const note = $('dispnote');
+  await loadDisplays();
+  box.innerHTML = '';
+  if (!DISPLAYS.length){
+    box.className = 'note';
+    box.textContent = 'Nothing has loaded the display page yet. Open it on a '
+                    + 'tablet and it appears here.';
+    if (note) note.textContent = '';
+    return;
+  }
+  box.className = '';
+  /* Waiting first. In the steady state this list is read once a year; the
+     moment somebody is actually looking at it, they have just hung something
+     and want the row for it at the top. */
+  const rows = DISPLAYS.slice().sort((a, b)=>
+    (a.approved === b.approved) ? (b.created || 0) - (a.created || 0)
+                                : (a.approved ? 1 : -1));
+  rows.forEach(d=>{
+    const row = document.createElement('div');
+    row.className = 'erow' + (d.approved ? '' : ' off');
+
+    const top = document.createElement('div'); top.className = 'top';
+    /* The name is the control, because renaming is the only edit a display
+       has and a separate RENAME button opening a prompt for one field is
+       ceremony. Enter or leaving the box saves it. */
+    const nm = document.createElement('input');
+    nm.type = 'text'; nm.className = 'nm'; nm.value = d.name || '';
+    nm.placeholder = d.asked || 'unnamed display';
+    nm.spellcheck = false;
+    nm.onkeydown = (e)=>{ if (e.key === 'Enter') nm.blur(); };
+    nm.onchange = ()=> displayAction('/displays/rename',
+                                     {id: d.id, name: nm.value.trim()});
+    top.appendChild(nm);
+    if (!d.approved){
+      const b = document.createElement('span');
+      b.className = 'badge'; b.textContent = 'WAITING';
+      top.appendChild(b);
+    }
+    if (d.refused){
+      const b = document.createElement('span');
+      b.className = 'badge';
+      b.textContent = d.refused + (d.refused === 1 ? ' REFUSAL' : ' REFUSALS');
+      top.appendChild(b);
+    }
+
+    const r = document.createElement('span'); r.className = 'r';
+    const flip = document.createElement('button');
+    flip.textContent = d.approved ? 'WITHDRAW' : 'APPROVE';
+    if (!d.approved) flip.className = 'act-save';
+    // Approving and naming in one gesture: whatever is in the box goes with it.
+    flip.onclick = ()=> displayAction('/displays/approve',
+                                      {id: d.id, approved: !d.approved,
+                                       name: nm.value.trim()});
+    const del = document.createElement('button');
+    del.textContent = 'DELETE';
+    del.className = 'act-danger';
+    del.onclick = ()=>{
+      if (confirm('Delete "' + d.label + '"? Its token stops working '
+                  + 'immediately, and it is removed from every endpoint that '
+                  + 'names it. If the device is still on the wall it will '
+                  + 'enrol again as a new one.'))
+        displayAction('/displays/delete', {id: d.id});
+    };
+    r.appendChild(flip); r.appendChild(del);
+    top.appendChild(r);
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const named = (RT.routes || []).filter(x=> x.restricted
+                                            && (x.displays || []).indexOf(d.id) >= 0);
+    const lines = [
+      ['calls itself', d.asked || 'nothing — no ?display= in its URL'],
+      ['id', d.id],
+      ['first seen', dispWhen(d.created)],
+      ['last seen', dispWhen(d.last_seen)],
+    ];
+    if (d.approved)
+      lines.push(['approved', dispWhen(d.approved_at) +
+                              (d.approved_by ? ' by ' + d.approved_by : '')]);
+    if (named.length)
+      lines.push(['may use', named.map(x=> x.name).join(', ')]);
+    if (d.refused)
+      lines.push(['refused', d.refused + ' × · last ' + dispWhen(d.refused_at) +
+                             (d.refused_from ? ' asking for ' + d.refused_from : '')]);
+    // A hint, never a credential — see the server. It is here to help somebody
+    // recognise a device, and it is forgeable from a console in one line.
+    if (d.hint) lines.push(['looks like', d.hint]);
+    lines.forEach(([k, v])=>{
+      const el = document.createElement('div');
+      const b = document.createElement('b');
+      b.textContent = k + ' ';
+      el.appendChild(b);
+      el.appendChild(document.createTextNode(v));
+      meta.appendChild(el);
+    });
+
+    row.appendChild(top); row.appendChild(meta);
+    box.appendChild(row);
+  });
+  const waiting = DISPLAYS.filter(d=> !d.approved).length;
+  if (note){
+    note.className = 'note';
+    note.textContent = DISPLAYS.length
+      + (DISPLAYS.length === 1 ? ' display' : ' displays')
+      + (waiting ? ' · ' + waiting + ' waiting to be approved' : ' · all approved');
+  }
+}
+
+async function displayAction(path, body){
+  const note = $('dispnote');
+  try{
+    await api(path, {method:'POST', body: JSON.stringify(body)});
+    await refreshDisplays();
+    /* An allow-list that still offers a display somebody just deleted is a
+       permission nobody can see. The endpoint blocks are rebuilt from the
+       fresh list — harmless when the AI tab is not the one on screen. */
+    paintBlocks();
+  }catch(e){
+    if (note){ note.className = 'note bad'; note.textContent = e.message; }
+  }
+}
+
 async function loadBackend(){
   if (!ME || ME.role !== 'admin') return;
   try{
+    /* The displays before the endpoints, because each endpoint's allow-list is
+       drawn from them: painting a block first would show an empty list and
+       then blink it full. */
+    await loadDisplays();
     const j = await api('/routes/all');
     RT = {routes: j.routes || [], default: j.default || '', voices: j.voices || []};
     paintBlocks();
@@ -3596,6 +3913,7 @@ function panelNav(){
     syncSaveRow();
     $('panelscroll').scrollTop = 0;
     if (tab === 'accounts') refreshUsers();
+    if (tab === 'displays') refreshDisplays();
     if (tab === 'embeds') refreshEmbeds();
     if (tab === 'app') loadApp();
     if (tab === 'ai') loadBackend();
@@ -3657,6 +3975,9 @@ function start(){
   // and be left wondering. Don't offer it. Same for the embed keys, which
   // are credentials rather than configuration.
   $('tab_app').style.display = admin ? '' : 'none';
+  // Approving a device is granting it something, which is not a thing a
+  // read-only account does — and the server refuses the routes anyway.
+  $('tab_displays').style.display = admin ? '' : 'none';
   $('tab_embeds').style.display = admin ? '' : 'none';
   // Same argument for accounts when there is no sign-in: the tab manages a
   // set of people who cannot sign in and are keeping nobody out. The server

@@ -96,6 +96,19 @@ Either way the conversation ends the usual way: the sleep word, or the pause.
 
 **Going to sleep clears the conversation.** This is deliberate — see below.
 
+**Some names are not for every screen.** An administrator can restrict an
+assistant — usually one that switches things on and off — to particular
+displays. A screen that is not on that list stays silent when it hears that
+name: it does not answer, and it does not hand what it heard to whatever it was
+already talking to, because you were addressing a different device. Its status
+line says so if you look. Speak to the display that owns the name, or ask your
+administrator to add this one.
+
+**A newly installed screen may be waiting to be approved.** It looks exactly
+right and answers to nothing; the line above the box says so, and gives the id
+an administrator needs. Approving it takes one click over in the panel, and the
+screen picks it up on its own within a few seconds — nobody needs to touch it.
+
 ## What it remembers
 
 Two different things, and it is worth knowing which is which.
