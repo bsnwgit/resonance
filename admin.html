@@ -531,6 +531,12 @@
   /* Three short numbers, side by side rather than stacked full width: they are
      one setting each and reading them as a row is how you notice the pending
      limit is larger than the total. */
+  /* A label and its control on one line, for the settings that are a question
+     with two answers. Under it, a two-button segment reads as a heading with a
+     row of options below rather than as the answer to the words beside it. */
+  .labrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:2px 0 0}
+  .labrow .bklab{margin:0}
+  .labrow .seg{margin:0}
   .cols2{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 0;align-items:stretch}
   /* Two to a line, deliberately: the days a grant lasts and the total number
      of displays are read together, and a basis that let three squeeze onto one
@@ -1079,13 +1085,13 @@
   <section class="grp" data-tab="look">
     <h4>Typography</h4>
     <div class="grpbody">
-  <label class="bklab">face</label>
+  <label class="bklab">Face</label>
   <div class="seg" data-set="face">
     <button data-v="mono" class="on">MONO</button>
     <button data-v="sans">SANS</button>
     <button data-v="wide">WIDE</button>
   </div>
-  <label class="bklab">size</label>
+  <label class="bklab">Size</label>
   <div class="seg" data-set="fs">
     <button data-v="1" class="on">NORMAL</button>
     <button data-v="1.12">LARGE</button>
@@ -1104,9 +1110,9 @@ size it is setting, so you read the choice while making it.</div>
   <section class="grp" data-tab="look">
     <h4>Who is speaking</h4>
     <div class="grpbody">
-  <label class="bklab">the person</label>
+  <label class="bklab">The person</label>
   <input id="opname" type="text" spellcheck="false" placeholder="operator">
-  <label class="bklab">the assistant</label>
+  <label class="bklab">The assistant</label>
   <input id="ainame" type="text" spellcheck="false" placeholder="resonance">
   <div class="note help">The two labels down the left of the transcript.
 
@@ -1134,12 +1140,12 @@ recognised is left standing so a typo is visible rather than silent.</div>
   </section>
   <section class="grp" data-tab="look">
     <h4>Form &amp; size</h4>
-    <div class="grpbody">  <div class="sl"><label>amplitude</label><output id="o_amp"></output><input id="s_amp" type="range" min="0" max="2.5" step=".01"></div>
-  <div class="sl"><label>lines</label><output id="o_lines"></output><input id="s_lines" type="range" min="1" max="40" step="1"></div>
-  <div class="sl"><label>layer phase</label><output id="o_lag"></output><input id="s_lag" type="range" min="0" max="14" step=".1"></div>
-  <div class="sl"><label>depth</label><output id="o_depth"></output><input id="s_depth" type="range" min="0" max="600" step="5"></div>
-  <div class="sl"><label>spread</label><output id="o_spread"></output><input id="s_spread" type="range" min="200" max="1100" step="10"></div>
-  <div class="sl"><label>perspective</label><output id="o_persp"></output><input id="s_persp" type="range" min="260" max="3000" step="20"></div></div>
+    <div class="grpbody">  <div class="sl"><label>Amplitude</label><output id="o_amp"></output><input id="s_amp" type="range" min="0" max="2.5" step=".01"></div>
+  <div class="sl"><label>Lines</label><output id="o_lines"></output><input id="s_lines" type="range" min="1" max="40" step="1"></div>
+  <div class="sl"><label>Layer phase</label><output id="o_lag"></output><input id="s_lag" type="range" min="0" max="14" step=".1"></div>
+  <div class="sl"><label>Depth</label><output id="o_depth"></output><input id="s_depth" type="range" min="0" max="600" step="5"></div>
+  <div class="sl"><label>Spread</label><output id="o_spread"></output><input id="s_spread" type="range" min="200" max="1100" step="10"></div>
+  <div class="sl"><label>Perspective</label><output id="o_persp"></output><input id="s_persp" type="range" min="260" max="3000" step="20"></div></div>
   </section>
   <section class="grp" data-tab="motion">
     <h4>Rotation</h4>
@@ -1147,24 +1153,24 @@ recognised is left standing so a typo is visible rather than silent.</div>
     <button data-v="turntable" class="on">TURNTABLE</button>
     <button data-v="free">FREE TUMBLE</button>
   </div>
-  <div class="sl"><label>spin (platter)</label><output id="o_spin"></output><input id="s_spin" type="range" min="0" max="4" step=".01"></div>
-  <div class="sl"><label>tilt / view height</label><output id="o_tilt"></output><input id="s_tilt" type="range" min="0" max="1.2" step=".001"></div>
-  <div class="sl"><label>wobble</label><output id="o_wobble"></output><input id="s_wobble" type="range" min="0" max="4" step=".01"></div>
-  <div class="sl"><label>roll / lean</label><output id="o_roll"></output><input id="s_roll" type="range" min="0" max="4" step=".01"></div>
-  <div class="sl"><label>master rate</label><output id="o_tumble"></output><input id="s_tumble" type="range" min="0" max="3" step=".01"></div>
-  <div class="sl"><label>re-aim every</label><output id="o_reo"></output><input id="s_reo" type="range" min="3" max="40" step="1"></div>
+  <div class="sl"><label>Spin (platter)</label><output id="o_spin"></output><input id="s_spin" type="range" min="0" max="4" step=".01"></div>
+  <div class="sl"><label>Tilt / view height</label><output id="o_tilt"></output><input id="s_tilt" type="range" min="0" max="1.2" step=".001"></div>
+  <div class="sl"><label>Wobble</label><output id="o_wobble"></output><input id="s_wobble" type="range" min="0" max="4" step=".01"></div>
+  <div class="sl"><label>Roll / lean</label><output id="o_roll"></output><input id="s_roll" type="range" min="0" max="4" step=".01"></div>
+  <div class="sl"><label>Master rate</label><output id="o_tumble"></output><input id="s_tumble" type="range" min="0" max="3" step=".01"></div>
+  <div class="sl"><label>Re-aim every</label><output id="o_reo"></output><input id="s_reo" type="range" min="3" max="40" step="1"></div>
   <div class="seg" style="margin-top:8px">
     <button id="b_reo">RE-AIM NOW</button>
   </div></div>
   </section>
   <section class="grp" data-tab="look">
     <h4>Glass</h4>
-    <div class="grpbody">  <div class="sl"><label>bloom</label><output id="o_bloom"></output><input id="s_bloom" type="range" min="0" max="2" step=".01"></div>
-  <div class="sl"><label>blur radius</label><output id="o_blur"></output><input id="s_blur" type="range" min="0" max="30" step="1"></div>
-  <div class="sl"><label>milk</label><output id="o_milk"></output><input id="s_milk" type="range" min="0" max="2" step=".01"></div>
-  <div class="sl"><label>grain</label><output id="o_grain"></output><input id="s_grain" type="range" min="0" max="1.5" step=".01"></div>
-  <div class="sl"><label>scanlines</label><output id="o_scan"></output><input id="s_scan" type="range" min="0" max="1" step=".01"></div>
-  <div class="sl"><label>line weight</label><output id="o_lw"></output><input id="s_lw" type="range" min=".3" max="3" step=".05"></div></div>
+    <div class="grpbody">  <div class="sl"><label>Bloom</label><output id="o_bloom"></output><input id="s_bloom" type="range" min="0" max="2" step=".01"></div>
+  <div class="sl"><label>Blur radius</label><output id="o_blur"></output><input id="s_blur" type="range" min="0" max="30" step="1"></div>
+  <div class="sl"><label>Milk</label><output id="o_milk"></output><input id="s_milk" type="range" min="0" max="2" step=".01"></div>
+  <div class="sl"><label>Grain</label><output id="o_grain"></output><input id="s_grain" type="range" min="0" max="1.5" step=".01"></div>
+  <div class="sl"><label>Scanlines</label><output id="o_scan"></output><input id="s_scan" type="range" min="0" max="1" step=".01"></div>
+  <div class="sl"><label>Line weight</label><output id="o_lw"></output><input id="s_lw" type="range" min=".3" max="3" step=".05"></div></div>
   </section>
   <!-- One block per AI endpoint, built at runtime by paintBlocks(), inserted
        before this anchor. The AI tab holds nothing else: testing an endpoint
@@ -1182,9 +1188,9 @@ recognised is left standing so a typo is visible rather than silent.</div>
   <select id="neuralvoice"></select>
   <div id="browservoice">
   <select id="voicesel"></select>
-  <div class="sl"><label>pitch</label><output id="o_vpitch"></output><input id="s_vpitch" type="range" min=".5" max="2" step=".05"></div>
+  <div class="sl"><label>Pitch</label><output id="o_vpitch"></output><input id="s_vpitch" type="range" min=".5" max="2" step=".05"></div>
   </div>
-  <div class="sl"><label>speech rate</label><output id="o_vrate"></output><input id="s_vrate" type="range" min=".5" max="2" step=".05"></div>
+  <div class="sl"><label>Speech rate</label><output id="o_vrate"></output><input id="s_vrate" type="range" min=".5" max="2" step=".05"></div>
   <div id="voicenote" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin:2px 0 8px;line-height:1.5"></div>
   <div class="seg" data-set="src">
     <button data-v="token">TOKEN</button>
@@ -1200,24 +1206,24 @@ recognised is left standing so a typo is visible rather than silent.</div>
   <section class="grp" data-tab="speech">
     <h4>Speech in (mic, STT)</h4>
     <div class="grpbody">
-  <label class="bklab" style="margin-top:2px">how it decides you have finished</label>
+  <label class="bklab" style="margin-top:2px">How it decides you have finished</label>
   <div class="seg" data-set="ptt">
     <button data-v="1" class="on">PUSH TO TALK</button>
     <button data-v="0">AUTO (voice detect)</button>
   </div>
   <div class="seg" style="margin-top:6px"><button id="b_mic">MIC ONLY (no transcript)</button></div>
-  <div class="sl"><label>mic gain</label><output id="o_micgain"></output><input id="s_micgain" type="range" min=".2" max="5" step=".05"></div>
-  <div class="sl"><label>noise gate</label><output id="o_micgate"></output><input id="s_micgate" type="range" min="0" max=".15" step=".002"></div>
-  <label class="bklab" style="margin-top:8px">transcription model (STT)</label>
+  <div class="sl"><label>Mic gain</label><output id="o_micgain"></output><input id="s_micgain" type="range" min=".2" max="5" step=".05"></div>
+  <div class="sl"><label>Noise gate</label><output id="o_micgate"></output><input id="s_micgate" type="range" min="0" max=".15" step=".002"></div>
+  <label class="bklab" style="margin-top:8px">Transcription model (STT)</label>
   <select id="sttmodel"></select>
   <div class="note" id="sttnote"></div>
-  <div class="sl"><label>end-of-speech wait</label><output id="o_hangover"></output><input id="s_hangover" type="range" min=".2" max="1.5" step=".05"></div>
-  <label class="bklab" style="margin-top:8px">signal processing</label>
+  <div class="sl"><label>End-of-speech wait</label><output id="o_hangover"></output><input id="s_hangover" type="range" min=".2" max="1.5" step=".05"></div>
+  <label class="bklab" style="margin-top:8px">Signal processing</label>
   <div class="seg" data-set="micdsp">
     <button data-v="clean" class="on">CLEAN (best recognition)</button>
     <button data-v="raw">RAW (best visuals)</button>
   </div>
-  <label class="bklab" style="margin-top:8px">background noise</label>
+  <label class="bklab" style="margin-top:8px">Background noise</label>
   <div class="seg"><button id="b_cal">CALIBRATE (stay quiet 2s)</button></div>
   <div class="note help">Everything here runs on this server — no audio leaves
 the box for transcription, whichever model is chosen.
@@ -1244,7 +1250,7 @@ model actually returns.
 <b>CLEAN</b> filters the input for recognition; <b>RAW</b> leaves it alone, so
 the figure moves more and transcription is slightly worse. <b>CALIBRATE</b>
 measures the room rather than asking you to guess at the gate.</div>
-  <label class="bklab" style="margin-top:8px">live from the preview</label>
+  <label class="bklab" style="margin-top:8px">Live from the preview</label>
   <div id="miclevel" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);line-height:1.5">level —</div>
   <div id="micnote" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:8px;line-height:1.5">off</div></div>
   </section>
@@ -1261,7 +1267,7 @@ picks.</div>
     <button data-v="always">ALWAYS</button>
   </div>
 
-<div class="sl"><label>stays awake for</label><output id="o_wakewindow"></output><input id="s_wakewindow" type="range" min="3" max="60" step="1"></div>
+<div class="sl"><label>Stays awake for</label><output id="o_wakewindow"></output><input id="s_wakewindow" type="range" min="3" max="60" step="1"></div>
   <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:8px">when that time runs out</label>
   <div class="seg" data-set="byeontimeout">
     <button data-v="1" class="on">SAY FAREWELL</button>
@@ -1316,20 +1322,20 @@ it, which is why it lives beside the microphone and the voices.</div>
     <button id="b_think">THINKING</button>
     <button id="b_speak">SPEAK SAMPLE</button>
   </div>
-  <div class="sl" style="margin-top:10px"><label>token rate ms</label><output id="o_rate"></output><input id="s_rate" type="range" min="15" max="180" step="5"></div></div>
+  <div class="sl" style="margin-top:10px"><label>Token rate ms</label><output id="o_rate"></output><input id="s_rate" type="range" min="15" max="180" step="5"></div></div>
   </section>
   <section class="grp" data-tab="motion">
     <h4>Spectrum</h4>
-    <div class="grpbody">  <div class="sl"><label>spike width</label><output id="o_spike"></output><input id="s_spike" type="range" min=".004" max=".09" step=".001"></div>
-  <div class="sl"><label>spike decay</label><output id="o_decay"></output><input id="s_decay" type="range" min=".25" max="4" step=".05"></div>
-  <div class="sl"><label>body / swell</label><output id="o_body"></output><input id="s_body" type="range" min="0" max="1.5" step=".01"></div>
-  <div class="sl"><label>peak colour</label><output id="o_grad"></output><input id="s_grad" type="range" min="0" max="1.5" step=".01"></div>
-  <div class="sl"><label>heat threshold</label><output id="o_hot"></output><input id="s_hot" type="range" min=".1" max="2.5" step=".01"></div></div>
+    <div class="grpbody">  <div class="sl"><label>Spike width</label><output id="o_spike"></output><input id="s_spike" type="range" min=".004" max=".09" step=".001"></div>
+  <div class="sl"><label>Spike decay</label><output id="o_decay"></output><input id="s_decay" type="range" min=".25" max="4" step=".05"></div>
+  <div class="sl"><label>Body / swell</label><output id="o_body"></output><input id="s_body" type="range" min="0" max="1.5" step=".01"></div>
+  <div class="sl"><label>Peak colour</label><output id="o_grad"></output><input id="s_grad" type="range" min="0" max="1.5" step=".01"></div>
+  <div class="sl"><label>Heat threshold</label><output id="o_hot"></output><input id="s_hot" type="range" min=".1" max="2.5" step=".01"></div></div>
   </section>
   <section class="grp" data-tab="motion">
     <h4>Noise floor</h4>
-    <div class="grpbody">  <div class="sl"><label>static level</label><output id="o_floor"></output><input id="s_floor" type="range" min="0" max="2" step=".01"></div>
-  <div class="sl"><label>crackle</label><output id="o_crackle"></output><input id="s_crackle" type="range" min="0" max="1.5" step=".01"></div></div>
+    <div class="grpbody">  <div class="sl"><label>Static level</label><output id="o_floor"></output><input id="s_floor" type="range" min="0" max="2" step=".01"></div>
+  <div class="sl"><label>Crackle</label><output id="o_crackle"></output><input id="s_crackle" type="range" min="0" max="1.5" step=".01"></div></div>
   </section>
 
   <!-- Two settings, not one mode. A single label covering both starts lying
@@ -1340,14 +1346,14 @@ it, which is why it lives beside the microphone and the voices.</div>
     <div class="grpbody">
   <div class="pending" id="posturewarn" hidden></div>
 
-  <label class="bklab">reachable at</label>
+  <label class="bklab">Reachable at</label>
   <div class="seg" id="ap_bind">
     <button data-v="loopback">THIS MACHINE ONLY</button>
     <button data-v="address">ONE ADDRESS</button>
     <button data-v="everything">EVERYTHING</button>
   </div>
   <div id="row_bindaddr" hidden>
-    <label class="bklab">which address</label>
+    <label class="bklab">Which address</label>
     <select id="ap_bindaddr"></select>
   </div>
   <div class="note help">Which addresses the server answers on. Binding one
@@ -1358,7 +1364,7 @@ laptop that later joins another network does not follow you onto it.
 http://localhost as a secure origin, so the microphone works unprompted and
 nothing crosses a network. Start it, open localhost, talk to it.</div>
 
-  <label class="bklab" style="margin-top:12px">to get in</label>
+  <label class="bklab" style="margin-top:12px">To get in</label>
   <div class="seg" id="ap_auth">
     <button data-v="none">NOTHING</button>
     <button data-v="pin" disabled title="arrives with identity">A SINGLE PIN</button>
@@ -1404,7 +1410,7 @@ root, and the server runs as an ordinary user.</div>
   <section class="grp" data-tab="app">
     <h4>Sessions</h4>
     <div class="grpbody">
-  <label class="bklab">sign-in lasts (minutes of inactivity)</label>
+  <label class="bklab">Sign-in lasts (minutes of inactivity)</label>
   <input id="ap_session" type="number" inputmode="numeric" min="5" max="480">
   <div class="note help">Idle minutes before an admin has to sign in again.
 Activity pushes the deadline out; the panel checks every 45 seconds and
@@ -1419,9 +1425,9 @@ Short by default — this session configures what everyone else is looking at.
     <h4>Your account</h4>
     <div class="grpbody">
   <div class="whoami" id="whoami"></div>
-  <label class="bklab">current password</label>
+  <label class="bklab">Current password</label>
   <input id="pw_cur" type="password" autocomplete="current-password">
-  <label class="bklab">new password</label>
+  <label class="bklab">New password</label>
   <input id="pw_new" type="password" autocomplete="new-password">
   <div class="seg" style="margin-top:8px"><button id="b_pw" class="act-save">CHANGE PASSWORD</button></div>
   <div class="note" id="pwnote"></div>
@@ -1442,11 +1448,11 @@ Short by default — this session configures what everyone else is looking at.
   <section class="grp" data-tab="accounts">
     <h4>Add an account</h4>
     <div class="grpbody">
-  <label class="bklab">username</label>
+  <label class="bklab">Username</label>
   <input id="nu_name" type="text" spellcheck="false" autocomplete="off">
-  <label class="bklab">password</label>
+  <label class="bklab">Password</label>
   <input id="nu_pw" type="password" autocomplete="new-password">
-  <label class="bklab">role</label>
+  <label class="bklab">Role</label>
   <div class="seg" id="nu_role">
     <button data-v="viewer" class="on">VIEWER</button>
     <button data-v="admin">ADMIN</button>
@@ -1462,10 +1468,12 @@ Short by default — this session configures what everyone else is looking at.
   <section class="grp" data-tab="displays">
     <h4>Requested Access</h4>
     <div class="grpbody">
-  <label class="bklab" style="margin-top:2px">does a general user require approval?</label>
-  <div class="seg" id="dp_guest">
-    <button data-v="1" class="on">YES</button>
-    <button data-v="0">NO</button>
+  <div class="labrow">
+    <label class="bklab">General users require approval</label>
+    <div class="seg" id="dp_guest">
+      <button data-v="1" class="on">YES</button>
+      <button data-v="0">NO</button>
+    </div>
   </div>
   <div class="note help"><b>YES</b> — they get the request form instead of the
 transcript and composer, and reach nothing until you decide.
@@ -1477,15 +1485,15 @@ nothing.</div>
 
   <div class="cols2">
     <div>
-      <label class="bklab">days a grant lasts</label>
+      <label class="bklab">Days a grant lasts</label>
       <input id="dp_days" type="number" min="1" max="3650">
     </div>
     <div>
-      <label class="bklab">displays in total</label>
+      <label class="bklab">Displays in total</label>
       <input id="dp_max" type="number" min="2" max="5000">
     </div>
     <div>
-      <label class="bklab">how many may wait at once</label>
+      <label class="bklab">How many may wait at once</label>
       <input id="dp_pending" type="number" min="1" max="1000">
     </div>
   </div>
@@ -1509,7 +1517,7 @@ by noise.</div>
   <section class="grp" data-tab="displays">
     <h4>Created Access</h4>
     <div class="grpbody">
-  <label class="bklab" style="margin-top:2px">add a display — name it, then type the code into the screen</label>
+  <label class="bklab" style="margin-top:2px">Add a display — name it, then type the code into the screen</label>
   <div class="seg" id="dispadd">
     <input id="dp_name" type="text" spellcheck="false" autocomplete="off"
            placeholder="kitchen wall">
@@ -1631,11 +1639,11 @@ Worked examples in DOCUMENTATION → Embedding it elsewhere.</div>
   <section class="grp" data-tab="embeds">
     <h4>Create an embed key</h4>
     <div class="grpbody">
-  <label class="bklab">name</label>
+  <label class="bklab">Name</label>
   <input id="em_name" type="text" spellcheck="false" autocomplete="off"
          placeholder="lobby kiosk">
 
-  <label class="bklab">start from</label>
+  <label class="bklab">Start from</label>
   <div class="seg" id="em_preset">
     <button data-v="full" class="on">FULL</button>
     <button data-v="console">CONSOLE</button>
@@ -1645,31 +1653,31 @@ Worked examples in DOCUMENTATION → Embedding it elsewhere.</div>
     <button data-v="signage">SIGNAGE</button>
   </div>
 
-  <label class="bklab">what it may do</label>
+  <label class="bklab">What it may do</label>
   <div class="cks" id="em_cap">
-    <label><input type="checkbox" data-c="ask"> ask</label>
-    <label><input type="checkbox" data-c="mic"> microphone</label>
-    <label><input type="checkbox" data-c="speak"> speak</label>
+    <label><input type="checkbox" data-c="ask"> Ask</label>
+    <label><input type="checkbox" data-c="mic"> Microphone</label>
+    <label><input type="checkbox" data-c="speak"> Speak</label>
   </div>
   <div class="note help">Permission, not furniture. Hiding the TALK button below
 does not withdraw the microphone.</div>
 
-  <label class="bklab">what it draws</label>
+  <label class="bklab">What it draws</label>
   <div class="cks" id="em_parts">
-    <label><input type="checkbox" data-p="visual"> figure</label>
-    <label><input type="checkbox" data-p="transcript"> transcript</label>
-    <label><input type="checkbox" data-p="input"> input field</label>
+    <label><input type="checkbox" data-p="visual"> Figure</label>
+    <label><input type="checkbox" data-p="transcript"> Transcript</label>
+    <label><input type="checkbox" data-p="input"> Input field</label>
     <label><input type="checkbox" data-p="mode"> SPACE/AUTO</label>
     <label><input type="checkbox" data-p="talk"> TALK</label>
     <label><input type="checkbox" data-p="audio"> AUDIO</label>
     <label><input type="checkbox" data-p="text"> TEXT</label>
   </div>
 
-  <label class="bklab">allowed to frame it — one origin a line</label>
+  <label class="bklab">Allowed to frame it — one origin a line</label>
   <textarea id="em_origins" rows="3" spellcheck="false"
             placeholder="https://app.example.com"></textarea>
 
-  <label class="bklab">session length, minutes</label>
+  <label class="bklab">Session length, minutes</label>
   <input id="em_ttl" type="number" min="5" max="1440" value="60">
 
   <div class="seg" style="margin-top:8px"><button id="b_addembed" class="act-save">CREATE</button></div>
@@ -2619,7 +2627,7 @@ function blockHTML(r){
   return `
   <h4><span class="rtname"></span><span class="rtsum"></span></h4>
   <div class="grpbody">
-  <label class="bklab" style="margin-top:2px">instance name</label>
+  <label class="bklab" style="margin-top:2px">Instance name</label>
   <input data-f="name" type="text" spellcheck="false" autocomplete="off"
          placeholder="House">
   <div class="note help">Labels this endpoint — in the heading above, in the
@@ -2630,14 +2638,14 @@ never spoken and never matched against.</div>
   <div class="subgrp" data-g="wake">
     <h5>Wake word<span class="subsum"></span></h5>
     <div class="subbody">
-  <label class="bklab">wake word</label>
+  <label class="bklab">Wake word</label>
   <input data-f="wakeword" type="text" spellcheck="false" autocomplete="off"
          placeholder="house">
   <div class="seg" style="margin-top:6px"><button data-a="learn">LEARN HOW I SAY IT (3x)</button></div>
   <div data-r="learnnote" class="learnnote"></div>
-  <label class="bklab">also answers to</label>
+  <label class="bklab">Also answers to</label>
   <textarea data-f="aliases" rows="3" spellcheck="false" placeholder="one per line"></textarea>
-  <label class="bklab">matching</label>
+  <label class="bklab">Matching</label>
   <div class="seg" data-f="strict">
     <button data-v="0" class="on">CLOSE ENOUGH</button>
     <button data-v="1">THE EXACT WORD</button>
@@ -2690,10 +2698,10 @@ Displays enrol themselves and are approved under DISPLAYS.</div>
   <div class="subgrp" data-g="voice">
     <h5>Greeting &amp; voice<span class="subsum"></span></h5>
     <div class="subbody">
-  <label class="bklab">greeting</label>
+  <label class="bklab">Greeting</label>
   <input data-f="greeting" type="text" spellcheck="false" autocomplete="off"
          placeholder="leave blank for the shared phrases">
-  <label class="bklab">voice</label>
+  <label class="bklab">Voice</label>
   <select data-f="voice"></select>
   <div class="note help">The greeting is spoken when its wake word is said and
 nothing else; blank falls back to the phrases on the SPEECH tab. Give the
@@ -2718,7 +2726,7 @@ everything it can be asked to touch is decided over there.</div>
   </div>
   <div data-r="conn">
   <div data-r="presetrow">
-  <label class="bklab">preset</label>
+  <label class="bklab">Preset</label>
   <div class="seg" data-r="preset">
     <button data-v="ollama">OLLAMA</button>
     <button data-v="openclaw">OPENCLAW</button>
@@ -2726,11 +2734,11 @@ everything it can be asked to touch is decided over there.</div>
     <button data-v="openai">OPENAI</button>
   </div>
   </div>
-  <label class="bklab" data-r="urllabel">base URL</label>
+  <label class="bklab" data-r="urllabel">Base URL</label>
   <input data-f="base_url" type="text" spellcheck="false" autocomplete="off"
          placeholder="http://127.0.0.1:11434/v1">
   <div data-r="modelrow">
-  <label class="bklab">model</label>
+  <label class="bklab">Model</label>
   <input data-f="model" type="text" spellcheck="false" autocomplete="off"
          placeholder="qwen2.5:3b">
   </div>
@@ -2740,14 +2748,14 @@ everything it can be asked to touch is decided over there.</div>
          placeholder="unchanged">
   <div class="note" data-r="keynote"></div>
   <div data-r="harows">
-  <label class="bklab">conversation agent</label>
+  <label class="bklab">Conversation agent</label>
   <input data-f="agent_id" type="text" spellcheck="false" autocomplete="off"
          placeholder="leave blank for the configured default">
   <div class="note help">Which agent in Home Assistant answers. The built-in
 one matches sentences, so it does what it is told and nothing else; an
 LLM-backed one interprets, so "it's a bit dark in here" works and costs a model
 call. Blank uses whichever is set as default over there.</div>
-  <label class="bklab">when it recognises nothing, ask</label>
+  <label class="bklab">When it recognises nothing, ask</label>
   <select data-f="fallthrough"></select>
   <div class="note help">Nobody remembers which name owns which capability, so
 somebody will ask the house a general question. Name another endpoint here and
@@ -2763,12 +2771,12 @@ nothing for one of those.</div>
   <div class="subgrp" data-g="limits">
     <h5>Limits<span class="subsum"></span></h5>
     <div class="subbody">
-  <div class="sl" data-r="maxrow"><label>reply limit (tokens)</label><output data-o="max_tokens"></output><input data-s="max_tokens" type="range" min="16" max="2000" step="16"></div>
-  <div class="sl" data-r="temprow"><label>temperature</label><output data-o="temperature"></output><input data-s="temperature" type="range" min="0" max="1.5" step=".05"></div>
-  <div class="sl" data-r="ctxrow"><label>turns of context</label><output data-o="history_turns"></output><input data-s="history_turns" type="range" min="0" max="24" step="1"></div>
-  <div class="sl"><label>timeout</label><output data-o="timeout"></output><input data-s="timeout" type="range" min="5" max="600" step="5"></div>
+  <div class="sl" data-r="maxrow"><label>Reply limit (tokens)</label><output data-o="max_tokens"></output><input data-s="max_tokens" type="range" min="16" max="2000" step="16"></div>
+  <div class="sl" data-r="temprow"><label>Temperature</label><output data-o="temperature"></output><input data-s="temperature" type="range" min="0" max="1.5" step=".05"></div>
+  <div class="sl" data-r="ctxrow"><label>Turns of context</label><output data-o="history_turns"></output><input data-s="history_turns" type="range" min="0" max="24" step="1"></div>
+  <div class="sl"><label>Timeout</label><output data-o="timeout"></output><input data-s="timeout" type="range" min="5" max="600" step="5"></div>
   <div data-r="keepaliverow">
-  <label class="bklab">keep model loaded</label>
+  <label class="bklab">Keep model loaded</label>
   <input data-f="keep_alive" type="text" spellcheck="false" autocomplete="off"
          placeholder="30m">
   </div>
@@ -3433,10 +3441,10 @@ function paintDpForm(fields){
     row.className = 'fldrow';
     const t = document.createElement('input');
     t.type = 'text'; t.value = f.label; t.spellcheck = false;
-    t.placeholder = 'what it asks for';
+    t.placeholder = 'What it asks for';
     t.oninput = ()=>{ DPFORM[i].label = t.value; };
     row.appendChild(t);
-    [['required', 'must answer'], ['message', 'message']].forEach(([k, word])=>{
+    [['required', 'Must answer'], ['message', 'Message']].forEach(([k, word])=>{
       const lab = document.createElement('label');
       const cb = document.createElement('input');
       cb.type = 'checkbox'; cb.checked = !!f[k];
@@ -3693,38 +3701,38 @@ async function refreshDisplays(){
     meta.className = 'meta';
     const named = (RT.routes || []).filter(x=> x.restricted
                                             && (x.displays || []).indexOf(d.id) >= 0);
-    const lines = [['id', d.id]];
+    const lines = [['ID', d.id]];
     if (d.enrolled){
-      lines.unshift(['calls itself', d.asked || 'nothing — no ?display= in its URL']);
-      lines.push(['first seen', dispWhen(d.created)],
-                 ['last seen', dispWhen(d.last_seen)]);
+      lines.unshift(['Calls itself', d.asked || 'nothing — no ?display= in its URL']);
+      lines.push(['First seen', dispWhen(d.created)],
+                 ['Last seen', dispWhen(d.last_seen)]);
     }else{
-      lines.push(['created', dispWhen(d.created)],
-                 ['device', st === 'stale'
+      lines.push(['Created', dispWhen(d.created)],
+                 ['Device', st === 'stale'
                    ? 'none — the code expired before anybody typed it. REISSUE for another'
                    : 'none yet — type the address above into the screen']);
     }
     if (d.approved)
-      lines.push(['approved', dispWhen(d.approved_at) +
+      lines.push(['Approved', dispWhen(d.approved_at) +
                               (d.approved_by ? ' by ' + d.approved_by : '')]);
-    if (d.requested_at) lines.push(['asked', dispWhen(d.requested_at)]);
+    if (d.requested_at) lines.push(['Asked', dispWhen(d.requested_at)]);
     if (d.expires)
-      lines.push(['access ' + (d.expired ? 'ran out' : 'runs out'),
+      lines.push(['Access ' + (d.expired ? 'ran out' : 'runs out'),
                   dispWhen(d.expires)]);
     if (d.denied || d.deny_note || d.deny_reason){
-      if (d.deny_reason) lines.push(['they were told', d.deny_reason]);
-      if (d.deny_note) lines.push(['your note', d.deny_note]);
+      if (d.deny_reason) lines.push(['They were told', d.deny_reason]);
+      if (d.deny_note) lines.push(['Your note', d.deny_note]);
       if (d.denied)
-        lines.push(['may ask again', d.deny_repeat ? 'yes' : 'no']);
+        lines.push(['May ask again', d.deny_repeat ? 'yes' : 'no']);
     }
     if (named.length)
-      lines.push(['may use', named.map(x=> x.name).join(', ')]);
+      lines.push(['May use', named.map(x=> x.name).join(', ')]);
     if (d.refused)
-      lines.push(['refused', d.refused + ' × · last ' + dispWhen(d.refused_at) +
+      lines.push(['Refused', d.refused + ' × · last ' + dispWhen(d.refused_at) +
                              (d.refused_from ? ' asking for ' + d.refused_from : '')]);
     // A hint, never a credential — see the server. It is here to help somebody
     // recognise a device, and it is forgeable from a console in one line.
-    if (d.hint) lines.push(['looks like', d.hint]);
+    if (d.hint) lines.push(['Looks like', d.hint]);
     lines.forEach(([k, v])=>{
       const el = document.createElement('div');
       const b = document.createElement('b');
@@ -3798,7 +3806,7 @@ function decide(d, approve, name, row){
     const grant = document.createElement('div');
     grant.className = 'grant';
     const b = document.createElement('b');
-    b.textContent = 'which endpoints it may use';
+    b.textContent = 'Which endpoints it may use';
     grant.appendChild(b);
     const cks = document.createElement('div');
     cks.className = 'cks';
@@ -4098,12 +4106,12 @@ async function refreshEmbeds(){
       meta.className = 'meta';
       const cap = ['ask','mic','speak'].filter(k=> e.cap && e.cap[k]);
       const lines = [
-        ['may', cap.length ? cap.join(', ') : 'nothing'],
-        ['draws', (e.parts || []).join(', ') || 'nothing'],
-        ['frames', (e.origins || []).join('  ')],
-        ['session', e.ttl_minutes + ' min · ' + (e.cap && e.cap.rate_per_min)
+        ['May', cap.length ? cap.join(', ') : 'nothing'],
+        ['Draws', (e.parts || []).join(', ') || 'nothing'],
+        ['Frames', (e.origins || []).join('  ')],
+        ['Session', e.ttl_minutes + ' min · ' + (e.cap && e.cap.rate_per_min)
                     + '/min · id ' + e.id],
-        ['last used', e.last_used
+        ['Last used', e.last_used
           ? new Date(e.last_used * 1000).toLocaleString() : 'never'],
       ];
       lines.forEach(([k, v])=>{
