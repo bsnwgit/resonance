@@ -541,17 +541,34 @@
         border-bottom:1px solid rgba(var(--glass),.08)}
   .erow .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .erow .nm{font-size:calc(10px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.96)}
-  /* A display's name is editable in place. Renaming is the only edit one has,
-     and a RENAME button that opens a dialog for a single field is ceremony
-     around a word. It takes the row's own name styling rather than the
-     panel's full-width field, which would push the buttons off the line. */
-  .erow input.nm{
-    flex:0 1 200px;min-width:110px;padding:3px 6px;font:inherit;
-    font-size:calc(10px * var(--fs));letter-spacing:.08em;
+  /* Each row collapses by its name, one open at a time — a register of fifty
+     devices that you scroll through is one nobody reads. The header keeps the
+     name and the badges, so a shut row still says what state it is in. */
+  .erow > .top{cursor:pointer;position:relative;padding-left:13px}
+  .erow > .top::before{                    /* the panel's own caret */
+    content:'';position:absolute;left:0;top:50%;margin-top:-3.5px;
+    border-left:4px solid rgba(var(--paper),.6);
+    border-top:3.5px solid transparent;border-bottom:3.5px solid transparent;
+    transform:rotate(90deg);transform-origin:2px 3.5px;transition:transform .12s;
+  }
+  .erow.shut > .top::before{transform:rotate(0deg)}
+  .erow.shut > *:not(.top){display:none}
+  .erow > .top:hover .nm{color:var(--hue)}
+  /* Renaming lives inside the row, where there is room for it to be a
+     labelled field rather than a box somebody clicks by accident while trying
+     to open the thing. */
+  .erow .namerow{display:flex;align-items:center;gap:8px;margin:7px 0 2px}
+  .erow .namerow > b{
+    font-weight:400;letter-spacing:.1em;font-size:calc(8px * var(--fs));
+    color:rgba(var(--paper),.5);white-space:nowrap;
+  }
+  .erow input.nmedit{
+    flex:0 1 220px;min-width:110px;padding:4px 6px;font:inherit;
+    font-size:calc(9.5px * var(--fs));letter-spacing:.06em;
     background:rgba(0,0,0,.55);color:rgba(var(--paper),.96);
     border:1px solid rgba(var(--glass),.16);outline:0;
   }
-  .erow input.nm:focus{border-color:var(--hue-dim)}
+  .erow input.nmedit:focus{border-color:var(--hue-dim)}
   /* Name it and get a code: one row, because it is one gesture. */
   /* Three short numbers, side by side rather than stacked full width: they are
      one setting each and reading them as a row is how you notice the pending
@@ -3520,6 +3537,9 @@ function paintBlocks(keepOpen){
    name it, and take it away again. */
 let DISPLAYS = [];
 let ENROL_BASE = '';
+//: which row is open. One at a time, and it survives a refresh so approving
+//: something does not shut the row you were working in.
+let OPENROW = '';
 let DPCFG = null;                // the displays document's own settings
 let DPEND = [];                  // endpoints, for the grant ticks
 let DPOPEN = '';                 // the default, if it is open to any display
@@ -3853,18 +3873,37 @@ async function refreshDisplays(){
     const row = document.createElement('div');
     row.className = 'erow' + (st === 'live' ? '' : ' off');
 
+    /* Shut unless it is the one being looked at. A list of fifty devices is a
+       register, and a register you scroll through is a register nobody reads —
+       one row open at a time keeps the whole of it on one screen. */
+    if (d.id !== OPENROW) row.classList.add('shut');
+
     const top = document.createElement('div'); top.className = 'top';
-    /* The name is the control, because renaming is the only edit a display
-       has and a separate RENAME button opening a prompt for one field is
-       ceremony. Enter or leaving the box saves it. */
+    /* The name, and the thing you press to open the row. It reads as the row's
+       title because that is what it is; renaming happens inside, where there
+       is room for it to be a labelled field rather than a box you might click
+       by accident while trying to look at something. */
+    const nmt = document.createElement('span');
+    nmt.className = 'nm';
+    nmt.textContent = d.label;
+    top.appendChild(nmt);
+    top.onclick = (e)=>{
+      if (e.target.closest('input, button, select, textarea')) return;
+      const opening = row.classList.contains('shut');
+      OPENROW = opening ? d.id : '';
+      // One at a time, across both lists: they are two halves of one register.
+      document.querySelectorAll('#displist .erow, #connlist .erow')
+              .forEach(x=> x.classList.add('shut'));
+      row.classList.toggle('shut', !opening);
+    };
+
     const nm = document.createElement('input');
-    nm.type = 'text'; nm.className = 'nm'; nm.value = d.name || '';
+    nm.type = 'text'; nm.className = 'nmedit'; nm.value = d.name || '';
     nm.placeholder = d.asked || 'unnamed display';
     nm.spellcheck = false;
     nm.onkeydown = (e)=>{ if (e.key === 'Enter') nm.blur(); };
     nm.onchange = ()=> displayAction('/displays/rename',
                                      {id: d.id, name: nm.value.trim()});
-    top.appendChild(nm);
     const badge = (t)=>{
       const b = document.createElement('span');
       b.className = 'badge'; b.textContent = t;
@@ -3943,6 +3982,13 @@ async function refreshDisplays(){
     /* The whole thing somebody has to type, on its own line and big enough to
        read from across a room while typing it into a television with a
        remote. The address as well as the code: nobody is typing half a URL. */
+    const namerow = document.createElement('div');
+    namerow.className = 'namerow';
+    const nlab = document.createElement('b');
+    nlab.textContent = 'Name';
+    namerow.appendChild(nlab);
+    namerow.appendChild(nm);
+
     if (st === 'code'){
       const c = document.createElement('div');
       c.className = 'dcode';
@@ -3951,9 +3997,9 @@ async function refreshDisplays(){
       const sub = document.createElement('span');
       sub.textContent = ' · ' + mins + ' min left · case and dashes do not matter';
       c.appendChild(sub);
-      row.appendChild(top); row.appendChild(c);
+      row.appendChild(top); row.appendChild(namerow); row.appendChild(c);
     }else{
-      row.appendChild(top);
+      row.appendChild(top); row.appendChild(namerow);
     }
 
     /* What they told you, in your own words — the labels are the ones you put
@@ -4151,7 +4197,11 @@ function decide(d, approve, name, row){
 async function displayAction(path, body){
   const note = $('dispnote');
   try{
-    await api(path, {method:'POST', body: JSON.stringify(body)});
+    const j = await api(path, {method:'POST', body: JSON.stringify(body)});
+    /* A row that was just given a code is the row you want open — the code is
+       the whole reason you pressed the button, and hunting for it in a shut
+       list would be the panel hiding the thing it just made. */
+    if (j && j.id) OPENROW = j.id;
     await refreshDisplays();
     /* An allow-list that still offers a display somebody just deleted is a
        permission nobody can see. The endpoint blocks are rebuilt from the
