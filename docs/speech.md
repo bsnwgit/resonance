@@ -50,7 +50,7 @@ does not come out.
 TOKEN moves in time with words appearing rather than being heard, which is
 useful if audio is muted. BEEP is for testing.
 
-## Speech in (mic)
+## Speech in (mic, STT)
 
 ### How it decides you have finished
 
@@ -67,21 +67,39 @@ appropriate.
 
 ### Accuracy
 
-**FAST (base.en)** and **ACCURATE (small.en)** are two transcription models.
-Accurate is noticeably better with accents, names, and technical words;
-fast is quicker to return. Both run on the server — no audio leaves the box
-for transcription.
+**transcription model (STT)** is a dropdown of every model this server will
+accept, with what each costs beside it. All of them run on the server — no
+audio leaves the box for transcription, whichever you pick.
+
+The list is grouped:
+
+- **English only** — the `.en` models. Better at English than the multilingual
+  model of the same size, and smaller.
+- **every language** — pick one of these and it will transcribe languages
+  other than English. That is the only thing that makes it do so.
+
+Sizes run from `tiny.en` at ~40MB to `large-v3` at ~1.6GB. `small.en` is the
+default and the right one for a modest box; `distil-small.en` gets close to it
+at nearly the speed of `base.en`; `large-v3-turbo` is most of the best model
+at several times its speed, on hardware that can hold it. Nothing here assumes
+what you are running it on, which is why the whole list is offered.
+
+**A model not already on disk is downloaded the first time somebody speaks
+after you choose it** — up to 1.6GB, inside that request, from a machine that
+may have no route to the internet. Choose it when nobody is waiting in front
+of the display, then say something to it yourself to pay the download. The
+panel lists which models are resident right now.
 
 If people report being misheard, change this before changing anything else.
 
 **The choice interacts with THE EXACT WORD.** An assistant set to match only
 its exact name refuses `"Magnolia's"` where a CLOSE ENOUGH one forgives it — so
-FAST buys speed at the cost of the occasional wake word that does not land, and
-the assistants most likely to be set to exact are the ones that switch things
-on. Measured on the reference box: ACCURATE took 4.4s to decode one sentence,
-which is felt on every single turn. If you want both, use FAST and press **LEARN
-HOW I SAY IT** on the strict assistant — it captures the spellings that model
-actually returns for you and adds them as alternatives.
+a smaller model buys speed at the cost of the occasional wake word that does
+not land, and the assistants most likely to be set to exact are the ones that
+switch things on. Measured on the reference box: `small.en` took 4.4s to decode
+one sentence, which is felt on every turn. If you want both, take the faster
+model and press **LEARN HOW I SAY IT** on the strict assistant — it captures the
+spellings that model actually returns for you and adds them as alternatives.
 
 ### Levels
 

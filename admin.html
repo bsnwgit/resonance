@@ -753,12 +753,13 @@
   .sl input::-webkit-slider-thumb{-webkit-appearance:none;width:9px;height:9px;background:var(--hue);cursor:pointer}
   .sl input::-moz-range-thumb{width:9px;height:9px;border:0;background:var(--hue);cursor:pointer}
   #voicesel,#neuralvoice,#sleepword,#greetings,#sleepaliases,#farewells,
-  #opname,#ainame,#ap_bindaddr{
+  #opname,#ainame,#ap_bindaddr,#sttmodel{
     width:100%;margin:9px 0 4px;font:inherit;font-size:calc(9.5px * var(--fs));padding:5px 6px;
     background:rgba(0,0,0,.6);color:var(--text);
     border:1px solid rgba(var(--glass),.16);outline:0;
   }
-  #voicesel option,#neuralvoice option,#ap_bindaddr option{background:#0a0d14;color:#dfe9f2}
+  #voicesel option,#neuralvoice option,#ap_bindaddr option,
+  #sttmodel option,#sttmodel optgroup{background:#0a0d14;color:#dfe9f2}
   #ap_bindaddr:focus{border-color:var(--hue-dim)}
   /* engine-specific blocks: exactly one is ever shown, and both start at the
      SAME y so switching engines doesn't move the voice list. The margin has
@@ -1086,10 +1087,8 @@ recognised is left standing so a typo is visible rather than silent.</div>
   <div class="sl"><label>mic gain</label><output id="o_micgain"></output><input id="s_micgain" type="range" min=".2" max="5" step=".05"></div>
   <div class="sl"><label>noise gate</label><output id="o_micgate"></output><input id="s_micgate" type="range" min="0" max=".15" step=".002"></div>
   <label class="bklab" style="margin-top:8px">transcription model (STT)</label>
-  <div class="seg" data-set="sttmodel">
-    <button data-v="base.en">FAST (base.en)</button>
-    <button data-v="small.en" class="on">ACCURATE (small.en)</button>
-  </div>
+  <select id="sttmodel"></select>
+  <div class="note" id="sttnote"></div>
   <div class="sl"><label>end-of-speech wait</label><output id="o_hangover"></output><input id="s_hangover" type="range" min=".2" max="1.5" step=".05"></div>
   <div class="seg" data-set="micdsp" style="margin-top:6px">
     <button data-v="clean" class="on">CLEAN (best recognition)</button>
@@ -1866,11 +1865,93 @@ function buildControls(){
      by no tab, saved by nothing, on exactly the installs least likely to
      notice. */
   ownTab($('neuralvoice'), 'ttsvoice');
+  /* Same reasoning for the transcription model: its options are fetched, and
+     a server that does not answer would otherwise leave the setting owned by
+     no tab and saved by nothing — on exactly the installs least able to
+     notice. The claim does not depend on the fetch. */
+  ownTab($('sttmodel'), 'sttmodel');
   voiceLists();
+  sttModels();
   /* The rows count what each tab owns, and they cannot know that until every
      control has been bound — which is here, not at sign-in where they are
      first drawn. */
   paintUiRows();
+}
+
+/* What each model costs and what it is for. Presentation only — the list of
+   models that may be chosen comes from the server, which is the thing that
+   has to load them. A name arriving here without an entry is still offered,
+   under its own name: an unknown model is better than a hidden one, and the
+   server is the authority on what it accepts. */
+const STT_NOTE = {
+  'tiny.en':          ['~40MB',   'fastest, and mishears names constantly'],
+  'base.en':          ['~75MB',   'fast'],
+  'distil-small.en':  ['~170MB',  'near small.en accuracy at close to base.en speed'],
+  'small.en':         ['~250MB',  'balanced — the default'],
+  'distil-medium.en': ['~500MB',  'medium accuracy, distilled'],
+  'medium.en':        ['~770MB',  'clearly better on names; wants headroom'],
+  'tiny':             ['~40MB',   'any language'],
+  'base':             ['~75MB',   'any language'],
+  'small':            ['~250MB',  'any language'],
+  'medium':           ['~770MB',  'any language'],
+  'large-v1':         ['~1.5GB',  'superseded by v2'],
+  'large-v2':         ['~1.5GB',  'any language'],
+  'large-v3':         ['~1.6GB',  'best accuracy; a GPU box'],
+  'large-v3-turbo':   ['~800MB',  'most of v3, several times faster'],
+  'distil-large-v2':  ['~750MB',  'distilled, English-leaning'],
+  'distil-large-v3':  ['~750MB',  'distilled, English-leaning'],
+};
+const STT_EN = /\.en$/;
+
+/* The models the SERVER will accept, grouped by whether they are English-only,
+   with what is already resident marked. Built from /stt/status rather than
+   from a list kept here: two lists of model names in two files is one list
+   that goes stale, and the one that matters is the server's. */
+async function sttModels(){
+  const sel = $('sttmodel'), note = $('sttnote');
+  if (!sel) return;
+  let j;
+  try{ j = await api('/stt/status'); }
+  catch(e){
+    sel.innerHTML = '<option>— server unreachable —</option>';
+    return;
+  }
+  const loaded = new Set(j.loaded || []);
+  const groups = [['English only', (j.allowed||[]).filter(m=> STT_EN.test(m))],
+                  ['every language', (j.allowed||[]).filter(m=> !STT_EN.test(m))]];
+  sel.innerHTML = '';
+  groups.forEach(([title, names])=>{
+    if (!names.length) return;
+    const g = document.createElement('optgroup');
+    g.label = title;
+    names.forEach(m=>{
+      const [size, what] = STT_NOTE[m] || ['', ''];
+      const o = document.createElement('option');
+      o.value = m;
+      o.textContent = m + (size ? ' — ' + size : '')
+                        + (what ? ' · ' + what : '')
+                        + (loaded.has(m) ? ' · loaded' : '');
+      g.appendChild(o);
+    });
+    sel.appendChild(g);
+  });
+  /* A model the server no longer allows — an upgrade, or a hand-edited
+     settings.json — would otherwise select nothing, and the field would read
+     as whatever happened to be first while the display kept using the stored
+     value. Show it, marked. */
+  if (S.sttmodel && !(j.allowed||[]).includes(S.sttmodel)){
+    const o = document.createElement('option');
+    o.value = S.sttmodel;
+    o.textContent = S.sttmodel + ' — this server will not accept it';
+    sel.appendChild(o);
+  }
+  bindField(sel, 'sttmodel');
+  if (note) note.textContent =
+    'Loaded now: ' + (j.loaded||[]).join(', ') + '. Anything else is '
+    + 'DOWNLOADED the first time somebody speaks after choosing it — up to '
+    + '1.6GB, during that request, from a machine that may have no route out. '
+    + 'Choose it while nobody is standing in front of the display, and say '
+    + 'something to it yourself to pay the download.';
 }
 
 /* Neural voices come from the server; browser voices from this browser,

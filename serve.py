@@ -1392,7 +1392,31 @@ def write_settings(obj):
 MODEL_NAME = os.environ.get("STT_MODEL", "small.en")
 MAX_UPLOAD = 12 * 1024 * 1024        # ~12MB of opus is minutes of speech
 
-ALLOWED = ("base.en", "small.en", "distil-small.en", "medium.en")
+# Every model faster-whisper knows how to fetch, because there is no way to
+# know from here what somebody is running this on. Four of these are sensible
+# on the reference box and the rest are for hardware it has never seen; the
+# aliases (`large` for large-v2, `turbo` for large-v3-turbo) are deliberately
+# left out, since a list offering the same weights twice under two names is a
+# choice nobody can make correctly.
+#
+# CAUTION, and it is stated in the panel too: a model that is not on disk is
+# DOWNLOADED on first use — up to ~1.6GB, inside the first request that asks
+# for it, from a box that may have no route to the internet. The failure is
+# visible rather than silent (the display's status line carries the error),
+# but the wait is real and belongs to whoever is standing there.
+#
+# The `.en` models are English-only and better at English than the
+# multilingual model of the same size. Choosing a multilingual one is what
+# makes this transcribe anything other than English at all.
+ALLOWED = (
+    # English-only, smallest first
+    "tiny.en", "base.en", "distil-small.en", "small.en",
+    "distil-medium.en", "medium.en",
+    # multilingual
+    "tiny", "base", "small", "medium",
+    "large-v1", "large-v2", "large-v3", "large-v3-turbo",
+    "distil-large-v2", "distil-large-v3",
+)
 _models = {}
 _model_err = None
 _model_lock = threading.Lock()
