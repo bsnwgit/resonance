@@ -464,6 +464,16 @@ const Embed = {
 const DISPLAY_NAME = (new URLSearchParams(location.search).get('display') || '')
   .replace(/[<>{}]/g, '').trim().slice(0, 40);
 
+/* How an enrolment went. Somebody typed /e/K7QP4M into this screen with a
+   remote; the server spent the code, set the cookie and sent them back here
+   with one word about it. Read once and taken straight out of the address bar
+   — a wall screen's URL should be the URL it was given, and the outcome of a
+   thing that happened once has no business surviving a reload. */
+const ENROL = (new URLSearchParams(location.search).get('enrol') || '')
+  .replace(/[^a-z]/g, '').slice(0, 12);
+if (ENROL && window.history && history.replaceState)
+  history.replaceState(null, '', location.pathname);
+
 /* ================================================================= DISPLAY
    Which physical thing this page is running on, as far as the server is
    concerned — the tablet in the kitchen rather than a browser tab.
@@ -3499,7 +3509,16 @@ Promise.all([Settings.load(), Display.hello().then(()=> Routes.load())]).then(()
      anything; what it will not do is answer to a name, and somebody standing
      in front of a newly hung tablet should be told that rather than left to
      conclude it is broken. */
-  if (Display.known && !Display.approved && !Routes.spoken())
+  /* A code was just typed into this screen, and whoever typed it is standing
+     in front of it waiting to find out whether it worked. That answer outranks
+     everything else the status line had to say. */
+  if (ENROL) micNote(
+      ENROL === 'ok'      ? 'enrolled as ' + Display.name
+                            + (Routes.spoken() ? ' — say ' + Routes.spoken() : '')
+    : ENROL === 'expired' ? 'that code had expired — ask for a new one'
+    : ENROL === 'blocked' ? 'too many wrong codes — wait a minute and try again'
+    : 'that code was not recognised — check it and try again');
+  else if (Display.known && !Display.approved && !Routes.spoken())
     micNote('waiting to be approved — ' + Display.name + ' (' + Display.id + ')');
   Display.watch();
   /* After the prefs, always: the grant decides what this surface is, and a

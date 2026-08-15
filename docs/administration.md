@@ -115,40 +115,70 @@ interface nobody can administer is a brick.
 
 ## Displays
 
-A display is one physical thing — the tablet in the kitchen — as distinct from
-a browser tab somebody opened. The DISPLAYS tab lists every one that has loaded
-the page.
+A display is one device — a screen on a wall, a TV, a laptop, somebody's phone
+— as distinct from a browser tab somebody opened. Anything with a browser and a
+microphone counts. The DISPLAYS tab lists every one that has loaded the page.
 
-**Commissioning one is three steps.** Hang it, open the display page on it —
-`https://<host>:9701/?display=kitchen` — and it appears in the list within
-seconds. Give it a name if the URL's is not the one you want, press APPROVE,
-and it starts working where it stands. It does not need reloading: a display
-that is waiting asks again every twenty seconds.
+**There are two ways one gets into the list**, and which you use depends on
+whether you knew it was coming.
+
+**You are installing it — name it here first.** Type a name into the box, press
+GET A CODE, and you are given an address to type into that screen:
+
+```
+https://<host>:9701/e/K7QP-4M
+```
+
+Type it once, on the device itself, and it *is* that display — named, and
+already holding whatever endpoints you ticked for it, because the row existed
+before the screen was switched on. The code lasts ten minutes, works once, and
+is forgiving about how it is typed: case does not matter, dashes and spaces are
+ignored, and the characters people misread on a remote — `O` and `0`, `I` and
+`1`, `l` — are not in it at all. `k7qp4m` is the same code as `K7QP-4M`.
+
+This is the one to use for anything without a keyboard. You are typing with a
+remote or an on-screen keyboard, so the whole address is six characters longer
+than the one you would have typed anyway, and there is no second trip back to
+the panel afterwards.
+
+**It turned up by itself — approve it.** Somebody opens the display page on a
+laptop or a phone, and it appears in the list as WAITING within seconds. Give it
+a name and press APPROVE. It does not need reloading: a display that is waiting
+asks again every twenty seconds and starts working on its own.
+
+**REISSUE is for a screen that lost its identity** — a browser that wiped its
+data, a television swapped for a bigger one in the same place. The row keeps its
+name and every endpoint that names it, so nothing has to be ticked again, and
+you get a new code to type into the new screen. **The device using that row
+stops working the moment you press it**, before the new code is typed: a place
+is one device, so deciding to move it ends the old one there and then.
 
 **Until you approve it, it renders and answers to nothing.** The appearance
-settings are public, so a new tablet looks exactly right the moment it is
-powered on; what it does not have is the right to use any endpoint you have
-restricted. Its status line says so, and gives the id you will see in the list.
+settings are public, so a device that has just arrived looks exactly right the
+moment it is powered on; what it does not have is the right to use any endpoint
+you have restricted. Its status line says so, and gives the id you will see in
+the list.
 
 **The name is not the credential.** Anybody can type `?display=kitchen` into a
 URL. What actually identifies a display is an unguessable token this server
 issues on its first visit and keeps in a cookie the page itself cannot read.
-Somebody who types a wall display's URL into their own phone gets a *new*
+Somebody who types a wall screen's URL into their own phone gets a *new*
 token, which nobody approved — and turns up in this list as a row you were not
 expecting. That is the early warning; it is also, in the ordinary case, simply
-your own new tablet.
+the next device you meant to add.
 
 **Restricting an endpoint to named displays** is on the endpoint, under AI →
 *who may use it*. `ANY DISPLAY` is the default and is what every endpoint did
-before displays existed. `ONLY THESE` names them, and is worth doing for an
-endpoint that *acts* — a house, a light switch — and rarely worth doing for one
-that answers questions.
+before displays existed. `ONLY THESE` names them. Two reasons to want it: an
+endpoint that *acts* — a house, a light switch — where every microphone in
+earshot should not be able to trigger it, and an endpoint that *costs*, where a
+hosted model is worth giving to some devices and not to all of them.
 
 **What a restricted endpoint does to everybody else:** nothing audible. A
 display that hears a name it may not use drops the utterance — it does not
 answer, does not pass what it heard to whatever it was already talking to, and
 says nothing out loud. The person was addressing a different device, and a
-tablet nobody was talking to announcing that it cannot help is noise laid over
+screen nobody was talking to announcing that it cannot help is noise laid over
 somebody else's answer. The reason appears on that display's status line and in
 the server log, which are the two places it belongs.
 

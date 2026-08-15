@@ -1015,10 +1015,54 @@ MAX_DISPLAYS = 64                # a household, not a directory service
 MAX_PENDING = 24
 SEEN_INTERVAL = 300              # seconds between writes of "last seen"
 
+#: An enrolment code is TYPED, on the device being enrolled, and that device is
+#: a television with a remote or a screen with an on-screen keyboard. Every
+#: character is a chore, so there are six of them — and six characters are only
+#: safe because of the four rules around them: one use, ten minutes, a back-off
+#: on wrong guesses, and an alphabet with no character anybody can misread into
+#: another. O/0, I/1 and L are simply not in it, so a misread character is not
+#: a different valid code, it is not a code at all.
+CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+CODE_LEN = 6
+CODE_TTL = 10 * 60               # you are standing in front of the screen
+_code_fails = {}                 # client ip -> [count, blocked_until]
+
+
+def norm_code(raw):
+    """What somebody typed, as the code it meant. Case folded and everything
+    that is not a letter or a digit dropped, so the panel can print K7QP-4M
+    and `k7qp 4m` still works."""
+    return re.sub(r"[^A-Z0-9]", "", str(raw or "").upper())[:16]
+
+
+def new_code():
+    return "".join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LEN))
+
+
+def code_blocked(ip):
+    rec = _code_fails.get(ip)
+    return bool(rec and rec[1] > time.time())
+
+
+def note_code_failure(ip):
+    """The same geometric back-off as the sign-in, in its own ledger. It is
+    what makes six characters enough: a billion possibilities matters only if
+    guessing is cheap, and after five wrong ones this address waits."""
+    rec = _code_fails.setdefault(ip, [0, 0])
+    rec[0] += 1
+    if rec[0] >= 5:
+        rec[1] = time.time() + min(300, 15 * (2 ** (rec[0] - 5)))
+
+
 DISPLAY_DEFAULTS = {
     "name": "",                  # what an admin called it
     "asked": "",                 # the ?display= name it announced itself with
     "approved": False,
+    # An unspent enrolment code, and when it dies. Stored in the clear rather
+    # than hashed, because the panel has to be able to show it to whoever is
+    # about to type it — and this file is admin-only, mode 600, and the code is
+    # worthless ten minutes after it was made.
+    "code": "", "code_expires": 0,
     # A stored fingerprint, and it is a HINT FOR THE PERSON APPROVING — "this
     # matches your approved kitchen display" — for the one case a token cannot
     # survive, which is a browser wiping its data. It must never become the
@@ -1087,7 +1131,10 @@ def find_display(token):
     if not did or not secret:
         return None
     rec = read_displays().get(did)
-    if not rec:
+    if not rec or not rec.get("hash"):
+        # A row that exists but holds no token: invited and not yet enrolled,
+        # or one whose token was killed by a reissue. Neither is something a
+        # cookie can be.
         return None
     try:
         ok = hmac.compare_digest(
@@ -1123,6 +1170,75 @@ def new_display(asked, hint):
     displays[did] = rec
     write_displays(displays)
     return did + "." + secret, dict(rec, id=did)
+
+
+def invite_display(name, by):
+    """A row created from the panel, before the device it is for has ever been
+    switched on. Approved from the moment it exists — an admin naming a screen
+    and ticking the endpoints it may use IS the approval — but holding no
+    token, so nothing can BE it until somebody types the code into the screen
+    itself."""
+    displays = read_displays()
+    if len(displays) >= MAX_DISPLAYS:
+        return None, ("that is %d displays already — remove one before adding "
+                      "another" % MAX_DISPLAYS)
+    did = "d" + secrets.token_hex(6)
+    now_ = int(time.time())
+    rec = dict(DISPLAY_DEFAULTS)
+    rec.update(name=name, approved=True, approved_by=by, approved_at=now_,
+               created=now_, code=new_code(), code_expires=now_ + CODE_TTL)
+    displays[did] = rec
+    write_displays(displays)
+    return dict(rec, id=did), None
+
+
+def reissue_display(did):
+    """A new code for a row that already exists — a browser wiped its data, a
+    screen replaced in the same place, a television swapped for a bigger one.
+
+    The row is the PLACE. Its name survives, and so does every endpoint that
+    names it, so nothing has to be ticked again.
+
+    The live token dies HERE, not when the new code is used. A place is one
+    device; the moment you decide to move it, the old one stops being that
+    place. Leaving it working until somebody got round to typing the code would
+    mean two devices holding one place for as long as that took."""
+    displays = read_displays()
+    rec = displays.get(did)
+    if not rec:
+        return None, "no such display"
+    now_ = int(time.time())
+    rec.update(salt="", hash="", approved=True,
+               code=new_code(), code_expires=now_ + CODE_TTL)
+    write_displays(displays)
+    return dict(rec, id=did), None
+
+
+def redeem_code(raw):
+    """Somebody typed the code into the screen. Returns (token, record), or
+    (None, reason) where the reason is one of `expired` or `unknown` — which
+    the display turns into words, because a code typed on a television with a
+    remote is mistyped often enough that "no" is not a useful answer."""
+    code = norm_code(raw)
+    if len(code) != CODE_LEN:
+        return None, "unknown"
+    displays = read_displays()
+    now_ = int(time.time())
+    for did, rec in displays.items():
+        if not rec.get("code") or not hmac.compare_digest(rec["code"], code):
+            continue
+        if (rec.get("code_expires") or 0) < now_:
+            return None, "expired"
+        secret = secrets.token_urlsafe(32)
+        salt, dk = hash_key(secret)
+        # Spent. The code is gone from the record before the token exists
+        # anywhere else, so the same six characters cannot enrol a second
+        # device however quickly somebody types them.
+        rec.update(salt=salt, hash=dk, code="", code_expires=0,
+                   last_seen=now_, approved=True)
+        write_displays(displays)
+        return did + "." + secret, dict(rec, id=did)
+    return None, "unknown"
 
 
 def note_display_seen(did, asked=None, hint=None):
@@ -1185,12 +1301,21 @@ def admin_displays():
     being the thing that proves it."""
     out = []
     displays = read_displays()
+    now_ = int(time.time())
     for did, rec in sorted(displays.items(), key=lambda kv: kv[1]["created"]):
         row = {k: rec.get(k) for k in
                ("name", "asked", "approved", "hint", "created", "last_seen",
                 "approved_by", "approved_at")}
         ref = _display_refusals.get(did)
+        live = bool(rec.get("code")) and (rec.get("code_expires") or 0) > now_
         row.update(id=did, label=display_label(rec),
+                   # Three states, and the panel needs to tell them apart:
+                   # INVITED is a row waiting for somebody to type its code
+                   # into a screen, WAITING is a device that turned up on its
+                   # own, and the rest are working.
+                   enrolled=bool(rec.get("hash")),
+                   code=rec["code"] if live else "",
+                   code_left=max(0, (rec.get("code_expires") or 0) - now_) if live else 0,
                    refused=ref[0] if ref else 0,
                    refused_at=ref[1] if ref else 0,
                    refused_from=ref[2] if ref else "")
@@ -1849,7 +1974,10 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      # Everything an ADMIN does to a display sits under
                      # /displays, one letter and a whole boundary apart.
                      "/displays", "/displays/approve", "/displays/rename",
-                     "/displays/delete")
+                     "/displays/delete", "/displays/new", "/displays/reissue")
+#: where an enrolment code is typed. On the display listeners only — it hands
+#: out a display's token, and the admin listener is not a display.
+ENROL_PREFIX = "/e/"
 #: the other half of the embed API: reachable from the display listeners,
 #: because that is where a host server and a host browser can actually get to
 EMBED_ROUTES = ("/embed", "/embed/session")
@@ -2152,6 +2280,42 @@ class Handler(SimpleHTTPRequestHandler):
                 "expires_in": max(0, int(s["expires"] - time.time())),
             }})
 
+        if path.startswith(ENROL_PREFIX):
+            # An enrolment code, typed into the screen being enrolled. A GET,
+            # because it arrives as a URL somebody entered with a remote — and
+            # it is one use, so the replay a GET usually invites cannot happen
+            # twice.
+            if self.admin_port:
+                return self._json(404, {"error": "not found"})
+            ip = self.address_string()
+            # Every answer below is a redirect back to the display, never a
+            # status code and a page of JSON. Somebody has just typed a URL into
+            # a television; what they need next is the screen, with a line on it
+            # saying what happened.
+            def _back(state):
+                self.send_response(303)
+                self.send_header("Location", "/?enrol=" + state)
+                self.send_header("Content-Length", "0")
+                return state
+            if code_blocked(ip):
+                _back("blocked")
+                self.end_headers()
+                return
+            token, out = redeem_code(path[len(ENROL_PREFIX):])
+            if not token:                        # `out` is the reason
+                note_code_failure(ip)
+                print("enrolment code refused (%s) from %s" % (out, ip), flush=True)
+                _back(out)
+                self.end_headers()
+                return
+            _code_fails.pop(ip, None)
+            print("display %s (%s) enrolled by code" % (out["id"], display_label(out)),
+                  flush=True)
+            _back("ok")
+            self._set_display_cookie(token)
+            self.end_headers()
+            return
+
         if path == "/embed":
             token = (parse_qs(urlparse(self.path).query).get("t") or [""])[0]
             s = get_embed_session(token)
@@ -2225,9 +2389,18 @@ class Handler(SimpleHTTPRequestHandler):
             # warning when it is somebody trying a URL they overheard. The
             # panel sorts the two apart; the server keeps one list, because
             # they are the same kind of thing seen at different moments.
+            # What somebody has to TYPE, built from the host this admin
+            # actually reached the panel on — that is the name which resolves
+            # for them, where a stored hostname or an interface address is a
+            # guess. The port is the display's, not this listener's.
+            host = re.sub(r":\d+$", "", self.headers.get("Host") or "") or LOOPBACK
+            secure = RUNNING.get("https_port")
             return self._json(200, {"displays": admin_displays(),
                                     "max": MAX_DISPLAYS,
-                                    "max_pending": MAX_PENDING})
+                                    "max_pending": MAX_PENDING,
+                                    "enrol_base": "%s://%s:%d/e/"
+                                                  % ("https" if secure else "http", host,
+                                                     secure or RUNNING.get("http_port") or 0)})
         if path == "/app":
             if not self._require("admin"):
                 return
@@ -2851,6 +3024,41 @@ class Handler(SimpleHTTPRequestHandler):
             self._set_display_cookie(token)
             self.end_headers()
             return self.wfile.write(body)
+
+        if parsed.path == "/displays/new":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            rec, err = invite_display(str(obj.get("name") or "").strip()[:40],
+                                      s["user"])
+            if err:
+                return self._json(400, {"error": err})
+            print("display %s (%s) invited by %s — code issued"
+                  % (rec["id"], display_label(rec), s["user"]), flush=True)
+            return self._json(200, {"ok": True, "id": rec["id"],
+                                    "code": rec["code"],
+                                    "displays": admin_displays()})
+
+        if parsed.path == "/displays/reissue":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            rec, err = reissue_display(str(obj.get("id") or ""))
+            if err:
+                return self._json(404, {"error": err})
+            # Loud in the log, because this took a working screen off the air
+            # deliberately and somebody may be standing in front of it.
+            print("display %s (%s) reissued by %s — its old token is dead"
+                  % (rec["id"], display_label(rec), s["user"]), flush=True)
+            return self._json(200, {"ok": True, "id": rec["id"],
+                                    "code": rec["code"],
+                                    "displays": admin_displays()})
 
         if parsed.path == "/displays/approve":
             s = self._require("admin")

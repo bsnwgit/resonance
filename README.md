@@ -806,6 +806,7 @@ On every listener:
 | `GET` | `/routes` | the routes: presentation to anyone, the routing half only to a caller holding a display token, and `allowed` per route for that caller |
 | `POST` | `/ask` | a question — `{"route": …}` picks one, absent means the default. `{"conversation_id": …}` continues one the endpoint is keeping, and the reply carries that id back. `403 {"refused": "display"}` where this display may not use that route |
 | `POST` | `/display/hello` | a display announcing itself: declared name in, its identity out, and a token in an `HttpOnly` cookie if it had none. Same-origin only |
+| `GET` | `/e/<code>` | an enrolment code, typed into the device being enrolled. Spends the code, sets the cookie, and redirects to the display with `?enrol=` saying how it went. Display listeners only |
 
 Display listeners only — the embed does not exist on the admin port:
 
@@ -837,7 +838,9 @@ Admin listener only — everything below returns 404 on the public ports:
 | `POST` | `/routes/enable` | enable or disable one — `admin` role |
 | `POST` | `/routes/delete` | remove one, and its key — `admin` role |
 | `POST` | `/routes/test` | one real round trip against that route — `admin` role |
-| `GET` | `/displays` | every display that has ever loaded the page, approved or not — `admin` role |
+| `GET` | `/displays` | every display, plus the address an enrolment code is typed into — `admin` role |
+| `POST` | `/displays/new` | create a row before its device exists, and issue its code — `admin` role |
+| `POST` | `/displays/reissue` | kill the row's live token now and issue a new code; name and permissions kept — `admin` role |
 | `POST` | `/displays/approve` | approve one, or withdraw it; may name it in the same call — `admin` role |
 | `POST` | `/displays/rename` | change what it is listed as; blank hands the row back to the name the device declares — `admin` role |
 | `POST` | `/displays/delete` | revoke: its token stops matching, and it is removed from every route's allow-list — `admin` role |
@@ -1375,6 +1378,29 @@ it. Each entry below carries its own panel scope.
   unstable across updates, and identical across two tablets bought together,
   which is every property you do not want in one.
 
+  **A display can also be enrolled deliberately, by a code typed into it.**
+  Added after the first build, because approving-what-turns-up is the wrong
+  shape when you *knew* the screen was coming: you create the row in the panel,
+  name it and tick its endpoints before the device is switched on, and the code
+  binds a device to it.
+
+  The constraint that decides everything about the code is that it is **typed,
+  on the device being enrolled** — a television with a remote, or an on-screen
+  keyboard. So it is six characters, and six characters are only safe because
+  of the four rules around them: one use, ten minutes, a back-off after five
+  wrong guesses, and an alphabet with no character that can be misread into
+  another (`O`/`0`, `I`/`1` and `l` are simply absent). Case, dashes and spaces
+  are ignored, so the panel can print `K7QP-4M` and `k7qp4m` still works.
+
+  **REISSUE is the same mechanism pointed at a row that already exists** — a
+  browser that wiped its data, a screen replaced in the same place. The row is
+  the *place*: its name and every endpoint that names it survive, and the
+  device behind it is swapped. **The live token dies when REISSUE is pressed**,
+  not when the new code is used — a place is one device, so the moment you
+  decide to move it, the old one stops being that place. Leaving it working
+  until somebody got round to typing the code would mean two devices holding
+  one place for as long as that took.
+
   *Panel:* a displays list — declared name, token, last seen, approve, rename,
   delete — unapproved requests with what they asked for, and an
   allowed-displays list on each route.
@@ -1808,6 +1834,16 @@ browser settings.
   Right-looking and inert is a better first five minutes than wrong-looking and
   refused. It asks again every twenty seconds, so approving it from the panel
   is the whole of the commissioning.
+- **Then a second way in, because approving-what-turns-up is the wrong shape
+  when you knew the screen was coming.** Name it in the panel, tick its
+  endpoints, and type `…/e/K7QP-4M` into the device once. The code is six
+  characters because it is typed with a remote, and six characters are safe
+  only because of the four rules around them — one use, ten minutes, a back-off
+  after five wrong guesses, and an alphabet with nothing in it that can be
+  misread into something else. REISSUE points the same mechanism at a row that
+  already exists, for a wiped browser or a replaced screen: the name and the
+  permissions stay, the device is swapped, and the old token dies on the button
+  press rather than when the new code is used.
 - **Deleting a display is the revocation**, and it takes the id out of every
   route's allow-list on the way — a permission naming a device that no longer
   exists is one nobody can see and nobody can withdraw. The same reasoning that

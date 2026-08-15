@@ -65,19 +65,23 @@ command meant for the house rather than passing it into its own conversation.
 
 ### Who may use it
 
-Two people in a room, one of them addressing the wall tablet, and everybody
-else's microphone hearing it too. Push-to-talk on a phone is the correct
-setting and is not a control, because nothing makes anybody set it — so the
-rule lives on the endpoint instead.
+Two reasons to restrict an endpoint.
+
+**A room with several microphones in it.** Two people, one of them addressing
+the wall screen, and every other device in earshot hearing it too. Push-to-talk
+on a phone is the correct setting and is not a control, because nothing makes
+anybody set it — so the rule lives on the endpoint instead.
+
+**What an endpoint costs.** A hosted model is worth giving to some devices and
+not to every one that can reach the port, and this is where that is decided.
 
 **ANY DISPLAY** is the default, and is what every endpoint did before displays
 existed.
 
-**ONLY THESE** names the displays that may reach it. Anything else that hears
-its wake word drops the utterance: no answer, nothing passed to whatever it was
-already talking to, nothing said out loud, no matter how that browser is
-configured. It is worth doing for an endpoint that *acts* — a house, a light
-switch — and rarely worth doing for one that answers questions.
+**ONLY THESE** names the devices that may reach it — a wall screen, a TV, a
+laptop, a phone. Anything else that hears its wake word drops the utterance: no
+answer, nothing passed to whatever it was already talking to, nothing said out
+loud, no matter how that browser is configured.
 
 Displays enrol themselves by loading the page and are approved under DISPLAYS;
 one that has not been approved yet can be ticked here, and is refused until it

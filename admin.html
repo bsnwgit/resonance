@@ -527,6 +527,32 @@
     border:1px solid rgba(var(--glass),.16);outline:0;
   }
   .erow input.nm:focus{border-color:var(--hue-dim)}
+  /* Name it and get a code: one row, because it is one gesture. */
+  #dispadd{display:flex;gap:4px;margin:4px 0 10px}
+  #dispadd input{
+    flex:1;min-width:0;padding:5px 6px;font:inherit;
+    font-size:calc(9.5px * var(--fs));
+    background:rgba(0,0,0,.6);color:var(--text);
+    border:1px solid rgba(var(--glass),.16);outline:0;
+  }
+  #dispadd input:focus{border-color:var(--hue-dim)}
+  /* The address somebody has to TYPE into a television, from across the room,
+     with a remote. Bigger than anything else in the row on purpose — it is the
+     one thing on this tab that gets read at a distance — and selectable in one
+     click for the screens that do have a keyboard. It takes the panel's "this
+     is the live thing" green, the same as the commit buttons. */
+  .erow .dcode{
+    margin:6px 0 2px;padding:6px 8px;user-select:all;
+    background:rgba(122,201,160,.07);
+    border:1px solid rgba(122,201,160,.5);
+    font-size:calc(12px * var(--fs));letter-spacing:.1em;
+    color:#d2f2e2;word-break:break-all;
+  }
+  .erow .dcode span{
+    display:block;margin-top:3px;user-select:none;
+    font-size:calc(8.5px * var(--fs));letter-spacing:.06em;
+    color:rgba(var(--paper),.62);
+  }
   .erow .r{margin-left:auto;display:flex;gap:4px}
   .erow button{font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.1em;padding:3px 6px;
                cursor:pointer;background:none;color:rgba(var(--paper),.87);
@@ -1355,22 +1381,41 @@ Short by default — this session configures what everyone else is looking at.
   <section class="grp" data-tab="displays">
     <h4>Displays</h4>
     <div class="grpbody">
+  <label class="bklab" style="margin-top:2px">add a display — name it, then type the code into the screen</label>
+  <div class="seg" id="dispadd">
+    <input id="dp_name" type="text" spellcheck="false" autocomplete="off"
+           placeholder="kitchen wall">
+    <button id="b_adddisp" class="act-save">GET A CODE</button>
+  </div>
   <div id="displist"></div>
   <div class="note" id="dispnote"></div>
-  <div class="note help" style="margin-top:10px">A display is one physical
-thing — the tablet in the kitchen — and this is every one that has loaded the
-page. Each is issued an unguessable token on its first visit and appears here
-the moment it does.
+  <div class="note help" style="margin-top:10px">A display is one device — a
+screen on a wall, a TV, a laptop, somebody's phone — and this is every one that
+has loaded the page. Anything with a browser and a microphone counts.
+
+<b>Two ways one gets here.</b> Name it above and you are given a six-character
+code: type <b>&lt;this server&gt;/e/CODE</b> into that screen once and it is
+that display, already named, already holding whatever endpoints you ticked for
+it. The code lasts ten minutes, works once, and case and dashes do not matter —
+<b>k7qp4m</b> is the same as <b>K7QP-4M</b>. Or a device simply opens the
+display page, in which case it turns up below as WAITING and you approve it by
+hand.
+
+<b>REISSUE</b> is for a screen that lost its cookie, or was replaced by a
+different one in the same place. The row keeps its name and every endpoint that
+names it; you get a new code to type into the new screen. <b>The old device
+stops working the moment you press it</b> — a place is one device, so deciding
+to move it ends the old one there and then.
 
 <b>The name is not the credential.</b> Anybody can type
 <b>?display=kitchen</b> into a URL. The token is what says this really is that
-place, and it lives in a cookie the page itself cannot read. Somebody who
-types a wall display's URL into their own phone is issued a <i>new</i> token,
+device, and it lives in a cookie the page itself cannot read. Somebody who
+types a wall screen's URL into their own phone is issued a <i>new</i> token,
 which nobody approved — and turns up here as a row you were not expecting.
 
 <b>Approve it and it works; leave it and it still renders.</b> The appearance
-settings are public, so a newly hung tablet looks right immediately and simply
-answers to nothing until you say otherwise.
+settings are public, so a device that has just arrived looks right immediately
+and simply answers to nothing until you say otherwise.
 
 An endpoint consults this list only where it has been restricted to named
 displays — <b>who may use it</b>, on each endpoint under AI. Until you restrict
@@ -2444,15 +2489,17 @@ other.</div>
   </div>
   <div class="cks" data-r="displays"></div>
   <div class="note" data-r="whonote"></div>
-  <div class="note help">Two people in a room, one of them addressing the wall
-tablet, and everybody else's microphone hearing it too. Push-to-talk on a
-phone is the right setting and is not a control, because nothing makes anybody
-set it — so the rule is enforced <b>here</b> instead, and a phone that wakes on
-this endpoint's name is refused however its browser is configured.
+  <div class="note help">Two reasons to restrict one. <b>A room with several
+microphones in it</b> — one person addresses the wall screen and every other
+device in earshot hears it too. And <b>what an endpoint costs</b> — a hosted
+model worth giving to some people and not to everyone.
 
-ANY DISPLAY is what every endpoint was before this existed. ONLY THESE is for
-the ones that <i>do</i> things: a light switch is worth naming the displays
-for, a general assistant usually is not.
+Either way the rule is enforced <b>here</b> rather than in anybody's browser
+settings, because push-to-talk on a phone is the right setting and is not a
+control: nothing makes anybody set it.
+
+ANY DISPLAY is what every endpoint was before this existed. ONLY THESE names
+the devices — a wall screen, a TV, a laptop, a phone — that may reach it.
 
 A display that hears a name it may not use <b>drops the utterance</b> — it
 does not answer, does not pass it to whatever it was already talking to, and
@@ -3146,12 +3193,17 @@ function paintBlocks(keepOpen){
 }
 
 /* ----------------------------------------------------------- displays
-   One physical thing each — the tablet in the kitchen — enrolled by turning
-   up rather than created here. What this page can do to one is approve it,
+   One device each — a wall screen, a TV, a laptop, a phone — enrolled by
+   turning up rather than created here. What this page can do to one is approve it,
    name it, and take it away again. */
 let DISPLAYS = [];
+let ENROL_BASE = '';
 
 const dispWhen = (ts)=> ts ? new Date(ts * 1000).toLocaleString() : 'never';
+/* Printed with a dash in the middle. Six characters read off a screen and
+   typed into another one across the room are easier in two groups of three,
+   and the server ignores the dash — so this is presentation, not format. */
+const dispCode = (c)=> c ? c.slice(0, 3) + '-' + c.slice(3) : '';
 
 /* Just the fetch. The endpoint blocks name displays in their allow-lists, so
    this has to have run before one is painted — and painting a block is not
@@ -3160,6 +3212,7 @@ async function loadDisplays(){
   try{
     const j = await api('/displays');
     DISPLAYS = j.displays || [];
+    ENROL_BASE = j.enrol_base || '';
   }catch(e){ DISPLAYS = []; }
   return DISPLAYS;
 }
@@ -3172,21 +3225,24 @@ async function refreshDisplays(){
   box.innerHTML = '';
   if (!DISPLAYS.length){
     box.className = 'note';
-    box.textContent = 'Nothing has loaded the display page yet. Open it on a '
-                    + 'tablet and it appears here.';
+    box.textContent = 'No displays yet. Name one above to get a code, or open '
+                    + 'the display page on any device and it appears here.';
     if (note) note.textContent = '';
     return;
   }
   box.className = '';
-  /* Waiting first. In the steady state this list is read once a year; the
-     moment somebody is actually looking at it, they have just hung something
-     and want the row for it at the top. */
+  /* Four states, and the two that want something from you come first. In the
+     steady state this list is read once a year; the moment somebody is
+     actually looking at it, they have just added something. */
+  const state = (d)=> !d.enrolled ? (d.code ? 'code' : 'stale')
+                    : d.approved  ? 'live' : 'waiting';
+  const rank = {code: 0, waiting: 1, stale: 2, live: 3};
   const rows = DISPLAYS.slice().sort((a, b)=>
-    (a.approved === b.approved) ? (b.created || 0) - (a.created || 0)
-                                : (a.approved ? 1 : -1));
+    rank[state(a)] - rank[state(b)] || (b.created || 0) - (a.created || 0));
   rows.forEach(d=>{
+    const st = state(d);
     const row = document.createElement('div');
-    row.className = 'erow' + (d.approved ? '' : ' off');
+    row.className = 'erow' + (st === 'live' ? '' : ' off');
 
     const top = document.createElement('div'); top.className = 'top';
     /* The name is the control, because renaming is the only edit a display
@@ -3200,26 +3256,39 @@ async function refreshDisplays(){
     nm.onchange = ()=> displayAction('/displays/rename',
                                      {id: d.id, name: nm.value.trim()});
     top.appendChild(nm);
-    if (!d.approved){
+    const badge = (t)=>{
       const b = document.createElement('span');
-      b.className = 'badge'; b.textContent = 'WAITING';
+      b.className = 'badge'; b.textContent = t;
       top.appendChild(b);
-    }
-    if (d.refused){
-      const b = document.createElement('span');
-      b.className = 'badge';
-      b.textContent = d.refused + (d.refused === 1 ? ' REFUSAL' : ' REFUSALS');
-      top.appendChild(b);
-    }
+    };
+    if (st === 'code')    badge('WAITING FOR ITS CODE');
+    if (st === 'stale')   badge('CODE EXPIRED');
+    if (st === 'waiting') badge('WAITING');
+    if (d.refused) badge(d.refused + (d.refused === 1 ? ' REFUSAL' : ' REFUSALS'));
 
     const r = document.createElement('span'); r.className = 'r';
-    const flip = document.createElement('button');
-    flip.textContent = d.approved ? 'WITHDRAW' : 'APPROVE';
-    if (!d.approved) flip.className = 'act-save';
-    // Approving and naming in one gesture: whatever is in the box goes with it.
-    flip.onclick = ()=> displayAction('/displays/approve',
-                                      {id: d.id, approved: !d.approved,
-                                       name: nm.value.trim()});
+    /* Approving is for a device that turned up on its own. A row created here
+       was approved by being created, and has no device yet to approve. */
+    if (d.enrolled){
+      const flip = document.createElement('button');
+      flip.textContent = d.approved ? 'WITHDRAW' : 'APPROVE';
+      if (!d.approved) flip.className = 'act-save';
+      // Approving and naming in one gesture: whatever is in the box goes too.
+      flip.onclick = ()=> displayAction('/displays/approve',
+                                        {id: d.id, approved: !d.approved,
+                                         name: nm.value.trim()});
+      r.appendChild(flip);
+    }
+    const again = document.createElement('button');
+    again.textContent = st === 'code' ? 'NEW CODE' : 'REISSUE';
+    again.onclick = ()=>{
+      // Only worth stopping for where it takes a working screen off the air.
+      if (st !== 'live' || confirm('Reissue "' + d.label + '"?\n\nThe device '
+            + 'using it now stops working immediately, and the row waits for '
+            + 'somebody to type the new code into a screen. Its name and every '
+            + 'endpoint that names it are kept.'))
+        displayAction('/displays/reissue', {id: d.id});
+    };
     const del = document.createElement('button');
     del.textContent = 'DELETE';
     del.className = 'act-danger';
@@ -3227,22 +3296,43 @@ async function refreshDisplays(){
       if (confirm('Delete "' + d.label + '"? Its token stops working '
                   + 'immediately, and it is removed from every endpoint that '
                   + 'names it. If the device is still on the wall it will '
-                  + 'enrol again as a new one.'))
+                  + 'come back as a new row, unapproved.'))
         displayAction('/displays/delete', {id: d.id});
     };
-    r.appendChild(flip); r.appendChild(del);
+    r.appendChild(again); r.appendChild(del);
     top.appendChild(r);
+
+    /* The whole thing somebody has to type, on its own line and big enough to
+       read from across a room while typing it into a television with a
+       remote. The address as well as the code: nobody is typing half a URL. */
+    if (st === 'code'){
+      const c = document.createElement('div');
+      c.className = 'dcode';
+      c.textContent = ENROL_BASE + dispCode(d.code);
+      const mins = Math.max(1, Math.round((d.code_left || 0) / 60));
+      const sub = document.createElement('span');
+      sub.textContent = ' · ' + mins + ' min left · case and dashes do not matter';
+      c.appendChild(sub);
+      row.appendChild(top); row.appendChild(c);
+    }else{
+      row.appendChild(top);
+    }
 
     const meta = document.createElement('div');
     meta.className = 'meta';
     const named = (RT.routes || []).filter(x=> x.restricted
                                             && (x.displays || []).indexOf(d.id) >= 0);
-    const lines = [
-      ['calls itself', d.asked || 'nothing — no ?display= in its URL'],
-      ['id', d.id],
-      ['first seen', dispWhen(d.created)],
-      ['last seen', dispWhen(d.last_seen)],
-    ];
+    const lines = [['id', d.id]];
+    if (d.enrolled){
+      lines.unshift(['calls itself', d.asked || 'nothing — no ?display= in its URL']);
+      lines.push(['first seen', dispWhen(d.created)],
+                 ['last seen', dispWhen(d.last_seen)]);
+    }else{
+      lines.push(['created', dispWhen(d.created)],
+                 ['device', st === 'stale'
+                   ? 'none — the code expired before anybody typed it. REISSUE for another'
+                   : 'none yet — type the address above into the screen']);
+    }
     if (d.approved)
       lines.push(['approved', dispWhen(d.approved_at) +
                               (d.approved_by ? ' by ' + d.approved_by : '')]);
@@ -3263,17 +3353,39 @@ async function refreshDisplays(){
       meta.appendChild(el);
     });
 
-    row.appendChild(top); row.appendChild(meta);
+    row.appendChild(meta);
     box.appendChild(row);
   });
-  const waiting = DISPLAYS.filter(d=> !d.approved).length;
+  const waiting = DISPLAYS.filter(d=> d.enrolled && !d.approved).length;
+  const coded = DISPLAYS.filter(d=> !d.enrolled && d.code).length;
   if (note){
+    const bits = [DISPLAYS.length + (DISPLAYS.length === 1 ? ' display' : ' displays')];
+    if (coded) bits.push(coded + ' waiting for a code to be typed in');
+    if (waiting) bits.push(waiting + ' waiting to be approved');
     note.className = 'note';
-    note.textContent = DISPLAYS.length
-      + (DISPLAYS.length === 1 ? ' display' : ' displays')
-      + (waiting ? ' · ' + waiting + ' waiting to be approved' : ' · all approved');
+    note.textContent = bits.join(' · ');
   }
 }
+
+/* Name it, get a code. The row exists from this moment, so its endpoints can
+   be ticked before the screen it is for has ever been switched on. */
+$('b_adddisp').addEventListener('click', async ()=>{
+  const el = $('dp_name');
+  const name = (el.value || '').trim();
+  if (!name){
+    const note = $('dispnote');
+    note.className = 'note bad';
+    note.textContent = 'give it a name first — it is what the row is called '
+                     + 'and what you will look for when you restrict an endpoint';
+    el.focus();
+    return;
+  }
+  el.value = '';
+  await displayAction('/displays/new', {name});
+});
+$('dp_name').addEventListener('keydown', e=>{
+  if (e.key === 'Enter') $('b_adddisp').click();
+});
 
 async function displayAction(path, body){
   const note = $('dispnote');

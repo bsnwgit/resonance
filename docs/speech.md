@@ -171,6 +171,9 @@ answer to *"why did nothing happen?"* now appears:
 | `asleep — heard "…", which names none of "house" or "ada"` | it transcribed you and no assistant answers to what it heard |
 | `"house" is not for this display — ignored` | somebody addressed an assistant this display is not allowed to use. Nothing was sent, nothing was answered, and the conversation it was already having was left alone |
 | `waiting to be approved — kitchen (d4a19…)` | this display has never been approved. It renders correctly and answers to nothing; the id is what an administrator looks for in DISPLAYS |
+| `enrolled as kitchen wall — say "house" or "ada"` | an enrolment code was just typed into this screen and it worked |
+| `that code was not recognised — check it and try again` | a mistyped or already-used enrolment code. Case and dashes do not matter, so it is a wrong character rather than a wrong format |
+| `that code had expired — ask for a new one` | the code was real but older than ten minutes. REISSUE in the panel gives another |
 | `approved as kitchen — say "house" or "ada"` | somebody just approved it, and it noticed on its own |
 | `refused: this display may not use house` | a question typed into the box went to an assistant this display is not allowed to use |
 | `backend: …` | why an endpoint failed, in full, where the spoken reply gives only the name |
