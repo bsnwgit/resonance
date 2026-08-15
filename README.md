@@ -1859,6 +1859,89 @@ on a desk. A tablet bolted to a wall, answering a household, moves them:
 
 Newest first.
 
+### 2026-08-15 — a name for a set of them, and a panel that reads as one
+
+Groups, and the tidying that came with using the thing for an hour.
+
+- **Twelve ticks is not a permission model, it is data entry.** So a group is a
+  name for a set of devices, made under ACCOUNTS and named wherever access is
+  granted — today an endpoint's allow-list, and anything later that grants
+  something can name them the same way. That is why they live in a file of
+  their own rather than inside the thing that currently uses them.
+- **Two kinds, and they do not mix**: people who asked to be here, and devices
+  an admin created and sent a code to. Separate populations answering separate
+  questions — *the physics department*, *the screens in the east wing* — and
+  one list that could hold both would be a list nobody could describe. The kind
+  is fixed once the group exists, because changing it would silently empty it.
+- **Grants add up, and a group is not approval.** Named by a group and named on
+  its own is reachable by both. Somebody in a group who was never approved, or
+  whose grant has run out, is still refused: the group decides *which*
+  endpoints, approval decides whether they reach anything at all.
+- **One section became four**, because they are read at different times: the
+  queue, the register of what is working, the guest settings, and the form
+  builder. A to-do list and a register are not the same object, and three rows
+  needing attention buried among fifty that do not is how a request sits
+  unanswered for a week.
+- **Each row collapses to its name**, one open at a time across both lists,
+  which meant renaming had to move inside the row — an editable box in a header
+  is one somebody clicks by accident while trying to look underneath it.
+- **Your own account moved behind your own name**, out of a tab about
+  everybody else's, and the accounts tab now survives a server with no sign-in
+  because groups live on it and a group has nothing to do with signing in.
+- **Two labels that read backwards.** The guest switch said CAN ASK / CANNOT
+  ASK, which names the mechanism — and in those terms it was inverted, since
+  *cannot ask* is the open setting where somebody walks straight into the
+  default endpoint. It asks the question somebody came to answer now. And
+  REISSUE was offered on a guest's row, where it would have killed their token
+  and printed a code for them to type into their laptop; a guest coming back is
+  a RENEWAL, and they are not the same button.
+- **Every label starts with a capital**, which is a small thing that was wrong
+  in seventy-eight places.
+
+### 2026-08-15 — a code you type into the screen, and a device that can ask
+
+Two ways in that the first build did not have, both driven by the same
+observation: approving what turns up is the wrong shape when you *knew* the
+device was coming, or when you cannot see it at all.
+
+- **The constraint that designs the enrolment code is that it is typed** — on a
+  television, with a remote. Nobody pastes onto a TV. So it is six characters,
+  the whole address is what the panel shows, and six characters are safe only
+  because of the four rules around them: one use, ten minutes, a back-off after
+  five wrong guesses, and an alphabet with no character that can be misread
+  into another. `O`/`0`, `I`/`1` and `l` are simply absent, so a misread
+  character is not a different valid code, it is not a code at all.
+- **Every answer from `/e/` is a redirect back to the display**, never a status
+  code and a page of JSON. Somebody has just typed a URL into a television;
+  what they need next is the screen, with a line on it saying what happened.
+- **REISSUE points the same mechanism at a row that already exists** — a wiped
+  browser, a replaced screen. The row is the *place*: its name and every
+  endpoint that names it survive, and the device behind it is swapped. The live
+  token dies on the button press rather than when the new code is used, because
+  a place is one device and waiting would mean two of them holding it.
+- **The case that drives the rest is an endpoint restricted because it costs.**
+  A hosted model given to some people and not to everyone, where the person
+  turning up is on a laptop in another building and nobody can walk over and
+  read an id off their screen. So a device can ask, on a form the admin built —
+  up to five fields, one of them a box big enough for a reason — and the
+  answers are what the decision is made on. This server has no opinion about
+  what a request should ask.
+- **Approving is granting**: the endpoints are ticked in the same gesture,
+  because an approval that grants nothing is a row that changed colour.
+  Refusing carries two messages, one shown to them and one that never leaves
+  the panel, plus whether that device may ask again — and it takes back
+  anything a previous approval gave.
+- **A grant that was asked for runs out; one an admin issued does not.** Expiry
+  is read where the request is answered rather than at the door, so it lands
+  cleanly mid-conversation: the turn in flight finishes and the next is
+  refused. Asking again is one press against the same row, never a second
+  device, and the row counts the renewals.
+- **Whether anybody may ask at all is a setting with a precondition.** Off
+  means straight in, so the default endpoint must be open to any display —
+  enforced from both ends, because in one direction it holds until the next
+  edit and then breaks silently, with guests reaching nothing and no error
+  anywhere to say why.
+
 ### 2026-08-15 — a display is a place, and a place has to be let in
 
 Phase 2. Two people in a room, one of them addressing the wall tablet, and
