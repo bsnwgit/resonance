@@ -1079,7 +1079,9 @@ recognised is left standing so a typo is visible rather than silent.</div>
   </section>
   <section class="grp" data-tab="speech">
     <h4>Speech in (mic, STT)</h4>
-    <div class="grpbody">  <div class="seg" data-set="ptt">
+    <div class="grpbody">
+  <label class="bklab" style="margin-top:2px">how it decides you have finished</label>
+  <div class="seg" data-set="ptt">
     <button data-v="1" class="on">PUSH TO TALK</button>
     <button data-v="0">AUTO (voice detect)</button>
   </div>
@@ -1090,11 +1092,13 @@ recognised is left standing so a typo is visible rather than silent.</div>
   <select id="sttmodel"></select>
   <div class="note" id="sttnote"></div>
   <div class="sl"><label>end-of-speech wait</label><output id="o_hangover"></output><input id="s_hangover" type="range" min=".2" max="1.5" step=".05"></div>
-  <div class="seg" data-set="micdsp" style="margin-top:6px">
+  <label class="bklab" style="margin-top:8px">signal processing</label>
+  <div class="seg" data-set="micdsp">
     <button data-v="clean" class="on">CLEAN (best recognition)</button>
     <button data-v="raw">RAW (best visuals)</button>
   </div>
-  <div class="seg" style="margin-top:6px"><button id="b_cal">CALIBRATE (stay quiet 2s)</button></div>
+  <label class="bklab" style="margin-top:8px">background noise</label>
+  <div class="seg"><button id="b_cal">CALIBRATE (stay quiet 2s)</button></div>
   <div class="note help">Everything here runs on this server — no audio leaves
 the box for transcription, whichever model is chosen.
 
@@ -1120,7 +1124,8 @@ model actually returns.
 <b>CLEAN</b> filters the input for recognition; <b>RAW</b> leaves it alone, so
 the figure moves more and transcription is slightly worse. <b>CALIBRATE</b>
 measures the room rather than asking you to guess at the gate.</div>
-  <div id="miclevel" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5">level —</div>
+  <label class="bklab" style="margin-top:8px">live from the preview</label>
+  <div id="miclevel" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);line-height:1.5">level —</div>
   <div id="micnote" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:8px;line-height:1.5">off</div></div>
   </section>
   <section class="grp" data-tab="speech">
