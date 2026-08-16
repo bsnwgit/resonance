@@ -1955,6 +1955,16 @@ reason it was split from phase 2.
   through the entire drift — the one stationary bright rectangle actually worth
   moving. They are now last in the sheet, with a comment saying why they are
   not where they look like they belong.
+- **Proven in a browser, not yet on a panel.** The geometry is verified — the
+  travel equals the margin to four decimal places over eight simulated hours,
+  and the renderer a wall runs is the same file a tab runs, so there is no
+  second implementation that could differ. What no browser can answer is
+  whether 70% and dim 45% are the right *kind* of numbers seen from three
+  metres in a dim hallway, and whether six seconds of ease-in is short enough
+  to miss and long enough not to startle. Those are judgements about a room.
+  The third thing a panel would settle — whether the burn-in is actually
+  prevented — takes months and cannot be tested at all, which is why the design
+  leans on the two mechanisms known to work rather than on measuring one.
 - **What it does not do is push to a screen already on the wall.** A device
   waiting on a decision polls every twenty seconds and takes these immediately;
   one that is working has nothing left to ask about and takes them on its next
