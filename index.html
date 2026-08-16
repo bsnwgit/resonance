@@ -136,6 +136,24 @@
 
   /* glass stack — everything below sits ON TOP of the canvas */
   .ov{position:absolute;inset:0;pointer-events:none}
+
+  /* ---------- what to say to it ----------
+     Sized off the SHORTER side of the frame rather than the type scale, so it
+     is legible from across a hallway on a portrait screen and on a landscape
+     one without either being tuned by hand. Low in the frame, out of the
+     figure's way, and dim: it is an invitation, not a headline, and the
+     brightest thing on a wall should stay the thing the wall is for.
+
+     Hidden by default and drawn only where it earns its place — see the rules
+     at the end of this sheet. */
+  #prompt{
+    display:none;align-items:flex-end;justify-content:center;
+    padding:0 6% 7%;z-index:5;
+    font-size:clamp(13px, 3.1vmin, 30px);letter-spacing:.16em;
+    text-align:center;line-height:1.5;
+    color:rgba(var(--paper),.42);
+    text-shadow:0 0 18px rgba(0,0,0,.75);
+  }
   #milk{background:radial-gradient(ellipse at 50% 45%,
           rgba(var(--glass),.055) 0%,
           rgba(var(--glass),.022) 42%,
@@ -383,6 +401,24 @@
 
      Inside an iframe this keys off the FRAME's width, not the device, so one
      breakpoint covers a phone and a narrow embed in a desktop page. */
+  /* ---------- fingers ----------
+     A touch target is about what is touching it, not about how wide the
+     window is. These sizes lived under `max-width: 560px`, which is right for
+     a phone and wrong for every tablet: a wall screen in portrait at 800
+     points, or a 10-inch one in landscape, never reaches that breakpoint and
+     was handing a finger a 22-pixel-high button. On a voice-only display that
+     is not cosmetic — TALK is the only thing that can open a microphone, so
+     the one control that has to be hittable was the smallest thing on screen.
+
+     `pointer: coarse` asks the question that was actually meant. Width still
+     decides whether the WORDS fit; it no longer decides how big the button
+     is. */
+  @media (pointer: coarse){
+    #bar{padding-top:9px;padding-bottom:9px}
+    .src button{min-height:44px;min-width:44px;padding:0 11px}
+    #q{min-height:44px}
+  }
+
   @media (max-width: 560px){
     #bar{padding:10px 14px;gap:10px;flex-wrap:wrap}
     /* an input will not go below its intrinsic width without this, which is
@@ -450,6 +486,19 @@
   body[data-saver] #request,
   body[data-saver] #verdict{display:none}
   body[data-saver] #screen{flex:1 1 auto}
+
+  /* ---------- the resting prompt ----------
+     Only on a wall, only when there is a name to say, and only while nobody
+     is talking to it — `data-prompt` carries all three, decided in one place
+     rather than by four rules that can disagree.
+
+     NOT while it drifts, and that is not the same as being hidden: the
+     screensaver DRAWS it on the canvas instead, moving with the figure and
+     dimming with it. Left here it would be the one stationary bright line on
+     a screen whose whole purpose at that moment is that nothing stays still —
+     and taking it away entirely would lose it for exactly the person it is
+     for, who walks up to a screen that has been idle for hours. */
+  body[data-prompt]:not([data-saver]) #prompt{display:flex}
 </style>
 </head>
 <body data-layout="hero">
@@ -459,6 +508,12 @@
 <div id="shell">
   <div id="screen">
     <canvas id="cv"></canvas>
+    <!-- What to say to it. A screen on a wall is walked past by people who
+         have never used it and have no way of knowing it listens — and on a
+         voice-only display there is no transcript, no composer and no hint of
+         any kind. Only ever drawn on a wall: a browser tab was opened
+         deliberately by somebody who already knows what it is. -->
+    <div class="ov" id="prompt"></div>
     <div class="ov" id="milk"></div>
     <div class="ov" id="scan"></div>
     <div class="ov" id="vign"></div>
@@ -777,11 +832,21 @@ const Display = {
 const Wall = {
   onWall: false,
   voiceOnly: false,
-  /* The button and the place it came from, so removing it is REVERSIBLE.
-     Turning the policy off has to give the control back without somebody
-     walking to the tablet and reloading it — and the panel's preview turns it
-     on and off while an admin makes their mind up. */
-  _btn: null, _slot: null,
+  /* The buttons a wall takes away, and where each came from, so removing them
+     is REVERSIBLE. Turning the policy off has to give the control back
+     without somebody walking to the tablet and reloading it — and the panel's
+     preview turns it on and off while an admin makes their mind up. */
+  _kept: {},
+  _pull(id, gone){
+    let k = this._kept[id];
+    if (!k){
+      const el = $(id);
+      if (!el) return;
+      k = this._kept[id] = {el: el, slot: el.parentNode};
+    }
+    if (gone) k.el.remove();
+    else if (!k.el.parentNode && k.slot) k.slot.appendChild(k.el);
+  },
 
   /* The four appearance values this place overrides, or null for "whatever
      everybody gets". Held rather than written straight into S, because the
@@ -819,21 +884,30 @@ const Wall = {
     document.body.toggleAttribute('data-wall', this.onWall);
     document.body.toggleAttribute('data-voiceonly', this.voiceOnly);
     this.applyLook();
-    if (!this._btn){
-      this._btn = $('textbtn');
-      if (this._btn) this._slot = this._btn.parentNode;
-    }
+
+    /* SPEAK ONLY, and it follows from being on a wall rather than being a
+       fourth thing to tick. Push-to-talk holds the SPACE bar, and a tablet
+       bolted to a wall has no space bar — a screen whose interaction model
+       needs a keyboard nobody standing in front of it has is not a wall
+       display, it is a workstation somebody screwed to a wall.
+
+       It is also what makes the resting prompt true. The wake gate is
+       inactive in push-to-talk, so "say the name" would be an instruction
+       that does nothing; in AUTO the name is exactly how you reach it. */
+    this._pull('pttbtn', this.onWall);
+    if (this.onWall) setPtt(false);
+    else if (!PREVIEW && Prefs.has('ptt')) setPtt(Prefs.get('ptt'));
+
+    this._pull('textbtn', this.voiceOnly);
     if (this.voiceOnly){
-      if (this._btn) this._btn.remove();
       setTextVisible(false);            // no `remember` — see above
     }else{
-      if (this._btn && !this._btn.parentNode && this._slot)
-        this._slot.appendChild(this._btn);
       /* Back to the viewer's own choice, which was never overwritten. A
          preview takes the fresh-viewer default instead: the admin is looking
          at what somebody else gets, not at their own habits. */
       setTextVisible(PREVIEW ? true : Prefs.get('text', true));
     }
+    if (typeof paintPrompt === 'function') paintPrompt();
   },
 };
 
@@ -1769,6 +1843,31 @@ function render(){
   }
   ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
 
+  /* --- what to say to it, while it drifts ---
+     The DOM copy is hidden for the duration, because a line of text holding
+     still on a screen whose whole purpose at that moment is that nothing
+     holds still would be the one thing left to burn in. Painted here instead
+     it travels with the figure and fades with the ease, and it is drawn
+     BEFORE the dim so it darkens with everything else.
+
+     It rides under the figure at a fixed fraction of the frame rather than
+     under its measured extent: the geometry breathes with the voice, and a
+     line that moved every time somebody spoke in the next room would be
+     restless in a way a hallway does not want. */
+  if (PROMPT && Saver.amount > 0.01){
+    const short = Math.min(W, H);
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 0.40 * Saver.amount;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = Math.round(Math.max(12*DPR, short*0.030*Saver.scale)) + 'px '
+             + getComputedStyle(document.body).fontFamily;
+    ctx.fillStyle = 'rgb(' + pal.glass + ')';
+    ctx.fillText(PROMPT, cx, cy + short * 0.19 * Saver.scale);
+    ctx.restore();
+  }
+
   /* …and the dim, last, over everything including the grain. Black rather
      than the palette's own ink: it is the panel's light output that burns and
      that a hallway at two in the morning is too bright with, and blending
@@ -1825,6 +1924,11 @@ let grainPat = null;
 const Saver = {
   /* From the display's row. delay 0 is off, and off is the default. */
   delay: 0, scaleTo: 0.70, dimTo: 0.45,
+  /* …and the dark hours, which are a separate thing from the idle dim and
+     not a variant of it. Idle asks "has anybody been here recently"; this
+     asks "what time is it", and only the second one keeps a hallway dark
+     after somebody walks past it at three in the morning. */
+  nightFrom: 0, nightTo: 0, nightDimTo: 0, nightAt: 0,
   armed: false,           // may it ever start
   on: false,              // is it drifting now, or easing out of it
   forced: false,          // the panel is demonstrating it
@@ -1847,6 +1951,13 @@ const Saver = {
     this.delay   = Math.max(0, s.delay | 0);
     this.scaleTo = Math.min(0.95, Math.max(0.2, (s.scale | 0) / 100 || 0.70));
     this.dimTo   = Math.min(0.95, Math.max(0, (s.dim | 0) / 100));
+    /* The dark hours, and the dim that runs through them. Equal is no window.
+       Read off the DEVICE's clock and not the server's, deliberately: this is
+       "dark at two in the morning where the screen is", and a building with
+       screens in two time zones wants each of them dark at its own two. */
+    this.nightFrom = Math.min(23, Math.max(0, s.night_from | 0));
+    this.nightTo   = Math.min(23, Math.max(0, s.night_to | 0));
+    this.nightDimTo = Math.min(0.95, Math.max(0, (s.night_dim | 0) / 100));
     /* Never in an embed. A surface inside somebody else's product that
        shrank and dimmed itself after three minutes would be a bug in their
        application, and they have their own screensaver. */
@@ -1866,6 +1977,19 @@ const Saver = {
   /* The panel, showing an admin what these numbers do without making them
      stand and wait out the idle delay. */
   demo(on){ this.forced = !!on; if (!on) this.poke(); },
+
+  /* Is it dark hours right now, and how dark. Equal endpoints are no window;
+     a `from` later than a `to` wraps midnight, which is the ordinary case
+     rather than the exception — 22 to 07 is what somebody means, and 07 to 22
+     is what they would have to type otherwise. */
+  nightNow(){
+    if (!this.nightDimTo || this.nightFrom === this.nightTo) return 0;
+    const h = new Date().getHours();
+    const inside = this.nightFrom < this.nightTo
+      ? (h >= this.nightFrom && h < this.nightTo)
+      : (h >= this.nightFrom || h < this.nightTo);
+    return inside ? this.nightDimTo : 0;
+  },
 
   step(dt){
     this.t += dt;
@@ -1890,7 +2014,16 @@ const Saver = {
     const m = (1 - this.scale) / 2;
     this.dx = Math.sin(this.t * 0.0314) * m;
     this.dy = Math.sin(this.t * 0.0193 + 1.7) * m;
-    this.dim = this.dimTo * this.amount;
+    /* The dark hours, eased over about eight seconds rather than switched.
+       It happens once a night with nobody watching, so the ease is not for
+       drama — it is so that a screen somebody IS standing in front of at ten
+       o'clock does not appear to fault. */
+    this.nightAt += (this.nightNow() - this.nightAt)
+                    * (1 - Math.pow(0.05, dt / 8));
+    /* The greater of the two, never the sum: they are both "how much light
+       comes off this panel", and two answers to one question resolve to the
+       darker rather than to something past black. */
+    this.dim = Math.max(this.dimTo * this.amount, this.nightAt);
     /* Text sliding around a screen is worse than either state on its own, so
        the transcript, the composer and the status line go while it drifts.
        Keyed on `on` rather than on `amount`: chrome asked for should come
@@ -1898,6 +2031,38 @@ const Saver = {
     document.body.toggleAttribute('data-saver', this.on);
   },
 };
+
+/* ======================================================= RESTING PROMPT
+   A screen on a wall is walked past by people who have never used it. It
+   shows a figure, it is silent, and nothing about it says that it listens —
+   and on a voice-only display there is no transcript and no composer to
+   suggest otherwise. So it says what to say.
+
+   Only on a wall. A browser tab was opened deliberately by somebody who
+   already knows what this is, and a permanent instruction in their window
+   would be furniture.
+
+   Only while nobody is talking to it. Mid-conversation the transcript, the
+   status line and the reply are all saying more than this could, and a prompt
+   telling somebody to say a name they have just said is noise.
+
+   It exists in two forms and they are the same sentence: DOM while the screen
+   is at rest, and painted onto the canvas while the screensaver drifts, where
+   it moves and dims with the figure. Neither is a stationary bright line
+   left on a panel for a year. */
+const promptEl = $('prompt');
+let PROMPT = '';
+function paintPrompt(){
+  const names = (typeof Routes !== 'undefined' && Routes.spoken) ? Routes.spoken() : '';
+  /* Awake means a conversation is happening, and a display with no wake gate
+     at all is one where "say the name" would be a lie — anything said to it
+     is heard, so there is no name to offer. */
+  const gated = typeof Wake !== 'undefined' && Wake.armed && Wake.armed();
+  PROMPT = (Wall.onWall && names && gated && !(Wake.awake))
+    ? 'say ' + names : '';
+  if (promptEl) promptEl.textContent = PROMPT;
+  document.body.toggleAttribute('data-prompt', !!PROMPT);
+}
 
 /* Every signal that is not speech. Passive, so none of it costs a frame, and
    on the window rather than the canvas because a voice-only display is mostly
@@ -3679,9 +3844,19 @@ function syncWake(){
   const el = document.getElementById('wakestate');
   if (el) el.textContent = wakeTxt;
   relay('wakestate', wakeTxt);
+  /* The one place wake state is reflected, so the one place the resting
+     prompt has to hear about it — waking, sleeping, a mode change and a route
+     document arriving all come through here. */
+  paintPrompt();
 }
 
 function setPtt(v, remember){
+  /* …except on a wall, which is speak only. Enforced here rather than at each
+     caller for the same reason voice only is: the stored preference, the
+     button and the shared document are three ways in, and a hallway screen
+     that quietly went back to needing a space bar would look broken to
+     everyone who walked up to it. */
+  if (Wall.onWall) v = false;
   S.ptt = !!v;
   if (remember) Prefs.set('ptt', S.ptt);
   PTT.up();                              // never leave the gate stuck open

@@ -1561,6 +1561,16 @@ it. Each entry below carries its own panel scope.
   axes: day and night in one hallway share an appearance and differ only in the
   dim, and a laptop can be given larger type without being told to drift.
 
+  **Speak only, and it says what to say.** A wall is voice only and in the
+  listening mode from the moment it is marked one — push-to-talk holds a SPACE
+  bar that a tablet on a wall does not have. And because a silent figure tells
+  a passer-by nothing, a wall carries one dim line naming the wake word, drawn
+  into the picture and travelling with it while the screensaver drifts.
+
+  **Dark hours beside the idle dim.** Idle asks whether anybody has been here
+  recently; only a clock keeps a hallway dark after somebody walks past it at
+  three in the morning.
+
   *Panel:* on a wall, voice only, and one profile from each list, on each
   display in the list the phase above builds — with the profiles themselves set
   once, centrally.
@@ -1885,6 +1895,50 @@ set centrally, three settings on each device's row, and nothing in any of them
 that touches what this server will answer — it is entirely canvas and presentation, which is the whole
 reason it was split from phase 2.
 
+- **A wall is voice only and speak only from one tick.** Both follow from what
+  the thing is rather than being boxes to find. Voice only defaults on, which
+  is safe only because `wall` gates it — a row that is not on a wall carries it
+  and does not apply it. And push-to-talk holds the SPACE bar: a tablet bolted
+  to a wall has no space bar, so a screen whose interaction model needs a
+  keyboard nobody standing in front of it has is a workstation somebody screwed
+  to a wall. SPACE is removed there, the same way TEXT is, and forced off in
+  `setPtt` rather than at each caller.
+- **That is also what made the resting prompt true.** The wake gate is inactive
+  in push-to-talk, so *say the name* was an instruction that did nothing — the
+  prompt correctly refused to draw itself, which is how the default was found
+  at all.
+- **A screen on a wall now says what to say to it.** One dim line low in the
+  frame, for the person walking past who has no way of knowing a silent figure
+  listens — and on a voice-only display there is no transcript or composer to
+  suggest otherwise. Never on a browser tab, which somebody opened on purpose,
+  and not while a conversation is happening, when everything else on screen is
+  saying more than it could.
+- **While it drifts the prompt is painted into the picture**, travelling with
+  the figure and fading with the ease. Left in the DOM it would have been the
+  one thing holding still on a screen whose entire purpose at that moment is
+  that nothing does; removed altogether it would have been missing for exactly
+  the person it is for, who walks up to a screen that has been idle for hours.
+- **Dark hours, because idle cannot express "it is three in the morning".**
+  Somebody walking past at 3am wakes an idle-dimmed screen to full brightness
+  for the rest of the night. So a screensaver profile carries a window and a
+  dim of its own, read off the DEVICE's clock — a building with screens in two
+  time zones wants each dark at its own two. Equal endpoints are no window; a
+  start later than an end wraps midnight, which is the ordinary case. The two
+  dims resolve to the darker rather than the sum, so nothing goes past black.
+- **A touch target is about fingers, not window width.** The 44-pixel minimum
+  was keyed to `max-width: 560px`, which is right for a phone and wrong for
+  every tablet: a wall screen in portrait at 800 points never reaches that
+  breakpoint and was handing a finger a 22-pixel-high button. On a voice-only
+  display that is not cosmetic — TALK is the only thing that can open a
+  microphone, so the one control that had to be hittable was the smallest thing
+  on the screen. `pointer: coarse` asks what was actually meant; width still
+  decides whether the words fit.
+- **Portrait was measured rather than assumed, and the geometry was fine.** The
+  figure is scaled by the shorter side, so it holds a constant 85% of the width
+  in portrait against 50% in landscape and never approaches an edge at any
+  aspect — checked at three sizes. What portrait turned up was the touch
+  targets above, which are not a portrait bug at all; they were simply invisible
+  until somebody looked at a screen shaped like a wall display.
 - **A place can have an appearance of its own.** The LOOK tab was one
   document for every viewer, so a deployment with a hallway screen and a laptop
   in it had no arrangement where both were right — one of them was wrong by

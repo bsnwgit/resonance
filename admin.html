@@ -1767,23 +1767,46 @@ than snapping, and it never starts while an answer is being thought about or
 spoken. The transcript, the composer and the status line hide while it drifts,
 and come back the instant the screen is touched.
 
+<b>Dark from / until</b> is a different question from the idle delay, and the
+reason it exists: idle asks whether anybody has been here recently, and only a
+clock keeps a hallway dark after somebody walks past it at three in the
+morning. Set the two hours the same and there is no dark window. A start later
+than an end wraps midnight, which is the ordinary case — <b>22:00</b> to
+<b>07:00</b> is what you mean.
+
+The two dims never add up. Whichever is darker at that moment wins, so a screen
+already drifting at night does not go past black.
+
+The hours are read off <b>the device's own clock</b>, not this server's. A
+building with screens in two time zones wants each of them dark at its own two
+in the morning.
+
 Deleting a profile clears it from every device that named it, the same way
 deleting a display clears it from every endpoint. Nothing keeps drifting to
 numbers that are no longer here.
 
-<b>On a device</b>, under Created Access, tick <b>On a wall</b> and two
-controls appear: which profile it uses, and whether it is <b>voice only</b>.
-Those are separate on purpose — a wall screen can be voice only without ever
-drifting, and a shared television can drift while still showing its transcript.
-Untick it and the screen goes back to being an ordinary page; what you chose is
-kept, so putting it back up restores it.
+<b>On a device</b>, under Created Access, tick <b>On a wall</b> and three
+controls appear: an appearance profile, a screensaver profile, and whether it
+is <b>voice only</b>. Untick it and the screen goes back to being an ordinary
+page; what you chose is kept, so putting it back up restores it.
 
-<b>Voice only</b> is the geometry alone: no transcript, no composer. It is the
-one setting that beats the viewer's own control, because it is a policy for a
-place rather than the preference of whoever walked past. On that screen the
-TEXT button is <i>removed</i> rather than left there refusing — but TALK stays,
-because a browser will not open a microphone unless somebody asks it to, and a
-screen with no TALK button could never hear its own wake word.
+<b>A wall is voice only and speak only the moment you tick it.</b> No text box
+— voice only arrives already ticked, and you untick it for the case that wants
+a transcript. And no keyboard: push-to-talk holds the SPACE bar, which a tablet
+on a wall does not have, so a wall always listens and the SPACE button is
+removed from that screen. That is also what makes the wake word real, because
+the gate is inactive in push-to-talk.
+
+TEXT and SPACE are <i>removed</i> rather than left there refusing. TALK and
+AUDIO stay — a browser will not open a microphone unless somebody asks it to,
+so TALK is pressed once when the screen is commissioned.
+
+<b>It says what to say to it.</b> A wall carries one dim line low in the frame
+— <i>say “kitchen”</i>, in whatever the wake words are — for the person walking
+past who has no way of knowing it listens. Never on a browser tab, and not
+while somebody is talking to it. While the screensaver drifts it is drawn into
+the picture and travels with it, because taking it away would lose it for
+exactly the person it is for.
 
 <b>When a device takes a change.</b> One still waiting on a decision asks this
 server every twenty seconds and takes it within seconds. One that is already
@@ -4007,7 +4030,8 @@ $('b_addsaver').addEventListener('click', ()=>{
   /* Something sensible rather than an empty row: three minutes, three
      quarters, and enough dim to matter. Nobody's first act should be typing
      numbers into a thing they have not seen yet — press PREVIEW, then adjust. */
-  DPSAVERS.push({id: '', name: '', delay: 180, scale: 70, dim: 45});
+  DPSAVERS.push({id: '', name: '', delay: 180, scale: 70, dim: 45,
+                 night_from: 0, night_to: 0, night_dim: 0});
   // Open, because it is the one you just made and the whole reason you
   // pressed the button. A new row that arrived shut would be a list that
   // grew by one line and nothing else.
@@ -4183,6 +4207,14 @@ function paintLooks(list){
   const btn = $('b_addlook');
   if (btn) btn.disabled = DPLOOKS.length >= 8;
 }
+/* Just the numbers, without the id and the name — what a display is sent and
+   what the preview is driven with. */
+function saverOf(s){
+  return {delay: s.delay, scale: s.scale, dim: s.dim,
+          night_from: s.night_from, night_to: s.night_to,
+          night_dim: s.night_dim};
+}
+
 /* Just the four values, without the id and the name — what a display is sent
    and what the preview is driven with. */
 function lookOf(s){
@@ -4205,7 +4237,10 @@ let DPSAVERS = [];
 function paintSavers(list){
   DPSAVERS = (list || []).map(s=> ({id: s.id || '', name: s.name || '',
                                     delay: s.delay | 0, scale: s.scale | 0,
-                                    dim: s.dim | 0}));
+                                    dim: s.dim | 0,
+                                    night_from: s.night_from | 0,
+                                    night_to: s.night_to | 0,
+                                    night_dim: s.night_dim | 0}));
   const box = $('dp_savers');
   if (!box) return;
   box.innerHTML = '';
@@ -4246,8 +4281,14 @@ function paintSavers(list){
        must not still say what it used to. */
     const retitle = ()=>{
       nmt.textContent = (s.name || '').trim() || 'unnamed profile';
-      sum.textContent = s.delay ? s.delay + 's · ' + s.scale + '% · dim ' + s.dim + '%'
-                                : 'NEVER STARTS';
+      const drift = s.delay ? s.delay + 's · ' + s.scale + '% · dim ' + s.dim + '%'
+                            : 'never drifts';
+      const hr = (h)=> (h < 10 ? '0' : '') + h + ':00';
+      const dark = (s.night_dim && s.night_from !== s.night_to)
+        ? ' · dark ' + hr(s.night_from) + '–' + hr(s.night_to) + ' by ' + s.night_dim + '%'
+        : '';
+      sum.textContent = (drift + dark) === 'never drifts' ? 'DOES NOTHING'
+                                                          : drift + dark;
     };
     retitle();
     top.onclick = (e)=>{
@@ -4275,24 +4316,56 @@ function paintSavers(list){
     namerow.appendChild(nm);
     row.appendChild(namerow);
 
+    /* Six controls, two to a line. The first three are what it does when
+       nobody has been there; the last three are what it does at night
+       whether anybody has or not. */
     const nums = document.createElement('div');
-    nums.className = 'svnums';
-    [['delay', 'Idle seconds', 0, 86400],
-     ['scale', 'Shrinks to %', 30, 90],
-     ['dim',   'Dims by %',    0, 85]].forEach(([k, label, lo, hi])=>{
+    nums.className = 'cols2';
+    const cell = (label)=>{
       const w = document.createElement('div');
       const l = document.createElement('label');
       l.className = 'bklab';
       l.textContent = label;
+      w.appendChild(l);
+      nums.appendChild(w);
+      return w;
+    };
+    [['delay', 'Idle seconds', 0, 86400],
+     ['scale', 'Shrinks to %', 30, 90],
+     ['dim',   'Dims by %',    0, 85]].forEach(([k, label, lo, hi])=>{
       const inp = document.createElement('input');
       inp.type = 'number'; inp.min = lo; inp.max = hi; inp.value = s[k];
       inp.oninput = ()=>{
         DPSAVERS[i][k] = s[k] = parseInt(inp.value, 10) || 0;
         retitle();
+        if (SVSHOWN === i) cmd('wall', {saver: saverOf(s)});
       };
-      w.appendChild(l); w.appendChild(inp);
-      nums.appendChild(w);
+      cell(label).appendChild(inp);
     });
+    [['night_from', 'Dark from'], ['night_to', 'Dark until']].forEach(([k, label])=>{
+      const sel = document.createElement('select');
+      for (let h = 0; h < 24; h++){
+        const o = document.createElement('option');
+        o.value = String(h);
+        o.textContent = (h < 10 ? '0' : '') + h + ':00';
+        sel.appendChild(o);
+      }
+      sel.value = String(s[k]);
+      sel.onchange = ()=>{
+        DPSAVERS[i][k] = s[k] = parseInt(sel.value, 10) || 0;
+        retitle();
+        if (SVSHOWN === i) cmd('wall', {saver: saverOf(s)});
+      };
+      cell(label).appendChild(sel);
+    });
+    const nd = document.createElement('input');
+    nd.type = 'number'; nd.min = 0; nd.max = 85; nd.value = s.night_dim;
+    nd.oninput = ()=>{
+      DPSAVERS[i].night_dim = s.night_dim = parseInt(nd.value, 10) || 0;
+      retitle();
+      if (SVSHOWN === i) cmd('wall', {saver: saverOf(s)});
+    };
+    cell('Dark by %').appendChild(nd);
     row.appendChild(nums);
 
     const acts = document.createElement('div');
@@ -4308,8 +4381,7 @@ function paintSavers(list){
     show.onclick = ()=>{
       const on = SVSHOWN !== i;
       SVSHOWN = on ? i : -1;
-      cmd('wall', {voice_only: false,
-                   saver: {delay: s.delay, scale: s.scale, dim: s.dim}});
+      cmd('wall', {voice_only: false, saver: saverOf(s)});
       cmd('drift', on);
       paintSavers(DPSAVERS);
     };
@@ -4410,7 +4482,9 @@ function wallBlock(d){
     p=> [p.palette, p.layout, p.mode, 'size ' + p.fs].join(' · '));
   const sel = picker('Screensaver', 'NONE — it never drifts',
     (DPCFG && DPCFG.savers) || [], d.saver,
-    p=> (p.delay ? p.delay + 's' : 'never') + ', ' + p.scale + '%, dim ' + p.dim + '%');
+    p=> (p.delay ? p.delay + 's, ' + p.scale + '%, dim ' + p.dim + '%' : 'never drifts')
+        + (p.night_dim && p.night_from !== p.night_to
+           ? ', dark by ' + p.night_dim + '%' : ''));
   box.appendChild(inner);
 
   const sync = ()=> inner.classList.toggle('off', !wall.checked);

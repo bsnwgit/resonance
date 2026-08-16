@@ -204,6 +204,22 @@ profile it uses, and which screensaver profile. Untick it and the screen goes
 back to being an ordinary page, with all three kept: putting the device back up
 restores what you chose.
 
+**A wall is voice only and speak only from the moment you tick it.** Both
+follow from what the thing is rather than being two more boxes to find:
+
+- **No text box.** Voice only arrives already ticked. Untick it for the case
+  that wants a transcript — a television in a meeting room, a screen somebody
+  reads — but the default is the geometry alone.
+- **No keyboard.** Push-to-talk holds the SPACE bar, and a tablet bolted to a
+  wall has no space bar. So a wall is always in the listening mode, and the
+  SPACE button is removed from that screen rather than left there. This is also
+  what makes the wake word real: the gate is inactive in push-to-talk, so on a
+  wall the name is the way in.
+
+TALK and AUDIO stay. A browser will not open a microphone unless somebody asks
+it to, so TALK is pressed once when the screen is commissioned and the wake word
+carries it from there.
+
 Neither changes what this server will answer. This is entirely what the screen
 looks like.
 
@@ -224,6 +240,18 @@ an ordinary tab gets that person's own setting back.
 TALK, AUDIO and SPACE stay. A browser will not open a microphone without
 somebody asking it to, so a display with no TALK button is a display that could
 never hear its own wake word. Voice only means no text, not no controls.
+
+**It says what to say to it.** A screen on a wall is walked past by people who
+have never used it, and nothing about a silent figure suggests that it listens.
+So a wall display carries one dim line low in the frame — *say “kitchen”*, in
+whatever the wake words actually are. It is there only while nobody is talking
+to it, only where a wake word exists, and never on a browser tab: somebody who
+opened the page did so on purpose.
+
+While the screensaver drifts, that line is **drawn into the picture** and moves
+with it. Taking it away would lose it for exactly the person it is for — who
+walks up to a screen that has been idle for hours — and leaving it where it was
+would be the one thing on a drifting screen that never moved.
 
 **Both profiles are chosen from lists set centrally**, under *Appearance
 profiles* and *Screensaver profiles*. All three settings are deliberately
@@ -285,6 +313,8 @@ Up to eight profiles, each a name and three numbers:
 | **Idle seconds** | how long with nobody speaking to it and nobody touching it. **0 never starts**, which is how you park a profile without deleting it and unpicking every device that names it |
 | **Shrinks to %** | how far down it scales first. Shrinking is what creates the margin to move within: drawn edge to edge there is nowhere to go, and moving it would only clip the sides |
 | **Dims by %** | how much light comes off it while it drifts |
+| **Dark from / until** | the hours a dim runs regardless of anybody being there. Set them the same for no dark window; a start later than an end wraps midnight, so **22:00** to **07:00** is what you mean |
+| **Dark by %** | how much light comes off it during those hours |
 
 Four things worth knowing about the behaviour:
 
@@ -293,6 +323,13 @@ Four things worth knowing about the behaviour:
   calmer to share a room with. The travel is exactly the margin the shrink
   bought, so nothing is ever cut off, and the path does not repeat: two nights
   running do not light the same pixels in the same order.
+- **Dark hours are a different question from the idle delay**, and that is why
+  they are both here. Idle asks whether anybody has been here recently; only a
+  clock keeps a hallway dark after somebody walks past it at three in the
+  morning. The two dims never add up — whichever is darker at that moment wins,
+  so a screen already drifting at night does not go past black. The hours are
+  read off **the device's own clock**, not the server's, so a building with
+  screens in two time zones has each of them dark at its own two in the morning.
 - **The dim does more than the movement does.** Reducing brightness is the
   strongest thing available against burn-in, and it is independently what a
   screen in a hallway should do at two in the morning. It is not the same as

@@ -63,12 +63,27 @@ Hides the transcript and gives the space to the figure. The conversation still
 happens — this only affects what is on screen. Turn it off for a display that
 is mostly being looked at rather than read.
 
-**On some screens this button is not there.** A display mounted on a wall can be
-set to voice only by whoever runs it, and then there is no transcript and no
-typing on that screen at all — only the figure and your voice. The button is
-taken away rather than left there refusing you, because a control that ignores
-you is worse than one that was never offered. Everything else works exactly as
-it does anywhere else.
+**On some screens this button is not there.** A display mounted on a wall is
+voice only, and then there is no transcript and no typing on that screen at all
+— only the figure and your voice. The button is taken away rather than left
+there refusing you, because a control that ignores you is worse than one that
+was never offered.
+
+**A wall screen has no SPACE button either.** Holding the space bar is a way of
+talking to it that assumes a keyboard, and a screen on a wall does not have one.
+Those screens always listen, so you say the wake word instead — which is what
+the line low on the screen is telling you.
+
+## What to say to it
+
+A screen on a wall shows one dim line near the bottom: **say “kitchen”**, or
+whatever it has been named. That is the whole instruction. Say it, wait for the
+figure to react, then ask your question.
+
+The line is not there while you are talking to it — the answer is more use than
+the instruction — and it comes back when the conversation ends. If the screen
+has drifted into its screensaver, the line has drifted with it and is sitting
+under the figure wherever that has got to.
 
 ## When the screen shrinks and dims
 

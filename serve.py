@@ -1130,7 +1130,13 @@ DISPLAY_DEFAULTS = {
     # PER DEVICE rather than part of a screensaver profile, because they are
     # separate axes: a wall screen can be voice only without ever drifting, and
     # a shared television can drift while still showing its transcript.
-    "voice_only": False,
+    #
+    # ON BY DEFAULT, which is safe precisely because `wall` gates it: a row
+    # that is not on a wall carries this and does not apply it. What it buys is
+    # that ticking "on a wall" is one gesture rather than two — a screen bolted
+    # to a wall is voice only unless somebody says otherwise, which is the way
+    # round that matches what the thing is for.
+    "voice_only": True,
     # …and WHICH SCREENSAVER, by the id of a profile in the settings below.
     # Empty is none, and none is the default: an upgrade that quietly started
     # moving every screen in a building would be this deciding something nobody
@@ -1163,12 +1169,26 @@ SAVER_LIMITS = {"delay": (15, 24 * 3600),
                 # Not 100: a screen dimmed the whole way is switched off, and
                 # switching a screen off is a different feature with different
                 # consequences — you cannot see that it is still working.
-                "dim": (0, 85)}
+                "dim": (0, 85),
+                # ---- and the same again, on a clock ----
+                # A hallway at two in the morning should be dark whether or not
+                # anybody has just walked past it, which the idle dim above
+                # cannot express: somebody walking by at 3am wakes the screen to
+                # full brightness for the rest of the night.
+                #
+                # The hours the dark runs between. EQUAL MEANS OFF — one field
+                # cannot say "no window" on its own, and a separate switch to
+                # say it would be a third control for a thing two already
+                # imply. A `from` later than `to` wraps midnight, which is the
+                # ordinary case rather than the exception.
+                "night_from": (0, 23), "night_to": (0, 23),
+                "night_dim": (0, 85)}
 #: What a device gets when it names no profile, or names one that has since
 #: been deleted. Off, in both cases, and deliberately the same answer: a screen
 #: pointing at a profile nobody can see any more must not keep drifting to
 #: numbers that exist nowhere in the panel.
-SAVER_OFF = {"delay": 0, "scale": 70, "dim": 45}
+SAVER_OFF = {"delay": 0, "scale": 70, "dim": 45,
+             "night_from": 0, "night_to": 0, "night_dim": 0}
 
 #: The appearance a PLACE overrides, and the whole of it. Everything else on
 #: LOOK, MOTION and SPEECH stays in the one shared document, so tuning the
@@ -1310,6 +1330,9 @@ def clean_savers(raw):
             except (TypeError, ValueError):
                 v = SAVER_OFF[k]
             row[k] = 0 if (k == "delay" and v <= 0) else min(hi, max(lo, v))
+        # A window of zero length is no window, however it was written.
+        if row["night_from"] == row["night_to"]:
+            row["night_dim"] = 0
         out.append(row)
     return out
 
@@ -1446,7 +1469,10 @@ def validate_display_settings(obj, current):
                     continue             # never starts, which is a real answer
                 if not (lo <= v <= hi):
                     return None, ("%s must be between %d and %d" % (k, lo, hi)
-                                  + (" — or 0 for never" if k == "delay" else ""))
+                                  + (" — or 0 for never" if k == "delay" else "")
+                                  + (" (an hour of the day)"
+                                     if k.startswith("night_") and k != "night_dim"
+                                     else ""))
         cfg["savers"] = clean_savers(obj["savers"])
     if "looks" in obj:
         if not isinstance(obj["looks"], (list, tuple)):
