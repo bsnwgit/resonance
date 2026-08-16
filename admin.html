@@ -3258,7 +3258,10 @@ $('b_appsave').addEventListener('click', async ()=>{
    Fields are addressed by `data-f` within a block rather than by id, because
    there are now several of every field on the page and an id can only ever
    name one of them. */
-const RT_FIELDS = ['name','wakeword','aliases','greeting','voice','base_url',
+/* greeting and voice are gone: a speech profile carries both, and an endpoint
+   names one. Two endpoints wanting the same voice used to be two copies of the
+   same choice. */
+const RT_FIELDS = ['name','wakeword','aliases','speech','base_url',
                    'model','system','keep_alive','agent_id'];
 const RT_SLIDERS = {max_tokens:  v=> v,
                     temperature: v=> (+v).toFixed(2),
@@ -3390,17 +3393,20 @@ Devices enrol themselves and are approved under ACCESS.</div>
   </div>
 
   <div class="subgrp" data-g="voice">
-    <h5>Greeting &amp; voice<span class="subsum"></span></h5>
+    <h5>Speech<span class="subsum"></span></h5>
     <div class="subbody">
-  <label class="bklab">Greeting</label>
-  <input data-f="greeting" type="text" spellcheck="false" autocomplete="off"
-         placeholder="leave blank for the shared phrases">
-  <label class="bklab">Voice</label>
-  <select data-f="voice"></select>
-  <div class="note help">The greeting is spoken when its wake word is said and
-nothing else; blank falls back to the phrases on the SPEECH tab. Give the
-endpoints different voices and you can tell which replied without looking at
-the screen — which is all a wall display offers.</div>
+  <select data-f="speech" class="ppick"></select>
+  <div class="note help">Which <b>speech profile</b> answers for this endpoint —
+the voice, the engine, the rate and pitch, and the greeting phrases. Blank is
+the deployment's default.
+
+This used to be a greeting and a voice typed onto each endpoint, which meant
+two endpoints wanting the same voice were two copies of the same choice, and
+changing it was a change in as many places as you had endpoints. Build it once
+under SPEECH and point at it.
+
+Give the endpoints different profiles and you can tell which replied without
+looking at the screen — which is all a kiosk offers.</div>
     </div>
   </div>
 
@@ -3707,18 +3713,24 @@ function blockPaint(blk, r){
     const h = blk.querySelector('[data-g="' + g + '"] .subsum');
     if (h) h.textContent = sums[g];
   });
-  const voice = F(blk, 'voice');
-  if (voice){
-    const want = r.voice || '';
-    voice.innerHTML = '';
-    const opts = [['', 'the shared voice']].concat((RT.voices || []).map(v=> [v, v]));
-    if (want && !(RT.voices || []).includes(want))
-      opts.push([want, want + ' — not installed here']);
+  /* The speech profiles, by name. A profile that has been deleted is still
+     offered on the row that names it, marked, rather than silently becoming
+     "the default" in a select the admin never touched. */
+  const sp = F(blk, 'speech');
+  if (sp){
+    const want = r.speech || '';
+    const pool = (DPCFG && DPCFG.speeches) || [];
+    const def  = pool.filter(x=> x.id === ((DPCFG && DPCFG.speech_default) || ''))[0];
+    sp.innerHTML = '';
+    const opts = [['', def ? 'DEFAULT — ' + def.name : 'DEFAULT']]
+                   .concat(pool.map(x=> [x.id, x.name]));
+    if (want && !pool.some(x=> x.id === want))
+      opts.push([want, 'a profile that no longer exists']);
     opts.forEach(([v, label])=>{
       const o = document.createElement('option');
-      o.value = v; o.textContent = label; voice.appendChild(o);
+      o.value = v; o.textContent = label; sp.appendChild(o);
     });
-    voice.value = want;
+    sp.value = want;
   }
   // buttons that only mean something once it exists on the server
   const set = (a, hide, label)=>{

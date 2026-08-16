@@ -618,6 +618,11 @@ ROUTES_PATH = os.path.join(ROOT, "routes.json")
 _routes_lock = threading.Lock()
 
 ROUTE_PRESENTATION = ("name", "greeting", "voice")
+#: …and where those two now come FROM. A route names a speech profile, and the
+#: profile carries the voice, the engine, the rate and the greeting phrases —
+#: everything a route used to hold a private copy of. Two screens wanting the
+#: same voice used to mean typing it twice.
+ROUTE_SPEECH_KEYS = ("ttsvoice", "ttsengine", "vrate", "vpitch", "greetings")
 ROUTE_ROUTING = ("wakeword", "aliases", "strict")
 #: everything else is BACKEND_DEFAULTS, and it is the connection half
 ROUTE_PUBLIC = ROUTE_PRESENTATION + ROUTE_ROUTING
@@ -630,6 +635,9 @@ ROUTE_DEFAULTS.update({
     # of a route having a voice as well.
     "greeting": "",
     "voice": "",                 # blank = whatever the shared settings chose
+    # Which speech profile answers for this route. Blank is the deployment's
+    # default, the same rule a device follows.
+    "speech": "",
     "wakeword": "resonance",
     "aliases": [],
     # Exact matching, for routes that DO things rather than answer. The same
@@ -770,6 +778,20 @@ def route_order(doc):
     return ([doc["default"]] if doc["default"] in doc["routes"] else []) + rest
 
 
+def _speech_pool():
+    try:
+        return display_settings()["speeches"]
+    except Exception:
+        return []
+
+
+def _speech_default():
+    try:
+        return display_settings()["speech_default"]
+    except Exception:
+        return ""
+
+
 def public_routes(doc, disp=None):
     """The two halves a browser may see. The connection half is not omitted
     from the serialisation by accident — it is enumerated the other way
@@ -794,6 +816,21 @@ def public_routes(doc, disp=None):
         if not rec.get("enabled", True):
             continue
         row = {k: rec[k] for k in ROUTE_PRESENTATION}
+        # Resolved here, so a browser is handed a voice rather than the name of a
+        # profile it has no business knowing the rest of. A route naming none
+        # falls back to the deployment's default speech profile, and one whose
+        # profile has been deleted falls back with it rather than going silent.
+        prof = find_look(str(rec.get("speech") or ""), _speech_pool()) \
+               or find_look(_speech_default(), _speech_pool()) or {}
+        for k in ROUTE_SPEECH_KEYS:
+            if k in prof:
+                row[k] = prof[k]
+        # A route's own greeting still wins where somebody typed one: the
+        # profile is the deployment's voice, the route's line is this one's.
+        if not row.get("greeting") and prof.get("greetings"):
+            row["greeting"] = prof["greetings"]
+        if not row.get("voice") and prof.get("ttsvoice"):
+            row["voice"] = prof["ttsvoice"]
         row.update(id=rid, allowed=display_may(disp, rec))
         if disp:
             row.update({k: rec[k] for k in ROUTE_ROUTING})
@@ -853,6 +890,13 @@ def validate_route(obj, current, doc, rid=None):
     for k in ("name", "greeting", "voice"):
         if k in obj:
             rec[k] = str(obj[k] or "").strip()[:200]
+    if "speech" in obj:
+        pid = str(obj["speech"] or "")[:16]
+        if pid and not any(p["id"] == pid
+                           for p in display_settings()["speeches"]):
+            return None, ("that speech profile no longer exists — reload the "
+                          "panel to see the current list")
+        rec["speech"] = pid
     if not rec["name"]:
         return None, "a route needs a name"
     if "strict" in obj:
