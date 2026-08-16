@@ -367,6 +367,13 @@
                 border-left:2px solid rgba(var(--glass),.22)}
   .profsettings .grp{border:0;margin:0;padding:0}
   .profsettings .grp + .grp{margin-top:9px}
+  /* An endpoint's subsections are .subgrp rather than .grp, so they need
+     saying separately — but they are the same thing to the eye: a caret, a
+     name, and a body that opens. */
+  .erow[data-rid] .subgrp{border:0;margin:0}
+  .erow[data-rid] .subgrp + .subgrp{margin-top:9px}
+  .erow[data-rid] .subwrap{margin:8px 0 2px;padding-left:9px;
+                           border-left:2px solid rgba(var(--glass),.22)}
 
   /* the first topic's own top rule would double up with the box edge */
   #grpbox .grp:first-of-type{border-top:0;margin-top:6px}
@@ -3578,13 +3585,15 @@ out loud, so ask for plain prose.</div>
 
   </div><!-- /subwrap -->
 
+  <!-- The same shape as a profile's foot: what this endpoint IS on the left,
+       committing it and ending it on the right. -->
   <div class="rtacts">
-    <button data-a="save" class="act-save">SAVE</button>
-    <button data-a="test">TEST</button>
     <button data-a="default">MAKE DEFAULT</button>
+    <button data-a="test">TEST</button>
     <button data-a="enable">SWITCH OFF</button>
-    <span class="spacer"></span>
     <button data-a="forget" class="act-undo">FORGET KEY</button>
+    <span class="spacer"></span>
+    <button data-a="save" class="act-save">SAVE</button>
     <button data-a="delete" class="act-danger">DELETE</button>
   </div>
   <div class="note" data-r="note"></div>
