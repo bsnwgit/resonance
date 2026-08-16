@@ -684,6 +684,18 @@
   /* Reads as part of the line above it: the same size as the tick's own
      words, and only as wide as the longest thing it can say rather than
      stretched across the row. */
+  /* A flex item will not shrink below its own content unless it is told it
+     may, and a select's content is its widest option. Without min-width the
+     appearance picker sat at the width of its longest profile name and ran
+     straight out of the box. */
+  #dp_kiosks .namerow{min-width:0}
+  #dp_kiosks .namerow select.ppick{
+    flex:1 1 auto;min-width:0;max-width:100%;box-sizing:border-box;
+    padding:3px 6px;font:inherit;
+    font-size:calc(9px * var(--fs));letter-spacing:.06em;
+    background:rgba(0,0,0,.55);color:rgba(var(--paper),.96);
+    border:1px solid rgba(var(--glass),.16);outline:0;
+  }
   .kiosk select.kpick{
     width:auto;max-width:100%;padding:3px 6px;font:inherit;
     font-size:calc(9px * var(--fs));letter-spacing:.06em;
@@ -4778,7 +4790,7 @@ function paintKiosks(list, def){
 
     const picker = (label, key, blank, pool, summary)=>{
       const sel = document.createElement('select');
-      sel.className = 'nmedit';
+      sel.className = 'ppick';
       const none = document.createElement('option');
       none.value = ''; none.textContent = blank;
       sel.appendChild(none);
@@ -4792,13 +4804,16 @@ function paintKiosks(list, def){
       sel.onchange = ()=>{ DPKIOSKS[i][key] = k[key] = sel.value; retitle(); };
       field(label, sel);
     };
-    picker('Appearance', 'look', 'SHARED — whatever the APPEARANCE tab says',
+    /* Short option text on purpose. A select is as wide as its longest option
+       whatever you do to it, so the sentence that used to sit in the empty
+       slot — "whatever the APPEARANCE tab says" — set the width of the control
+       and pushed it past the edge of the box. What it means is under the ?. */
+    picker('Appearance', 'look', 'SHARED',
       (DPCFG && DPCFG.looks) || [],
-      p=> [p.palette, p.layout, p.mode, 'size ' + p.fs].join(' · '));
-    picker('Screensaver', 'saver', 'NONE — it never drifts',
+      p=> [p.palette, p.mode].join(' · '));
+    picker('Screensaver', 'saver', 'NONE',
       (DPCFG && DPCFG.savers) || [],
-      p=> (p.delay ? p.delay + 's, ' + p.scale + '%, dim ' + p.dim + '%'
-                   : 'never drifts'));
+      p=> (p.delay ? p.delay + 's · ' + p.scale + '%' : 'off'));
 
     const acts = document.createElement('div');
     acts.className = 'acts';
