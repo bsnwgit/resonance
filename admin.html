@@ -334,6 +334,11 @@
   /* Same measure as the header, so the pinned entries and the identity stay
      in one column down the left rather than a row of buttons a metre wide. */
   #panelfoot > *{max-width:560px}
+  /* …except the tab row, which carries two groups either side of a rule and
+     has to run the whole width out to the preview edge, the same as the row at
+     the top. Capping it at a readable measure left the rule and Connections
+     stranded in the left half of the panel. */
+  #panelfoot > .tabrow{max-width:none}
   /* nothing but the tab row lives here now — the identity moved to the bar
      at the top of the panel, where it does not scroll away */
   /* the one state where the admin's view and everyone else's disagree */
