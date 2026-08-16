@@ -4604,7 +4604,15 @@ function paintProfiles(kind, list, def){
       pr.values = tabKeys(kind.tab);
       pr._new = false;
       retitle();
+      /* Closed on save: the row is finished with, and leaving it open leaves
+         the tab showing a profile you have stopped editing. Closing also puts
+         the default back into the live settings, which is what an ordinary
+         display gets — so the tab goes back to describing the deployment
+         rather than one profile in it. */
+      OPENPR[kind.key] = -1;
+      loadProfile(kind, defaultOf(kind));
       saveProfileList(kind);
+      reRender();
     };
     acts.appendChild(save);
 
@@ -4649,9 +4657,12 @@ function paintProfiles(kind, list, def){
   if (seeding) saveProfileList(kind);
   const btn = $(kind.add);
   if (btn){
-    const fresh = arr.some(x=> x._new);
-    btn.hidden = fresh;
-    btn.disabled = fresh || arr.length >= 8;
+    /* Hidden while any profile is open — one being written and one being
+       edited are the same situation, and offering to start a third under the
+       one you are in the middle of is the same clutter either way. */
+    const busy = arr.some(x=> x._new) || OPENPR[kind.key] >= 0;
+    btn.hidden = busy;
+    btn.disabled = busy || arr.length >= 8;
   }
 }
 
