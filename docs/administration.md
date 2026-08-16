@@ -130,10 +130,10 @@ The DEVICES tab holds six topics:
 | | |
 |---|---|
 | **Requested Access** | whether a general user needs approval at all, and what a grant to one is worth once given |
+| **The request form** | what a request asks for — beneath the setting that decides whether anyone is asked at all |
 | **Created Access** | the queue: everything waiting on a decision, on a code being typed in, or on somebody asking again — and where you add one |
 | **Appearance profiles** | what a place looks like, for the handful of values that cannot be shared |
 | **Screensaver profiles** | what a screen on a wall does when nobody is there |
-| **The request form** | what a request asks for |
 | **Connected devices** | everything that is simply working, most recently heard from first |
 
 Created Access and Connected devices are separate lists on purpose. One is a to-do list and empties as
