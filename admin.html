@@ -360,7 +360,12 @@
      topics into 300px columns, this one takes the full width of them — rows
      that read across need the room, and a device row has four things on it
      before the profile picker lands. */
-  #grpbox .grp.bare{grid-column:1 / -1}
+  /* Out to the same edges as the tab row above: a list is not a settings
+     column, and the box's own inset left it starting short of the tabs. The
+     negatives are the box's padding plus its border, so the two line up. */
+  #grpbox .grp.bare{grid-column:1 / -1;margin-left:-11px;margin-right:-11px}
+  #grpbox .grp.bare > .barehead,
+  #grpbox .grp.bare > .grpbody{padding-left:11px;padding-right:11px}
   /* Inside a profile the controls are part of the row, not topics in the box:
      no frame of their own, indented under the name they belong to. */
   .profsettings{margin:8px 0 2px;padding-left:9px;
