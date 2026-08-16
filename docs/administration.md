@@ -48,7 +48,7 @@ At the top:
 At the foot, pinned so they are always reachable:
 
 - **APP SETTINGS** — how the server itself is wired: where it can be reached
-  from, signing in, ports, sessions, and what the two transcript labels say.
+  from, signing in, ports and sessions.
 - **ACCOUNTS** — who can sign in, and the groups access is granted to.
 - **ACCESS** — what may use this server, and what each may reach.
 - **EMBEDS** — keys that let another application frame this interface.
