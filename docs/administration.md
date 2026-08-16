@@ -35,11 +35,12 @@ At the top:
 - **filter settings** — type to search across every topic in every tab at
   once. This is the fastest way to find a control when you know roughly what
   it is called but not which tab it lives under.
-- **APPEARANCE / GEOMETRY / SPEECH**, **AI** and **DEVICES** — the profile
-  settings row. The first three are lists of profiles, and the controls for one
-  appear inside it when you open it. AI holds the endpoints, each naming a
-  speech profile. DEVICES is the register: every device this server knows
-  about, and where each one is set up.
+- **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER / DEVICE** — the profile
+  settings group. Each is a list of profiles, and the controls for one appear
+  inside it when you open it.
+- **AI** and **DEVICES** — the connections group, to the right of a rule. AI
+  holds the endpoints, each naming a speech profile. DEVICES is the register:
+  every device this server knows about, and where each one is set up.
 - **?**, beside the SETTINGS title — these documents. It is blue, and it is the
   same blue as every ? beside a topic heading, so help is one colour wherever
   you meet it.
@@ -48,8 +49,6 @@ At the foot, pinned so they are always reachable:
 
 - **APP SETTINGS** — how the server itself is wired: where it can be reached
   from, signing in, ports, sessions, and what the two transcript labels say.
-- **PROFILES** — the appearance, screensaver and device profiles a screen can be
-  pointed at.
 - **ACCOUNTS** — who can sign in, and the groups access is granted to.
 - **ACCESS** — what may use this server, and what each may reach.
 - **EMBEDS** — keys that let another application frame this interface.
@@ -116,8 +115,8 @@ Each of these writes a different document, so each has its own button:
 Offering one button that meant all of them is how somebody presses the wrong
 one. A tab that writes nothing shared shows no SAVE FOR EVERYONE at all — the
 AI tab has none, because each endpoint saves itself from inside its own block.
-PROFILES has a commit of its own instead: **SAVE PROFILES** writes all three
-lists together, because they are three parts of one document and a kiosk
+SCREENSAVER and DEVICE share one: **SAVE PROFILES** writes both lists
+together, because they are parts of one document and a device
 profile can name an appearance added in the same sitting.
 
 ## The live preview
@@ -162,9 +161,8 @@ The register itself is on its own tab, **DEVICES**, on the profile settings
 row —
 every device this server knows about, in one list.
 
-The profile lists live on the **PROFILES** tab instead, beside the deployment's
-own settings — what a screen looks like and what it is allowed to do were never
-the same question:
+Each profile list has a tab of its own in the profile settings group — what a
+screen looks like and what it is allowed to do were never the same question:
 
 | | |
 |---|---|
@@ -264,7 +262,7 @@ for them.
 
 Most rows in a real deployment are not kiosks — a guest's laptop, somebody's
 phone — so it is one tick. Tick **Kiosk mode** on a device and one control
-appears: **which kiosk it is**, chosen from the profiles on the PROFILES tab.
+appears: **which kiosk it is**, chosen from the DEVICE profiles.
 Untick it and the screen goes back to being an ordinary page, with the choice
 kept: putting the device back up restores what you had.
 
@@ -340,9 +338,8 @@ with it. Taking it away would lose it for exactly the person it is for — who
 walks up to a screen that has been idle for hours — and leaving it where it was
 would be the one thing on a drifting screen that never moved.
 
-**Both profiles are chosen from lists set centrally**, under *Appearance
-profiles* and *Screensaver profiles* on the **PROFILES** tab. All three
-settings are deliberately
+**Both profiles are chosen from lists set centrally**, on the APPEARANCE and
+SCREENSAVER tabs. All three settings are deliberately
 separate axes: a wall screen can be voice only without ever drifting, a shared
 television can drift while still showing its transcript, and a laptop can be
 given larger type without being told to do either.

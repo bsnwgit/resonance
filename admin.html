@@ -1382,6 +1382,8 @@
              same reason. -->
         <button data-tab="motion">GEOMETRY</button>
         <button data-tab="speech">SPEECH</button>
+        <button data-tab="savers">SCREENSAVER</button>
+        <button data-tab="devprof">DEVICE</button>
       </div>
     </div>
     <div class="tabsplit"></div>
@@ -2048,7 +2050,7 @@ what the tab says now.</div>
 
   <!-- Central, and named from a device rather than copied into it. A
        deployment has a handful of kinds of place, not one setting per screen. -->
-  <section class="grp" data-tab="profiles">
+  <section class="grp bare proflist" data-tab="savers">
     <h4>Screensaver profiles</h4>
     <div class="grpbody">
   <div id="dp_savers"></div>
@@ -2143,7 +2145,7 @@ a setting that changes twice a year would be the wrong trade.</div>
   </section>
   <!-- What a public screen IS, and the only one of the three a device names.
        The other lists are things a device profile points at. -->
-  <section class="grp" data-tab="profiles">
+  <section class="grp bare proflist" data-tab="devprof">
     <h4>Device profiles</h4>
     <div class="grpbody">
   <div id="dp_kiosks"></div>
@@ -2391,7 +2393,6 @@ button to download it as a PDF.</div>
            in with who may use the server. Both lists moved off ACCESS: what a
            screen looks like and what it is allowed to do were never the same
            question. -->
-      <button id="tab_profiles" data-tab="profiles">PROFILES</button>
       <!-- Accounts before devices: a group is made here and named over there,
            so the order follows the order you do them in. -->
       <button id="tab_accounts" data-tab="accounts">ACCOUNTS</button>
@@ -6511,7 +6512,8 @@ function panelNav(){
        add a second endpoint is to first collapse the first. */
     const pr = $('profrow');
     if (pr) pr.classList.toggle('on',
-      tab === 'profiles' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
+      (tab === 'savers' || tab === 'devprof')
+      && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
     const air = $('airow');
     if (air) air.classList.toggle('on',
       tab === 'ai' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
@@ -6540,7 +6542,7 @@ function panelNav(){
        PROFILES does. Without this the lists were painted only if you happened
        to visit PROFILES first, which on a panel that opens on APPEARANCE
        meant they were blank. */
-    if (tab === 'profiles' || PROF_OF[tab]) refreshProfiles();
+    if (tab === 'savers' || tab === 'devprof' || PROF_OF[tab]) refreshProfiles();
     if (tab === 'embeds') refreshEmbeds();
     if (tab === 'app') loadApp();
     if (tab === 'ai'){
