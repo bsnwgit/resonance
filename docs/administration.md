@@ -76,7 +76,8 @@ that block — SAVE and REVERT alike, with anything that MAKES a new thing at th
 left of the same row.
 
 Colour says which kind of act a button is: **green** commits, **red** destroys,
-**amber** brings something new into existence, **blue** explains. CREATE and
+**amber** brings something new into existence, **yellow** takes something back
+without destroying it, **blue** explains. CREATE and
 SAVE used to share green, which made pressing one feel like pressing the
 other — only one of them adds a row you then have to name. One position for all of them, so
 the commit is where the eye already is rather than somewhere to be found again

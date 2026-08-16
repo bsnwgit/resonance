@@ -1265,9 +1265,21 @@
     border-color:rgba(224,178,110,1);color:#f7e3c2;
     background:rgba(224,178,110,.22);
   }
+  /* Taking something back. Not destruction — the row stays and can be granted
+     again — so it is not the red DELETE wears, and not the amber of making a
+     new thing either. A yellow of its own, kept clear of the amber it sits
+     next to. */
+  button.act-warn{
+    border-color:rgba(226,206,122,.75);color:#ece1a4;
+    background:rgba(226,206,122,.10);
+  }
+  button.act-warn:hover:not(:disabled){
+    border-color:rgba(226,206,122,1);color:#f6f0cd;
+    background:rgba(226,206,122,.22);
+  }
   /* A disabled commit must not still look like an invitation. */
   button.act-save:disabled,button.act-undo:disabled,button.act-danger:disabled,
-  button.act-add:disabled{
+  button.act-add:disabled,button.act-warn:disabled{
     border-color:rgba(var(--glass),.20);color:rgba(var(--paper),.35);
     background:none;
   }
@@ -5271,6 +5283,7 @@ async function refreshDisplays(){
       r.appendChild(no);
     }else if (d.enrolled && d.approved){
       const flip = document.createElement('button');
+      flip.className = 'act-warn';
       flip.textContent = 'WITHDRAW';
       flip.onclick = ()=> decide(d, false, nm.value.trim(), row);
       r.appendChild(flip);
