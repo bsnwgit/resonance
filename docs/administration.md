@@ -35,16 +35,22 @@ At the top:
 - **filter settings** — type to search across every topic in every tab at
   once. This is the fastest way to find a control when you know roughly what
   it is called but not which tab it lives under.
-- **LOOK / MOTION / SPEECH** and **AI** — the four tabs that edit the shared
-  interface.
+- **LOOK / MOTION / SPEECH**, **AI** and **DEVICES** — the user interface row.
+  The first three edit the shared interface. AI holds the endpoints, each of
+  which saves itself. DEVICES is where a single screen's own settings live and
+  carries nothing yet.
+- **?**, beside the SETTINGS title — these documents. It is blue, and it is the
+  same blue as every ? beside a topic heading, so help is one colour wherever
+  you meet it.
 
 At the foot, pinned so they are always reachable:
 
 - **APP SETTINGS** — how the server itself is wired.
+- **PROFILES** — the screensaver and appearance profiles a screen can be
+  pointed at.
 - **ACCOUNTS** — who can sign in, and the groups access is granted to.
 - **ACCESS** — what may use this server, and what each may reach.
 - **EMBEDS** — keys that let another application frame this interface.
-- **DOCUMENTATION** — these documents.
 - Your own name, your role, and **SIGN OUT**.
 
 **Your own account is behind your name.** Click it for the box that changes
@@ -92,8 +98,9 @@ Each of these writes a different document, so each has its own button:
 | SAVE APP SETTINGS | ports, binding, session lifetime | only after a restart |
 
 Offering one button that meant all of them is how somebody presses the wrong
-one. A tab that writes nothing shared shows no save row at all — the AI tab
-has none, because each endpoint saves itself.
+one. A tab that writes nothing shared shows no save row at all — the AI and
+PROFILES tabs have none, because each endpoint and each profile list saves
+itself from inside its own block.
 
 ## The live preview
 
@@ -125,14 +132,12 @@ A display is one device — a screen on a wall, a TV, a laptop, somebody's phone
 — as distinct from a browser tab somebody opened. Anything with a browser and a
 microphone counts.
 
-The ACCESS tab holds six topics:
+The ACCESS tab holds four topics:
 
-| | |
-|---|---|
-| | left | middle | right |
-|---|---|---|---|
-| **top** | Requested Access | Created Access | Screensaver profiles |
-| **bottom** | The request form | Connected devices | Appearance profiles |
+| | left | right |
+|---|---|---|
+| **top** | Requested Access | Created Access |
+| **bottom** | The request form | Connected devices |
 
 | | |
 |---|---|
@@ -140,6 +145,13 @@ The ACCESS tab holds six topics:
 | **The request form** | what a request asks for, under the setting that decides whether anyone is asked at all |
 | **Created Access** | the queue: everything waiting on a decision, on a code being typed in, or on somebody asking again — and where you add one |
 | **Connected devices** | everything that is simply working, most recently heard from first |
+
+The two profile lists live on the **PROFILES** tab instead, beside the
+deployment's own settings — what a screen looks like and what it is allowed to
+do were never the same question:
+
+| | |
+|---|---|
 | **Screensaver profiles** | what a screen on a wall does when nobody is there |
 | **Appearance profiles** | what a place looks like, for the handful of values that cannot be shared |
 
@@ -276,7 +288,8 @@ walks up to a screen that has been idle for hours — and leaving it where it wa
 would be the one thing on a drifting screen that never moved.
 
 **Both profiles are chosen from lists set centrally**, under *Appearance
-profiles* and *Screensaver profiles*. All three settings are deliberately
+profiles* and *Screensaver profiles* on the **PROFILES** tab. All three
+settings are deliberately
 separate axes: a wall screen can be voice only without ever drifting, a shared
 television can drift while still showing its transcript, and a laptop can be
 given larger type without being told to do either.

@@ -987,6 +987,11 @@
   .grp.shut .grpbody{display:none}
   .grpbody{padding-bottom:4px}
   .seg{display:flex;flex-wrap:wrap;gap:4px}
+  /* The one thing a section like this is FOR, in the corner every dialog puts
+     its commit in. Last and hard right, so it reads as the end of the form
+     rather than as another field in it — and below the note, so a refusal
+     appears between what you typed and the button you press again. */
+  .createrow{justify-content:flex-end;margin-top:10px}
   .seg button{
     font:inherit;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;padding:5px 8px;cursor:pointer;
     background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.9);
@@ -1575,8 +1580,8 @@ Short by default — this session configures what everyone else is looking at.
     <button data-v="viewer" class="on">VIEWER</button>
     <button data-v="admin">ADMIN</button>
   </div>
-  <div class="seg" style="margin-top:8px"><button id="b_adduser" class="act-save">CREATE</button></div>
   <div class="note" id="usernote"></div>
+  <div class="seg createrow"><button id="b_adduser" class="act-save">CREATE</button></div>
     </div>
   </section>
   <!-- Whether uninvited devices may ask at all, and what a grant to one is
@@ -1611,9 +1616,9 @@ Short by default — this session configures what everyone else is looking at.
       <button data-v="user" class="on">PEOPLE</button>
       <button data-v="device">DEVICES</button>
     </div>
-    <button id="b_addgroup" class="act-save">CREATE</button>
   </div>
   <div class="note" id="groupnote"></div>
+  <div class="seg createrow"><button id="b_addgroup" class="act-save">CREATE</button></div>
   <div class="note help" style="margin-top:10px">A group of <b>people</b> holds
 those who asked for access and were approved. A group of <b>devices</b> holds
 the screens you created and sent a code to. They are separate populations
