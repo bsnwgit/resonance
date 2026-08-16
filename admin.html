@@ -699,6 +699,29 @@
   }
   /* The answers somebody gave, on their row. Indented under a rule so a long
      reason reads as a quotation rather than as more metadata. */
+  /* A register reads down a column. The shut row is a grid: who it is, what
+     they told you, whether it is a kiosk, and what you can do to it. The
+     actions WRAP to a line of their own rather than push the row past the
+     panel edge — 425px does not hold three columns and three buttons, and a
+     row that overflows is worse than one that is two lines tall. */
+  .erow > .top.drow{
+    display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto;
+    align-items:center;column-gap:8px;row-gap:5px;
+  }
+  .erow > .top.drow .dname{min-width:0;display:flex;flex-wrap:wrap;
+                           align-items:center;gap:5px}
+  .erow > .top.drow .dcell{
+    min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:calc(8.5px * var(--fs));letter-spacing:.05em;
+    color:rgba(var(--paper),.62);
+  }
+  .erow > .top.drow .dkiosk{
+    display:flex;align-items:center;gap:5px;white-space:nowrap;
+    font-size:calc(8.5px * var(--fs));letter-spacing:.06em;
+    color:rgba(var(--paper),.72);cursor:pointer;
+  }
+  .erow > .top.drow .dkiosk input{margin:0;flex:0 0 auto}
+  .erow > .top.drow .acts{grid-column:1 / -1;justify-content:flex-end;margin:0}
   .erow .said{
     margin:6px 0 2px;padding:4px 0 4px 9px;
     border-left:2px solid rgba(var(--glass),.28);
@@ -4824,13 +4847,15 @@ function kioskBlock(d){
   const box = document.createElement('div');
   box.className = 'kiosk';
 
+  /* The tick goes in the row's header, beside the name — whether a screen is a
+     kiosk is a fact about it you should read without opening anything. Only
+     WHICH kiosk needs the room, and that stays down here. */
   const l = document.createElement('label');
-  l.className = 'vo hd';
+  l.className = 'dkiosk';
   const kb = document.createElement('input');
   kb.type = 'checkbox'; kb.checked = !!d.kiosk;
   l.appendChild(kb);
-  l.appendChild(document.createTextNode('Kiosk mode'));
-  box.appendChild(l);
+  l.appendChild(document.createTextNode('Kiosk'));
 
   const inner = document.createElement('div');
   inner.className = 'kioskon';
@@ -4903,7 +4928,7 @@ function kioskBlock(d){
      DELETE, because a row with two action rows — one for what this screen is,
      one for whether it may be here — reads as two things to press rather than
      one place to look. */
-  return {box: box, save: save, said: said};
+  return {box: box, tick: l, save: save, said: said};
 }
 
 /* What a row IS, and it decides which of the two lists it belongs in as well
@@ -4959,7 +4984,8 @@ async function refreshDisplays(){
        one row open at a time keeps the whole of it on one screen. */
     if (d.id !== OPENROW) row.classList.add('shut');
 
-    const top = document.createElement('div'); top.className = 'top';
+    const top = document.createElement('div'); top.className = 'top drow';
+    const namecell = document.createElement('div'); namecell.className = 'dname';
     /* The name, and the thing you press to open the row. It reads as the row's
        title because that is what it is; renaming happens inside, where there
        is room for it to be a labelled field rather than a box you might click
@@ -4967,7 +4993,8 @@ async function refreshDisplays(){
     const nmt = document.createElement('span');
     nmt.className = 'nm';
     nmt.textContent = d.label;
-    top.appendChild(nmt);
+    namecell.appendChild(nmt);
+    top.appendChild(namecell);
     top.onclick = (e)=>{
       if (e.target.closest('input, button, select, textarea')) return;
       const opening = row.classList.contains('shut');
@@ -4988,7 +5015,7 @@ async function refreshDisplays(){
     const badge = (t)=>{
       const b = document.createElement('span');
       b.className = 'badge'; b.textContent = t;
-      top.appendChild(b);
+      namecell.appendChild(b);
     };
     if (st === 'code')    badge('WAITING FOR ITS CODE');
     if (st === 'stale')   badge('CODE EXPIRED');
@@ -4999,10 +5026,24 @@ async function refreshDisplays(){
     if (d.renewals) badge('RENEWED ' + d.renewals + '×');
     if (d.refused) badge(d.refused + (d.refused === 1 ? ' REFUSAL' : ' REFUSALS'));
 
-    /* A line of their own, under the row, rather than crowded onto the end of
-       the name. Four buttons plus a name box plus two badges do not fit a
-       425px column, and what they did instead was run over the edge of it. */
     const kb = kioskBlock(d);
+    /* What they told you, on the shut row. The labels are the admin's own, so
+       there is nothing to hard-code here: everything except the message field
+       — the long one, which is the reason and is kept for the open row — is
+       what identifies a person at a glance. A department, a room, a shift. */
+    const msgLabels = ((DPCFG && DPCFG.form) || [])
+      .filter(f=> f.message).map(f=> f.label);
+    const shortAnswers = (d.answers || [])
+      .filter(a=> msgLabels.indexOf(a.label) < 0 && (a.value || '').trim())
+      .map(a=> a.value.trim());
+    const cell = document.createElement('div');
+    cell.className = 'dcell';
+    cell.textContent = shortAnswers.join(' · ');
+    cell.title = (d.answers || [])
+      .filter(a=> msgLabels.indexOf(a.label) < 0)
+      .map(a=> a.label + ': ' + a.value).join('\n');
+    top.appendChild(cell);
+    top.appendChild(kb.tick);
     const r = document.createElement('div'); r.className = 'acts';
     /* Deciding is for a device that turned up on its own. A row created here
        was approved by being created, and has no device yet to decide about. */
@@ -5087,19 +5128,24 @@ async function refreshDisplays(){
       const sub = document.createElement('span');
       sub.textContent = ' · ' + mins + ' min left · case and dashes do not matter';
       c.appendChild(sub);
-      row.appendChild(top); row.appendChild(namerow); row.appendChild(c);
+      row.appendChild(top); row.appendChild(c);
     }else{
-      row.appendChild(top); row.appendChild(namerow);
+      row.appendChild(top);
     }
 
     /* What they told you, in your own words — the labels are the ones you put
        on the form. This is the whole of what an admin who cannot see the
        device has to go on, so it sits above the machine detail rather than
        under it. */
-    if ((d.answers || []).length){
+    /* The REASON only. The short answers are on the shut row above, and
+       repeating them here would be the open row restating what you could
+       already read. */
+    const reasons = (d.answers || [])
+      .filter(a=> msgLabels.indexOf(a.label) >= 0 && (a.value || '').trim());
+    if (reasons.length){
       const said = document.createElement('div');
       said.className = 'said';
-      d.answers.forEach(a=>{
+      reasons.forEach(a=>{
         const wrap = document.createElement('div');
         const b = document.createElement('b');
         b.textContent = a.label;
@@ -5156,11 +5202,14 @@ async function refreshDisplays(){
     });
 
     row.appendChild(meta);
+    /* The name is editable, so it belongs with the other things you change
+       rather than among the facts you read. */
+    row.appendChild(namerow);
     /* Under the facts and above the buttons that end the row's life. A screen
        can be told what it will look like before it has ever been switched on,
        the same way its endpoints can be ticked before it arrives. */
+    top.appendChild(r);
     row.appendChild(kb.box);
-    row.appendChild(r);
     row.appendChild(kb.said);
     conn.appendChild(row);
   });
