@@ -106,7 +106,7 @@ rather than blanked, so a typo is visible instead of silently disappearing.
 
 ## GEOMETRY
 
-### Style
+### Pattern
 
 Four figures. They are genuinely different shapes rather than presets of one
 shape, so try each rather than assuming.
