@@ -1188,7 +1188,7 @@ SAVER_OFF = {"delay": 0, "scale": 70, "dim": 45,
 #: `PALETTES[S.palette].ink` throwing once per frame forever.
 LOOK_VALUES = {
     "fs":      ("1", "1.12", "1.25"),
-    "palette": ("blue", "milk", "ice", "amber", "bone", "rust"),
+    "palette": ("blue", "milk", "ice", "amber", "rust"),
     "layout":  ("hero", "bleed"),
     "mode":    ("stack", "disc", "orb", "knot"),
 }

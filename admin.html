@@ -1115,7 +1115,6 @@
   .seg[data-set="palette"] button[data-v="milk"] {--sw:236,244,252;--swt:#dfe9f4}
   .seg[data-set="palette"] button[data-v="ice"]  {--sw:169,220,242;--swt:#b6e2f6}
   .seg[data-set="palette"] button[data-v="amber"]{--sw:242,196,137;--swt:#f0c98d}
-  .seg[data-set="palette"] button[data-v="bone"] {--sw:216,210,196;--swt:#ddd7c8}
   .seg[data-set="palette"] button[data-v="rust"] {--sw:242,168,150;--swt:#f0a795}
   .seg[data-set="palette"] button{
     color:var(--swt);border-color:rgba(var(--sw),.45);
@@ -1386,7 +1385,6 @@
     <button data-v="milk">MILK</button>
     <button data-v="ice">ICE</button>
     <button data-v="amber">AMBER</button>
-    <button data-v="bone">BONE</button>
     <button data-v="rust">RUST</button>
   </div></div>
   </section>
@@ -1955,6 +1953,41 @@ change, not this.</div>
 
     </div>
   </section>
+  <section class="grp" data-tab="profiles">
+    <h4>Geometry profiles</h4>
+    <div class="grpbody">
+  <div id="dp_motions"></div>
+  <div class="seg addrow">
+    <button id="b_addmotion" class="act-add">ADD A PROFILE</button>
+  </div>
+  <div class="note help">A snapshot of the <b>GEOMETRY</b> tab under a name.
+Set the rotation, the spectrum and the noise floor up there, watch the preview,
+then ADD A PROFILE to capture exactly what you are looking at.
+
+<b>LOAD</b> puts a profile back into the tab so you can see it and change it;
+<b>UPDATE</b> replaces it with whatever the tab says now. Loading does not
+publish anything — the tab is dirty afterwards exactly as if you had moved the
+controls by hand.</div>
+    </div>
+  </section>
+
+  <section class="grp" data-tab="profiles">
+    <h4>Speech profiles</h4>
+    <div class="grpbody">
+  <div id="dp_speeches"></div>
+  <div class="seg addrow">
+    <button id="b_addspeech" class="act-add">ADD A PROFILE</button>
+  </div>
+  <div class="note help">A snapshot of the <b>SPEECH</b> tab under a name — the
+voice, the transcription model, the wake and sleep words, the microphone
+handling. A hallway that has to hear over a corridor and a quiet office want
+different microphone settings and the same everything else.
+
+<b>LOAD</b> puts a profile back into the tab; <b>UPDATE</b> replaces it with
+what the tab says now.</div>
+    </div>
+  </section>
+
   <!-- Central, and named from a device rather than copied into it. A
        deployment has a handful of kinds of place, not one setting per screen. -->
   <section class="grp" data-tab="profiles">
@@ -4234,7 +4267,7 @@ function paintDpSettings(){
   $('dp_max').value = DPCFG.max_displays;
   $('dp_pending').value = DPCFG.max_pending;
   paintDpForm(DPCFG.form || []);
-  paintLooks(DPCFG.looks || []);
+  PROFILE_KINDS.forEach(k=> paintProfiles(k, DPCFG[k.key] || []));
   paintSavers(DPCFG.savers || []);
   paintKiosks(DPCFG.kiosks || [], DPCFG.kiosk_default || '');
 }
@@ -4356,17 +4389,6 @@ $('b_formsave').addEventListener('click', ()=>{
   saveDp({form: DPFORM.filter(f=> (f.label || '').trim())}, 'formnote');
 });
 
-$('b_addlook').addEventListener('click', ()=>{
-  if (DPLOOKS.length >= 8) return;
-  const row = {id: '', name: ''};
-  // The panel's own defaults, so a new profile starts as what a display
-  // already gets rather than as four empty boxes.
-  LOOK_FIELDS.forEach(([k, , opts])=>{ row[k] = opts[0][0]; });
-  OPENLK = DPLOOKS.length;
-  DPLOOKS.push(row);
-  paintLooks(DPLOOKS);
-});
-
 $('b_addsaver').addEventListener('click', ()=>{
   if (DPSAVERS.length >= 8) return;
   /* Something sensible rather than an empty row: three minutes, three
@@ -4390,49 +4412,67 @@ $('b_addsaver').addEventListener('click', ()=>{
    different axes: day and night in one hallway share an appearance and differ
    only in the dim, and a laptop can want larger type without being told to
    drift. Same row, same caret, same one-open-at-a-time as everything else. */
-const LOOK_FIELDS = [
-  ['fs',      'Type size', [['1', 'NORMAL'], ['1.12', 'LARGER'], ['1.25', 'LARGEST']]],
-  ['palette', 'Palette',   [['blue', 'BLUE'], ['milk', 'MILK'], ['ice', 'ICE'],
-                            ['amber', 'AMBER'], ['bone', 'BONE'],
-                            ['rust', 'RUST']]],
-  ['layout',  'Layout',    [['hero', 'HERO'], ['bleed', 'FULL BLEED']]],
-  ['mode',    'Figure',    [['stack', 'STACK'], ['disc', 'DISC'],
-                            ['orb', 'ORB'], ['knot', 'KNOT']]],
+/* There is no per-profile preview any more, and no need of one: LOAD puts a
+   profile into the tab, and the tab drives the live preview already. Kept as a
+   no-op because the commit and revert handlers call it, and a preview that
+   cannot be running is one there is nothing to stop. */
+function stopLookPreview(){}
+
+/* ---- a profile is a snapshot of a tab ----
+   The tab is the editor. You tune APPEARANCE, GEOMETRY or SPEECH with the real
+   controls against the live preview, then capture what you are looking at
+   under a name. Editing one loads it back into the tab and updates it from
+   there.
+
+   The alternative was to draw every control a second time inside each profile
+   row — three lists, eight profiles, twenty controls each — and choose a
+   palette without being able to see it. A profile holds the same keys either
+   way; this way there is one set of controls and you are always looking at
+   what you are picking. */
+const PROFILE_KINDS = [
+  {key: 'looks',    tab: 'look',   box: 'dp_looks',    add: 'b_addlook',   pre: 'l'},
+  {key: 'motions',  tab: 'motion', box: 'dp_motions',  add: 'b_addmotion', pre: 'm'},
+  {key: 'speeches', tab: 'speech', box: 'dp_speeches', add: 'b_addspeech', pre: 'p'},
 ];
-let DPLOOKS = [];
-let OPENLK = -1;
-let LKSHOWN = -1;
-function stopLookPreview(){
-  if (LKSHOWN < 0) return;
-  LKSHOWN = -1;
-  cmd('kiosk', {});
-  // The panel pushes the whole document, which is exactly what puts the
-  // shared appearance back over the profile that was being tried.
-  push();
+const PROFILES = {looks: [], motions: [], speeches: []};
+const OPENPR = {looks: -1, motions: -1, speeches: -1};
+
+function profileId(pre){
+  const b = new Uint8Array(4);
+  (window.crypto || window.msCrypto).getRandomValues(b);
+  return pre + [...b].map(x=> x.toString(16).padStart(2, '0')).join('');
 }
 
-function paintLooks(list){
-  DPLOOKS = (list || []).map(s=>{
-    const row = {id: s.id || '', name: s.name || ''};
-    LOOK_FIELDS.forEach(([k, , opts])=>{
-      row[k] = opts.some(o=> o[0] === s[k]) ? s[k] : opts[0][0];
-    });
-    return row;
-  });
-  const box = $('dp_looks');
+/* What a profile is worth saying about itself in one line: how many settings
+   it carries, and the two or three a person would recognise. */
+function profileSum(kind, pr){
+  const v = pr.values || {};
+  const n = Object.keys(v).length;
+  const nice = {palette:1, mode:1, layout:1, fs:1, tmode:1, ttsengine:1,
+                sttmodel:1, wake:1};
+  const bits = Object.keys(v).filter(k=> nice[k]).slice(0, 3)
+                     .map(k=> String(v[k]).toUpperCase());
+  return (n + (n === 1 ? ' setting' : ' settings'))
+       + (bits.length ? ' · ' + bits.join(' · ') : '');
+}
+
+function paintProfiles(kind, list){
+  const arr = PROFILES[kind.key] = (list || []).map(p=> ({
+    id: p.id || '', _new: !!p._new, name: p.name || '',
+    values: Object.assign({}, p.values || {})}));
+  const box = $(kind.box);
   if (!box) return;
   box.innerHTML = '';
-  if (!DPLOOKS.length){
+  if (!arr.length){
     const em = document.createElement('div');
     em.className = 'note';
-    em.textContent = 'No profiles. Every device shows what the APPEARANCE tab says, '
-                   + 'which is what they all did before this existed.';
+    em.textContent = 'No profiles. Every device shows what the tab itself says.';
     box.appendChild(em);
   }
-  DPLOOKS.forEach((s, i)=>{
+  arr.forEach((pr, i)=>{
     const row = document.createElement('div');
     row.className = 'erow';
-    if (OPENLK !== i) row.classList.add('shut');
+    if (OPENPR[kind.key] !== i) row.classList.add('shut');
 
     const top = document.createElement('div');
     top.className = 'top';
@@ -4442,26 +4482,15 @@ function paintLooks(list){
     const sum = document.createElement('span');
     sum.className = 'badge';
     top.appendChild(sum);
-    const live = document.createElement('span');
-    live.className = 'badge';
-    live.textContent = 'IN THE PREVIEW';
-    live.style.display = LKSHOWN === i ? '' : 'none';
-    top.appendChild(live);
-    const word = (k)=>{
-      const f = LOOK_FIELDS.find(x=> x[0] === k);
-      const o = f[2].find(x=> x[0] === s[k]);
-      return o ? o[1] : s[k];
-    };
     const retitle = ()=>{
-      nmt.textContent = (s.name || '').trim() || 'unnamed profile';
-      sum.textContent = word('palette') + ' · ' + word('layout') + ' · '
-                      + word('mode') + ' · ' + word('fs');
+      nmt.textContent = (pr.name || '').trim() || 'unnamed profile';
+      sum.textContent = profileSum(kind, pr);
     };
     retitle();
     top.onclick = (e)=>{
       if (e.target.closest('input, button, select, textarea')) return;
       const opening = row.classList.contains('shut');
-      OPENLK = opening ? i : -1;
+      OPENPR[kind.key] = opening ? i : -1;
       box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
       row.classList.toggle('shut', !opening);
     };
@@ -4473,94 +4502,93 @@ function paintLooks(list){
     nlab.textContent = 'Name';
     namerow.appendChild(nlab);
     const nm = document.createElement('input');
-    nm.type = 'text'; nm.className = 'nmedit'; nm.value = s.name;
-    nm.spellcheck = false;
-    nm.placeholder = 'Hallway';
+    nm.type = 'text'; nm.className = 'nmedit'; nm.value = pr.name;
+    nm.spellcheck = false; nm.placeholder = 'Hallway';
     nm.onkeydown = (e)=>{ if (e.key === 'Enter') nm.blur(); };
-    nm.oninput = ()=>{ DPLOOKS[i].name = s.name = nm.value; retitle(); };
+    nm.oninput = ()=>{ pr.name = nm.value; retitle(); };
     namerow.appendChild(nm);
     row.appendChild(namerow);
 
-    /* Two to a line rather than four, for the same reason every other block
-       here is: four controls across a 425px column is four nobody can read. */
-    const cols = document.createElement('div');
-    cols.className = 'cols2';
-    LOOK_FIELDS.forEach(([k, label, opts])=>{
-      const w = document.createElement('div');
-      const l = document.createElement('label');
-      l.className = 'bklab';
-      l.textContent = label;
-      const sel = document.createElement('select');
-      opts.forEach(([v, t])=>{
-        const o = document.createElement('option');
-        o.value = v; o.textContent = t;
-        sel.appendChild(o);
-      });
-      sel.value = s[k];
-      sel.onchange = ()=>{
-        DPLOOKS[i][k] = s[k] = sel.value;
-        retitle();
-        // Being previewed right now: show the change rather than making
-        // somebody press the button again to see what they just chose.
-        if (LKSHOWN === i) cmd('kiosk', {look: lookOf(s)});
-      };
-      w.appendChild(l); w.appendChild(sel);
-      cols.appendChild(w);
-    });
-    row.appendChild(cols);
-
     const acts = document.createElement('div');
     acts.className = 'acts';
-    const show = document.createElement('button');
-    show.textContent = LKSHOWN === i ? 'STOP' : 'PREVIEW';
-    show.title = 'try this appearance in the preview, without saving it';
-    if (LKSHOWN === i) show.className = 'on';
-    show.onclick = ()=>{
-      const on = LKSHOWN !== i;
-      if (LKSHOWN >= 0) stopLookPreview();
-      if (on){ LKSHOWN = i; cmd('kiosk', {look: lookOf(s)}); }
-      paintLooks(DPLOOKS);
+    /* LOAD writes the profile into the tab so you can see it and adjust it.
+       It does NOT save: the tab is dirty afterwards exactly as if you had
+       moved the controls by hand, and SAVE FOR EVERYONE is still what
+       publishes it to everybody. */
+    const load = document.createElement('button');
+    load.textContent = 'LOAD';
+    load.title = 'put this profile into the ' + kind.tab.toUpperCase()
+               + ' tab so you can see and change it';
+    load.onclick = ()=>{
+      const keys = Object.keys(pr.values).filter(k=> k in S);
+      keys.forEach(k=>{ S[k] = pr.values[k]; });
+      repaintControls();
+      applyType();
+      push();
+      // Marked through the same door a moved slider uses, so the tab's own
+      // commit row lights up and says there is work waiting behind it.
+      keys.forEach(dirty);
+      dpNote('loaded into the ' + kind.tab.toUpperCase() + ' tab — adjust it '
+             + 'there, then UPDATE', false, 'profnote');
     };
-    acts.appendChild(show);
+    acts.appendChild(load);
+
+    const upd = document.createElement('button');
+    upd.textContent = 'UPDATE';
+    upd.className = 'act-save';
+    upd.title = 'replace this profile with what the tab says now';
+    upd.onclick = ()=>{
+      pr.values = tabKeys(kind.tab);
+      retitle();
+      dpNote('captured ' + Object.keys(pr.values).length
+             + ' settings — SAVE to keep it', false, 'profnote');
+    };
+    acts.appendChild(upd);
+
     const del = document.createElement('button');
     del.textContent = 'REMOVE';
     del.className = 'act-danger';
     del.onclick = ()=>{
-      stopLookPreview();
-      OPENLK = -1;
-      DPLOOKS.splice(i, 1);
-      paintLooks(DPLOOKS);
+      OPENPR[kind.key] = -1;
+      arr.splice(i, 1);
+      paintProfiles(kind, arr);
     };
     acts.appendChild(del);
     row.appendChild(acts);
     box.appendChild(row);
   });
-  const btn = $('b_addlook');
-  /* Out of the way while a new profile is being filled in. One that has no id
-     yet has never been saved, so offering to make ANOTHER on top of it is a
-     second empty row appearing under the one somebody is still typing into.
-     It comes back when the profiles are saved, or when the new one is
-     reverted or removed. */
+  const btn = $(kind.add);
   if (btn){
-    const fresh = DPLOOKS.some(x=> !x.id);
+    const fresh = arr.some(x=> x._new);
     btn.hidden = fresh;
-    btn.disabled = fresh || DPLOOKS.length >= 8;
+    btn.disabled = fresh || arr.length >= 8;
   }
 }
+
+/* Kept as the old name because plenty still calls it. */
+function paintLooks(list){ paintProfiles(PROFILE_KINDS[0], list); }
+
+PROFILE_KINDS.forEach(kind=>{
+  const b = $(kind.add);
+  if (!b) return;
+  b.addEventListener('click', ()=>{
+    const arr = PROFILES[kind.key];
+    if (arr.length >= 8) return;
+    /* Captured from the tab as it is RIGHT NOW, which is the whole idea: you
+       set it up, you look at it, you name it. */
+    arr.push({id: profileId(kind.pre), _new: true, name: '',
+              values: tabKeys(kind.tab)});
+    OPENPR[kind.key] = arr.length - 1;
+    paintProfiles(kind, arr);
+  });
+});
+
 /* Just the numbers, without the id and the name — what a display is sent and
    what the preview is driven with. */
 function saverOf(s){
   return {delay: s.delay, scale: s.scale, dim: s.dim,
           night_from: s.night_from, night_to: s.night_to,
           night_dim: s.night_dim};
-}
-
-/* Just the four values, without the id and the name — what a display is sent
-   and what the preview is driven with. */
-function lookOf(s){
-  const out = {};
-  LOOK_FIELDS.forEach(([k])=>{ out[k] = s[k]; });
-  return out;
 }
 
 /* ---- the screensaver profiles, which are central ----
@@ -4769,7 +4797,10 @@ function paintKiosks(list, def){
   DPKIOSKS = (list || []).map(k=> ({id: k.id || '', _new: !!k._new,
                                     name: k.name || '',
                                     voice_only: k.voice_only !== false,
-                                    look: k.look || '', saver: k.saver || '',
+                                    look: k.look || '',
+                                    motion: k.motion || '',
+                                    speech: k.speech || '',
+                                    saver: k.saver || '',
                                     fullscreen: k.fullscreen !== false,
                                     prompt: k.prompt !== false,
                                     prompt_text: k.prompt_text || ''}));
@@ -4808,9 +4839,12 @@ function paintKiosks(list, def){
     const retitle = ()=>{
       nmt.textContent = (k.name || '').trim() || 'unnamed profile';
       const bits = [k.voice_only ? 'voice only' : 'with transcript'];
-      const lk = ((DPCFG && DPCFG.looks) || []).filter(x=> x.id === k.look)[0];
+      [['looks','look'],['motions','motion'],['speeches','speech']].forEach(
+        ([list, key])=>{
+          const p = ((DPCFG && DPCFG[list]) || []).filter(x=> x.id === k[key])[0];
+          if (p) bits.push(p.name);
+        });
       const sv = ((DPCFG && DPCFG.savers) || []).filter(x=> x.id === k.saver)[0];
-      if (lk) bits.push(lk.name);
       if (sv) bits.push(sv.name); else bits.push('never drifts');
       if (!k.fullscreen) bits.push('no full screen');
       if (!k.prompt) bits.push('no prompt');
@@ -4900,9 +4934,12 @@ function paintKiosks(list, def){
        whatever you do to it, so the sentence that used to sit in the empty
        slot — "whatever the APPEARANCE tab says" — set the width of the control
        and pushed it past the edge of the box. What it means is under the ?. */
-    picker('Appearance', 'look', 'SHARED',
-      (DPCFG && DPCFG.looks) || [],
-      p=> [p.palette, p.mode].join(' · '));
+    /* The summary is the profile's own one-liner now, because a profile is a
+       bag of settings rather than four named fields. */
+    const psum = (p)=> Object.keys(p.values || {}).length + ' settings';
+    picker('Appearance', 'look', 'SHARED', (DPCFG && DPCFG.looks) || [], psum);
+    picker('Geometry', 'motion', 'SHARED', (DPCFG && DPCFG.motions) || [], psum);
+    picker('Speech', 'speech', 'SHARED', (DPCFG && DPCFG.speeches) || [], psum);
     picker('Screensaver', 'saver', 'NONE',
       (DPCFG && DPCFG.savers) || [],
       p=> (p.delay ? p.delay + 's · ' + p.scale + '%' : 'off'));
@@ -4964,7 +5001,7 @@ function newProfileId(){
 $('b_addkiosk').addEventListener('click', ()=>{
   if (DPKIOSKS.length >= 8) return;
   DPKIOSKS.push({id:newProfileId(), _new:true, name:'', voice_only:true,
-                 look:'', saver:'',
+                 look:'', motion:'', speech:'', saver:'',
                  fullscreen:true, prompt:true, prompt_text:''});
   OPENKI = DPKIOSKS.length - 1;
   paintKiosks(DPKIOSKS);
@@ -5463,9 +5500,13 @@ $('b_profsave').addEventListener('click', ()=>{
      out and the server nominates the first — which is the right answer for a
      deployment saving its very first profile, and beats refusing the save for
      the want of a choice nobody has been offered yet. */
-  const body = {looks:  DPLOOKS.filter(x=> (x.name || '').trim()),
-                savers: DPSAVERS.filter(x=> (x.name || '').trim()),
-                kiosks: kiosks};
+  const named = (a)=> a.filter(x=> (x.name || '').trim())
+                      .map(x=> ({id: x.id, name: x.name, values: x.values}));
+  const body = {looks:    named(PROFILES.looks),
+                motions:  named(PROFILES.motions),
+                speeches: named(PROFILES.speeches),
+                savers:   DPSAVERS.filter(x=> (x.name || '').trim()),
+                kiosks:   kiosks};
   if (kiosks.some(k=> k.id === DPKDEF)) body.kiosk_default = DPKDEF;
   saveDp(body, 'profnote');
 });
@@ -5473,7 +5514,8 @@ $('b_profrevert').addEventListener('click', ()=>{
   stopSaverPreview();
   stopLookPreview();
   OPENKI = -1;
-  paintLooks((DPCFG && DPCFG.looks) || []);
+  PROFILE_KINDS.forEach(k=>{ OPENPR[k.key] = -1;
+                             paintProfiles(k, (DPCFG && DPCFG[k.key]) || []); });
   paintSavers((DPCFG && DPCFG.savers) || []);
   paintKiosks((DPCFG && DPCFG.kiosks) || [], (DPCFG && DPCFG.kiosk_default) || '');
   dpNote('back to what is saved', false, 'profnote');
