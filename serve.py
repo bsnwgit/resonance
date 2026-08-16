@@ -1892,6 +1892,54 @@ def write_displays(displays):
     _write_displays_doc(doc)
 
 
+def migrate_models():
+    """One-time: lift each endpoint's connection into a model profile.
+
+    Deduplicated by the connection itself, so two endpoints already pointed at
+    the same base URL and model come back as one profile that both name —
+    which is the whole reason for the list. A profile is named after the first
+    endpoint using it, because that is the name somebody will recognise.
+
+    Runs only while the list is empty and something has a connection to lift:
+    after that the profiles are the source of truth and a route's own copy is
+    vestigial."""
+    doc = read_routes()
+    routes = doc.get("routes") or {}
+    if not routes:
+        return
+    ddoc = read_displays_doc()
+    cfg = ddoc.get("settings")
+    cfg = dict(cfg) if isinstance(cfg, dict) else {}
+    if clean_profiles(cfg.get("models"), "n", MAX_LOOKS):
+        return                              # already imported, or hand-built
+    made, order = {}, []
+    for rid in route_order(doc):
+        rec = routes[rid]
+        key = tuple(str(rec.get(k) or "") for k in MODEL_KEYS)
+        if key not in made:
+            prof = {"id": "n" + secrets.token_hex(4),
+                    "name": rec.get("name") or "endpoint",
+                    "values": {k: rec.get(k) or "" for k in MODEL_KEYS}}
+            made[key] = prof
+            order.append(prof)
+        rec["model_profile"] = made[key]["id"]
+    if not order:
+        return
+    cfg["models"] = order
+    if cfg.get("model_default") not in [p["id"] for p in order]:
+        # The default endpoint's connection is the one an endpoint naming
+        # nothing should get.
+        dflt = routes.get(doc.get("default")) or {}
+        cfg["model_default"] = dflt.get("model_profile") or order[0]["id"]
+    ddoc["settings"] = cfg
+    _write_displays_doc(ddoc)
+    doc["routes"] = routes
+    write_routes(doc)
+    print("model migration: %d endpoint(s) -> %d profile(s) (%s)"
+          % (len(routes), len(order), ", ".join(p["name"] for p in order)),
+          flush=True)
+
+
 def ensure_default_kiosk():
     """There is always at least one kiosk profile, and always one nominated as
     the default.
@@ -4937,6 +4985,7 @@ def main():
     # wall settings silently — see migrate_kiosks.
     migrate_kiosks()
     ensure_default_kiosk()
+    migrate_models()
     app = read_app()
     # Environment still wins, so a one-off run on a different port needs no
     # edit to the stored configuration. Setting PORT alone moves all three,
