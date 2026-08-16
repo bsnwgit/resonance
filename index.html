@@ -3926,7 +3926,7 @@ function syncPtt(){
 function syncWake(){
   let sleepTxt =
       S.wake === 'off' ? 'Not used while the wake word is off.'
-    : !Wake.armed()    ? 'Not in effect — the wake gate is inactive in this mode.'
+    : !Wake.armed()    ? 'Not in effect — the wake word is inactive in this mode.'
     : Wake.awake       ? 'Say “' + (S.sleepword||'…') + '” to end the conversation now.'
     : 'Ready — used once it is awake.';
   if (S.byeontimeout && Wake.armed() && S.wake !== 'off')

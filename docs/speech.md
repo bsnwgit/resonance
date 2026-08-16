@@ -129,10 +129,10 @@ Two signal-processing profiles, and they genuinely conflict:
 Choose by what the display is for. A display people ask questions of wants
 CLEAN. A display that mostly looks good in a foyer wants RAW.
 
-## The wake gate
+## Wake word
 
 Without a wake word, an AUTO display responds to any speech near it —
-including two people talking to each other. The wake gate is what makes it
+including two people talking to each other. The wake word is what makes it
 usable in an occupied room.
 
 **The words themselves are not here.** Each belongs to an assistant, on the AI
