@@ -873,6 +873,9 @@
      directly under the list rather than after the help below it: with a
      profile open the section is tall, and a button at the very bottom is one
      you have to go looking for at the moment you have just used it. */
+  /* With the button hidden the row would still draw its rule, leaving a line
+     under the list with nothing beneath it. */
+  .addrow:not(:has(button:not([hidden]))){display:none}
   .addrow{
     justify-content:flex-start;
     margin-top:11px;padding-top:10px;
@@ -4466,7 +4469,16 @@ function paintLooks(list){
     box.appendChild(row);
   });
   const btn = $('b_addlook');
-  if (btn) btn.disabled = DPLOOKS.length >= 8;
+  /* Out of the way while a new profile is being filled in. One that has no id
+     yet has never been saved, so offering to make ANOTHER on top of it is a
+     second empty row appearing under the one somebody is still typing into.
+     It comes back when the profiles are saved, or when the new one is
+     reverted or removed. */
+  if (btn){
+    const fresh = DPLOOKS.some(x=> !x.id);
+    btn.hidden = fresh;
+    btn.disabled = fresh || DPLOOKS.length >= 8;
+  }
 }
 /* Just the numbers, without the id and the name — what a display is sent and
    what the preview is driven with. */
@@ -4664,7 +4676,16 @@ function paintSavers(list){
     box.appendChild(row);
   });
   const btn = $('b_addsaver');
-  if (btn) btn.disabled = DPSAVERS.length >= 8;
+  /* Out of the way while a new profile is being filled in. One that has no id
+     yet has never been saved, so offering to make ANOTHER on top of it is a
+     second empty row appearing under the one somebody is still typing into.
+     It comes back when the profiles are saved, or when the new one is
+     reverted or removed. */
+  if (btn){
+    const fresh = DPSAVERS.some(x=> !x.id);
+    btn.hidden = fresh;
+    btn.disabled = fresh || DPSAVERS.length >= 8;
+  }
 }
 /* ---- the kiosk profiles ----
    The one list a device names. Same row, same caret, same one-open-at-a-time
@@ -4855,7 +4876,16 @@ function paintKiosks(list, def){
     box.appendChild(row);
   });
   const btn = $('b_addkiosk');
-  if (btn) btn.disabled = DPKIOSKS.length >= 8;
+  /* Out of the way while a new profile is being filled in. One that has no id
+     yet has never been saved, so offering to make ANOTHER on top of it is a
+     second empty row appearing under the one somebody is still typing into.
+     It comes back when the profiles are saved, or when the new one is
+     reverted or removed. */
+  if (btn){
+    const fresh = DPKIOSKS.some(x=> !x.id);
+    btn.hidden = fresh;
+    btn.disabled = fresh || DPKIOSKS.length >= 8;
+  }
 }
 
 $('b_addkiosk').addEventListener('click', ()=>{
