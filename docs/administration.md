@@ -125,13 +125,14 @@ A display is one device — a screen on a wall, a TV, a laptop, somebody's phone
 — as distinct from a browser tab somebody opened. Anything with a browser and a
 microphone counts.
 
-The DEVICES tab holds five topics:
+The DEVICES tab holds six topics:
 
 | | |
 |---|---|
 | **Requested Access** | whether a general user needs approval at all, and what a grant to one is worth once given |
 | **Created Access** | the queue: everything waiting on a decision, on a code being typed in, or on somebody asking again — and where you add one |
-| **Screensaver profiles** | what a screen on a wall does when nobody is there, set once and picked per device |
+| **Appearance profiles** | what a place looks like, for the handful of values that cannot be shared |
+| **Screensaver profiles** | what a screen on a wall does when nobody is there |
 | **The request form** | what a request asks for |
 | **Connected devices** | everything that is simply working, most recently heard from first |
 
@@ -198,9 +199,10 @@ carries, which is what a dedicated URL will be.
 
 Most rows in a real deployment are not on a wall — a guest's laptop, somebody's
 phone — so it is one tick that turns the rest of it on. Tick **On a wall** on a
-device and two controls appear: whether it is voice only, and which screensaver
-profile it uses. Untick it and the screen goes back to being an ordinary page,
-with both settings kept: putting the device back up restores what you chose.
+device and three controls appear: whether it is voice only, which appearance
+profile it uses, and which screensaver profile. Untick it and the screen goes
+back to being an ordinary page, with all three kept: putting the device back up
+restores what you chose.
 
 Neither changes what this server will answer. This is entirely what the screen
 looks like.
@@ -223,10 +225,46 @@ TALK, AUDIO and SPACE stay. A browser will not open a microphone without
 somebody asking it to, so a display with no TALK button is a display that could
 never hear its own wake word. Voice only means no text, not no controls.
 
-**The screensaver is a profile, chosen from a list**, and the profiles are set
-centrally under *Screensaver profiles*. Voice only and the screensaver are
-deliberately separate axes: a wall screen can be voice only without ever
-drifting, and a shared television can drift while still showing its transcript.
+**Both profiles are chosen from lists set centrally**, under *Appearance
+profiles* and *Screensaver profiles*. All three settings are deliberately
+separate axes: a wall screen can be voice only without ever drifting, a shared
+television can drift while still showing its transcript, and a laptop can be
+given larger type without being told to do either.
+
+### Appearance profiles
+
+The LOOK tab is **one document for everybody**, and that is right for almost
+all of it — tune the bloom once and every screen in the building gets it. It is
+wrong for exactly four values.
+
+A screen in a hallway is read from three metres. A laptop is read from fifty
+centimetres. One type size cannot be right for both, and neither can one
+layout: a wall wants the figure filling the frame, a desk wants room for the
+transcript beside it. So four values become a profile that a device names:
+
+| | |
+| --- | --- |
+| **Type size** | NORMAL, LARGER, LARGEST — the range the LOOK tab offers |
+| **Palette** | which of the five |
+| **Layout** | HERO, or FULL BLEED for a screen that is mostly being looked at |
+| **Figure** | STACK, DISC, ORB or KNOT |
+
+Everything else stays shared. That is the point of the shortlist rather than
+"override anything": a per-place setting that could cover the whole document
+would quietly end the ability to change something once for everyone.
+
+**A device that names no profile shows what the LOOK tab says**, which is what
+every display did before this existed. Deleting a profile puts every device
+that named it back to that, rather than to nothing — so the fall-back is always
+a working appearance.
+
+**PREVIEW** lays a profile over the live preview without saving it, and follows
+the controls as you change them. STOP puts the shared document back, and so
+does touching anything on LOOK, MOTION or SPEECH.
+
+One limit worth knowing before a screen goes up: **type size tops out at
+LARGEST**, because that is the range the LOOK tab offers. If that is not enough
+at three metres, the range itself is the thing to change.
 
 ### Screensaver profiles
 

@@ -1543,8 +1543,27 @@ it. Each entry below carries its own panel scope.
   speech, so it has to count. The transcript hides while it drifts — text
   sliding around a screen is worse than either state on its own.
 
-  *Panel:* voice only, and the screensaver's idle delay, scale and dim, on
-  each display in the list the phase above builds.
+  **An appearance a place can have of its own.** Added while building, and
+  not in the original entry — the same way phase 2 grew past its own. The LOOK
+  tab is one document for everybody, which is right for almost all of it and
+  wrong for exactly four values: a hallway read at three metres and a laptop at
+  fifty centimetres cannot share a type size, and a wall wants the figure
+  filling the frame where a desk wants room for the transcript beside it. So
+  type size, palette, layout and the figure become a profile a device names,
+  and everything else stays shared.
+
+  **Shortlisted rather than "override anything"**, deliberately. A per-place
+  setting that could cover the whole document would quietly end the ability to
+  change something once for everyone, which is the reason the shared document
+  exists at all.
+
+  **Both profile lists are central and named by id**, and they are separate
+  axes: day and night in one hallway share an appearance and differ only in the
+  dim, and a laptop can be given larger type without being told to drift.
+
+  *Panel:* on a wall, voice only, and one profile from each list, on each
+  display in the list the phase above builds — with the profiles themselves set
+  once, centrally.
 
 - **Staying up unattended.** *Not designed yet — this entry states the problem
   and nothing else. Its position in the order is provisional.*
@@ -1861,11 +1880,34 @@ Newest first.
 
 ### 2026-08-15 — the screensaver is still the product
 
-Phase 3: what a wall display looks like. Screensaver profiles set centrally,
-two settings on each device's row, and nothing in either that touches what this
-server will answer — it is entirely canvas and presentation, which is the whole
+Phase 3: what a wall display looks like. Appearance and screensaver profiles
+set centrally, three settings on each device's row, and nothing in any of them
+that touches what this server will answer — it is entirely canvas and presentation, which is the whole
 reason it was split from phase 2.
 
+- **A place can have an appearance of its own.** The LOOK tab was one
+  document for every viewer, so a deployment with a hallway screen and a laptop
+  in it had no arrangement where both were right — one of them was wrong by
+  construction. Four values now come from a profile a device names: type size,
+  palette, layout and the figure. Everything else stays shared, and that
+  shortlist is the design rather than a first cut. An override that could cover
+  the whole document would quietly end "change it once for everyone", which is
+  the only reason the shared document exists.
+- **A missing appearance falls back; a missing screensaver switches off.** Both
+  fail quiet and they fail to different places, because the safe answer differs:
+  a screen with no appearance still has to look like something, and a screen
+  with no screensaver simply does not drift. Deleting a profile clears it from
+  every device that named it, so neither state is one somebody has to discover.
+- **Values are checked against the list the panel offers, not stored as
+  typed.** A palette name that is not a palette is not a screen that looks
+  wrong, it is `PALETTES[S.palette].ink` throwing once per frame forever. Out of
+  range is refused when a person presses save and clamped when a file is read —
+  the same split the screensaver numbers use.
+- **The look is re-applied after the settings load, not when it arrives.** The
+  display asks for both documents at once and they race; loading the shared
+  settings overwrites `S` wholesale. A place's own appearance applied when the
+  display answered first would be silently undone a moment later by the very
+  document it exists to override.
 - **The numbers are central, not per device.** A deployment has a handful of
   *kinds* of place — a hallway, a bedroom, a shop floor — not one setting per
   screen, so a profile is a name and three numbers and a device names one by
@@ -1939,6 +1981,14 @@ reason it was split from phase 2.
   the first cut printed four paragraphs into every device row, which is exactly
   the habit that rule exists to stop. What stays visible in a row is the
   controls and whatever the server is saying right now.
+- **A rig instrument was on every wall in the building.** The frame rate
+  readout was hidden for embeds and nowhere else, so every real display carried
+  it — fixed at the top left, never moving, small and bright. On a wall that is
+  not untidiness: it was the one thing left that drifting the whole figure away
+  could not save, which is the exact failure the drift exists to prevent. The
+  reasoning was already written beside the rule and had only ever been applied
+  to the embed; a tablet in somebody's hallway is as much somebody else's
+  product as an embed is.
 - **A new admin route is not admin-only because it calls `_require("admin")`.**
   `/displays/wall` did, and answered **401** on the display listeners where
   every one of its siblings answers **404** — which is the route confirming it

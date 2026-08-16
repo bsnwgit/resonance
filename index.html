@@ -783,17 +783,42 @@ const Wall = {
      on and off while an admin makes their mind up. */
   _btn: null, _slot: null,
 
+  /* The four appearance values this place overrides, or null for "whatever
+     everybody gets". Held rather than written straight into S, because the
+     shared settings arrive on their own schedule and loading them overwrites
+     S wholesale — so this has to be re-applied after, not merely once. */
+  look: null,
+
   take(w){
     w = w || {};
     this.onWall = !!w.wall;
     this.voiceOnly = !!w.voice_only;
+    this.look = w.look || null;
     Saver.configure(w.saver);
     this.apply();
+  },
+
+  /* A hallway read at three metres and a laptop at fifty centimetres cannot
+     both be right in one document, which is the whole reason this exists. Only
+     the four a PLACE changes: everything else stays shared, so tuning the
+     bloom once still reaches every screen in the building.
+
+     Nothing to undo when it is null. The shared document is already in S, and
+     a screen with no profile is a screen that never had one. */
+  applyLook(){
+    if (!this.look) return false;
+    let n = 0;
+    Object.keys(this.look).forEach(k=>{
+      if (k in S && S[k] !== this.look[k]){ S[k] = this.look[k]; n++; }
+    });
+    if (n) repaintAll();
+    return n > 0;
   },
 
   apply(){
     document.body.toggleAttribute('data-wall', this.onWall);
     document.body.toggleAttribute('data-voiceonly', this.voiceOnly);
+    this.applyLook();
     if (!this._btn){
       this._btn = $('textbtn');
       if (this._btn) this._slot = this._btn.parentNode;
@@ -4027,6 +4052,10 @@ if (PREVIEW){
     if (m.kind === 'settings' && m.settings){
       Object.keys(m.settings).forEach(k=>{ if (k in S) S[k] = m.settings[k]; });
       repaintAll();
+      /* The panel pushes the whole document on every control it moves, so an
+         appearance profile being previewed has to be laid back over the top or
+         the first slider touched would wipe it. */
+      Wall.applyLook();
       if (scanEl) scanEl.style.opacity = S.scan;
       tiltAim = S.tilt;
     } else if (m.kind === 'routes'){
@@ -4069,6 +4098,11 @@ applyPrefs();
    until the next reload. The shared settings have no such dependency and
    still load in parallel. */
 Promise.all([Settings.load(), Display.hello().then(()=> Routes.load())]).then(()=>{
+  /* After BOTH, and not merely when the display answered. The two race, and
+     loading the shared settings overwrites S wholesale — so a place's own
+     appearance applied when hello came back first would be silently undone a
+     moment later by the document it is supposed to override. */
+  Wall.applyLook();
   applyPrefs();
   syncWake();
   /* Right-looking and inert, with the reason on the screen. The appearance
