@@ -372,8 +372,21 @@
      name, and a body that opens. */
   .erow[data-rid] .subgrp{border:0;margin:0}
   .erow[data-rid] .subgrp + .subgrp{margin-top:9px}
-  .erow[data-rid] .subwrap{margin:8px 0 2px;padding-left:9px;
-                           border-left:2px solid rgba(var(--glass),.22)}
+  /* One per line, full width, the way a profile's sections stack — rather than
+     tiling into 215px columns. An endpoint reads down its own row instead of
+     across it, and the two lists look like the same kind of thing. */
+  .erow[data-rid] .subwrap{
+    display:block;margin:8px 0 2px;padding-left:9px;
+    border-left:2px solid rgba(var(--glass),.22);
+  }
+  /* No box of its own either: a profile's sections are separated by a hairline
+     under the name, not by a frame each. */
+  .erow[data-rid] .subgrp{
+    border:0;border-top:1px solid rgba(var(--glass),.10);
+    background:none;margin:0;
+  }
+  .erow[data-rid] .subgrp:first-child{border-top:0}
+  .erow[data-rid] .subgrp > h5{padding-left:20px}
 
   /* the first topic's own top rule would double up with the box edge */
   #grpbox .grp:first-of-type{border-top:0;margin-top:6px}
