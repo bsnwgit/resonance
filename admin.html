@@ -4623,7 +4623,9 @@ function paintProfiles(kind, list, def){
          gets. */
       if (opening) loadProfile(kind, pr);
       else loadProfile(kind, defaultOf(kind));
-      reRender();
+      /* Repaint, because moving the settings into this row happens there —
+         toggling a class was never going to carry them across. */
+      paintProfiles(kind, arr);
     };
     row.appendChild(top);
 
@@ -4710,6 +4712,9 @@ function paintProfiles(kind, list, def){
     row.appendChild(acts);
     box.appendChild(row);
   });
+  /* Last, and always: a section moved into a row keeps whatever `hidden` it
+     was left with, so the row would open on nothing. */
+  reRender();
   if (seeding) saveProfileList(kind);
   const btn = $(kind.add);
   if (btn){
