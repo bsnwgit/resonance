@@ -758,7 +758,13 @@
   .erow.sel .nm{color:#d2f2e2}
   /* Actions belong to the row you picked, and get a line of their own so a
      long label never wraps a row into a ragged block. */
-  .erow .acts{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
+  /* One line. These are at most three short verbs on a row of their own, and
+     the column they sit in has room for them — wrapping was leaving a single
+     button stranded underneath the others, which reads as a different kind of
+     action rather than the last of the same set. Labels never break, and a
+     button gives up padding before the row gives up its line. */
+  .erow .acts{display:flex;flex-wrap:nowrap;gap:4px;margin-top:7px}
+  .erow .acts button{white-space:nowrap;min-width:0}
 
   /* Each endpoint keeps a full edge whether it is open or closed. The other
      topics are parts of one tab, and a hairline between neighbours is enough
