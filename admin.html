@@ -1639,33 +1639,6 @@ by noise.</div>
   <div class="note" id="dpnote"></div>
     </div>
   </section>
-  <!-- The form itself, which is a different job again: this one is written
-       once, in somebody's own words, and read by strangers. -->
-  <section class="grp" data-tab="displays">
-    <h4>The request form</h4>
-    <div class="grpbody">
-  <div id="dp_form"></div>
-  <div class="seg" style="margin-top:6px">
-    <button id="b_addfield">ADD A FIELD</button>
-  </div>
-  <div class="note help">Up to five fields, and they are yours — this server has
-no opinion about what a request should ask. Somebody running a campus wants a
-name and a department; somebody running a house wants none of it. Tick
-<b>message</b> on one field to make it a box big enough for a reason, and mark
-the ones that must be answered.
-
-If you do not ask for a name, rows arrive labelled by their id and you approve
-them on whatever you did ask for. Ask for nothing at all and a request carries
-nothing but that id.</div>
-
-  <div class="seg" style="margin-top:8px">
-    <button id="b_formsave" class="act-save">SAVE THE FORM</button>
-    <button id="b_formrevert" class="act-undo">REVERT</button>
-  </div>
-  <div class="note" id="formnote"></div>
-    </div>
-  </section>
-
   <section class="grp" data-tab="displays">
     <h4>Created Access</h4>
     <div class="grpbody">
@@ -1714,46 +1687,6 @@ DELETE is the revocation: that token stops matching anything, and the device
 is back to being a browser that has never been here.</div>
     </div>
   </section>
-
-  <!-- The other half of a place: what it looks like when somebody IS there.
-       Its own list, because appearance and the screensaver are different axes. -->
-  <section class="grp" data-tab="displays">
-    <h4>Appearance profiles</h4>
-    <div class="grpbody">
-  <div id="dp_looks"></div>
-  <div class="seg" style="margin-top:6px">
-    <button id="b_addlook">ADD A PROFILE</button>
-  </div>
-  <div class="note help">The LOOK tab is <b>one document for everybody</b>, and
-that is right for almost all of it — tune the bloom once and every screen in
-the building gets it. It is wrong for exactly four values.
-
-A screen in a hallway is read from three metres. A laptop is read from fifty
-centimetres. One type size cannot be right for both, and neither can one
-layout: a wall wants the figure filling the frame, a desk wants room for the
-transcript beside it. So <b>type size, palette, layout and the figure</b>
-become a profile a device names, and everything else stays shared.
-
-A device that names none of these shows what the LOOK tab says, which is what
-every display did before this existed. Deleting a profile puts every device
-that named it back to that, rather than to nothing.
-
-<b>PREVIEW</b> lays a profile over the preview on the right without saving it,
-and follows the controls as you change them. Pressing STOP — or touching
-anything on LOOK, MOTION or SPEECH — puts the shared document back.
-
-<b>Type size tops out at LARGEST</b>, which is the range the LOOK tab offers.
-If that turns out not to be enough on a real wall, the range is the thing to
-change, not this.</div>
-
-  <div class="seg" style="margin-top:8px">
-    <button id="b_looksave" class="act-save">SAVE THE PROFILES</button>
-    <button id="b_lookrevert" class="act-undo">REVERT</button>
-  </div>
-  <div class="note" id="looknote"></div>
-    </div>
-  </section>
-
   <!-- Central, and named from a device rather than copied into it. A
        deployment has a handful of kinds of place, not one setting per screen. -->
   <section class="grp" data-tab="displays">
@@ -1847,8 +1780,32 @@ a setting that changes twice a year would be the wrong trade.</div>
   <div class="note" id="savernote"></div>
     </div>
   </section>
+  <!-- The form itself, which is a different job again: this one is written
+       once, in somebody's own words, and read by strangers. -->
+  <section class="grp" data-tab="displays">
+    <h4>The request form</h4>
+    <div class="grpbody">
+  <div id="dp_form"></div>
+  <div class="seg" style="margin-top:6px">
+    <button id="b_addfield">ADD A FIELD</button>
+  </div>
+  <div class="note help">Up to five fields, and they are yours — this server has
+no opinion about what a request should ask. Somebody running a campus wants a
+name and a department; somebody running a house wants none of it. Tick
+<b>message</b> on one field to make it a box big enough for a reason, and mark
+the ones that must be answered.
 
+If you do not ask for a name, rows arrive labelled by their id and you approve
+them on whatever you did ask for. Ask for nothing at all and a request carries
+nothing but that id.</div>
 
+  <div class="seg" style="margin-top:8px">
+    <button id="b_formsave" class="act-save">SAVE THE FORM</button>
+    <button id="b_formrevert" class="act-undo">REVERT</button>
+  </div>
+  <div class="note" id="formnote"></div>
+    </div>
+  </section>
   <!-- Everything that is simply working. Its own topic, because the list
        above is a queue — read when something needs deciding — and this one is
        a register, read when somebody asks what is out there. Three rows that
@@ -1869,6 +1826,44 @@ code for do not, and never will.
 
 <b>WITHDRAW</b> takes access away and puts the row back under Created Access.
 <b>DELETE</b> goes further and forgets the device entirely.</div>
+    </div>
+  </section>
+  <!-- The other half of a place: what it looks like when somebody IS there.
+       Its own list, because appearance and the screensaver are different axes. -->
+  <section class="grp" data-tab="displays">
+    <h4>Appearance profiles</h4>
+    <div class="grpbody">
+  <div id="dp_looks"></div>
+  <div class="seg" style="margin-top:6px">
+    <button id="b_addlook">ADD A PROFILE</button>
+  </div>
+  <div class="note help">The LOOK tab is <b>one document for everybody</b>, and
+that is right for almost all of it — tune the bloom once and every screen in
+the building gets it. It is wrong for exactly four values.
+
+A screen in a hallway is read from three metres. A laptop is read from fifty
+centimetres. One type size cannot be right for both, and neither can one
+layout: a wall wants the figure filling the frame, a desk wants room for the
+transcript beside it. So <b>type size, palette, layout and the figure</b>
+become a profile a device names, and everything else stays shared.
+
+A device that names none of these shows what the LOOK tab says, which is what
+every display did before this existed. Deleting a profile puts every device
+that named it back to that, rather than to nothing.
+
+<b>PREVIEW</b> lays a profile over the preview on the right without saving it,
+and follows the controls as you change them. Pressing STOP — or touching
+anything on LOOK, MOTION or SPEECH — puts the shared document back.
+
+<b>Type size tops out at LARGEST</b>, which is the range the LOOK tab offers.
+If that turns out not to be enough on a real wall, the range is the thing to
+change, not this.</div>
+
+  <div class="seg" style="margin-top:8px">
+    <button id="b_looksave" class="act-save">SAVE THE PROFILES</button>
+    <button id="b_lookrevert" class="act-undo">REVERT</button>
+  </div>
+  <div class="note" id="looknote"></div>
     </div>
   </section>
 
