@@ -1396,7 +1396,24 @@ MAX_KIOSKS = 8
 #: eight of them — and it would lose the case that turns up first in any
 #: building with more than three screens, where day and night in one hallway
 #: share an appearance and differ only in the dim.
-KIOSK_OFF = {"voice_only": True, "look": "", "saver": ""}
+KIOSK_OFF = {"voice_only": True, "look": "", "saver": "",
+             # Asked for on the first touch, and off is a real answer: a screen
+             # somebody also browses on wants its address bar, and a television
+             # whose operating system already hides the chrome gains nothing.
+             "fullscreen": True,
+             # The line low in the frame that tells a passer-by this listens.
+             "prompt": True,
+             # …and what it says. EMPTY MEANS the automatic one, built from the
+             # wake words this display actually answers to — which is right far
+             # more often than anything typed here, and stays right when a wake
+             # word is renamed. Typed text is for the deployment where the
+             # generated line is not the point: a shop floor that would rather
+             # say "ask me about opening hours".
+             "prompt_text": ""}
+
+#: One dim line at the foot of a screen, read in passing. Anything longer is a
+#: paragraph nobody standing up will finish.
+MAX_PROMPT_TEXT = 80
 
 
 def clean_kiosks(raw):
@@ -1419,7 +1436,11 @@ def clean_kiosks(raw):
         out.append({"id": kid, "name": name,
                     "voice_only": bool(k.get("voice_only", KIOSK_OFF["voice_only"])),
                     "look": str(k.get("look") or "")[:16],
-                    "saver": str(k.get("saver") or "")[:16]})
+                    "saver": str(k.get("saver") or "")[:16],
+                    "fullscreen": bool(k.get("fullscreen", KIOSK_OFF["fullscreen"])),
+                    "prompt": bool(k.get("prompt", KIOSK_OFF["prompt"])),
+                    "prompt_text": str(k.get("prompt_text") or "")
+                                   .strip()[:MAX_PROMPT_TEXT]})
     return out
 
 
@@ -1559,6 +1580,14 @@ def validate_display_settings(obj, current):
             if not str(k.get("name") or "").strip():
                 return None, ("every profile needs a name — it is what you pick "
                               "on a device")
+            # Refused rather than truncated, for the reason the screensaver
+            # numbers are: this is somebody typing and pressing save, and
+            # quietly storing half their sentence is the panel lying about
+            # what it did. clean_kiosks truncates instead, and it is reading a
+            # file rather than answering a person.
+            if len(str(k.get("prompt_text") or "").strip()) > MAX_PROMPT_TEXT:
+                return None, ("the prompt line has to fit in %d characters — it "
+                              "is one line read in passing" % MAX_PROMPT_TEXT)
             # Named and gone, told rather than swallowed — the same rule as a
             # device naming a deleted profile.
             for key, pool, what in (("saver", cfg["savers"], "screensaver"),
@@ -1685,10 +1714,10 @@ def migrate_kiosks():
             key = (bool(rec.get("voice_only", KIOSK_OFF["voice_only"])),
                    str(rec.get("saver") or ""), str(rec.get("look") or ""))
             if key not in made:
-                prof = {"id": "k" + secrets.token_hex(4),
-                        "name": "Default" if not kiosks else
-                                "Kiosk %d" % (len(kiosks) + 1),
-                        "voice_only": key[0], "saver": key[1], "look": key[2]}
+                prof = dict(KIOSK_OFF, id="k" + secrets.token_hex(4),
+                            name="Default" if not kiosks else
+                                 "Kiosk %d" % (len(kiosks) + 1),
+                            voice_only=key[0], saver=key[1], look=key[2])
                 made[key] = prof
                 kiosks.append(prof)
             rec["kiosk_profile"] = made[key]["id"]
@@ -1751,7 +1780,14 @@ def kiosk_of(rec, savers=None, looks=None, kiosks=None, default_id=None):
     return {"kiosk": True,
             "voice_only": bool(prof.get("voice_only", KIOSK_OFF["voice_only"])),
             "look": find_look(str(prof.get("look") or ""), looks),
-            "saver": find_saver(str(prof.get("saver") or ""), savers)}
+            "saver": find_saver(str(prof.get("saver") or ""), savers),
+            "fullscreen": bool(prof.get("fullscreen", KIOSK_OFF["fullscreen"])),
+            "prompt": bool(prof.get("prompt", KIOSK_OFF["prompt"])),
+            # The admin's words where there are any, and the empty string where
+            # there are not — the display builds the automatic line itself,
+            # because only the browser knows which wake words it is currently
+            # answering to.
+            "prompt_text": str(prof.get("prompt_text") or "")[:MAX_PROMPT_TEXT]}
 
 
 def validate_kiosk(obj, rec, kiosks):
