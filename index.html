@@ -265,7 +265,7 @@
      figure away could not save. The reasoning was already written here; it
      had only ever been applied to the embed. */
   body[data-embed] #fps,
-  body[data-wall]  #fps{display:none}
+  body[data-kiosk]  #fps{display:none}
 
   /* ---------- composer ---------- */
   #bar{
@@ -758,7 +758,7 @@ const Display = {
        whatever the state is: a tablet waiting to be approved is already on a
        wall, and the panel nobody has opened yet is exactly the case where a
        screen sits burning an image into itself. */
-    Wall.take(d.wall);
+    Kiosk.take(d.kiosk);
     this.known = true;
   },
 
@@ -829,9 +829,12 @@ const Display = {
    stays in localStorage untouched, so a display taken off the wall and turned
    back into an ordinary tab gets that person's own choice back rather than
    the policy's. */
-const Wall = {
-  onWall: false,
+const Kiosk = {
+  on: false,
   voiceOnly: false,
+  fullscreen: true,
+  prompt: true,
+  promptText: '',
   /* The buttons a wall takes away, and where each came from, so removing them
      is REVERSIBLE. Turning the policy off has to give the control back
      without somebody walking to the tablet and reloading it — and the panel's
@@ -856,9 +859,16 @@ const Wall = {
 
   take(w){
     w = w || {};
-    this.onWall = !!w.wall;
+    this.on = !!w.kiosk;
     this.voiceOnly = !!w.voice_only;
     this.look = w.look || null;
+    /* Both default ON where the server said nothing, so the panel's preview —
+       which sends an appearance or a screensaver and nothing else — does not
+       read as a kiosk that has had its full screen and its prompt switched
+       off. */
+    this.fullscreen = w.fullscreen !== false;
+    this.prompt = w.prompt !== false;
+    this.promptText = w.prompt_text || '';
     Saver.configure(w.saver);
     this.apply();
   },
@@ -881,7 +891,7 @@ const Wall = {
   },
 
   apply(){
-    document.body.toggleAttribute('data-wall', this.onWall);
+    document.body.toggleAttribute('data-kiosk', this.on);
     document.body.toggleAttribute('data-voiceonly', this.voiceOnly);
     this.applyLook();
 
@@ -894,8 +904,8 @@ const Wall = {
        It is also what makes the resting prompt true. The wake gate is
        inactive in push-to-talk, so "say the name" would be an instruction
        that does nothing; in AUTO the name is exactly how you reach it. */
-    this._pull('pttbtn', this.onWall);
-    if (this.onWall) setPtt(false);
+    this._pull('pttbtn', this.on);
+    if (this.on) setPtt(false);
     else if (!PREVIEW && Prefs.has('ptt')) setPtt(Prefs.get('ptt'));
 
     this._pull('textbtn', this.voiceOnly);
@@ -2058,8 +2068,18 @@ function paintPrompt(){
      at all is one where "say the name" would be a lie — anything said to it
      is heard, so there is no name to offer. */
   const gated = typeof Wake !== 'undefined' && Wake.armed && Wake.armed();
-  PROMPT = (Wall.onWall && names && gated && !(Wake.awake))
-    ? 'say ' + names : '';
+  /* The admin's words where there are any, and the automatic line where
+     there are none. Empty is not "say nothing": it is "work it out", and the
+     browser is the only thing that knows which wake words this screen is
+     currently answering to — so a renamed wake word keeps the line true
+     without anybody editing a profile.
+
+     A typed line does NOT need a wake word to exist, because it is not making
+     a claim about one. The generated one does, and says so by not appearing. */
+  const custom = (Kiosk.promptText || '').trim();
+  PROMPT = (Kiosk.on && Kiosk.prompt && !(Wake.awake))
+    ? (custom || (names && gated ? 'say ' + names : ''))
+    : '';
   if (promptEl) promptEl.textContent = PROMPT;
   document.body.toggleAttribute('data-prompt', !!PROMPT);
 }
@@ -2084,7 +2104,7 @@ function paintPrompt(){
    their very next tap would make the screen unusable exactly when somebody is
    working on it. So a deliberate exit buys a minute of quiet, after which a
    wall goes back to being a wall. */
-const Kiosk = {
+const FullScreen = {
   leftAt: 0,
   GRACE: 60,                            // seconds of quiet after a manual exit
 
@@ -2095,7 +2115,8 @@ const Kiosk = {
   },
 
   ask(){
-    if (EMBED || PREVIEW || !Wall.onWall || !this.can() || this.el()) return;
+    if (EMBED || PREVIEW || !Kiosk.on || !Kiosk.fullscreen
+        || !this.can() || this.el()) return;
     if (this.leftAt && (wallNow() - this.leftAt) < this.GRACE) return;
     const r = document.documentElement;
     try{
@@ -2115,7 +2136,7 @@ const Kiosk = {
       }));
   },
 };
-Kiosk.init();
+FullScreen.init();
 
 /* Every signal that is not speech. Passive, so none of it costs a frame, and
    on the window rather than the canvas because a voice-only display is mostly
@@ -2124,7 +2145,7 @@ Kiosk.init();
    The same gesture that ends the screensaver is the one that can ask for the
    full screen — there is only ever one first touch, and both want it. */
 ['pointerdown', 'touchstart', 'keydown', 'wheel'].forEach(ev=>
-  window.addEventListener(ev, ()=>{ Saver.poke(); Kiosk.ask(); }, {passive: true}));
+  window.addEventListener(ev, ()=>{ Saver.poke(); FullScreen.ask(); }, {passive: true}));
 
 /* ================================================================ LOOP */
 let now=0, last=performance.now(), frames=0, fpsT=0;
@@ -3281,7 +3302,7 @@ const CMD = {
   /* The wall settings, applied without saving — the same live-preview
      contract the appearance settings have. The panel is the only caller: a
      real display gets these from its own row, over its own token. */
-  wall:     (w)=> Wall.take(w),
+  kiosk:    (w)=> Kiosk.take(w),
   /* …and start the drift now, so an admin picking a scale and a dim can see
      what they are picking instead of standing in front of a screen waiting
      out three minutes of idle to find out. */
@@ -3939,7 +3960,7 @@ function setPtt(v, remember){
      button and the shared document are three ways in, and a hallway screen
      that quietly went back to needing a space bar would look broken to
      everyone who walked up to it. */
-  if (Wall.onWall) v = false;
+  if (Kiosk.on) v = false;
   S.ptt = !!v;
   if (remember) Prefs.set('ptt', S.ptt);
   PTT.up();                              // never leave the gate stuck open
@@ -4043,7 +4064,7 @@ function setTextVisible(on, remember){
      policy beats a preference. Enforced here rather than at each caller so
      there is no path — the button, the stored preference, an embed grant —
      that can put a transcript back on a screen in a hallway. */
-  if (Wall.voiceOnly) on = false;
+  if (Kiosk.voiceOnly) on = false;
   document.body.dataset.text = on ? 'on' : 'off';
   if (remember) Prefs.set('text', !!on);
   if (textBtn){
@@ -4313,7 +4334,7 @@ if (PREVIEW){
       /* The panel pushes the whole document on every control it moves, so an
          appearance profile being previewed has to be laid back over the top or
          the first slider touched would wipe it. */
-      Wall.applyLook();
+      Kiosk.applyLook();
       if (scanEl) scanEl.style.opacity = S.scan;
       tiltAim = S.tilt;
     } else if (m.kind === 'routes'){
@@ -4360,7 +4381,7 @@ Promise.all([Settings.load(), Display.hello().then(()=> Routes.load())]).then(()
      loading the shared settings overwrites S wholesale — so a place's own
      appearance applied when hello came back first would be silently undone a
      moment later by the document it is supposed to override. */
-  Wall.applyLook();
+  Kiosk.applyLook();
   applyPrefs();
   syncWake();
   /* Right-looking and inert, with the reason on the screen. The appearance

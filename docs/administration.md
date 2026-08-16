@@ -153,14 +153,27 @@ The ACCESS tab holds four topics:
 | **Created Access** | the queue: everything waiting on a decision, on a code being typed in, or on somebody asking again — and where you add one |
 | **Connected devices** | everything that is simply working, most recently heard from first |
 
-The two profile lists live on the **PROFILES** tab instead, beside the
-deployment's own settings — what a screen looks like and what it is allowed to
-do were never the same question:
+The profile lists live on the **PROFILES** tab instead, beside the deployment's
+own settings — what a screen looks like and what it is allowed to do were never
+the same question:
 
 | | |
 |---|---|
-| **Screensaver profiles** | what a screen on a wall does when nobody is there |
+| **Kiosk profiles** | what a public screen is: voice only, full screen, the prompt line, and which of the two below it uses |
+| **Screensaver profiles** | what a kiosk does when nobody is there |
 | **Appearance profiles** | what a place looks like, for the handful of values that cannot be shared |
+
+**A kiosk profile is composed, not self-contained.** It names an appearance and
+a screensaver rather than carrying copies of their values, so changing what a
+hallway looks like once still reaches every kiosk using it. Day and night in
+one hallway share an appearance and differ only in the dim — that case is the
+reason the three lists stayed three.
+
+**One of them is the default**, and you choose which. A device that names no
+profile gets it, so a screen hung and never configured behaves like the rest of
+the building rather than like nothing. It is stored by name rather than being
+"the first in the list", so reordering the panel cannot quietly change what
+every unconfigured screen is doing.
 
 Created Access and Connected devices are separate lists on purpose. One is a to-do list and empties as
 you work through it; the other is a register you read when somebody asks what
@@ -221,17 +234,28 @@ laptop can open the page on their phone and ask again from a clean row. That is
 what device identity is — anything stronger needs an identity that person
 carries, which is what a dedicated URL will be.
 
-### On a wall
+### Kiosk mode
 
-Most rows in a real deployment are not on a wall — a guest's laptop, somebody's
-phone — so it is one tick that turns the rest of it on. Tick **On a wall** on a
-device and three controls appear: whether it is voice only, which appearance
-profile it uses, and which screensaver profile. Untick it and the screen goes
-back to being an ordinary page, with all three kept: putting the device back up
-restores what you chose.
+A **kiosk** is a screen people walk up to, that nobody has open and nobody is
+sitting at — a wall, a stand, a reception counter, a tabletop. The mounting was
+never what any of this followed from: what it follows from is that nobody owns
+the session and nobody has a keyboard. It was called *on a wall* until
+2026-08-16, which told anybody deploying on a stand that the feature was not
+for them.
 
-**A wall is voice only and speak only from the moment you tick it.** Both
-follow from what the thing is rather than being two more boxes to find:
+Most rows in a real deployment are not kiosks — a guest's laptop, somebody's
+phone — so it is one tick. Tick **Kiosk mode** on a device and one control
+appears: **which kiosk it is**, chosen from the profiles on the PROFILES tab.
+Untick it and the screen goes back to being an ordinary page, with the choice
+kept: putting the device back up restores what you had.
+
+What a kiosk *does* is the profile's business, not the row's. That is the whole
+point of the split — the settings that used to be edited one device at a time
+are now edited once, where they are named, and every screen using that profile
+changes with them.
+
+**A kiosk is voice only and speak only by default.** Both follow from what the
+thing is rather than being two more boxes to find:
 
 - **No text box.** Voice only arrives already ticked. Untick it for the case
   that wants a transcript — a television in a meeting room, a screen somebody
@@ -246,13 +270,13 @@ TALK and AUDIO stay. A browser will not open a microphone unless somebody asks
 it to, so TALK is pressed once when the screen is commissioned and the wake word
 carries it from there.
 
-**And it goes full screen on the first touch.** An address bar, a tab strip and
+**And it goes full screen on the first touch**, unless the profile says otherwise. An address bar, a tab strip and
 somebody's bookmarks across the top of a hallway screen is a browser that
 happens to be running a display. The page cannot remove that chrome — no page
 can — but it can ask to be shown full screen, and a browser grants that off a
 gesture, which is why it happens on a touch rather than on load.
 
-Only on a wall. A tab you opened is yours, and a page that went full screen the
+Only on a kiosk. A tab you opened is yours, and a page that went full screen the
 moment you clicked it would be a page you never opened twice.
 
 **It does not fight you.** Press Escape and it stays out for a minute, because
@@ -266,7 +290,7 @@ looks like.
 
 **Voice only** is the geometry alone: no transcript and no composer. That is
 what a screen in a hallway wants. It is not a workstation, and a page of
-scrolling text on a wall is neither useful nor discreet.
+scrolling text on a kiosk is neither useful nor discreet.
 
 This is the one setting that **beats the viewer's own control.** The three
 buttons in the bar were built to override the shared settings deliberately,
@@ -282,10 +306,13 @@ TALK, AUDIO and SPACE stay. A browser will not open a microphone without
 somebody asking it to, so a display with no TALK button is a display that could
 never hear its own wake word. Voice only means no text, not no controls.
 
-**It says what to say to it.** A screen on a wall is walked past by people who
+**It says what to say to it.** A kiosk is walked past by people who
 have never used it, and nothing about a silent figure suggests that it listens.
-So a wall display carries one dim line low in the frame — *say “kitchen”*, in
-whatever the wake words actually are. It is there only while nobody is talking
+So a kiosk carries one dim line low in the frame — *say “kitchen”*, in
+whatever the wake words actually are. **The profile can turn that line off, or
+give it words of your own**; leave the text empty and it writes itself from the
+wake words the screen is currently answering to, which stays right when you
+rename one. It is there only while nobody is talking
 to it, only where a wake word exists, and never on a browser tab: somebody who
 opened the page did so on purpose.
 
