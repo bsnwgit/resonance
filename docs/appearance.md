@@ -105,7 +105,7 @@ screen named *Kitchen* labels its own.
 
 It resolves to the first of these that exists:
 
-1. the name you gave that row under **DEVICES**
+1. the name you gave that row under **ACCESS**
 2. `?display=` from the URL it was opened with
 3. the first thing typed on its request form
 
