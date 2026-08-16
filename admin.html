@@ -5004,8 +5004,12 @@ function kioskBlock(d){
   kiosks.forEach(k=>{
     const o = document.createElement('option');
     o.value = k.id;
-    /* A summary in the option text so the choice can be made here without
-       scrolling up to read what the profile holds. */
+    /* The name and nothing else. A select is as wide as its longest option, so
+       a summary here set the width of the control on every device row — and
+       what a profile holds is one tab away, stated once, instead of restated
+       on every screen that uses it. The summary stays on the title attribute
+       for anybody who wants it without leaving the row. */
+    o.textContent = k.name;
     const bits = [k.voice_only ? 'voice only' : 'with transcript'];
     const lk = ((DPCFG && DPCFG.looks) || []).filter(x=> x.id === k.look)[0];
     const sv = ((DPCFG && DPCFG.savers) || []).filter(x=> x.id === k.saver)[0];
@@ -5013,7 +5017,7 @@ function kioskBlock(d){
     if (sv) bits.push(sv.name);
     if (!k.fullscreen) bits.push('no full screen');
     if (!k.prompt) bits.push('no prompt line');
-    o.textContent = k.name + '  ·  ' + bits.join(', ');
+    o.title = bits.join(', ');
     sel.appendChild(o);
   });
   sel.value = d.kiosk_profile || '';
