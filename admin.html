@@ -875,7 +875,8 @@
     border-top:1px solid rgba(var(--glass),.22);
   }
   .rtacts button{border-width:2px;border-style:solid;padding:6px 10px}
-  .rtacts .spacer{flex:1}
+  .rtacts .spacer,
+  .erow .acts .spacer{flex:1;min-width:8px}
   /* The first control in a box should not sit tight under its heading. */
   .subgrp > .subbody > .bklab:first-child{margin-top:2px}
   .grp.isdefault > h4{border-left:2px solid rgba(122,201,160,.9);padding-left:7px}
@@ -4875,8 +4876,6 @@ function kioskBlock(d){
   kb.onchange = sync;
   sync();
 
-  const acts = document.createElement('div');
-  acts.className = 'acts actrow';
   const said = document.createElement('div');
   said.className = 'note';
   const save = document.createElement('button');
@@ -4898,10 +4897,11 @@ function kioskBlock(d){
       said.textContent = e.message;
     }
   };
-  acts.appendChild(save);
-  box.appendChild(acts);
-  box.appendChild(said);
-  return box;
+  /* The button does not live here. It goes in the row's own bottom bar with
+     DELETE, because a row with two action rows — one for what this screen is,
+     one for whether it may be here — reads as two things to press rather than
+     one place to look. */
+  return {box: box, save: save, said: said};
 }
 
 /* What a row IS, and it decides which of the two lists it belongs in as well
@@ -5001,6 +5001,7 @@ async function refreshDisplays(){
     /* A line of their own, under the row, rather than crowded onto the end of
        the name. Four buttons plus a name box plus two badges do not fit a
        425px column, and what they did instead was run over the edge of it. */
+    const kb = kioskBlock(d);
     const r = document.createElement('div'); r.className = 'acts';
     /* Deciding is for a device that turned up on its own. A row created here
        was approved by being created, and has no device yet to decide about. */
@@ -5047,6 +5048,14 @@ async function refreshDisplays(){
       };
       r.appendChild(again);
     }
+    /* Everything above is about whether this device may be here — granting,
+       refusing, withdrawing, reissuing — and it stays left. What follows is
+       committing what the row says and ending it, and those go right. The
+       spacer is the whole split. */
+    const gap = document.createElement('span');
+    gap.className = 'spacer';
+    r.appendChild(gap);
+    r.appendChild(kb.save);
     const del = document.createElement('button');
     del.textContent = 'DELETE';
     del.className = 'act-danger';
@@ -5149,8 +5158,9 @@ async function refreshDisplays(){
     /* Under the facts and above the buttons that end the row's life. A screen
        can be told what it will look like before it has ever been switched on,
        the same way its endpoints can be ticked before it arrives. */
-    row.appendChild(kioskBlock(d));
+    row.appendChild(kb.box);
     row.appendChild(r);
+    row.appendChild(kb.said);
     conn.appendChild(row);
   });
   const count = (st)=> pending.filter(d=> dispState(d) === st).length;
