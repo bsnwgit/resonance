@@ -4564,14 +4564,7 @@ function paintProfiles(kind, list, def){
   arr.forEach((pr, i)=>{
     const row = document.createElement('div');
     row.className = 'erow';
-    const open = OPENPR[kind.key];
-    if (open !== i) row.classList.add('shut');
-    /* While one profile is open the others step out of the way, so the row you
-       are editing is the last thing above its settings. Hidden rather than
-       moved: the settings are separate sections further down the tab, and
-       relocating live controls into a list that is rebuilt on every repaint
-       was how this broke the first time. */
-    if (open >= 0 && open !== i) row.hidden = true;
+    if (OPENPR[kind.key] !== i) row.classList.add('shut');
 
     const top = document.createElement('div');
     top.className = 'top';
