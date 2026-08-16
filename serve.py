@@ -1244,6 +1244,12 @@ DISPLAY_SETTINGS = {
     # tabletop — as against a page somebody opened and is sitting at. The
     # mounting was never the point: what these settings follow from is that
     # nobody owns the session and nobody has a keyboard.
+    # Snapshots of the GEOMETRY and SPEECH tabs, the way `looks` is a snapshot
+    # of APPEARANCE. Three lists rather than one because a place can want a
+    # hallway's appearance with a quieter microphone, and folding them together
+    # would mean a profile per combination.
+    "motions": [],
+    "speeches": [],
     "kiosks": [],
     # Which of them a device gets when it names none. An id rather than "the
     # first in the list", so reordering the panel cannot silently change what
@@ -1331,29 +1337,60 @@ def clean_savers(raw):
     return out
 
 
-def clean_looks(raw):
-    """The appearance profiles, sanitised. Same id discipline as the
-    screensavers — see clean_savers — and every value checked against the list
-    the panel offers, with anything unrecognised falling back to the first
-    entry rather than being dropped: a profile missing a field is one the
-    display has to guess about, and the panel would draw an empty select."""
+#: The three profile lists that are snapshots of a settings tab, and the tab
+#: each one belongs to. A profile holds EVERY key that tab writes rather than a
+#: hand-picked four: the tab is the editor and the profile is what it looked
+#: like when you pressed the button, so anything you could tune there is
+#: something a place can differ in.
+#:
+#: The values are stored the way the shared settings document is stored —
+#: unvalidated here, checked by the display as it applies them. That is not
+#: laxness, it is the same contract: settings.json is written the same way, and
+#: a second validator that drifted from the display's own would be worse than
+#: none.
+PROFILE_LISTS = {"looks": "look", "motions": "motion", "speeches": "speech"}
+
+#: A profile carries at most this many keys. A tab has tens; a document
+#: arriving with thousands is not a profile.
+MAX_PROFILE_KEYS = 120
+
+
+def clean_profiles(raw, prefix, limit=None):
+    """A list of {id, name, values}, sanitised, in the order the panel put it.
+
+    Same id discipline as the screensavers — see clean_savers — because a
+    device and a kiosk profile both name these by id, so a rename must not
+    orphan one and a reorder must not move a screen onto somebody else's
+    settings."""
     out, seen = [], set()
-    for s in (raw or [])[:MAX_LOOKS]:
+    for s in (raw or [])[:(limit or MAX_LOOKS)]:
         if not isinstance(s, dict):
             continue
         name = str(s.get("name") or "").strip()[:40]
         if not name:
             continue
-        lid = str(s.get("id") or "")[:16]
-        if not lid or lid in seen:
-            lid = "l" + secrets.token_hex(4)
-        seen.add(lid)
-        row = {"id": lid, "name": name}
-        for k, allowed in LOOK_VALUES.items():
-            v = str(s.get(k, ""))
-            row[k] = v if v in allowed else allowed[0]
-        out.append(row)
+        pid = str(s.get("id") or "")[:16]
+        if not pid or pid in seen:
+            pid = prefix + secrets.token_hex(4)
+        seen.add(pid)
+        vals = s.get("values")
+        if not isinstance(vals, dict):
+            # An old-shape appearance profile: four settings sitting flat on
+            # the row. Lift them into `values` rather than dropping them —
+            # this is what somebody's hallway already looks like.
+            vals = {k: s[k] for k in LOOK_VALUES if k in s}
+        clean = {}
+        for k, v in list(vals.items())[:MAX_PROFILE_KEYS]:
+            if isinstance(k, str) and isinstance(v, (str, int, float, bool)):
+                clean[k[:40]] = v
+        out.append({"id": pid, "name": name, "values": clean})
     return out
+
+
+def clean_looks(raw):
+    """Kept as its own name because the appearance list is referenced by it all
+    over — it is clean_profiles with the appearance prefix."""
+    return clean_profiles(raw, "l", MAX_LOOKS)
 
 
 def find_look(lid, looks=None):
@@ -1367,7 +1404,7 @@ def find_look(lid, looks=None):
         return None
     for s in (looks if looks is not None else display_settings()["looks"]):
         if s["id"] == lid:
-            return {k: s[k] for k in LOOK_VALUES}
+            return dict(s.get("values") or {})
     return None
 
 
@@ -1396,7 +1433,8 @@ MAX_KIOSKS = 8
 #: eight of them — and it would lose the case that turns up first in any
 #: building with more than three screens, where day and night in one hallway
 #: share an appearance and differ only in the dim.
-KIOSK_OFF = {"voice_only": True, "look": "", "saver": "",
+KIOSK_OFF = {"voice_only": True, "look": "", "motion": "", "speech": "",
+             "saver": "",
              # Asked for on the first touch, and off is a real answer: a screen
              # somebody also browses on wants its address bar, and a television
              # whose operating system already hides the chrome gains nothing.
@@ -1436,6 +1474,8 @@ def clean_kiosks(raw):
         out.append({"id": kid, "name": name,
                     "voice_only": bool(k.get("voice_only", KIOSK_OFF["voice_only"])),
                     "look": str(k.get("look") or "")[:16],
+                    "motion": str(k.get("motion") or "")[:16],
+                    "speech": str(k.get("speech") or "")[:16],
                     "saver": str(k.get("saver") or "")[:16],
                     "fullscreen": bool(k.get("fullscreen", KIOSK_OFF["fullscreen"])),
                     "prompt": bool(k.get("prompt", KIOSK_OFF["prompt"])),
@@ -1566,6 +1606,23 @@ def validate_display_settings(obj, current):
                     return None, ("%s must be one of: %s"
                                   % (k, ", ".join(allowed)))
         cfg["looks"] = clean_looks(obj["looks"])
+    # The geometry and speech lists, validated exactly as the appearance one is:
+    # a name, and a bag of settings the display checks as it applies them.
+    for key, prefix in (("motions", "m"), ("speeches", "p")):
+        if key not in obj:
+            continue
+        if not isinstance(obj[key], (list, tuple)):
+            return None, "the %s profiles must be a list" % key[:-1]
+        if len(obj[key]) > MAX_LOOKS:
+            return None, ("there is room for %d %s profiles"
+                          % (MAX_LOOKS, key[:-1]))
+        for pr in obj[key]:
+            if not isinstance(pr, dict):
+                return None, "a profile must be a set of fields"
+            if not str(pr.get("name") or "").strip():
+                return None, ("every profile needs a name — it is what you pick "
+                              "on a kiosk")
+        cfg[key] = clean_profiles(obj[key], prefix, MAX_LOOKS)
     if "kiosks" in obj:
         if not isinstance(obj["kiosks"], (list, tuple)):
             return None, "the kiosk profiles must be a list"
@@ -1591,7 +1648,9 @@ def validate_display_settings(obj, current):
             # Named and gone, told rather than swallowed — the same rule as a
             # device naming a deleted profile.
             for key, pool, what in (("saver", cfg["savers"], "screensaver"),
-                                    ("look", cfg["looks"], "appearance")):
+                                    ("look", cfg["looks"], "appearance"),
+                                    ("motion", cfg["motions"], "geometry"),
+                                    ("speech", cfg["speeches"], "speech")):
                 pid = str(k.get(key) or "")
                 if pid and not any(p["id"] == pid for p in pool):
                     return None, ("a kiosk profile names a %s that no longer "
@@ -1761,7 +1820,8 @@ def display_label(rec):
 KIOSK_FIELDS = ("kiosk", "kiosk_profile")
 
 
-def kiosk_of(rec, savers=None, looks=None, kiosks=None, default_id=None):
+def kiosk_of(rec, savers=None, looks=None, kiosks=None, default_id=None,
+             motions=None, speeches=None):
     """What this display is, resolved and clamped: whether it is a kiosk at
     all, whether the transcript is there, and the numbers of the screensaver
     the profile names.
@@ -1782,9 +1842,26 @@ def kiosk_of(rec, savers=None, looks=None, kiosks=None, default_id=None):
     # settings under it, because being a kiosk means things none of them
     # covers — a rig instrument in the corner of a hallway screen is the first.
     prof = find_kiosk(rec.get("kiosk_profile"), kiosks, default_id) or {}
+    # The three snapshots are merged into ONE map of settings before it leaves
+    # here. The display already knows how to take a map of settings and apply
+    # it; handing it three would make it learn an order of precedence that only
+    # ever has one answer. Appearance first, then geometry, then speech —
+    # disjoint in practice, since each is the keys of one tab.
+    # One read of the settings covers whichever pools the caller did not pass.
+    cfg_all = None
+    if looks is None or motions is None or speeches is None:
+        cfg_all = display_settings()
+    pools = {"look":   looks    if looks    is not None else cfg_all["looks"],
+             "motion": motions  if motions  is not None else cfg_all["motions"],
+             "speech": speeches if speeches is not None else cfg_all["speeches"]}
+    merged = {}
+    for key in ("look", "motion", "speech"):
+        got = find_look(str(prof.get(key) or ""), pools[key] or [])
+        if got:
+            merged.update(got)
     return {"kiosk": True,
             "voice_only": bool(prof.get("voice_only", KIOSK_OFF["voice_only"])),
-            "look": find_look(str(prof.get("look") or ""), looks),
+            "look": merged or None,
             "saver": find_saver(str(prof.get("saver") or ""), savers),
             "fullscreen": bool(prof.get("fullscreen", KIOSK_OFF["fullscreen"])),
             "prompt": bool(prof.get("prompt", KIOSK_OFF["prompt"])),
