@@ -1503,16 +1503,16 @@ it, which is why it lives beside the microphone and the voices.</div>
   <!-- Two settings, not one mode. A single label covering both starts lying
        the moment somebody changes half of it, so the panel shows the pair and
        states the arrangement underneath in the words it actually means. -->
-  <!-- Where this server can be reached from. Its own tab: it is the setting
-       that decides whether anything outside this machine can see the thing at
-       all, and it was sharing a section with the question of what happens once
-       they have. The posture line lives here with it, because what it warns
-       about is exposure. -->
-  <section class="grp" data-tab="extaccess">
-    <h4>Reachable at</h4>
+  <!-- Where this server can be reached from. Its own topic under app
+       settings: it was sharing a section with the question of what happens
+       once somebody has reached it, and those are independent. The posture
+       line lives here with it, because what it warns about is exposure. -->
+  <section class="grp" data-tab="app">
+    <h4>EXT Access</h4>
     <div class="grpbody">
   <div class="pending" id="posturewarn" hidden></div>
 
+  <label class="bklab">Reachable at</label>
   <div class="seg" id="ap_bind">
     <button data-v="loopback">THIS MACHINE ONLY</button>
     <button data-v="address">ONE ADDRESS</button>
@@ -2119,7 +2119,6 @@ button to download it as a PDF.</div>
            in with who may use the server. Both lists moved off ACCESS: what a
            screen looks like and what it is allowed to do were never the same
            question. -->
-      <button id="tab_extaccess" data-tab="extaccess">EXT ACCESS</button>
       <button id="tab_profiles" data-tab="profiles">PROFILES</button>
       <!-- Accounts before devices: a group is made here and named over there,
            so the order follows the order you do them in. -->
@@ -5868,8 +5867,7 @@ function panelNav(){
        offering to save something that is not on screen. */
     const ar = $('approw');
     if (ar) ar.classList.toggle('on',
-      (tab === 'app' || tab === 'extaccess')
-      && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
+      tab === 'app' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
     /* ADD INSTANCE is not inside any block, because it makes one — it has to
        stay reachable whichever block happens to be open, or the only way to
        add a second endpoint is to first collapse the first. */
@@ -5897,7 +5895,7 @@ function panelNav(){
     if (tab === 'displays') refreshDisplays();
     if (tab === 'profiles') refreshProfiles();
     if (tab === 'embeds') refreshEmbeds();
-    if (tab === 'app' || tab === 'extaccess') loadApp();
+    if (tab === 'app') loadApp();
     if (tab === 'ai') loadBackend();
     if (tab === 'docs') loadDocs();
   }
