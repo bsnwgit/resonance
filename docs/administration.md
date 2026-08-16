@@ -35,7 +35,7 @@ At the top:
 - **filter settings** — type to search across every topic in every tab at
   once. This is the fastest way to find a control when you know roughly what
   it is called but not which tab it lives under.
-- **LOOK / MOTION / SPEECH**, **AI** and **DEVICES** — the user interface row.
+- **APPEARANCE / MOTION / SPEECH**, **AI** and **DEVICES** — the user interface row.
   The first three edit the shared interface. AI holds the endpoints, each of
   which saves itself. DEVICES is where a single screen's own settings live and
   carries nothing yet.
@@ -66,7 +66,7 @@ nothing for anybody else. The state is yours until you commit it.
 
 ### Every part of the panel commits itself
 
-There is no single save button. **LOOK, MOTION and SPEECH each have their own
+There is no single save button. **APPEARANCE, MOTION and SPEECH each have their own
 SAVE FOR EVERYONE and REVERT**, at the foot of that tab, writing only the
 settings on that tab.
 
@@ -79,16 +79,16 @@ actions held apart at the right.
 
 That is not decoration. There used to be one button for all three, which meant
 pressing it while looking at MOTION also published whatever had been left
-half-adjusted on LOOK — a save whose scope was wider than the thing in front
+half-adjusted on APPEARANCE — a save whose scope was wider than the thing in front
 of you, and no way to tell from the screen. Each row now says what it covers:
 *19 settings on this tab, shared with every viewer*.
 
-The consequence worth knowing: you can leave MOTION unsaved while saving LOOK,
+The consequence worth knowing: you can leave MOTION unsaved while saving APPEARANCE,
 and the preview will keep showing both. Each row carries its own unsaved
 warning, in red, so the tab with work waiting behind it says so.
 
 **REVERT** puts that tab's settings back to what the server holds and leaves
-every other tab alone — reverting LOOK should not throw away an hour spent on
+every other tab alone — reverting APPEARANCE should not throw away an hour spent on
 SPEECH.
 
 An unsaved change is flagged in red on that tab's row. Walking away from a
@@ -159,9 +159,12 @@ the same question:
 
 | | |
 |---|---|
-| **Kiosk profiles** | what a public screen is: voice only, full screen, the prompt line, and which of the two below it uses |
-| **Screensaver profiles** | what a kiosk does when nobody is there |
 | **Appearance profiles** | what a place looks like, for the handful of values that cannot be shared |
+| **Screensaver profiles** | what a kiosk does when nobody is there |
+| **Kiosk profiles** | what a public screen is: voice only, full screen, the prompt line, and which of the two above it uses |
+
+They are in that order on the tab because it is the order you build in: the two
+pieces first, then the thing that names them.
 
 **A kiosk profile is composed, not self-contained.** It names an appearance and
 a screensaver rather than carrying copies of their values, so changing what a
@@ -330,7 +333,7 @@ given larger type without being told to do either.
 
 ### Appearance profiles
 
-The LOOK tab is **one document for everybody**, and that is right for almost
+The APPEARANCE tab is **one document for everybody**, and that is right for almost
 all of it — tune the bloom once and every screen in the building gets it. It is
 wrong for exactly four values.
 
@@ -341,7 +344,7 @@ transcript beside it. So four values become a profile that a device names:
 
 | | |
 | --- | --- |
-| **Type size** | NORMAL, LARGER, LARGEST — the range the LOOK tab offers |
+| **Type size** | NORMAL, LARGER, LARGEST — the range the APPEARANCE tab offers |
 | **Palette** | which of the five |
 | **Layout** | HERO, or FULL BLEED for a screen that is mostly being looked at |
 | **Figure** | STACK, DISC, ORB or KNOT |
@@ -350,17 +353,17 @@ Everything else stays shared. That is the point of the shortlist rather than
 "override anything": a per-place setting that could cover the whole document
 would quietly end the ability to change something once for everyone.
 
-**A device that names no profile shows what the LOOK tab says**, which is what
+**A device that names no profile shows what the APPEARANCE tab says**, which is what
 every display did before this existed. Deleting a profile puts every device
 that named it back to that, rather than to nothing — so the fall-back is always
 a working appearance.
 
 **PREVIEW** lays a profile over the live preview without saving it, and follows
 the controls as you change them. STOP puts the shared document back, and so
-does touching anything on LOOK, MOTION or SPEECH.
+does touching anything on APPEARANCE, MOTION or SPEECH.
 
 One limit worth knowing before a screen goes up: **type size tops out at
-LARGEST**, because that is the range the LOOK tab offers. If that is not enough
+LARGEST**, because that is the range the APPEARANCE tab offers. If that is not enough
 at three metres, the range itself is the thing to change.
 
 ### Screensaver profiles

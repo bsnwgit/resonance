@@ -7,7 +7,7 @@ nothing reaches anyone else until you press SAVE FOR EVERYONE.
 There is no wrong setting in this document — none of it can break the app —
 so the honest advice is to open the preview and push the sliders around.
 
-## LOOK
+## APPEARANCE
 
 ### Geometry
 
@@ -164,7 +164,7 @@ this exists; too much of it reads as noise. A little goes a long way.
 
 ## Test drive
 
-Under SPEECH, not LOOK, but it belongs in this workflow: **IDLE**,
+Under SPEECH, not APPEARANCE, but it belongs in this workflow: **IDLE**,
 **THINKING** and **SPEAK SAMPLE** drive the figure through each state without
 needing a microphone or a real question. This is the fastest way to judge a
 palette or a motion setting, because you can see all three states in a few

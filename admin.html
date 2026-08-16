@@ -1189,7 +1189,11 @@
        carry the SAVE FOR EVERYONE button. -->
   <div class="tabgroup">User interface settings</div>
   <div class="tabs">
-    <button data-tab="look"   class="on">LOOK</button>
+    <!-- APPEARANCE rather than LOOK, so the tab and the "Appearance profiles"
+         under PROFILES read as the same subject. data-tab stays "look": it is
+         the storage key for these settings, and renaming it would rewrite
+         every stored document for a label change. -->
+    <button data-tab="look"   class="on">APPEARANCE</button>
     <button data-tab="motion">MOTION</button>
     <button data-tab="speech">SPEECH</button>
     <button id="tab_ai" data-tab="ai">AI</button>
@@ -1742,46 +1746,42 @@ DELETE is the revocation: that token stops matching anything, and the device
 is back to being a browser that has never been here.</div>
     </div>
   </section>
-  <!-- What a public screen IS, and the only one of the three a device names.
-       The other two lists are things a kiosk profile points at. -->
+  <!-- The other half of a place: what it looks like when somebody IS there.
+       Its own list, because appearance and the screensaver are different axes. -->
   <section class="grp" data-tab="profiles">
-    <h4>Kiosk profiles</h4>
+    <h4>Appearance profiles</h4>
     <div class="grpbody">
-  <div id="dp_kiosks"></div>
+  <div id="dp_looks"></div>
   <div class="seg" style="margin-top:6px">
-    <button id="b_addkiosk">ADD A PROFILE</button>
+    <button id="b_addlook">ADD A PROFILE</button>
   </div>
-  <div class="note help">A <b>kiosk</b> is a screen people walk up to, that
-nobody has open and nobody is sitting at — a wall, a stand, a reception
-counter, a tabletop. The mounting was never what any of this followed from:
-what it follows from is that nobody owns the session and nobody has a keyboard.
+  <div class="note help">The APPEARANCE tab is <b>one document for everybody</b>, and
+that is right for almost all of it — tune the bloom once and every screen in
+the building gets it. It is wrong for exactly four values.
 
-<b>Build them here, pick one on a device.</b> A hallway, a reception desk, a
-shop floor — a handful of kinds of place, not one setting per screen. Change
-what a hallway does once and every hallway screen changes with it.
+A screen in a hallway is read from three metres. A laptop is read from fifty
+centimetres. One type size cannot be right for both, and neither can one
+layout: a wall wants the figure filling the frame, a desk wants room for the
+transcript beside it. So <b>type size, palette, layout and the figure</b>
+become a profile a device names, and everything else stays shared.
 
-<b>Voice only</b> takes away the transcript and the composer, and it outranks
-what the viewer chose: a hallway is not a workstation, and a screen of
-scrolling text in one is neither useful nor discreet.
+A device that names none of these shows what the APPEARANCE tab says, which is what
+every display did before this existed. Deleting a profile puts every device
+that named it back to that, rather than to nothing.
 
-<b>Full screen</b> is asked for on the first touch. Turn it off where somebody
-also browses on that machine, or where the operating system already hides the
-chrome.
+<b>PREVIEW</b> lays a profile over the preview on the right without saving it,
+and follows the controls as you change them. Pressing STOP — or touching
+anything on APPEARANCE, MOTION or SPEECH — puts the shared document back.
 
-<b>The prompt line</b> is one dim line low in the frame telling a passer-by
-this listens. Leave the text empty and it writes itself from the wake words the
-screen actually answers to — which stays right when you rename one. Type
-something only where the generated line is not the point.
-
-<b>The default</b> is what a device gets when it names no profile, and you
-choose which one that is. A screen hung on a wall and never configured
-behaves like the rest of the building rather than like nothing.</div>
+<b>Type size tops out at LARGEST</b>, which is the range the APPEARANCE tab offers.
+If that turns out not to be enough on a real wall, the range is the thing to
+change, not this.</div>
 
   <div class="seg actrow">
-    <button id="b_kiosksave" class="act-save">SAVE THE PROFILES</button>
-    <button id="b_kioskrevert" class="act-undo">REVERT</button>
+    <button id="b_looksave" class="act-save">SAVE THE PROFILES</button>
+    <button id="b_lookrevert" class="act-undo">REVERT</button>
   </div>
-  <div class="note" id="kiosknote"></div>
+  <div class="note" id="looknote"></div>
     </div>
   </section>
   <!-- Central, and named from a device rather than copied into it. A
@@ -1884,6 +1884,48 @@ a setting that changes twice a year would be the wrong trade.</div>
   <div class="note" id="savernote"></div>
     </div>
   </section>
+  <!-- What a public screen IS, and the only one of the three a device names.
+       The other two lists are things a kiosk profile points at. -->
+  <section class="grp" data-tab="profiles">
+    <h4>Kiosk profiles</h4>
+    <div class="grpbody">
+  <div id="dp_kiosks"></div>
+  <div class="seg" style="margin-top:6px">
+    <button id="b_addkiosk">ADD A PROFILE</button>
+  </div>
+  <div class="note help">A <b>kiosk</b> is a screen people walk up to, that
+nobody has open and nobody is sitting at — a wall, a stand, a reception
+counter, a tabletop. The mounting was never what any of this followed from:
+what it follows from is that nobody owns the session and nobody has a keyboard.
+
+<b>Build them here, pick one on a device.</b> A hallway, a reception desk, a
+shop floor — a handful of kinds of place, not one setting per screen. Change
+what a hallway does once and every hallway screen changes with it.
+
+<b>Voice only</b> takes away the transcript and the composer, and it outranks
+what the viewer chose: a hallway is not a workstation, and a screen of
+scrolling text in one is neither useful nor discreet.
+
+<b>Full screen</b> is asked for on the first touch. Turn it off where somebody
+also browses on that machine, or where the operating system already hides the
+chrome.
+
+<b>The prompt line</b> is one dim line low in the frame telling a passer-by
+this listens. Leave the text empty and it writes itself from the wake words the
+screen actually answers to — which stays right when you rename one. Type
+something only where the generated line is not the point.
+
+<b>The default</b> is what a device gets when it names no profile, and you
+choose which one that is. A screen hung on a wall and never configured
+behaves like the rest of the building rather than like nothing.</div>
+
+  <div class="seg actrow">
+    <button id="b_kiosksave" class="act-save">SAVE THE PROFILES</button>
+    <button id="b_kioskrevert" class="act-undo">REVERT</button>
+  </div>
+  <div class="note" id="kiosknote"></div>
+    </div>
+  </section>
   <!-- The form itself, which is a different job again: this one is written
        once, in somebody's own words, and read by strangers. -->
   <section class="grp" data-tab="displays">
@@ -1930,44 +1972,6 @@ code for do not, and never will.
 
 <b>WITHDRAW</b> takes access away and puts the row back under Created Access.
 <b>DELETE</b> goes further and forgets the device entirely.</div>
-    </div>
-  </section>
-  <!-- The other half of a place: what it looks like when somebody IS there.
-       Its own list, because appearance and the screensaver are different axes. -->
-  <section class="grp" data-tab="profiles">
-    <h4>Appearance profiles</h4>
-    <div class="grpbody">
-  <div id="dp_looks"></div>
-  <div class="seg" style="margin-top:6px">
-    <button id="b_addlook">ADD A PROFILE</button>
-  </div>
-  <div class="note help">The LOOK tab is <b>one document for everybody</b>, and
-that is right for almost all of it — tune the bloom once and every screen in
-the building gets it. It is wrong for exactly four values.
-
-A screen in a hallway is read from three metres. A laptop is read from fifty
-centimetres. One type size cannot be right for both, and neither can one
-layout: a wall wants the figure filling the frame, a desk wants room for the
-transcript beside it. So <b>type size, palette, layout and the figure</b>
-become a profile a device names, and everything else stays shared.
-
-A device that names none of these shows what the LOOK tab says, which is what
-every display did before this existed. Deleting a profile puts every device
-that named it back to that, rather than to nothing.
-
-<b>PREVIEW</b> lays a profile over the preview on the right without saving it,
-and follows the controls as you change them. Pressing STOP — or touching
-anything on LOOK, MOTION or SPEECH — puts the shared document back.
-
-<b>Type size tops out at LARGEST</b>, which is the range the LOOK tab offers.
-If that turns out not to be enough on a real wall, the range is the thing to
-change, not this.</div>
-
-  <div class="seg actrow">
-    <button id="b_looksave" class="act-save">SAVE THE PROFILES</button>
-    <button id="b_lookrevert" class="act-undo">REVERT</button>
-  </div>
-  <div class="note" id="looknote"></div>
     </div>
   </section>
 
@@ -2067,7 +2071,7 @@ button to download it as a PDF.</div>
   <!-- One commit row per tab, each writing only the settings on that tab.
        There was a single SAVE FOR EVERYONE across all of them, which meant
        pressing it while looking at MOTION also published whatever had been
-       left half-adjusted on LOOK — a save whose scope was wider than the
+       left half-adjusted on APPEARANCE — a save whose scope was wider than the
        thing you were looking at. -->
   <div id="uirow_look" class="uirow" data-uitab="look"></div>
   <div id="uirow_motion" class="uirow" data-uitab="motion"></div>
@@ -2265,7 +2269,7 @@ leaveFieldsAlone();
    Two ways in, deliberately, because one of them is not enough on its own.
    The 401 catches it the moment anything is asked of the server — but a 401
    can only arrive if a request is made, and most of this panel is client
-   side. Dragging a slider, switching between LOOK and MOTION, reading a
+   side. Dragging a slider, switching between APPEARANCE and MOTION, reading a
    value: none of that touches the server, so a dead session stays invisible
    for as long as somebody sticks to those. That was the actual hole: the
    page had already been told nothing, so it reported nothing.
@@ -2392,7 +2396,7 @@ $('b_signout').addEventListener('click', async ()=>{
 
 /* --------------------------------------------------------- preview link */
 /* Typography is the one shared setting this panel applies to ITSELF as well
-   as pushing to the preview. Everything else on the LOOK tab describes the
+   as pushing to the preview. Everything else on the APPEARANCE tab describes the
    figure, which the panel does not draw; a face and a size describe reading,
    which is exactly what the panel is for. Choosing a face for a wall display
    from a 600px preview while the panel stays in something else would be
@@ -2709,7 +2713,7 @@ function dirty(key){
 }
 /* Each tab's last word, held per tab. Kept in a map rather than read back off
    the element, because painting one row must not depend on what another row
-   happens to be saying — repainting after a save on LOOK was wiping the
+   happens to be saying — repainting after a save on APPEARANCE was wiping the
    message MOTION had just put up. */
 const SAID = {};
 function status(m, bad, tab){
@@ -2789,7 +2793,7 @@ async function saveTab(tab){
 }
 
 /* Only this tab's settings go back to what the server holds. Everything else
-   somebody has in flight on another tab stays in flight — reverting LOOK
+   somebody has in flight on another tab stays in flight — reverting APPEARANCE
    should not throw away an hour spent on SPEECH. */
 async function revertTab(tab){
   status('reloading this tab from the server…', false, tab);
@@ -3803,7 +3807,7 @@ function paintBlocks(keepOpen){
   have.forEach(g=>{ if (!kept.has(g)) g.remove(); });
   /* Put them in the server's order, and measure that against the OTHER AI
      blocks rather than against every section in the panel — the blocks share
-     a parent with LOOK, MOTION and SPEECH, so positioning by absolute sibling
+     a parent with APPEARANCE, MOTION and SPEECH, so positioning by absolute sibling
      lifted the first endpoint above sections belonging to other tabs.
 
      Skipped entirely while something inside one is focused: re-inserting an
@@ -4216,7 +4220,7 @@ function paintLooks(list){
   if (!DPLOOKS.length){
     const em = document.createElement('div');
     em.className = 'note';
-    em.textContent = 'No profiles. Every device shows what the LOOK tab says, '
+    em.textContent = 'No profiles. Every device shows what the APPEARANCE tab says, '
                    + 'which is what they all did before this existed.';
     box.appendChild(em);
   }
@@ -4668,7 +4672,7 @@ function paintKiosks(list, def){
       sel.onchange = ()=>{ DPKIOSKS[i][key] = k[key] = sel.value; retitle(); };
       field(label, sel);
     };
-    picker('Appearance', 'look', 'SHARED — whatever the LOOK tab says',
+    picker('Appearance', 'look', 'SHARED — whatever the APPEARANCE tab says',
       (DPCFG && DPCFG.looks) || [],
       p=> [p.palette, p.layout, p.mode, 'size ' + p.fs].join(' · '));
     picker('Screensaver', 'saver', 'NONE — it never drifts',
