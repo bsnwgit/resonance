@@ -3789,7 +3789,11 @@ function blockFillWho(blk, r){
   const want = r.displays || [], wantG = r.groups || [];
   // Never rebuilt under somebody's cursor — replacing the nodes would drop
   // the tick they were in the middle of making.
-  if (!box.contains(document.activeElement)
+  // Both guarded. `box` is gone now that a grant is made to groups rather than
+  // to devices one at a time, and reading .contains off it threw on every
+  // endpoint paint — which aborted the loop, so only the first endpoint drew
+  // and the block was never hidden when you left the tab.
+  if (!(box && box.contains(document.activeElement))
       && !(gbox && gbox.contains(document.activeElement))){
     /* Groups first, and in their own box. Naming a group is the grant you
        want to make most of the time — twelve people who all get the same
