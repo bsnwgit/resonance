@@ -1250,6 +1250,12 @@ DISPLAY_SETTINGS = {
     # would mean a profile per combination.
     "motions": [],
     "speeches": [],
+    # Which profile in each list an ordinary display gets. One per list, always
+    # set, and the profile it names cannot be removed — a list whose default
+    # points at nothing would leave every screen with no appearance at all.
+    "look_default": "",
+    "motion_default": "",
+    "speech_default": "",
     "kiosks": [],
     # Which of them a device gets when it names none. An id rather than "the
     # first in the list", so reordering the panel cannot silently change what
@@ -1657,6 +1663,25 @@ def validate_display_settings(obj, current):
                                   "exists — reload the panel to see the "
                                   "current list" % what)
         cfg["kiosks"] = clean_kiosks(obj["kiosks"])
+    # Which profile each list hands to a display that names none. Corrected
+    # rather than refused when it points at nothing — the deletion was the
+    # deliberate act, and a list whose default named a profile that is gone
+    # would leave every ordinary screen with no appearance at all.
+    #
+    # WHICH KEY BELONGS TO WHICH TAB is not known here, and deliberately: that
+    # mapping is built in the panel from the sections themselves, so a control
+    # moved between tabs cannot leave a stale copy of the answer on the server.
+    # Seeding the first profile is the panel's job for the same reason.
+    for dkey, lkey in (("look_default", "looks"), ("motion_default", "motions"),
+                       ("speech_default", "speeches")):
+        if dkey in obj:
+            want = str(obj[dkey] or "")
+            if want and not any(p["id"] == want for p in cfg[lkey]):
+                return None, "that default is not one of the %s profiles" % lkey[:-1]
+            if want:
+                cfg[dkey] = want
+        if cfg[lkey] and not any(p["id"] == cfg.get(dkey) for p in cfg[lkey]):
+            cfg[dkey] = cfg[lkey][0]["id"]
     if "kiosk_default" in obj:
         want = str(obj["kiosk_default"] or "")
         # Empty is "choose for me", not a mistake — it is what a deployment
