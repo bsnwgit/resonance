@@ -1227,8 +1227,23 @@
     border-color:rgba(224,132,132,1);color:#f6cdcd;
     background:rgba(224,132,132,.18);
   }
+  /* MAKING something is its own act, and now its own colour. The panel spends
+     green on "this is the live thing", red on "this destroys something", blue
+     on "this explains itself"; amber is "this brings a new thing into
+     existence". Worth separating from green in particular — CREATE and SAVE
+     sitting in the same colour made pressing one feel like pressing the
+     other, and only one of them adds a row you then have to name. */
+  button.act-add{
+    border-color:rgba(224,178,110,.75);color:#f0cf9a;
+    background:rgba(224,178,110,.10);
+  }
+  button.act-add:hover:not(:disabled){
+    border-color:rgba(224,178,110,1);color:#f7e3c2;
+    background:rgba(224,178,110,.22);
+  }
   /* A disabled commit must not still look like an invitation. */
-  button.act-save:disabled,button.act-undo:disabled,button.act-danger:disabled{
+  button.act-save:disabled,button.act-undo:disabled,button.act-danger:disabled,
+  button.act-add:disabled{
     border-color:rgba(var(--glass),.20);color:rgba(var(--paper),.35);
     background:none;
   }
@@ -1718,7 +1733,7 @@ recognised is left standing so a typo is visible rather than silent.</div>
     <button data-v="admin">ADMIN</button>
   </div>
   <div class="note" id="usernote"></div>
-  <div class="seg actrow"><button id="b_adduser" class="act-save">CREATE</button></div>
+  <div class="seg actrow"><button id="b_adduser" class="act-add">CREATE</button></div>
     </div>
   </section>
   <!-- Whether uninvited devices may ask at all, and what a grant to one is
@@ -1755,7 +1770,7 @@ recognised is left standing so a typo is visible rather than silent.</div>
     </div>
   </div>
   <div class="note" id="groupnote"></div>
-  <div class="seg actrow"><button id="b_addgroup" class="act-save">CREATE</button></div>
+  <div class="seg actrow"><button id="b_addgroup" class="act-add">CREATE</button></div>
   <div class="note help" style="margin-top:10px">A group of <b>people</b> holds
 those who asked for access and were approved. A group of <b>devices</b> holds
 the screens you created and sent a code to. They are separate populations
@@ -1829,7 +1844,7 @@ by noise.</div>
   <div class="seg" id="dispadd">
     <input id="dp_name" type="text" spellcheck="false" autocomplete="off"
            placeholder="kitchen wall">
-    <button id="b_adddisp" class="act-save">GET A CODE</button>
+    <button id="b_adddisp" class="act-add">GET A CODE</button>
   </div>
   <div class="note" id="dispnote"></div>
   <div class="note help" style="margin-top:10px">How a device comes to exist.
@@ -1877,7 +1892,7 @@ is back to being a browser that has never been here.</div>
     <div class="grpbody">
   <div id="dp_looks"></div>
   <div class="seg addrow">
-    <button id="b_addlook">ADD A PROFILE</button>
+    <button id="b_addlook" class="act-add">ADD A PROFILE</button>
   </div>
   <div class="note help">The APPEARANCE tab is <b>one document for everybody</b>, and
 that is right for almost all of it — tune the bloom once and every screen in
@@ -1910,7 +1925,7 @@ change, not this.</div>
     <div class="grpbody">
   <div id="dp_savers"></div>
   <div class="seg addrow">
-    <button id="b_addsaver">ADD A PROFILE</button>
+    <button id="b_addsaver" class="act-add">ADD A PROFILE</button>
   </div>
   <div class="note help">A screen showing the same bright figure in the same
 place for years keeps a ghost of it permanently. A profile is the answer to
@@ -2005,7 +2020,7 @@ a setting that changes twice a year would be the wrong trade.</div>
     <div class="grpbody">
   <div id="dp_kiosks"></div>
   <div class="seg addrow">
-    <button id="b_addkiosk">ADD A PROFILE</button>
+    <button id="b_addkiosk" class="act-add">ADD A PROFILE</button>
   </div>
   <div class="note help">A <b>kiosk</b> is a screen people walk up to, that
 nobody has open and nobody is sitting at — a wall, a stand, a reception
@@ -2042,7 +2057,7 @@ behaves like the rest of the building rather than like nothing.</div>
     <div class="grpbody">
   <div id="dp_form"></div>
   <div class="seg" style="margin-top:6px">
-    <button id="b_addfield">ADD A FIELD</button>
+    <button id="b_addfield" class="act-add">ADD A FIELD</button>
   </div>
   <div class="note help">Up to five fields, and they are yours — this server has
 no opinion about what a request should ask. Somebody running a campus wants a
@@ -2172,7 +2187,7 @@ does not withdraw the microphone.</div>
   <label class="bklab">Session length, minutes</label>
   <input id="em_ttl" type="number" min="5" max="1440" value="60">
 
-  <div class="seg" style="margin-top:8px"><button id="b_addembed" class="act-save">CREATE</button></div>
+  <div class="seg" style="margin-top:8px"><button id="b_addembed" class="act-add">CREATE</button></div>
   <div class="note" id="embnote"></div>
   <div id="em_key"></div>
     </div>
@@ -2211,7 +2226,7 @@ button to download it as a PDF.</div>
   <div id="airow">
     <div class="note" id="rtlistnote"></div>
     <div class="seg actrow">
-      <button id="b_addroute" class="act-save">ADD INSTANCE</button>
+      <button id="b_addroute" class="act-add">ADD INSTANCE</button>
     </div>
   </div>
   <!-- One commit for the whole tab, the way the shared-settings tabs have one.

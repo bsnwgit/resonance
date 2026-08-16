@@ -72,7 +72,13 @@ SAVE FOR EVERYONE and REVERT**, at the foot of that tab, writing only the
 settings on that tab.
 
 Wherever a block commits itself, its buttons sit at the **bottom right** of
-that block — CREATE, SAVE and REVERT alike. One position for all of them, so
+that block — SAVE and REVERT alike, with anything that MAKES a new thing at the
+left of the same row.
+
+Colour says which kind of act a button is: **green** commits, **red** destroys,
+**amber** brings something new into existence, **blue** explains. CREATE and
+SAVE used to share green, which made pressing one feel like pressing the
+other — only one of them adds a row you then have to name. One position for all of them, so
 the commit is where the eye already is rather than somewhere to be found again
 per topic. The one exception is an endpoint's action bar, which is a row of
 seven and keeps its own arrangement: SAVE at the left, and the destructive
