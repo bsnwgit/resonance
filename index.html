@@ -2064,11 +2064,67 @@ function paintPrompt(){
   document.body.toggleAttribute('data-prompt', !!PROMPT);
 }
 
+/* ========================================================== FULL SCREEN
+   A tablet on a wall showing an address bar, a tab strip and somebody's
+   bookmarks is a browser that happens to be running a display. The chrome is
+   not ours to remove — no page can take it — but a page CAN ask to be shown
+   full screen, and a browser will grant that off a gesture.
+
+   ONLY ON A WALL. A tab somebody opened is theirs, and a page that went full
+   screen the moment it was clicked would be a page nobody opens twice. Never
+   in an embed either: taking over somebody else's viewport from inside their
+   iframe is the single rudest thing a guest can do.
+
+   ON A GESTURE, because there is no other way. Browsers require user
+   activation for this and are right to, so it happens on the first touch —
+   which on a screen being commissioned is somebody's first touch anyway.
+
+   AND IT DOES NOT FIGHT. Leaving full screen is nearly always the person
+   installing it, who wants the address bar back for a minute; asking again on
+   their very next tap would make the screen unusable exactly when somebody is
+   working on it. So a deliberate exit buys a minute of quiet, after which a
+   wall goes back to being a wall. */
+const Kiosk = {
+  leftAt: 0,
+  GRACE: 60,                            // seconds of quiet after a manual exit
+
+  el(){ return document.fullscreenElement || document.webkitFullscreenElement; },
+  can(){
+    const r = document.documentElement;
+    return !!(r.requestFullscreen || r.webkitRequestFullscreen);
+  },
+
+  ask(){
+    if (EMBED || PREVIEW || !Wall.onWall || !this.can() || this.el()) return;
+    if (this.leftAt && (wallNow() - this.leftAt) < this.GRACE) return;
+    const r = document.documentElement;
+    try{
+      const p = (r.requestFullscreen || r.webkitRequestFullscreen).call(r);
+      /* A rejected request is not a fault worth saying anything about: the
+         browser refused, the screen still works, and there is nobody standing
+         in front of a hallway tablet to read a complaint about it. */
+      if (p && p.catch) p.catch(()=>{});
+    }catch(e){}
+  },
+
+  init(){
+    ['fullscreenchange', 'webkitfullscreenchange'].forEach(ev=>
+      document.addEventListener(ev, ()=>{
+        // Out, and we did not do it — so somebody did, and they get a minute.
+        if (!this.el()) this.leftAt = wallNow();
+      }));
+  },
+};
+Kiosk.init();
+
 /* Every signal that is not speech. Passive, so none of it costs a frame, and
    on the window rather than the canvas because a voice-only display is mostly
-   canvas but the request form and the verdict are not. */
+   canvas but the request form and the verdict are not.
+
+   The same gesture that ends the screensaver is the one that can ask for the
+   full screen — there is only ever one first touch, and both want it. */
 ['pointerdown', 'touchstart', 'keydown', 'wheel'].forEach(ev=>
-  window.addEventListener(ev, ()=> Saver.poke(), {passive: true}));
+  window.addEventListener(ev, ()=>{ Saver.poke(); Kiosk.ask(); }, {passive: true}));
 
 /* ================================================================ LOOP */
 let now=0, last=performance.now(), frames=0, fpsT=0;

@@ -74,6 +74,11 @@ talking to it that assumes a keyboard, and a screen on a wall does not have one.
 Those screens always listen, so you say the wake word instead — which is what
 the line low on the screen is telling you.
 
+**A wall screen fills the display when you touch it.** The browser's own bars
+disappear and the figure takes the whole panel. If you need them back — to read
+the address, or to reload — press Escape, and they stay for a minute before it
+goes full screen again.
+
 ## What to say to it
 
 A screen on a wall shows one dim line near the bottom: **say “kitchen”**, or

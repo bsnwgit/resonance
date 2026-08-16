@@ -1567,6 +1567,12 @@ it. Each entry below carries its own panel scope.
   a passer-by nothing, a wall carries one dim line naming the wake word, drawn
   into the picture and travelling with it while the screensaver drifts.
 
+  **Full screen on the first touch.** No page can remove a browser's own
+  chrome, but it can ask to be shown full screen, and a browser grants that off
+  a gesture — so it happens on a touch rather than on load. Only on a wall, and
+  a manual exit buys a minute of quiet: whoever left full screen is nearly
+  always the person installing the screen.
+
   **Dark hours beside the idle dim.** Idle asks whether anybody has been here
   recently; only a clock keeps a hallway dark after somebody walks past it at
   three in the morning.
@@ -1895,6 +1901,16 @@ set centrally, three settings on each device's row, and nothing in any of them
 that touches what this server will answer — it is entirely canvas and presentation, which is the whole
 reason it was split from phase 2.
 
+- **Full screen is asked for on a gesture, and it does not fight.** An address
+  bar and a tab strip across a hallway screen is a browser that happens to be
+  running a display. The chrome is not removable by any page; being shown full
+  screen is askable, and only off user activation — so the same first touch
+  that ends the screensaver asks for it. A manual exit records the time and
+  buys sixty seconds, because somebody leaving full screen is nearly always
+  commissioning the screen and wants the address bar for a minute; asking again
+  on their next tap would make it unusable exactly then. Never in an embed:
+  taking over somebody else's viewport from inside their iframe is the rudest
+  thing a guest can do.
 - **A wall is voice only and speak only from one tick.** Both follow from what
   the thing is rather than being boxes to find. Voice only defaults on, which
   is safe only because `wall` gates it — a row that is not on a wall carries it

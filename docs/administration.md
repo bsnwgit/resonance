@@ -227,6 +227,21 @@ TALK and AUDIO stay. A browser will not open a microphone unless somebody asks
 it to, so TALK is pressed once when the screen is commissioned and the wake word
 carries it from there.
 
+**And it goes full screen on the first touch.** An address bar, a tab strip and
+somebody's bookmarks across the top of a hallway screen is a browser that
+happens to be running a display. The page cannot remove that chrome — no page
+can — but it can ask to be shown full screen, and a browser grants that off a
+gesture, which is why it happens on a touch rather than on load.
+
+Only on a wall. A tab you opened is yours, and a page that went full screen the
+moment you clicked it would be a page you never opened twice.
+
+**It does not fight you.** Press Escape and it stays out for a minute, because
+somebody leaving full screen is nearly always the person installing the screen
+wanting the address bar back — and asking again on their next tap would make it
+unusable exactly while they are working on it. After that minute a wall goes
+back to being a wall.
+
 Neither changes what this server will answer. This is entirely what the screen
 looks like.
 
