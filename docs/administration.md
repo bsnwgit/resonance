@@ -46,7 +46,7 @@ At the top:
 At the foot, pinned so they are always reachable:
 
 - **APP SETTINGS** — how the server itself is wired: where it can be reached
-  from, signing in, ports, sessions.
+  from, signing in, ports, sessions, and what the two transcript labels say.
 - **PROFILES** — the appearance, screensaver and kiosk profiles a screen can be
   pointed at.
 - **ACCOUNTS** — who can sign in, and the groups access is granted to.

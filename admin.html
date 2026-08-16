@@ -1271,44 +1271,6 @@ size it is setting, so you read the choice while making it.</div>
   </section>
 
   <section class="grp" data-tab="look">
-    <h4>Speaker label</h4>
-    <div class="grpbody">
-  <label class="bklab">The person</label>
-  <input id="opname" type="text" spellcheck="false" placeholder="operator">
-  <label class="bklab">The assistant</label>
-  <input id="ainame" type="text" spellcheck="false" placeholder="resonance">
-  <div class="note help">The two labels down the left of the transcript.
-
-Either can be a variable instead of a fixed word:
-
-<b>{name}</b> — the word you say to reach whichever assistant is answering, so
-renaming that renames this. Already what the greeting and farewell fields use.
-
-<b>{assistant}</b> — what answered, which is its own field on each endpoint.
-<b>This is the default</b>, and with more than one endpoint it is the only
-label that can be right: a fixed word attributes every answer to the same
-name. Each line keeps the name of whoever gave it, so switching endpoints
-mid-conversation does not rewrite what is already on screen.
-
-<b>{display}</b> — the name of the device this is being viewed at. Put it in
-<i>the person</i> and every device attributes the transcript to itself, with no
-setting per device.
-
-It resolves to the first of these that exists: the name you gave that row under
-ACCESS, then <b>?display=</b> from its URL, then the first thing typed on its
-request form. So a laptop you approved as <i>Sarah laptop</i> labels her lines
-with that, and a wall screen named <i>Kitchen</i> labels its own.
-
-A person's name as distinct from the device they are at — the same name
-following somebody from laptop to phone — needs an identity they carry, and
-does not exist yet.
-
-Mix them with ordinary text — <b>{display} shift lead</b> is fine. A variable
-that resolves to nothing falls back to the default, and one that is not
-recognised is left standing so a typo is visible rather than silent.</div>
-    </div>
-  </section>
-  <section class="grp" data-tab="look">
     <h4>Form &amp; size</h4>
     <div class="grpbody">  <div class="sl"><label>Amplitude</label><output id="o_amp"></output><input id="s_amp" type="range" min="0" max="2.5" step=".01"></div>
   <div class="sl"><label>Lines</label><output id="o_lines"></output><input id="s_lines" type="range" min="1" max="40" step="1"></div>
@@ -1597,6 +1559,48 @@ returns you to the sign-in as soon as it lapses.
 
 Short by default — this session configures what everyone else is looking at.
 5 to 480. Full reasoning in DOCUMENTATION → App settings &amp; accounts.</div>
+    </div>
+  </section>
+  <!-- Moved off APPEARANCE: what the two transcript labels SAY is closer to
+       how this server is set up than to how the figure looks. It still writes
+       the SHARED settings document rather than app.json, which is why this tab
+       now carries both commits — see UI_TABS below. -->
+  <section class="grp" data-tab="app">
+    <h4>Speaker label</h4>
+    <div class="grpbody">
+  <label class="bklab">The person</label>
+  <input id="opname" type="text" spellcheck="false" placeholder="operator">
+  <label class="bklab">The assistant</label>
+  <input id="ainame" type="text" spellcheck="false" placeholder="resonance">
+  <div class="note help">The two labels down the left of the transcript.
+
+Either can be a variable instead of a fixed word:
+
+<b>{name}</b> — the word you say to reach whichever assistant is answering, so
+renaming that renames this. Already what the greeting and farewell fields use.
+
+<b>{assistant}</b> — what answered, which is its own field on each endpoint.
+<b>This is the default</b>, and with more than one endpoint it is the only
+label that can be right: a fixed word attributes every answer to the same
+name. Each line keeps the name of whoever gave it, so switching endpoints
+mid-conversation does not rewrite what is already on screen.
+
+<b>{display}</b> — the name of the device this is being viewed at. Put it in
+<i>the person</i> and every device attributes the transcript to itself, with no
+setting per device.
+
+It resolves to the first of these that exists: the name you gave that row under
+ACCESS, then <b>?display=</b> from its URL, then the first thing typed on its
+request form. So a laptop you approved as <i>Sarah laptop</i> labels her lines
+with that, and a wall screen named <i>Kitchen</i> labels its own.
+
+A person's name as distinct from the device they are at — the same name
+following somebody from laptop to phone — needs an identity they carry, and
+does not exist yet.
+
+Mix them with ordinary text — <b>{display} shift lead</b> is fine. A variable
+that resolves to nothing falls back to the default, and one that is not
+recognised is left standing so a typo is visible rather than silent.</div>
     </div>
   </section>
 
@@ -2096,6 +2100,7 @@ button to download it as a PDF.</div>
   <div id="uirow_look" class="uirow" data-uitab="look"></div>
   <div id="uirow_motion" class="uirow" data-uitab="motion"></div>
   <div id="uirow_speech" class="uirow" data-uitab="speech"></div>
+  <div id="uirow_app" class="uirow" data-uitab="app"></div>
 
   <div id="airow">
     <div class="note" id="rtlistnote"></div>
@@ -2747,7 +2752,12 @@ function status(m, bad, tab){
    and what everyone else is looking at have come apart — it is easy to tune
    something, be satisfied by the preview, and walk away having changed
    nothing for anybody. */
-const UI_TABS = ['look', 'motion', 'speech'];
+/* Tabs carrying settings from the SHARED document, and therefore a
+   SAVE FOR EVERYONE of their own. `app` is here because the speaker labels
+   live on it now: the tab also has SAVE APP SETTINGS, and the two are not
+   interchangeable — one publishes what every viewer sees, the other rewires
+   the server. Two documents, two buttons, each saying which it writes. */
+const UI_TABS = ['look', 'motion', 'speech', 'app'];
 function paintUiRows(){
   UI_TABS.forEach(t=>{
     const row = $('uirow_' + t);
@@ -5861,7 +5871,7 @@ function panelNav(){
      about. Nothing on the AI tab writes the shared document now, so
      SAVE FOR EVERYONE there would be a button that saves nothing on the tab
      it is sitting on. Each endpoint saves itself, from inside its block. */
-  const SETTINGS_TABS = new Set(['look', 'motion', 'speech']);
+  const SETTINGS_TABS = new Set(['look', 'motion', 'speech', 'app']);
   function syncSaveRow(){
     const show = SETTINGS_TABS.has(tab) ? '' : 'none';
     UI_TABS.forEach(t=>{
