@@ -758,6 +758,14 @@
     font-size:calc(8.5px * var(--fs));letter-spacing:.05em;
     color:rgba(var(--paper),.62);
   }
+  /* The one badge that is a STATUS rather than a summary: this is what a
+     display with no profile of its own is showing. Amber, because it is the
+     colour this panel already spends on "this is the one that counts" — and
+     never grey, which is what every other badge on the row is. */
+  .badge.isdefault{
+    border-color:rgba(224,178,110,.75);color:#f0cf9a;
+    background:rgba(224,178,110,.14);
+  }
   .erow > .top.drow .dkstate{white-space:nowrap;color:rgba(var(--paper),.78)}
   /* Shut, the name is a title; open, it is the field you rename in. Same cell
      either way, so what you are editing does not jump when the row opens. */
@@ -1925,6 +1933,7 @@ is back to being a browser that has never been here.</div>
   <section class="grp bare proflist" data-tab="look">
     <div class="grpbody">
   <div id="dp_looks"></div>
+  <div class="note" id="prnote_looks"></div>
   <div class="seg addrow">
     <button id="b_addlook" class="act-add">ADD A PROFILE</button>
   </div>
@@ -1955,6 +1964,7 @@ change, not this.</div>
   <section class="grp bare proflist" data-tab="motion">
     <div class="grpbody">
   <div id="dp_motions"></div>
+  <div class="note" id="prnote_motions"></div>
   <div class="seg addrow">
     <button id="b_addmotion" class="act-add">ADD A PROFILE</button>
   </div>
@@ -1972,6 +1982,7 @@ controls by hand.</div>
   <section class="grp bare proflist" data-tab="speech">
     <div class="grpbody">
   <div id="dp_speeches"></div>
+  <div class="note" id="prnote_speeches"></div>
   <div class="seg addrow">
     <button id="b_addspeech" class="act-add">ADD A PROFILE</button>
   </div>
@@ -4498,12 +4509,17 @@ function loadProfile(kind, pr){
    shared document — that document is what a screen with no profile reads, and
    leaving the two to drift would mean the default said one thing and every
    plain browser tab showed another. */
+/* On the tab the button is on. These used to write to the PROFILES tab's note,
+   which is not on screen while you are editing an appearance profile — so a
+   refused save, and a successful one, both looked like nothing happening. */
+function prNote(kind, m, bad){ dpNote(m, bad, 'prnote_' + kind.key); }
+
 async function saveProfileList(kind){
   const named = (PROFILES[kind.key] || [])
     .filter(x=> (x.name || '').trim())
     .map(x=> ({id: x.id, name: x.name, values: x.values}));
   if (!named.length){
-    dpNote('a profile needs a name before it can be saved', true, 'profnote');
+    prNote(kind, 'a profile needs a name before it can be saved', true);
     return;
   }
   const body = {};
@@ -4519,8 +4535,8 @@ async function saveProfileList(kind){
         {settings: def.values, merge: true})});
     paintProfiles(kind, DPCFG[kind.key] || [], DPCFG[DEF_KEY[kind.key]] || '');
     reRender();
-    dpNote('saved', false, 'profnote');
-  }catch(e){ dpNote(e.message, true, 'profnote'); }
+    prNote(kind, 'saved');
+  }catch(e){ prNote(kind, e.message, true); }
 }
 
 function paintProfiles(kind, list, def){
@@ -4558,9 +4574,17 @@ function paintProfiles(kind, list, def){
     const sum = document.createElement('span');
     sum.className = 'badge';
     top.appendChild(sum);
+    /* Which one an ordinary display gets, on the shut row. It is the single
+       most useful fact about a list of profiles and it was only discoverable
+       by opening each one to see whether MAKE DEFAULT was greyed out. */
+    const dflag = document.createElement('span');
+    dflag.className = 'badge isdefault';
+    dflag.textContent = 'DEFAULT';
+    top.appendChild(dflag);
     const retitle = ()=>{
       nmt.textContent = (pr.name || '').trim() || 'unnamed profile';
       sum.textContent = profileSum(kind, pr);
+      dflag.style.display = (pr.id && pr.id === DPDEF[kind.key]) ? '' : 'none';
     };
     retitle();
     top.onclick = (e)=>{
@@ -4930,7 +4954,7 @@ function paintKiosks(list, def){
     sum.className = 'badge';
     top.appendChild(sum);
     const dflag = document.createElement('span');
-    dflag.className = 'badge';
+    dflag.className = 'badge isdefault';
     dflag.textContent = 'DEFAULT';
     top.appendChild(dflag);
 
