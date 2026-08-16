@@ -1113,47 +1113,57 @@ DISPLAY_DEFAULTS = {
     "deny_repeat": True,
     # ---- what makes this one a wall display rather than a browser tab ----
     #
-    # Both of these are a POLICY FOR A PLACE, which is why they live on the row
-    # rather than in the shared settings: the tablet in the hall and the laptop
-    # somebody enrolled last week are the same document and not remotely the
-    # same object. Neither changes what this server will answer — they are
-    # presentation, and a display that sets both wrong is ugly, not exposed.
-    #
+    # Is this device ON A WALL? Most rows in a real deployment are not: a
+    # guest's laptop and a phone are displays too, and neither wants any of
+    # this. So it is one tick that turns the rest of it on, and while it is off
+    # the two settings below are stored and not applied — untick it, the screen
+    # goes back to being an ordinary page, tick it again and what you chose is
+    # still there.
+    "wall": False,
     # Voice only: the geometry alone, no transcript and no composer. It is the
     # one setting that OUTRANKS the viewer's own control, because a hallway is
     # not a workstation and a screen of scrolling text in one is neither useful
     # nor discreet. Where it applies the TEXT button is removed rather than
     # disabled — a control that is present and ignores you is worse than one
     # that was never offered.
+    #
+    # PER DEVICE rather than part of a screensaver profile, because they are
+    # separate axes: a wall screen can be voice only without ever drifting, and
+    # a shared television can drift while still showing its transcript.
     "voice_only": False,
-    # The screensaver, which is still the product: the same face, every
-    # appearance setting still applied, scaled down and drifting. Seconds of
-    # nobody speaking to it and nobody touching it before it starts, and ZERO
-    # IS OFF — the same default-nothing-changes rule that made ANY DISPLAY the
-    # default on a route. An upgrade that quietly started moving every screen
-    # in the building would be this phase deciding something nobody asked it to.
-    "saver_delay": 0,
-    # How far down it shrinks, as a percentage of the frame. Shrinking is what
-    # creates the margin to move within: drawn full-bleed there is nowhere to
-    # go, and translating only clips the edges.
-    "saver_scale": 70,
-    # …and how much light comes off it while it drifts. This does more against
-    # burn-in than the movement does, and it is independently what a hallway
-    # screen should do at two in the morning.
-    "saver_dim": 45,
+    # …and WHICH SCREENSAVER, by the id of a profile in the settings below.
+    # Empty is none, and none is the default: an upgrade that quietly started
+    # moving every screen in a building would be this deciding something nobody
+    # asked it to — the same rule that made ANY DISPLAY the default on a route.
+    #
+    # An ID rather than the numbers themselves. That is the whole point of a
+    # profile: change *night* once and every screen using it changes together,
+    # instead of twelve rows drifting out of step with each other and no way to
+    # see which had. It is also why renaming a profile cannot orphan anything.
+    "saver": "",
 }
 
-#: (low, high) for the three numbers on a row. saver_delay takes 0 as well, and
-#: means off by it — see the field.
-WALL_LIMITS = {"saver_delay": (15, 24 * 3600),
-               # Under a third of the frame is a postage stamp somebody has to
-               # walk up to; over nine tenths there is no margin left to drift
-               # within and the shrink has bought nothing.
-               "saver_scale": (30, 90),
-               # Not 100: a screen dimmed the whole way is switched off, and
-               # switching a screen off is a different feature with different
-               # consequences — you cannot see that it is still working.
-               "saver_dim": (0, 85)}
+#: How many screensaver profiles may exist. A deployment has a handful of
+#: KINDS of place — a hallway, a bedroom, a shop floor — not one per screen. A
+#: list long enough to need scrolling is a list somebody has stopped curating.
+MAX_SAVERS = 8
+#: (low, high) for the three numbers in a profile. `delay` takes 0 as well and
+#: means the profile never starts, which is how you park one without deleting
+#: it and unpicking every device that names it.
+SAVER_LIMITS = {"delay": (15, 24 * 3600),
+                # Under a third of the frame is a postage stamp somebody has to
+                # walk up to; over nine tenths there is no margin left to drift
+                # within and the shrink has bought nothing.
+                "scale": (30, 90),
+                # Not 100: a screen dimmed the whole way is switched off, and
+                # switching a screen off is a different feature with different
+                # consequences — you cannot see that it is still working.
+                "dim": (0, 85)}
+#: What a device gets when it names no profile, or names one that has since
+#: been deleted. Off, in both cases, and deliberately the same answer: a screen
+#: pointing at a profile nobody can see any more must not keep drifting to
+#: numbers that exist nowhere in the panel.
+SAVER_OFF = {"delay": 0, "scale": 70, "dim": 45}
 
 #: The displays document's own settings, as opposed to the rows in it. Set in
 #: the panel, and none of them needs a restart.
@@ -1186,6 +1196,11 @@ DISPLAY_SETTINGS = {
     # box for a reason somebody needs a paragraph to give. Empty means nobody
     # has built one yet.
     "form": [],
+    # The screensaver profiles, each {id, name, delay, scale, dim}. CENTRAL,
+    # and named from a device rather than copied into it — see the `saver`
+    # field on a row. A deployment has a handful of kinds of place, and the
+    # numbers that suit a hallway suit every hallway in the building.
+    "savers": [],
 }
 MAX_FORM_FIELDS = 5
 #: (low, high) for each number the panel can set
@@ -1234,6 +1249,48 @@ def clean_form(raw):
     return out
 
 
+def clean_savers(raw):
+    """The screensaver profiles, sanitised, in the order the panel put them.
+
+    An id is minted for a profile that arrives without one, and kept for every
+    profile that has one — a device names a profile by id, so a rename must not
+    orphan it and a reorder must not silently move a screen onto somebody
+    else's numbers. Duplicate ids are re-minted for the same reason: two rows
+    claiming the same id is one row nobody can point at."""
+    out, seen = [], set()
+    for s in (raw or [])[:MAX_SAVERS]:
+        if not isinstance(s, dict):
+            continue
+        name = str(s.get("name") or "").strip()[:40]
+        if not name:
+            continue                     # a profile with no name is unpickable
+        sid = str(s.get("id") or "")[:16]
+        if not sid or sid in seen:
+            sid = "s" + secrets.token_hex(4)
+        seen.add(sid)
+        row = {"id": sid, "name": name}
+        for k, (lo, hi) in SAVER_LIMITS.items():
+            try:
+                v = int(s.get(k, SAVER_OFF[k]))
+            except (TypeError, ValueError):
+                v = SAVER_OFF[k]
+            row[k] = 0 if (k == "delay" and v <= 0) else min(hi, max(lo, v))
+        out.append(row)
+    return out
+
+
+def find_saver(sid, savers=None):
+    """The profile a row names, resolved to numbers. Off where it names none,
+    and off where it names one that has been deleted — a screen must not go on
+    drifting to a profile nobody can find in the panel to change."""
+    if not sid:
+        return dict(SAVER_OFF)
+    for s in (savers if savers is not None else display_settings()["savers"]):
+        if s["id"] == sid:
+            return {k: s[k] for k in SAVER_OFF}
+    return dict(SAVER_OFF)
+
+
 def display_settings():
     """Kept beside the displays rather than in the shared settings document,
     which is world readable and belongs to the interface. Who may ask this
@@ -1249,6 +1306,7 @@ def display_settings():
             cfg[k] = DISPLAY_SETTINGS[k]
     cfg["guest_requests"] = bool(cfg["guest_requests"])
     cfg["form"] = clean_form(cfg.get("form"))
+    cfg["savers"] = clean_savers(cfg.get("savers"))
     return cfg
 
 
@@ -1286,6 +1344,34 @@ def validate_display_settings(obj, current):
             if isinstance(f, dict) and not str(f.get("label") or "").strip():
                 return None, "every field needs a label — it is what somebody reads"
         cfg["form"] = clean_form(obj["form"])
+    if "savers" in obj:
+        if not isinstance(obj["savers"], (list, tuple)):
+            return None, "the screensaver profiles must be a list"
+        if len(obj["savers"]) > MAX_SAVERS:
+            return None, "there is room for %d screensaver profiles" % MAX_SAVERS
+        for s in obj["savers"]:
+            if not isinstance(s, dict):
+                return None, "a screensaver profile must be a set of fields"
+            if not str(s.get("name") or "").strip():
+                return None, ("every profile needs a name — it is what you pick "
+                              "on a device")
+            # Refused rather than clamped, because this is somebody typing a
+            # number and pressing save: quietly storing 90 where they asked for
+            # 900 is the panel lying about what it did. clean_savers clamps
+            # instead, and it is reading a file rather than answering a person.
+            for k, (lo, hi) in SAVER_LIMITS.items():
+                if k not in s:
+                    continue
+                try:
+                    v = int(s[k])
+                except (TypeError, ValueError):
+                    return None, "%s must be a whole number" % k
+                if k == "delay" and v <= 0:
+                    continue             # never starts, which is a real answer
+                if not (lo <= v <= hi):
+                    return None, ("%s must be between %d and %d" % (k, lo, hi)
+                                  + (" — or 0 for never" if k == "delay" else ""))
+        cfg["savers"] = clean_savers(obj["savers"])
     if "guest_requests" in obj:
         cfg["guest_requests"] = bool(obj["guest_requests"])
     return cfg, None
@@ -1347,60 +1433,48 @@ def display_label(rec):
     return "unnamed display"
 
 
-def wall_of(rec):
-    """The presentation policy for the place this display sits in, clamped.
-
-    Read through this rather than off the record, because a row written before
-    these fields existed has none of them and a hand-edited one can have
-    anything. A screensaver that scales to 4000% because a number was typed
-    into a file is a screen somebody has to drive to."""
-    out = {"voice_only": bool(rec.get("voice_only"))}
-    saver = {}
-    for k, (lo, hi) in WALL_LIMITS.items():
-        try:
-            v = int(rec.get(k, DISPLAY_DEFAULTS[k]))
-        except (TypeError, ValueError):
-            v = DISPLAY_DEFAULTS[k]
-        # Zero is off, and only for the delay — it is the one field with a
-        # meaning below its own range rather than a value clamped up into it.
-        out[k] = 0 if (k == "saver_delay" and v <= 0) else min(hi, max(lo, v))
-    for k in ("saver_delay", "saver_scale", "saver_dim"):
-        saver[k[6:]] = out.pop(k)
-    out["saver"] = saver
-    return out
+WALL_FIELDS = ("wall", "voice_only", "saver")
 
 
-WALL_FIELDS = ("voice_only", "saver_delay", "saver_scale", "saver_dim")
+def wall_of(rec, savers=None):
+    """What the place this display sits in looks like, resolved and clamped:
+    whether the transcript is there at all, and the numbers of the screensaver
+    profile this row names.
+
+    Resolved HERE rather than on the display, so a browser is handed three
+    numbers and never the list of profiles. That list is a description of a
+    building — *hallway*, *ward*, *shop floor* — and no display has any use for
+    the names of places it is not in.
+
+    Everything is off where the row is not on a wall. The two settings stay
+    stored, so unticking is not the same as forgetting: a device taken down and
+    put back up comes back as what it was."""
+    if not rec.get("wall"):
+        return {"voice_only": False, "saver": dict(SAVER_OFF)}
+    return {"voice_only": bool(rec.get("voice_only")),
+            "saver": find_saver(str(rec.get("saver") or ""), savers)}
 
 
-def validate_wall(obj, rec):
-    """Returns (the four fields, error). Same shape as
-    validate_display_settings, and separate from it for the same reason the
-    panel has two SAVE buttons: these belong to one screen, those to the
-    deployment, and one commit writing both would publish a half-made edit.
-
-    Out of range is REFUSED rather than clamped, because this is somebody
-    typing a number and pressing save — silently saving 90 when they asked for
-    900 is the panel lying about what it did. wall_of clamps instead, and it is
-    reading a file rather than answering a person."""
+def validate_wall(obj, rec, savers):
+    """Returns (the three fields, error). Separate from
+    validate_display_settings for the same reason the panel has a SAVE per
+    block: these belong to one screen, those to the deployment, and one commit
+    writing both would publish an edit somebody was halfway through."""
     out = {k: rec.get(k, DISPLAY_DEFAULTS[k]) for k in WALL_FIELDS}
+    if "wall" in obj:
+        out["wall"] = bool(obj["wall"])
     if "voice_only" in obj:
         out["voice_only"] = bool(obj["voice_only"])
-    for k, (lo, hi) in WALL_LIMITS.items():
-        if k not in obj:
-            continue
-        try:
-            v = int(obj[k])
-        except (TypeError, ValueError):
-            return None, "%s must be a whole number" % k[6:]
-        if k == "saver_delay" and v <= 0:
-            out[k] = 0                       # off, said in the only field there is
-            continue
-        if not (lo <= v <= hi):
-            return None, ("%s must be between %d and %d"
-                          % (k[6:], lo, hi)
-                          + (" — or 0 for never" if k == "saver_delay" else ""))
-        out[k] = v
+    if "saver" in obj:
+        sid = str(obj["saver"] or "")[:16]
+        # Named and gone is an ERROR here, where it is merely off in wall_of.
+        # The two are not inconsistent: a screen must fail quiet and a person
+        # pressing save must be told, or a stale panel silently sets a device
+        # to a profile that was deleted while they had the tab open.
+        if sid and not any(s["id"] == sid for s in savers):
+            return None, ("that screensaver profile no longer exists — reload "
+                          "the panel to see the current list")
+        out["saver"] = sid
     return out, None
 
 
@@ -1700,11 +1774,10 @@ def admin_displays():
                 "approved_by", "approved_at", "answers", "requested_at",
                 "expires", "renewals", "denied", "deny_reason", "deny_note",
                 "deny_repeat")}
-        # Through the same clamp the display gets, so the panel is never
-        # showing a number the screen is not using.
-        w = wall_of(rec)
-        row.update(voice_only=w["voice_only"], saver_delay=w["saver"]["delay"],
-                   saver_scale=w["saver"]["scale"], saver_dim=w["saver"]["dim"])
+        # The row's own three fields, NOT the resolved numbers: the panel is
+        # editing what this device names, and the numbers behind that name are
+        # on the profile where they can be changed once for every screen.
+        row.update({k: rec.get(k, DISPLAY_DEFAULTS[k]) for k in WALL_FIELDS})
         ref = _display_refusals.get(did)
         live = bool(rec.get("code")) and (rec.get("code_expires") or 0) > now_
         row.update(id=did, label=display_label(rec),
@@ -3777,6 +3850,21 @@ class Handler(SimpleHTTPRequestHandler):
                     "Make an endpoint that is open to any display the default "
                     "first."})
             write_display_settings(cfg)
+            # A device pointing at a profile that has just been deleted is a
+            # setting nobody can see and nobody can change — the same fault as
+            # an allow-list naming a display that no longer exists, and cleared
+            # the same way. wall_of already fails it off, so nothing was ever
+            # drifting to numbers that had gone; this is so the panel says so.
+            live = {s["id"] for s in cfg["savers"]}
+            displays = read_displays()
+            orphaned = [d for d, r in displays.items()
+                        if r.get("saver") and r["saver"] not in live]
+            if orphaned:
+                for d in orphaned:
+                    displays[d]["saver"] = ""
+                write_displays(displays)
+                print("screensaver profile deleted — cleared from %d device(s)"
+                      % len(orphaned), flush=True)
             print("display settings saved by %s: requests=%s max=%d "
                   "pending=%d guest=%dd form=%d field(s)"
                   % (s["user"], "on" if cfg["guest_requests"] else "off",
@@ -3919,7 +4007,8 @@ class Handler(SimpleHTTPRequestHandler):
             displays = read_displays()
             if did not in displays:
                 return self._json(404, {"error": "no such display"})
-            fields, err = validate_wall(obj, displays[did])
+            fields, err = validate_wall(obj, displays[did],
+                                        display_settings()["savers"])
             if err:
                 return self._json(400, {"error": err})
             displays[did].update(fields)

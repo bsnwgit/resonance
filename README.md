@@ -1861,19 +1861,39 @@ Newest first.
 
 ### 2026-08-15 — the screensaver is still the product
 
-Phase 3: what a wall display looks like. Two settings on each device's row,
-neither of which touches what this server will answer — it is entirely canvas
-and presentation, which is the whole reason it was split from phase 2.
+Phase 3: what a wall display looks like. Screensaver profiles set centrally,
+two settings on each device's row, and nothing in either that touches what this
+server will answer — it is entirely canvas and presentation, which is the whole
+reason it was split from phase 2.
 
-- **Voice only is the one setting that beats the viewer.** The three controls in
-  the bar were built to override the shared settings deliberately, because
-  somebody standing in front of a screen knows better than a document does. This
-  is the exception: a policy for a *place*, not the preference of a passer-by.
-  Where it applies the TEXT button is removed from the document rather than
-  hidden, and enforced in `setTextVisible` rather than at each caller, so there
-  is no path — the button, the stored preference, an embed grant — that can put
-  a transcript back on a screen in a hallway. The viewer's own stored choice is
-  never overwritten, so a tablet taken off the wall gets it back.
+- **The numbers are central, not per device.** A deployment has a handful of
+  *kinds* of place — a hallway, a bedroom, a shop floor — not one setting per
+  screen, so a profile is a name and three numbers and a device names one by
+  **id**. Change *night* once and every screen using it changes together; the
+  alternative is twelve rows quietly drifting out of step with each other and
+  nothing on screen saying which had. By id and not by name, so renaming a
+  profile cannot orphan a screen, and clean_savers re-mints a duplicate id
+  because two rows claiming one is a row nobody can point at.
+- **One tick reveals the rest.** Most rows in a real deployment are a laptop or
+  a phone. *On a wall* is the gate, and while it is off the two settings under
+  it are stored and not applied — untick, and the screen is an ordinary page;
+  tick it again and what was chosen is still there. Three controls that do not
+  apply, on every one of fifty rows, is a register nobody reads.
+- **Voice only stayed per device, deliberately.** It and the screensaver are
+  separate axes: a wall screen can be voice only without ever drifting, and a
+  shared television can drift while still showing its transcript. Folding one
+  into the other would have made a profile a thing you cannot reuse.
+- **A display is never told the list.** `wall_of` resolves the profile server
+  side and hands over three numbers. The list of names is a description of a
+  building — *ward*, *shop floor*, *back office* — and no screen has any use
+  for the names of places it is not in.
+- **Named and gone is off on a screen and an error in the panel**, and the two
+  are not inconsistent. A screen has to fail quiet, or deleting a profile
+  leaves tablets drifting to numbers nobody can find to change; a person
+  pressing SAVE has to be told, or a panel left open overnight silently sets a
+  device to a profile that no longer exists. Deleting also clears the id from
+  every device that named it, the same way deleting a display clears it from
+  every endpoint.
 - **It does not take the rest of the bar with it.** The first cut hid `#bar`
   entirely, which reads correctly — *the geometry alone* — and would have made
   every voice-only display permanently deaf: a browser will not open a
@@ -1909,9 +1929,16 @@ and presentation, which is the whole reason it was split from phase 2.
 - **Off is the default, on every device.** Same rule that made `ANY DISPLAY` the
   default on a route: an upgrade that quietly started moving every screen in a
   building would be this phase deciding something nobody asked it to.
-- **PREVIEW drives the real preview with unsaved values.** Nobody picks a scale
-  and a dim by reading two numbers, and nobody should stand in front of a screen
-  waiting out three minutes of idle to find out what they chose.
+- **PREVIEW sits on the profile, not on the device.** What a scale and a dim
+  actually look like is a property of the profile, and the profile is where
+  somebody is choosing them. It drives the real preview with unsaved values,
+  because nobody picks either number by reading it, and nobody should stand in
+  front of a screen waiting out three minutes of idle to find out.
+- **The panel says none of this out loud.** Every word of explanation is behind
+  the `?` on its section, where the rest of the panel's prose already lives —
+  the first cut printed four paragraphs into every device row, which is exactly
+  the habit that rule exists to stop. What stays visible in a row is the
+  controls and whatever the server is saying right now.
 - **A new admin route is not admin-only because it calls `_require("admin")`.**
   `/displays/wall` did, and answered **401** on the display listeners where
   every one of its siblings answers **404** — which is the route confirming it

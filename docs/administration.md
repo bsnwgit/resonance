@@ -125,7 +125,7 @@ A display is one device — a screen on a wall, a TV, a laptop, somebody's phone
 — as distinct from a browser tab somebody opened. Anything with a browser and a
 microphone counts.
 
-The DEVICES tab holds four topics:
+The DEVICES tab holds five topics:
 
 | | |
 |---|---|
@@ -133,6 +133,7 @@ The DEVICES tab holds four topics:
 | **Created Access** | the queue: everything waiting on a decision, on a code being typed in, or on somebody asking again — and where you add one |
 | **Connected devices** | everything that is simply working, most recently heard from first |
 | **The request form** | what a request asks for |
+| **Screensaver profiles** | what a screen on a wall does when nobody is there, set once and picked per device |
 
 Created Access and Connected devices are separate lists on purpose. One is a to-do list and empties as
 you work through it; the other is a register you read when somebody asks what
@@ -193,14 +194,16 @@ laptop can open the page on their phone and ask again from a clean row. That is
 what device identity is — anything stronger needs an identity that person
 carries, which is what a dedicated URL will be.
 
-### On the wall
+### On a wall
 
-Two settings inside each row, and they are what makes a tablet bolted to a wall
-a different object from a browser tab. Neither changes what this server will
-answer — this is entirely what the screen looks like — and both are **per
-device**, because the screen in the hall and the laptop somebody enrolled last
-week are not remotely the same thing. They have their own SAVE, like every other
-block in the panel.
+Most rows in a real deployment are not on a wall — a guest's laptop, somebody's
+phone — so it is one tick that turns the rest of it on. Tick **On a wall** on a
+device and two controls appear: whether it is voice only, and which screensaver
+profile it uses. Untick it and the screen goes back to being an ordinary page,
+with both settings kept: putting the device back up restores what you chose.
+
+Neither changes what this server will answer. This is entirely what the screen
+looks like.
 
 **Voice only** is the geometry alone: no transcript and no composer. That is
 what a screen in a hallway wants. It is not a workstation, and a page of
@@ -212,26 +215,40 @@ because somebody standing in front of a screen knows better than a document
 does. This is the exception: it is a policy for a *place* rather than the
 preference of whoever walked past last. Where it applies, the TEXT button is
 **removed from that screen rather than disabled** — a control that is present
-and ignores you is worse than one that was never offered. What it does not do is
-overwrite anyone's stored choice, so a tablet taken off the wall and used as an
-ordinary tab gets that person's own setting back.
+and ignores you is worse than one that was never offered. What it does not do
+is overwrite anyone's stored choice, so a tablet taken off the wall and used as
+an ordinary tab gets that person's own setting back.
 
 TALK, AUDIO and SPACE stay. A browser will not open a microphone without
 somebody asking it to, so a display with no TALK button is a display that could
 never hear its own wake word. Voice only means no text, not no controls.
 
-**The screensaver** is the other one, and it exists because a tablet showing a
-mostly-stationary figure for years will burn it into the panel. The usual answer
-replaces the screen with something else. This one keeps the same face — every
-appearance setting still applied — and moves it.
+**The screensaver is a profile, chosen from a list**, and the profiles are set
+centrally under *Screensaver profiles*. Voice only and the screensaver are
+deliberately separate axes: a wall screen can be voice only without ever
+drifting, and a shared television can drift while still showing its transcript.
+
+### Screensaver profiles
+
+A tablet showing a mostly-stationary figure for years will burn it into the
+panel. The usual answer replaces the screen with something else. This one keeps
+the same face — every appearance setting still applied — and moves it.
+
+**Set them once, pick them per device.** A deployment has a handful of *kinds*
+of place — a hallway, a bedroom, a shop floor — not one setting per screen.
+Change **night** and every screen using it changes together. The alternative is
+twelve rows quietly drifting out of step with each other and nothing on screen
+telling you which had.
+
+Up to eight profiles, each a name and three numbers:
 
 | | what it does |
 | --- | --- |
-| **Idle seconds before it drifts** | how long with nobody speaking to it and nobody touching it. **0 is off**, and off is where every device starts |
+| **Idle seconds** | how long with nobody speaking to it and nobody touching it. **0 never starts**, which is how you park a profile without deleting it and unpicking every device that names it |
 | **Shrinks to %** | how far down it scales first. Shrinking is what creates the margin to move within: drawn edge to edge there is nowhere to go, and moving it would only clip the sides |
 | **Dims by %** | how much light comes off it while it drifts |
 
-Three things worth knowing about the behaviour:
+Four things worth knowing about the behaviour:
 
 - **It scales down, then drifts** — slowly and continuously rather than bouncing
   between corners. It covers more of the panel over a night that way, and it is
@@ -248,19 +265,26 @@ Three things worth knowing about the behaviour:
   hide while it drifts — text sliding around a screen is worse than either state
   on its own — and they come back the instant you touch it. It also never starts
   while an answer is being thought about or spoken.
+- **A device is never told the list.** It is handed the three numbers of the
+  profile it uses and nothing else. The list of names is a description of a
+  building, and no screen has any use for the names of places it is not in.
 
-**PREVIEW tries the values without saving them.** Nobody can pick a scale and a
+**PREVIEW tries a profile without saving it.** Nobody can pick a scale and a
 dim by reading two numbers, and nobody should have to stand in front of a screen
 waiting out three minutes of idle to find out what they chose. It drives the
-live preview on the right with whatever is in the boxes; SAVE is what gives them
-to the device.
+live preview on the right; SAVE is what gives it to the devices that name it.
 
-**When a device picks them up.** One still waiting on a decision is asking this
-server every twenty seconds and takes them within seconds. One that is already
-working has nothing left to ask about, so it takes them the next time its page
-loads — reload it on the screen, or use OPEN DISPLAY here. Making a working
+**Deleting a profile clears it from every device that named it**, the same way
+deleting a display clears it from every endpoint that named that. A setting
+pointing at something nobody can see is a setting nobody can change.
+
+**When a device picks a change up.** One still waiting on a decision is asking
+this server every twenty seconds and takes it within seconds. One that is
+already working has nothing left to ask about, so it takes it the next time its
+page loads — reload it on the screen, or use OPEN DISPLAY here. Making a working
 screen poll continuously for a setting that changes twice a year would be the
 wrong trade.
+
 
 ### The settings above the list
 
