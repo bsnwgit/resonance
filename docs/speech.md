@@ -41,6 +41,7 @@ Activity extends it.
 **greeting phrases** are the fallback for every assistant with no greeting of
 its own. `{name}` is the word that was said to reach whoever answered, so one line
 written here reads correctly whichever one answers.
+
 ## Sleep word
 
 One word, shared by all of them: there is one way out of a conversation
