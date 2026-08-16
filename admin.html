@@ -1369,7 +1369,7 @@
        Its settings follow it. The per-tab SAVE publishes the keys of the
        sections on that tab, so moving the section moves what GEOMETRY commits
        and what APPEARANCE stops claiming. -->
-  <section class="grp" data-tab="motion">
+  <section class="grp" data-prof="motion" data-tab="motion">
     <h4>Pattern</h4>
     <div class="grpbody">  <div class="seg" data-set="mode">
     <button data-v="stack" class="on">STACK</button>
@@ -1378,7 +1378,7 @@
     <button data-v="knot">KNOT</button>
   </div></div>
   </section>
-  <section class="grp" data-tab="look">
+  <section class="grp" data-prof="look" data-tab="look">
     <h4>Palette</h4>
     <div class="grpbody">  <div class="seg" data-set="palette">
     <button data-v="blue" class="on">BLUE</button>
@@ -1388,14 +1388,14 @@
     <button data-v="rust">RUST</button>
   </div></div>
   </section>
-  <section class="grp" data-tab="look">
+  <section class="grp" data-prof="look" data-tab="look">
     <h4>Layout</h4>
     <div class="grpbody">  <div class="seg" data-set="layout">
     <button data-v="hero" class="on">HERO</button>
     <button data-v="bleed">FULL BLEED</button>
   </div></div>
   </section>
-  <section class="grp" data-tab="look">
+  <section class="grp" data-prof="look" data-tab="look">
     <h4>Typography</h4>
     <div class="grpbody">
   <label class="bklab">Face</label>
@@ -1420,7 +1420,7 @@ size it is setting, so you read the choice while making it.</div>
     </div>
   </section>
 
-  <section class="grp" data-tab="look">
+  <section class="grp" data-prof="look" data-tab="look">
     <h4>Form &amp; size</h4>
     <div class="grpbody">  <div class="sl"><label>Amplitude</label><output id="o_amp"></output><input id="s_amp" type="range" min="0" max="2.5" step=".01"></div>
   <div class="sl"><label>Lines</label><output id="o_lines"></output><input id="s_lines" type="range" min="1" max="40" step="1"></div>
@@ -1429,7 +1429,7 @@ size it is setting, so you read the choice while making it.</div>
   <div class="sl"><label>Spread</label><output id="o_spread"></output><input id="s_spread" type="range" min="200" max="1100" step="10"></div>
   <div class="sl"><label>Perspective</label><output id="o_persp"></output><input id="s_persp" type="range" min="260" max="3000" step="20"></div></div>
   </section>
-  <section class="grp" data-tab="motion">
+  <section class="grp" data-prof="motion" data-tab="motion">
     <h4>Rotation</h4>
     <div class="grpbody">  <div class="seg" data-set="tmode">
     <button data-v="turntable" class="on">TURNTABLE</button>
@@ -1445,7 +1445,7 @@ size it is setting, so you read the choice while making it.</div>
     <button id="b_reo">RE-AIM NOW</button>
   </div></div>
   </section>
-  <section class="grp" data-tab="look">
+  <section class="grp" data-prof="look" data-tab="look">
     <h4>Glass</h4>
     <div class="grpbody">  <div class="sl"><label>Bloom</label><output id="o_bloom"></output><input id="s_bloom" type="range" min="0" max="2" step=".01"></div>
   <div class="sl"><label>Blur radius</label><output id="o_blur"></output><input id="s_blur" type="range" min="0" max="30" step="1"></div>
@@ -1461,7 +1461,7 @@ size it is setting, so you read the choice while making it.</div>
        that service, with nothing to keep in step. -->
   <div id="ai_anchor" hidden></div>
 
-  <section class="grp" data-tab="speech">
+  <section class="grp" data-prof="speech" data-tab="speech">
     <h4>Wake word</h4>
     <div class="grpbody">
   <div class="note help">Whether a name is needed at all, and how long one
@@ -1488,7 +1488,7 @@ itself; <b>{name}</b> is the word that was said to reach whoever answered.</div>
   <div class="seg"><button id="b_greet">TEST GREETING</button></div>
   <div id="wakestate" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5"></div></div>
     </section>
-  <section class="grp" data-tab="speech">
+  <section class="grp" data-prof="speech" data-tab="speech">
     <h4>Speech in (mic, STT)</h4>
     <div class="grpbody">
   <label class="bklab" style="margin-top:2px">How it decides you have finished</label>
@@ -1539,7 +1539,7 @@ measures the room rather than asking you to guess at the gate.</div>
   <div id="miclevel" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);line-height:1.5">level —</div>
   <div id="micnote" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:8px;line-height:1.5">off</div></div>
   </section>
-    <section class="grp" data-tab="speech">
+    <section class="grp" data-prof="speech" data-tab="speech">
     <h4>Speech out (TTS)</h4>
     <div class="grpbody">  <div class="seg" data-set="ttsengine">
     <button data-v="local" class="on">NEURAL (server)</button>
@@ -1564,7 +1564,7 @@ measures the room rather than asking you to guess at the gate.</div>
   <div id="ttsnote" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:8px;line-height:1.5"></div></div>
   </section>
 
-  <section class="grp" data-tab="speech">
+  <section class="grp" data-prof="speech" data-tab="speech">
     <h4>Sleep word</h4>
     <div class="grpbody">
   <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:0">word that ends the conversation at once</label>
@@ -1581,7 +1581,7 @@ measures the room rather than asking you to guess at the gate.</div>
     <div id="sleepstate" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5"></div>
     </div>
 </section>
-<section class="grp" data-tab="speech">
+<section class="grp" data-prof="speech" data-tab="speech">
     <h4>Commissioning check</h4>
     <div class="grpbody">
   <div class="note help">Walks every link in the chain and names whichever is
@@ -1597,7 +1597,7 @@ it, which is why it lives beside the microphone and the voices.</div>
     </div>
   </section>
 
-<section class="grp" data-tab="speech">
+<section class="grp" data-prof="speech" data-tab="speech">
     <h4>Test drive</h4>
     <div class="grpbody">  <div class="seg">
     <button id="b_idle">IDLE</button>
@@ -1606,7 +1606,7 @@ it, which is why it lives beside the microphone and the voices.</div>
   </div>
   <div class="sl" style="margin-top:10px"><label>Token rate ms</label><output id="o_rate"></output><input id="s_rate" type="range" min="15" max="180" step="5"></div></div>
   </section>
-  <section class="grp" data-tab="motion">
+  <section class="grp" data-prof="motion" data-tab="motion">
     <h4>Spectrum</h4>
     <div class="grpbody">  <div class="sl"><label>Spike width</label><output id="o_spike"></output><input id="s_spike" type="range" min=".004" max=".09" step=".001"></div>
   <div class="sl"><label>Spike decay</label><output id="o_decay"></output><input id="s_decay" type="range" min=".25" max="4" step=".05"></div>
@@ -1614,7 +1614,7 @@ it, which is why it lives beside the microphone and the voices.</div>
   <div class="sl"><label>Peak colour</label><output id="o_grad"></output><input id="s_grad" type="range" min="0" max="1.5" step=".01"></div>
   <div class="sl"><label>Heat threshold</label><output id="o_hot"></output><input id="s_hot" type="range" min=".1" max="2.5" step=".01"></div></div>
   </section>
-  <section class="grp" data-tab="motion">
+  <section class="grp" data-prof="motion" data-tab="motion">
     <h4>Noise floor</h4>
     <div class="grpbody">  <div class="sl"><label>Static level</label><output id="o_floor"></output><input id="s_floor" type="range" min="0" max="2" step=".01"></div>
   <div class="sl"><label>Crackle</label><output id="o_crackle"></output><input id="s_crackle" type="range" min="0" max="1.5" step=".01"></div></div>
@@ -1922,8 +1922,7 @@ is back to being a browser that has never been here.</div>
   </section>
   <!-- The other half of a place: what it looks like when somebody IS there.
        Its own list, because appearance and the screensaver are different axes. -->
-  <section class="grp" data-tab="profiles">
-    <h4>Appearance profiles</h4>
+  <section class="grp bare proflist" data-tab="look">
     <div class="grpbody">
   <div id="dp_looks"></div>
   <div class="seg addrow">
@@ -1953,8 +1952,7 @@ change, not this.</div>
 
     </div>
   </section>
-  <section class="grp" data-tab="profiles">
-    <h4>Geometry profiles</h4>
+  <section class="grp bare proflist" data-tab="motion">
     <div class="grpbody">
   <div id="dp_motions"></div>
   <div class="seg addrow">
@@ -1971,8 +1969,7 @@ controls by hand.</div>
     </div>
   </section>
 
-  <section class="grp" data-tab="profiles">
-    <h4>Speech profiles</h4>
+  <section class="grp bare proflist" data-tab="speech">
     <div class="grpbody">
   <div id="dp_speeches"></div>
   <div class="seg addrow">
@@ -3257,6 +3254,9 @@ const SHIPPED_PROMPT = 'You are a spoken assistant. Answer in one or two ' +
   'markdown, lists, headings, or emoji — because your reply is read aloud.';
 
 let openTopic = ()=>{};        // assigned once the panel's sections exist
+/* Same arrangement: opening a profile changes which sections exist, and the
+   thing that knows how to redraw them lives inside the tab machinery. */
+let reRender = ()=>{};
 let rescanGroups = ()=>{};     // ditto — this tab builds sections at runtime
 let RT = {routes: [], default: '', voices: []};
 let LEARNING = '';             // which block asked the display to LEARN
@@ -4267,7 +4267,8 @@ function paintDpSettings(){
   $('dp_max').value = DPCFG.max_displays;
   $('dp_pending').value = DPCFG.max_pending;
   paintDpForm(DPCFG.form || []);
-  PROFILE_KINDS.forEach(k=> paintProfiles(k, DPCFG[k.key] || []));
+  PROFILE_KINDS.forEach(k=> paintProfiles(k, DPCFG[k.key] || [],
+                                          DPCFG[DEF_KEY[k.key]] || ''));
   paintSavers(DPCFG.savers || []);
   paintKiosks(DPCFG.kiosks || [], DPCFG.kiosk_default || '');
 }
@@ -4435,6 +4436,9 @@ const PROFILE_KINDS = [
   {key: 'speeches', tab: 'speech', box: 'dp_speeches', add: 'b_addspeech', pre: 'p'},
 ];
 const PROFILES = {looks: [], motions: [], speeches: []};
+/* tab -> the list of profiles OF that tab, so a gated section can ask whether
+   its own tab has one open. */
+const PROF_OF = {look: 'looks', motion: 'motions', speech: 'speeches'};
 const OPENPR = {looks: -1, motions: -1, speeches: -1};
 
 function profileId(pre){
@@ -4456,19 +4460,73 @@ function profileSum(kind, pr){
        + (bits.length ? ' · ' + bits.join(' · ') : '');
 }
 
-function paintProfiles(kind, list){
+/* Which profile each list hands to a display that names none. */
+const DPDEF = {looks: '', motions: '', speeches: ''};
+const DEF_KEY = {looks: 'look_default', motions: 'motion_default',
+                 speeches: 'speech_default'};
+
+function defaultOf(kind){
+  const arr = PROFILES[kind.key] || [];
+  return arr.filter(p=> p.id === DPDEF[kind.key])[0] || arr[0] || null;
+}
+
+/* A profile becomes the live document for its tab: every control on the tab
+   reads the live document, and so does the preview, so this is all it takes to
+   make both show the profile. */
+function loadProfile(kind, pr){
+  if (!pr) return;
+  const keys = Object.keys(pr.values || {}).filter(k=> k in S);
+  keys.forEach(k=>{ S[k] = pr.values[k]; });
+  repaintControls();
+  applyType();
+  push();
+}
+
+/* One list at a time, and the nomination with it. The DEFAULT profile is also
+   what an ordinary display gets, so saving it publishes its values to the
+   shared document — that document is what a screen with no profile reads, and
+   leaving the two to drift would mean the default said one thing and every
+   plain browser tab showed another. */
+async function saveProfileList(kind){
+  const named = (PROFILES[kind.key] || [])
+    .filter(x=> (x.name || '').trim())
+    .map(x=> ({id: x.id, name: x.name, values: x.values}));
+  if (!named.length){
+    dpNote('a profile needs a name before it can be saved', true, 'profnote');
+    return;
+  }
+  const body = {};
+  body[kind.key] = named;
+  body[DEF_KEY[kind.key]] = DPDEF[kind.key];
+  try{
+    const j = await api('/displays/settings', {method:'POST',
+                                               body: JSON.stringify(body)});
+    DPCFG = j.settings;
+    const def = defaultOf(kind);
+    if (def)
+      await api('/settings', {method:'POST', body: JSON.stringify(
+        {settings: def.values, merge: true})});
+    paintProfiles(kind, DPCFG[kind.key] || [], DPCFG[DEF_KEY[kind.key]] || '');
+    reRender();
+    dpNote('saved', false, 'profnote');
+  }catch(e){ dpNote(e.message, true, 'profnote'); }
+}
+
+function paintProfiles(kind, list, def){
+  if (def !== undefined) DPDEF[kind.key] = def || '';
+  /* A list is never empty. The first profile is seeded from what the tab is
+     showing right now — which is what every display is already showing — so a
+     deployment arrives with "what this looks like today" under a name rather
+     than with nothing and no way back. */
+  if (!(list || []).length && S)
+    list = [{id: profileId(kind.pre), name: 'Default', values: tabKeys(kind.tab)}];
   const arr = PROFILES[kind.key] = (list || []).map(p=> ({
     id: p.id || '', _new: !!p._new, name: p.name || '',
     values: Object.assign({}, p.values || {})}));
   const box = $(kind.box);
   if (!box) return;
   box.innerHTML = '';
-  if (!arr.length){
-    const em = document.createElement('div');
-    em.className = 'note';
-    em.textContent = 'No profiles. Every device shows what the tab itself says.';
-    box.appendChild(em);
-  }
+  if (!DPDEF[kind.key] && arr.length) DPDEF[kind.key] = arr[0].id;
   arr.forEach((pr, i)=>{
     const row = document.createElement('div');
     row.className = 'erow';
@@ -4493,6 +4551,14 @@ function paintProfiles(kind, list){
       OPENPR[kind.key] = opening ? i : -1;
       box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
       row.classList.toggle('shut', !opening);
+      /* The settings for this tab ARE this profile while it is open: its
+         values go into the live document, so every control on the tab and the
+         preview beside it are showing the profile and nothing else. Closing it
+         puts back what the default says, which is what an ordinary display
+         gets. */
+      if (opening) loadProfile(kind, pr);
+      else loadProfile(kind, defaultOf(kind));
+      reRender();
     };
     row.appendChild(top);
 
@@ -4511,48 +4577,53 @@ function paintProfiles(kind, list){
 
     const acts = document.createElement('div');
     acts.className = 'acts';
-    /* LOAD writes the profile into the tab so you can see it and adjust it.
-       It does NOT save: the tab is dirty afterwards exactly as if you had
-       moved the controls by hand, and SAVE FOR EVERYONE is still what
-       publishes it to everybody. */
-    const load = document.createElement('button');
-    load.textContent = 'LOAD';
-    load.title = 'put this profile into the ' + kind.tab.toUpperCase()
-               + ' tab so you can see and change it';
-    load.onclick = ()=>{
-      const keys = Object.keys(pr.values).filter(k=> k in S);
-      keys.forEach(k=>{ S[k] = pr.values[k]; });
-      repaintControls();
-      applyType();
-      push();
-      // Marked through the same door a moved slider uses, so the tab's own
-      // commit row lights up and says there is work waiting behind it.
-      keys.forEach(dirty);
-      dpNote('loaded into the ' + kind.tab.toUpperCase() + ' tab — adjust it '
-             + 'there, then UPDATE', false, 'profnote');
-    };
-    acts.appendChild(load);
 
-    const upd = document.createElement('button');
-    upd.textContent = 'UPDATE';
-    upd.className = 'act-save';
-    upd.title = 'replace this profile with what the tab says now';
-    upd.onclick = ()=>{
+    const save = document.createElement('button');
+    save.textContent = 'SAVE';
+    save.className = 'act-save';
+    save.title = 'keep this profile as the tab now shows it';
+    save.onclick = ()=>{
       pr.values = tabKeys(kind.tab);
+      pr._new = false;
       retitle();
-      dpNote('captured ' + Object.keys(pr.values).length
-             + ' settings — SAVE to keep it', false, 'profnote');
+      saveProfileList(kind);
     };
-    acts.appendChild(upd);
+    acts.appendChild(save);
+
+    const mk = document.createElement('button');
+    mk.textContent = 'MAKE DEFAULT';
+    if (pr.id && pr.id === DPDEF[kind.key]){
+      mk.disabled = true;
+      mk.title = 'this is what a display with no profile gets';
+    }else{
+      mk.onclick = ()=>{ DPDEF[kind.key] = pr.id; saveProfileList(kind); };
+    }
+    acts.appendChild(mk);
+
+    const gap = document.createElement('span');
+    gap.className = 'spacer';
+    acts.appendChild(gap);
 
     const del = document.createElement('button');
     del.textContent = 'REMOVE';
     del.className = 'act-danger';
-    del.onclick = ()=>{
-      OPENPR[kind.key] = -1;
-      arr.splice(i, 1);
-      paintProfiles(kind, arr);
-    };
+    if (pr.id && pr.id === DPDEF[kind.key]){
+      /* The default cannot go. Every display naming no profile is showing it,
+         so removing it would take the appearance off every ordinary screen —
+         nominate another one first, which is a deliberate act with a button
+         of its own. */
+      del.disabled = true;
+      del.title = 'make another profile the default first';
+    }else{
+      del.onclick = ()=>{
+        OPENPR[kind.key] = -1;
+        arr.splice(i, 1);
+        loadProfile(kind, defaultOf(kind));
+        paintProfiles(kind, arr);
+        reRender();
+        saveProfileList(kind);
+      };
+    }
     acts.appendChild(del);
     row.appendChild(acts);
     box.appendChild(row);
@@ -5500,13 +5571,10 @@ $('b_profsave').addEventListener('click', ()=>{
      out and the server nominates the first — which is the right answer for a
      deployment saving its very first profile, and beats refusing the save for
      the want of a choice nobody has been offered yet. */
-  const named = (a)=> a.filter(x=> (x.name || '').trim())
-                      .map(x=> ({id: x.id, name: x.name, values: x.values}));
-  const body = {looks:    named(PROFILES.looks),
-                motions:  named(PROFILES.motions),
-                speeches: named(PROFILES.speeches),
-                savers:   DPSAVERS.filter(x=> (x.name || '').trim()),
-                kiosks:   kiosks};
+  /* Only the two lists still on this tab. Appearance, geometry and speech each
+     live on their own tab now and each profile saves itself from its own row. */
+  const body = {savers: DPSAVERS.filter(x=> (x.name || '').trim()),
+                kiosks: kiosks};
   if (kiosks.some(k=> k.id === DPKDEF)) body.kiosk_default = DPKDEF;
   saveDp(body, 'profnote');
 });
@@ -5514,8 +5582,6 @@ $('b_profrevert').addEventListener('click', ()=>{
   stopSaverPreview();
   stopLookPreview();
   OPENKI = -1;
-  PROFILE_KINDS.forEach(k=>{ OPENPR[k.key] = -1;
-                             paintProfiles(k, (DPCFG && DPCFG[k.key]) || []); });
   paintSavers((DPCFG && DPCFG.savers) || []);
   paintKiosks((DPCFG && DPCFG.kiosks) || [], (DPCFG && DPCFG.kiosk_default) || '');
   dpNote('back to what is saved', false, 'profnote');
@@ -6260,7 +6326,13 @@ function panelNav(){
   function render(){
     const q = (findEl.value || '').trim().toLowerCase();
     groups.forEach(g=>{
-      const show = q ? g.textContent.toLowerCase().includes(q) : g.dataset.tab === tab;
+      /* A settings section on APPEARANCE, GEOMETRY or SPEECH belongs to
+         whichever profile is open, and there is nothing for it to describe
+         while none is. The profile list itself carries no data-prof and is
+         always there. */
+      const gated = g.dataset.prof && OPENPR[PROF_OF[g.dataset.prof]] < 0;
+      const show = q ? g.textContent.toLowerCase().includes(q)
+                     : (g.dataset.tab === tab && !gated);
       g.hidden = !show;
       g.classList.toggle('shut',
         q ? false : (!g.classList.contains('bare') && !!shut.get(g)));
@@ -6350,6 +6422,7 @@ function panelNav(){
   /* Opening a section from somewhere other than its own heading: ADD has to
      take you to the block it just created. Assigned out to module scope
      because this closure is where the collapse state lives. */
+  reRender = render;
   openTopic = (g)=>{
     if (!g) return;
     rescan();
