@@ -275,11 +275,11 @@
   /* The app tab's own commit row, at the foot of the box. Hidden outright
      on every other tab: a save button that belongs to settings you cannot
      currently see is a save button somebody will eventually press. */
-  #approw,#airow,.uirow{display:none;margin-top:14px;padding-top:10px;
+  #approw,#airow,#profrow,.uirow{display:none;margin-top:14px;padding-top:10px;
           border-top:1px solid rgba(var(--glass),.30)}
-  #approw.on,#airow.on,.uirow.on{display:block}
-  #approw .seg,#airow .seg,.uirow .seg{justify-content:flex-end;margin-top:8px}
-  #approw .seg button,#airow .seg button,
+  #approw.on,#airow.on,#profrow.on,.uirow.on{display:block}
+  #approw .seg,#airow .seg,#profrow .seg,.uirow .seg{justify-content:flex-end;margin-top:8px}
+  #approw .seg button,#airow .seg button,#profrow .seg button,
   .uirow .seg button{border-width:2px;border-style:solid;padding:6px 10px}
   /* What this row's scope actually is. Worth a line, because "shared" is the
      property that separates these from the three controls a viewer keeps. */
@@ -294,7 +294,7 @@
   .uirow .state.alert{color:#eaa8a8}
   /* Spans every column once the topics tile, so it reads as the foot of the
      whole box rather than the tail of whichever column it landed in. */
-  @container (min-width:700px){ #approw,#airow,.uirow{grid-column:1/-1} }
+  @container (min-width:700px){ #approw,#airow,#profrow,.uirow{grid-column:1/-1} }
 
   /* The caption over a row of tabs. Quieter than anything it labels — it is
      there to be read once and then ignored, not to compete with the tabs
@@ -1882,11 +1882,7 @@ change, not this.</div>
 
   <div class="seg actrow">
     <button id="b_addlook">ADD A PROFILE</button>
-    <span class="spacer"></span>
-    <button id="b_looksave" class="act-save">SAVE</button>
-    <button id="b_lookrevert" class="act-undo">REVERT</button>
   </div>
-  <div class="note" id="looknote"></div>
     </div>
   </section>
   <!-- Central, and named from a device rather than copied into it. A
@@ -1981,11 +1977,7 @@ a setting that changes twice a year would be the wrong trade.</div>
 
   <div class="seg actrow">
     <button id="b_addsaver">ADD A PROFILE</button>
-    <span class="spacer"></span>
-    <button id="b_saversave" class="act-save">SAVE</button>
-    <button id="b_saverrevert" class="act-undo">REVERT</button>
   </div>
-  <div class="note" id="savernote"></div>
     </div>
   </section>
   <!-- What a public screen IS, and the only one of the three a device names.
@@ -2022,11 +2014,7 @@ behaves like the rest of the building rather than like nothing.</div>
 
   <div class="seg actrow">
     <button id="b_addkiosk">ADD A PROFILE</button>
-    <span class="spacer"></span>
-    <button id="b_kiosksave" class="act-save">SAVE</button>
-    <button id="b_kioskrevert" class="act-undo">REVERT</button>
   </div>
-  <div class="note" id="kiosknote"></div>
     </div>
   </section>
   <!-- The form itself, which is a different job again: this one is written
@@ -2206,6 +2194,18 @@ button to download it as a PDF.</div>
     <div class="note" id="rtlistnote"></div>
     <div class="seg actrow">
       <button id="b_addroute" class="act-save">ADD INSTANCE</button>
+    </div>
+  </div>
+  <!-- One commit for the whole tab, the way the shared-settings tabs have one.
+       The three lists are three parts of a single document, so three SAVEs was
+       three buttons writing the same file — and a kiosk profile naming an
+       appearance you had just added, but not yet saved, could only be stored
+       by pressing them in the right order. -->
+  <div id="profrow">
+    <div class="note" id="profnote"></div>
+    <div class="seg actrow">
+      <button id="b_profsave" class="act-save">SAVE PROFILES</button>
+      <button id="b_profrevert" class="act-undo">REVERT</button>
     </div>
   </div>
   <div id="approw">
@@ -4282,15 +4282,6 @@ $('b_addlook').addEventListener('click', ()=>{
   DPLOOKS.push(row);
   paintLooks(DPLOOKS);
 });
-$('b_lookrevert').addEventListener('click', ()=>{
-  stopLookPreview();
-  paintLooks((DPCFG && DPCFG.looks) || []);
-  dpNote('back to what is saved', false, 'looknote');
-});
-$('b_looksave').addEventListener('click', ()=>{
-  stopLookPreview();
-  saveDp({looks: DPLOOKS.filter(s=> (s.name || '').trim())}, 'looknote');
-});
 
 $('b_addsaver').addEventListener('click', ()=>{
   if (DPSAVERS.length >= 8) return;
@@ -4304,18 +4295,6 @@ $('b_addsaver').addEventListener('click', ()=>{
   // grew by one line and nothing else.
   OPENSV = DPSAVERS.length - 1;
   paintSavers(DPSAVERS);
-});
-$('b_saverrevert').addEventListener('click', ()=>{
-  stopSaverPreview();
-  paintSavers((DPCFG && DPCFG.savers) || []);
-  dpNote('back to what is saved', false, 'savernote');
-});
-$('b_saversave').addEventListener('click', ()=>{
-  /* The preview is showing an unsaved profile. Put it back before the list
-     changes underneath it, or the screen keeps drifting to numbers that are no
-     longer on any row. */
-  stopSaverPreview();
-  saveDp({savers: DPSAVERS.filter(s=> (s.name || '').trim())}, 'savernote');
 });
 
 /* ---- the appearance profiles, which are also central ----
@@ -4868,20 +4847,6 @@ $('b_addkiosk').addEventListener('click', ()=>{
   OPENKI = DPKIOSKS.length - 1;
   paintKiosks(DPKIOSKS);
 });
-$('b_kioskrevert').addEventListener('click', ()=>{
-  OPENKI = -1;
-  paintKiosks((DPCFG && DPCFG.kiosks) || [], (DPCFG && DPCFG.kiosk_default) || '');
-  dpNote('back to what is saved', false, 'kiosknote');
-});
-$('b_kiosksave').addEventListener('click', ()=>{
-  const keep = DPKIOSKS.filter(k=> (k.name || '').trim());
-  if (!keep.length){
-    dpNote('there has to be at least one profile — a screen ticked as a kiosk '
-           + 'needs something to be', true, 'kiosknote');
-    return;
-  }
-  saveDp({kiosks: keep, kiosk_default: DPKDEF}, 'kiosknote');
-});
 
 /* Which profile is open, and which one the preview is showing — both by
    INDEX and not by the object, because paintSavers rebuilds the array every
@@ -5352,6 +5317,34 @@ async function refreshDisplays(){
      underneath it. */
   paintBulk();
 }
+
+/* ---- one commit for all three lists ----
+   They are three parts of one document, so they are written in one request.
+   Three separate saves meant a kiosk profile naming an appearance you had just
+   added could only be stored by pressing the buttons in the right order, and
+   the server validates the three together anyway. */
+$('b_profsave').addEventListener('click', ()=>{
+  stopSaverPreview();
+  stopLookPreview();
+  const kiosks = DPKIOSKS.filter(k=> (k.name || '').trim());
+  if (!kiosks.length){
+    dpNote('there has to be at least one kiosk profile — a screen ticked as a '
+           + 'kiosk needs something to be', true, 'profnote');
+    return;
+  }
+  saveDp({looks:  DPLOOKS.filter(x=> (x.name || '').trim()),
+          savers: DPSAVERS.filter(x=> (x.name || '').trim()),
+          kiosks: kiosks, kiosk_default: DPKDEF}, 'profnote');
+});
+$('b_profrevert').addEventListener('click', ()=>{
+  stopSaverPreview();
+  stopLookPreview();
+  OPENKI = -1;
+  paintLooks((DPCFG && DPCFG.looks) || []);
+  paintSavers((DPCFG && DPCFG.savers) || []);
+  paintKiosks((DPCFG && DPCFG.kiosks) || [], (DPCFG && DPCFG.kiosk_default) || '');
+  dpNote('back to what is saved', false, 'profnote');
+});
 
 /* ---- applying one profile to many devices ----
    One request per device rather than a bulk endpoint. The server validates a
@@ -6144,6 +6137,9 @@ function panelNav(){
     /* ADD INSTANCE is not inside any block, because it makes one — it has to
        stay reachable whichever block happens to be open, or the only way to
        add a second endpoint is to first collapse the first. */
+    const pr = $('profrow');
+    if (pr) pr.classList.toggle('on',
+      tab === 'profiles' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
     const air = $('airow');
     if (air) air.classList.toggle('on',
       tab === 'ai' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');

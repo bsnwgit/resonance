@@ -106,9 +106,11 @@ Each of these writes a different document, so each has its own button:
 | SAVE APP SETTINGS | ports, binding, session lifetime | only after a restart |
 
 Offering one button that meant all of them is how somebody presses the wrong
-one. A tab that writes nothing shared shows no save row at all — the AI and
-PROFILES tabs have none, because each endpoint and each profile list saves
-itself from inside its own block.
+one. A tab that writes nothing shared shows no SAVE FOR EVERYONE at all — the
+AI tab has none, because each endpoint saves itself from inside its own block.
+PROFILES has a commit of its own instead: **SAVE PROFILES** writes all three
+lists together, because they are three parts of one document and a kiosk
+profile can name an appearance added in the same sitting.
 
 ## The live preview
 
