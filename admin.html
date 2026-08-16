@@ -1730,7 +1730,7 @@ is back to being a browser that has never been here.</div>
   </section>
   <!-- Central, and named from a device rather than copied into it. A
        deployment has a handful of kinds of place, not one setting per screen. -->
-  <section class="grp" data-tab="displays">
+  <section class="grp" data-tab="profiles">
     <h4>Screensaver profiles</h4>
     <div class="grpbody">
   <div id="dp_savers"></div>
@@ -1878,7 +1878,7 @@ code for do not, and never will.
   </section>
   <!-- The other half of a place: what it looks like when somebody IS there.
        Its own list, because appearance and the screensaver are different axes. -->
-  <section class="grp" data-tab="displays">
+  <section class="grp" data-tab="profiles">
     <h4>Appearance profiles</h4>
     <div class="grpbody">
   <div id="dp_looks"></div>
@@ -2042,6 +2042,12 @@ button to download it as a PDF.</div>
     <div class="tabgroup">Admin settings</div>
     <div class="tabs" id="foottabs">
       <button id="tab_app" data-tab="app">APP SETTINGS</button>
+      <!-- A profile is a kind of place — a hallway, a shop floor — rather than
+           a screen, so it belongs beside the deployment's own settings and not
+           in with who may use the server. Both lists moved off ACCESS: what a
+           screen looks like and what it is allowed to do were never the same
+           question. -->
+      <button id="tab_profiles" data-tab="profiles">PROFILES</button>
       <!-- Accounts before devices: a group is made here and named over there,
            so the order follows the order you do them in. -->
       <button id="tab_accounts" data-tab="accounts">ACCOUNTS</button>
@@ -3947,6 +3953,20 @@ function paintDpSettings(){
   paintSavers(DPCFG.savers || []);
 }
 
+/* The two profile lists live on their own tab now, and they are painted from
+   the same document the device register loads. So opening PROFILES has to
+   fetch it as well, or both lists sit empty until somebody happens to visit
+   ACCESS first and fills them in as a side effect. Lighter than
+   refreshDisplays on purpose: there is no register to sort or draw here, and
+   the fields it paints that belong to other tabs are hidden rather than
+   absent, so writing to them costs nothing and keeps the two tabs describing
+   one document rather than two copies of it. */
+async function refreshProfiles(){
+  if (!ME || ME.role !== 'admin') return;
+  await loadDisplays();
+  paintDpSettings();
+}
+
 /* One row per field. Rebuilt from an array rather than read off the DOM,
    because ADD and REMOVE both change the list and a builder that edits itself
    in place loses a field the moment two things happen at once. */
@@ -5596,6 +5616,7 @@ function panelNav(){
     $('panelscroll').scrollTop = 0;
     if (tab === 'accounts'){ refreshUsers(); refreshGroups(); }
     if (tab === 'displays') refreshDisplays();
+    if (tab === 'profiles') refreshProfiles();
     if (tab === 'embeds') refreshEmbeds();
     if (tab === 'app') loadApp();
     if (tab === 'ai') loadBackend();
