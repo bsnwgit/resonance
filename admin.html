@@ -1482,6 +1482,23 @@ size it is setting, so you read the choice while making it.</div>
 lasts. <b>The words themselves live on the routes</b>, in AI — with several
 routes the word is what picks between them, so it belongs to the thing it
 picks.</div>
+  <label class="bklab" style="margin-top:8px">The word</label>
+  <input id="wakeword" type="text" spellcheck="false" autocomplete="off"
+         placeholder="resonance">
+  <label class="bklab">Also accept</label>
+  <textarea id="wakealiases" rows="3" spellcheck="false"
+            placeholder="one per line — what a transcriber actually hears"></textarea>
+  <label class="bklab">Matching</label>
+  <div class="seg" data-set="wakestrict">
+    <button data-v="0" class="on">FUZZY</button>
+    <button data-v="1">EXACT</button>
+  </div>
+  <div class="note help">The word that reaches an endpoint using this profile,
+the spellings a transcriber actually returns for it, and how close a match has
+to be. <b>EXACT</b> is for a profile whose endpoint DOES things rather than
+answers — the same false-positive rate costs a few tokens on one and actuates
+hardware on the other.</div>
+
   <div class="seg" data-set="wake" style="margin-top:8px">
     <button data-v="off">OFF</button>
     <button data-v="auto" class="on">AUTO ONLY</button>
@@ -2734,7 +2751,7 @@ function repaintControls(){
   FIELDS.forEach(f=>f());
   document.querySelectorAll('.seg[data-set]').forEach(s=> syncSeg(s.dataset.set));
 }
-const BOOL_KEYS = new Set(['ptt','byeontimeout']);
+const BOOL_KEYS = new Set(['ptt','byeontimeout','wakestrict']);
 const FMT = {
   amp:2, spin:2, tilt:3, wobble:2, roll:2, tumble:2, bloom:2, milk:2, grain:2,
   scan:2, lw:2, vrate:'x', vpitch:2, micgain:2, micgate:3, spike:3, decay:2,
@@ -2797,7 +2814,8 @@ function syncSeg(key){
 function buildControls(){
   document.querySelectorAll('#panel input[type="range"]').forEach(bindSlider);
   // no wakeword or wakealiases: those are a route's, saved with the route
-  ['sleepword','sleepaliases','greetings','farewells',
+  ['wakeword','wakealiases',
+   'sleepword','sleepaliases','greetings','farewells',
    'opname','ainame']
     .forEach(id=>{ const el = $(id); if (el) bindField(el, id); });
 
@@ -3261,7 +3279,9 @@ $('b_appsave').addEventListener('click', async ()=>{
 /* greeting and voice are gone: a speech profile carries both, and an endpoint
    names one. Two endpoints wanting the same voice used to be two copies of the
    same choice. */
-const RT_FIELDS = ['name','wakeword','aliases','speech','base_url',
+/* wakeword, aliases and strict have gone the same way as greeting and voice:
+   the speech profile carries them, and an endpoint names a profile. */
+const RT_FIELDS = ['name','speech','base_url',
                    'model','system','keep_alive','agent_id'];
 const RT_SLIDERS = {max_tokens:  v=> v,
                     temperature: v=> (+v).toFixed(2),
@@ -3329,37 +3349,6 @@ server log, and wherever a transcript label uses <b>{assistant}</b>. It is
 never spoken and never matched against.</div>
 
   <div class="subwrap">
-  <div class="subgrp" data-g="wake">
-    <h5>Wake word<span class="subsum"></span></h5>
-    <div class="subbody">
-  <label class="bklab">Wake word</label>
-  <input data-f="wakeword" type="text" spellcheck="false" autocomplete="off"
-         placeholder="house">
-  <div class="seg" style="margin-top:6px"><button data-a="learn">LEARN HOW I SAY IT (3x)</button></div>
-  <div data-r="learnnote" class="learnnote"></div>
-  <label class="bklab">Also answers to</label>
-  <textarea data-f="aliases" rows="3" spellcheck="false" placeholder="one per line"></textarea>
-  <label class="bklab">Matching</label>
-  <div class="seg" data-f="strict">
-    <button data-v="0" class="on">CLOSE ENOUGH</button>
-    <button data-v="1">THE EXACT WORD</button>
-  </div>
-  <div class="note help">What somebody says to reach this endpoint. It follows
-the instance name until you edit it, then stays where you put it — an endpoint
-named <b>Kitchen Lights</b> is a good label and a poor thing to say out loud.
-
-Pick words that sound <b>far apart</b>, not merely different: differing
-syllable counts, vowels and stress survive a noisy room, two words one letter
-apart do not. LEARN records how you actually say it, three times, and adds
-what the transcriber returns.
-
-CLOSE ENOUGH forgives a mishearing, which is what an endpoint that answers
-questions wants. THE EXACT WORD is for one that <i>does</i> things — the same
-near-miss costs a few tokens on one and switches on the lights on the
-other.</div>
-    </div>
-  </div>
-
   <div class="subgrp" data-g="who">
     <h5>Who may use it<span class="subsum"></span></h5>
     <div class="subbody">

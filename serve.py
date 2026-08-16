@@ -834,6 +834,19 @@ def public_routes(doc, disp=None):
         row.update(id=rid, allowed=display_may(disp, rec))
         if disp:
             row.update({k: rec[k] for k in ROUTE_ROUTING})
+            # …and the words come from the speech profile now, not from the
+            # route's own record. An endpoint names a profile; the profile says
+            # what wakes it, what else to accept for it, and how close a match
+            # has to be. A route keeps its stored copy only so that unpicking
+            # this later does not lose what somebody typed.
+            if "wakeword" in prof:
+                row["wakeword"] = str(prof.get("wakeword") or "")
+            if "wakealiases" in prof:
+                row["aliases"] = [a.strip() for a
+                                  in str(prof.get("wakealiases") or "").splitlines()
+                                  if a.strip()]
+            if "wakestrict" in prof:
+                row["strict"] = bool(prof.get("wakestrict"))
         out.append(row)
     return out
 

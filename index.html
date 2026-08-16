@@ -1273,6 +1273,10 @@ const S = {
      sleep word stays shared for the same reason — there is one way out of a
      conversation regardless of which route you are in. */
   wake:'auto', wakewindow:12,                     // off | auto | always
+  /* The wake word now belongs to a SPEECH PROFILE rather than to a route: an
+     endpoint names a profile, and the profile says what wakes it. Kept as
+     ordinary settings so a profile captures them like everything else. */
+  wakeword:'resonance', wakealiases:'', wakestrict:false,
   sleepword:'goodbye', sleepaliases:'', byeontimeout:true,
   farewells:"{name} going quiet.\nStanding by.\nGoodbye.",
   greetings:"{name} here. Go ahead.\n{name} online. What do you need?\n"+
