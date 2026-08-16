@@ -23,15 +23,18 @@ follow-up needs no second address, which is the only tolerable behaviour for
 speech. Say a *different* name mid-conversation and you switch to that one
 instead.
 
-Each has its own service, its own model, its own key, its own instructions,
-and optionally its own greeting and voice — so a room with more than one can
-hear which replied.
+Each names **a model profile** — the service, address, model and key, kept as
+a named set under PROFILES ▸ MODELS — and adds its own instructions, and
+optionally its own greeting and voice, so a room with more than one can hear
+which replied. Two endpoints may name the same profile: one connection, two
+names to say, two sets of instructions.
 
-**One block per endpoint**, and the block is the whole of it: the wake word
-that reaches it and the connection it reaches, saved together by the SAVE
-inside it. **ADD INSTANCE** at the foot of the tab makes another and opens it;
-each block carries its own TEST, MAKE DEFAULT, SWITCH OFF, FORGET KEY and
-DELETE.
+**One row per endpoint**, and the row is the whole of it: the speech profile
+that carries the word reaching it, the model profile it speaks to, and the
+instructions it speaks under, saved together by the SAVE inside it. **ADD
+INSTANCE** at the foot of the tab makes another and opens it; each row carries
+its own TEST, MAKE DEFAULT, SWITCH OFF and DELETE. The key is not here — it
+belongs to the profile, and is edited once for every endpoint using it.
 
 Every block's heading says what you say to reach it and what it is wired to —
 `say "house" -> house-agent` — so you can find the right one without opening
@@ -154,6 +157,19 @@ is checking this endpoint's own connection, and a pass borrowed from a
 different endpoint would tell you nothing about this one. The line underneath
 names where the same question would have gone in use.
 
+## Model profiles
+
+A profile is one connection under a name: **PROFILES ▸ MODELS**, one row each,
+the same caret and the same one-open-at-a-time as every other list. ADD MODEL
+makes one; SAVE commits the row; MAKE DEFAULT nominates the one an endpoint
+naming nothing gets.
+
+Editing a profile changes what every endpoint naming it reaches, in one place
+— which is the point. A key typed once serves all of them, and rotating it is
+one edit rather than six.
+
+The four kinds below are what a profile can be.
+
 ## The four providers
 
 ### DEMO
@@ -167,32 +183,28 @@ short panel.
 
 A **dialect, not a vendor**. Ollama, OpenClaw, LM Studio and vLLM all speak
 it, so one adapter reaches all of them and the only difference between them is
-the base URL — which is what the preset buttons fill in.
+the base URL.
 
-| Preset | Base URL | Model field |
+| Server | Base URL | Model field |
 |---|---|---|
-| OLLAMA | `http://127.0.0.1:11434/v1` | the tag, e.g. `qwen2.5:3b` |
-| OPENCLAW | `http://127.0.0.1:18789/v1` | an agent id, e.g. `openclaw:main` |
-| LM STUDIO | `http://127.0.0.1:1234/v1` | whatever is loaded |
-| OPENAI | `https://api.openai.com/v1` | e.g. `gpt-4o-mini` |
+| Ollama | `http://127.0.0.1:11434/v1` | the tag, e.g. `qwen2.5:3b` |
+| OpenClaw | `http://127.0.0.1:18789/v1` | an agent id, e.g. `openclaw:main` |
+| LM Studio | `http://127.0.0.1:1234/v1` | whatever is loaded |
+| OpenAI | `https://api.openai.com/v1` | e.g. `gpt-4o-mini` |
 
-Pick a preset, set the model, save. A local model needs no API key.
-
-Under the model field you may see **installed there:** followed by a list.
-That is an Ollama trick — the panel asks the same host what it actually has,
-so a model name is chosen rather than typed from memory and subtly wrong.
-Nothing else answers that path, so the line stays empty for other providers.
+Set the address and the model, save. A local model needs no API key.
 
 ### ANTHROPIC
 
-Its own choice rather than another preset, because the wire format genuinely
+Its own kind rather than another OpenAI-compatible address, because the
+wire format genuinely
 differs: the key rides an `x-api-key` header rather than `Authorization:
 Bearer`, a version header is required, the system prompt is a top-level field
 rather than a message in the list, a reply limit is mandatory, and the answer
 arrives as a list of content blocks rather than one string.
 
-There is exactly one endpoint — `https://api.anthropic.com` — so it has no
-preset to choose; selecting the provider fills it in. A key is **required**,
+There is exactly one endpoint — `https://api.anthropic.com` — so choosing the
+provider fills the address in. A key is **required**,
 and saving without one is refused at the point of saving rather than
 discovered later by whoever is standing in front of the screen.
 
@@ -327,13 +339,13 @@ A Home Assistant token is a key like any other here, and lives in the same
 place under the same rules — the field is labelled differently because that is
 what Home Assistant calls it, not because it is treated differently.
 
-Keys live in `routes.json`, admin-only, mode 600, one per assistant. A key is
-**never returned to a browser**: the field shows whether one is stored, not
-what it is. Leaving the field blank keeps the stored key; **FORGET KEY**
-clears it for the one selected.
+Keys live with the model profiles, in `displays.json` — admin-only, and not
+the world-readable document — one per profile rather than one per assistant.
+A key is **never returned to a browser**: the field shows whether one is
+stored, not what it is. Leaving it blank keeps the stored key.
 
-**Changing which service answers drops its key and its address**, unless you
-supply new ones in the same save. Carrying one provider's endpoint into
+**Changing which service a profile answers with drops its key and its
+address**, unless you supply new ones in the same save. Carrying one provider's endpoint into
 another would send an Anthropic key to whatever happens to be listening on
 the old URL, which is worse than an error because it looks like it worked.
 

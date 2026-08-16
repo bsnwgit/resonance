@@ -1244,8 +1244,7 @@
      has to read as one — {display} typed into a lowercasing field still
      works, but it stops looking like the token it is */
   #opname,#ainame{letter-spacing:.06em}
-  #panel input[data-f="api_key"]{letter-spacing:.18em}
-  #panel input[data-f="base_url"],#panel input[data-f="model"],
+  #panel input[data-f="api_key"],#dp_models input[type=password]{letter-spacing:.18em}
   #panel input[data-f="keep_alive"]{letter-spacing:.04em}
   #greetings,#sleepaliases,#farewells,
   #panel textarea[data-f]{resize:vertical;line-height:1.6;min-height:44px}
@@ -3375,8 +3374,9 @@ $('b_appsave').addEventListener('click', async ()=>{
 });
 
 /* ------------------------------------------------- AI endpoints (routes) */
-/* One block per endpoint, and the block is the whole of it: the wake word
-   that reaches it and the connection it reaches, together, saved together.
+/* One block per endpoint, and the block is the whole of it: the speech profile
+   whose word reaches it, the model profile it speaks to, and the instructions
+   it speaks under — together, saved together.
 
    This replaced a list plus three shared topics that repainted for whichever
    row was selected. That shape asked you to hold "which one am I editing" in
@@ -3393,24 +3393,13 @@ $('b_appsave').addEventListener('click', async ()=>{
    same choice. */
 /* wakeword, aliases and strict have gone the same way as greeting and voice:
    the speech profile carries them, and an endpoint names a profile. */
-const RT_FIELDS = ['name','speech','base_url',
-                   'model','system','keep_alive','agent_id'];
+/* The connection went the way of the greeting and the wake word: a model
+   profile carries it, and an endpoint names one. */
+const RT_FIELDS = ['name','speech','model_profile','system','keep_alive'];
 const RT_SLIDERS = {max_tokens:  v=> v,
                     temperature: v=> (+v).toFixed(2),
                     history_turns: v=> v == 0 ? 'none' : v,
                     timeout:     v=> v + 's'};
-/* A preset is only a base URL and a hint at the model format. It exists so
-   nobody has to remember that OpenClaw listens on 18789 and routes by putting
-   an agent id in the model field. */
-const BK_PRESETS = {
-  ollama:   {base_url:'http://127.0.0.1:11434/v1', hint:'qwen2.5:3b',    keep_alive:'30m', provider:'openai'},
-  openclaw: {base_url:'http://127.0.0.1:18789/v1', hint:'openclaw:main', keep_alive:'',    provider:'openai'},
-  lmstudio: {base_url:'http://127.0.0.1:1234/v1',  hint:'',              keep_alive:'',    provider:'openai'},
-  openai:   {base_url:'https://api.openai.com/v1', hint:'gpt-4o-mini',   keep_alive:'',    provider:'openai'}
-  /* No Anthropic preset. A preset exists to fill in a base URL you would
-     otherwise have to remember, and Anthropic has exactly one — the provider
-     button already fills it. */
-};
 const SHIPPED_PROMPT = 'You are a spoken assistant. Answer in one or two ' +
   'short sentences unless asked for more. Write plain prose only — no ' +
   'markdown, lists, headings, or emoji — because your reply is read aloud.';
@@ -3510,52 +3499,20 @@ looking at the screen — which is all a kiosk offers.</div>
   </div>
 
   <div class="subgrp" data-g="conn">
-    <h5>Connection<span class="subsum"></span></h5>
+    <h5>Model<span class="subsum"></span></h5>
     <div class="subbody">
-  <div class="note help">OPENAI-COMPATIBLE is a shape, not a company: Ollama,
-OpenClaw, LM Studio and vLLM all speak it and differ only by base URL. DEMO
-answers from built-in text and reaches nothing. HOME ASSISTANT talks to a
-house rather than to a model — it is an endpoint like any other here, and
-everything it can be asked to touch is decided over there.</div>
-  <div class="seg" data-f="provider">
-    <button data-v="demo" class="on">DEMO</button>
-    <button data-v="openai">OPENAI-COMPATIBLE</button>
-    <button data-v="anthropic">ANTHROPIC</button>
-    <button data-v="homeassistant">HOME ASSISTANT</button>
-  </div>
-  <div data-r="conn">
-  <div data-r="presetrow">
-  <label class="bklab">Preset</label>
-  <div class="seg" data-r="preset">
-    <button data-v="ollama">OLLAMA</button>
-    <button data-v="openclaw">OPENCLAW</button>
-    <button data-v="lmstudio">LM STUDIO</button>
-    <button data-v="openai">OPENAI</button>
-  </div>
-  </div>
-  <label class="bklab" data-r="urllabel">Base URL</label>
-  <input data-f="base_url" type="text" spellcheck="false" autocomplete="off"
-         placeholder="http://127.0.0.1:11434/v1">
-  <div data-r="modelrow">
-  <label class="bklab">Model</label>
-  <input data-f="model" type="text" spellcheck="false" autocomplete="off"
-         placeholder="qwen2.5:3b">
-  </div>
-  <div class="note" data-r="models"></div>
-  <label class="bklab" data-r="keylabel">API key</label>
-  <input data-f="api_key" type="password" spellcheck="false" autocomplete="off"
-         placeholder="unchanged">
-  <div class="note" data-r="keynote"></div>
+  <select data-f="model_profile" class="ppick"></select>
+  <div class="note help">Which <b>model profile</b> answers for this endpoint —
+the provider, the base URL, the model and the key. Built once under MODELS and
+named here, so two endpoints on the same model are one connection rather than
+the same credential typed twice. Blank is the deployment's default.
+
+<b>DEMO</b> answers from built-in text and reaches nothing, which is how you
+tell a fault in the interface from a fault in whatever it is pointed at.</div>
+
   <div data-r="harows">
-  <label class="bklab">Conversation agent</label>
-  <input data-f="agent_id" type="text" spellcheck="false" autocomplete="off"
-         placeholder="leave blank for the configured default">
-  <div class="note help">Which agent in Home Assistant answers. The built-in
-one matches sentences, so it does what it is told and nothing else; an
-LLM-backed one interprets, so "it's a bit dark in here" works and costs a model
-call. Blank uses whichever is set as default over there.</div>
   <label class="bklab">When it recognises nothing, ask</label>
-  <select data-f="fallthrough"></select>
+  <select data-f="fallthrough" class="ppick"></select>
   <div class="note help">Nobody remembers which name owns which capability, so
 somebody will ask the house a general question. Name another endpoint here and
 it answers instead — in this one's name and voice, so the person is never told
@@ -3563,11 +3520,9 @@ they used the wrong word. It only fires when the house recognised no command
 at all, which an LLM-backed agent essentially never reports: leave it at
 nothing for one of those.</div>
   </div>
-  </div>
     </div>
   </div>
-
-  <div class="subgrp" data-g="limits">
+<div class="subgrp" data-g="limits">
     <h5>Limits<span class="subsum"></span></h5>
     <div class="subbody">
   <div class="sl" data-r="maxrow"><label>Reply limit (tokens)</label><output data-o="max_tokens"></output><input data-s="max_tokens" type="range" min="16" max="2000" step="16"></div>
@@ -3632,7 +3587,6 @@ out loud, so ask for plain prose.</div>
     <button data-a="default">MAKE DEFAULT</button>
     <button data-a="test">TEST</button>
     <button data-a="enable">SWITCH OFF</button>
-    <button data-a="forget" class="act-undo">FORGET KEY</button>
     <span class="spacer"></span>
     <button data-a="save" class="act-save">SAVE</button>
     <button data-a="delete" class="act-danger">DELETE</button>
@@ -3655,13 +3609,19 @@ function blockNote(blk, m, bad){
    configure and the built-in replies ignore the prompt. Leaving the fields on
    screen would be a block full of controls wired to nothing. */
 function blockSyncProvider(blk){
-  const on = blk.querySelector('[data-f="provider"] button.on');
-  const v = on ? on.dataset.v : 'demo';
+  /* Read off the model profile this endpoint names, not off a control — the
+     provider is the profile's now. Reading a control that no longer exists
+     made every endpoint look like DEMO, which hid its limits and its system
+     prompt. */
+  const sel = blk.querySelector('[data-f="model_profile"]');
+  const want = sel ? sel.value : '';
+  const pool = (DPCFG && DPCFG.models) || [];
+  const prof = pool.filter(x=> x.id === want)[0]
+            || pool.filter(x=> x.id === ((DPCFG && DPCFG.model_default) || ''))[0];
+  const v = (prof && prof.values && prof.values.provider) || 'demo';
   const connected = v !== 'demo', anth = v === 'anthropic',
         ha = v === 'homeassistant';
   const show = (name, yes)=>{ const el = R(blk, name); if (el) el.style.display = yes ? '' : 'none'; };
-  show('conn', connected);
-  show('promptblock', connected);
   /* Anthropic takes neither of these — see the note that replaces them. A
      slider wired to a field the adapter deliberately never sends is the same
      defect as a toggle nothing reads. Home Assistant takes fewer still: it
@@ -3674,9 +3634,6 @@ function blockSyncProvider(blk){
   show('anthnote', anth);
   show('hanote', ha);
   show('harows', ha);
-  show('modelrow', connected && !ha);      // HA is not a model
-  show('presetrow', connected && !anth && !ha);   // one endpoint; nothing to pick
-  show('models', connected && !anth && !ha);      // that listing is an Ollama trick
   const t = blk.querySelector('[data-a="test"]');
   if (t) t.disabled = !connected;
   /* DEMO reaches nothing, so its limits and its prompt are inert. Dimmed and
@@ -3698,23 +3655,9 @@ function blockSyncProvider(blk){
     box.style.opacity = connected ? '' : '.45';
     if (!connected || gone) box.classList.remove('open');
   });
-  const url = F(blk, 'base_url');
-  if (url) url.placeholder = anth ? 'https://api.anthropic.com'
-                          : ha   ? 'http://homeassistant.local:8123'
-                                 : 'http://127.0.0.1:11434/v1';
-  const model = F(blk, 'model');
-  if (model && anth && !model.placeholder.startsWith('claude'))
-    model.placeholder = 'claude-opus-5';
-  const ul = R(blk, 'urllabel');
-  if (ul) ul.textContent = ha ? 'Home Assistant address' : 'base URL';
-  const kl = R(blk, 'keylabel');
-  if (kl) kl.textContent = ha ? 'long-lived access token' : 'API key';
-  const kn = R(blk, 'keynote');
-  if (kn) kn.textContent = ha
-    ? 'Required. Make it a non-admin Home Assistant user of its own: the token carries that user’s permissions and never expires, and every action appears in the logbook as that user whoever spoke. Held on the server, never sent back to a browser; blank keeps the stored one.'
-    : anth
-    ? 'Required. Held on the server, never sent back to a browser. Blank keeps the stored one.'
-    : 'Held on the server, never sent back to a browser. Blank keeps the stored one; a local model needs none.';
+  /* The address, the model and the key are the model profile's now, and are
+     labelled where they live — this used to relabel them here because the
+     endpoint held them. */
 }
 
 function blockPaint(blk, r){
@@ -3750,19 +3693,25 @@ function blockPaint(blk, r){
   blk.querySelectorAll('[data-f="restricted"] button').forEach(b=>
     b.classList.toggle('on', (b.dataset.v === '1') === !!r.restricted));
   blockFillWho(blk, r);
-  blk.querySelectorAll('[data-f="provider"] button').forEach(b=>
-    b.classList.toggle('on', b.dataset.v === r.provider));
-  /* Light the preset the base URL actually corresponds to, rather than
-     whichever was last pressed — after a reload nothing was pressed, and the
-     honest answer is which one you are on. */
-  const u = (r.base_url || '').replace(/\/+$/, '');
-  blk.querySelectorAll('[data-r="preset"] button').forEach(b=>{
-    const pre = BK_PRESETS[b.dataset.v];
-    b.classList.toggle('on', !!pre && pre.provider === r.provider
-                                   && pre.base_url.replace(/\/+$/, '') === u);
-  });
-  const key = F(blk, 'api_key');
-  if (key) key.placeholder = r.has_key ? 'unchanged — a key is stored' : 'none stored';
+  /* The model picker, by profile name. A profile that has been deleted is
+     still offered on the endpoint naming it, marked, rather than silently
+     reading as the default. */
+  const mp = F(blk, 'model_profile');
+  if (mp){
+    const want = r.model_profile || '';
+    const pool = (DPCFG && DPCFG.models) || [];
+    const def = pool.filter(x=> x.id === ((DPCFG && DPCFG.model_default) || ''))[0];
+    mp.innerHTML = '';
+    const opts = [['', def ? 'DEFAULT — ' + def.name : 'DEFAULT']]
+                   .concat(pool.map(x=> [x.id, x.name]));
+    if (want && !pool.some(x=> x.id === want))
+      opts.push([want, 'a profile that no longer exists']);
+    opts.forEach(([v, label])=>{
+      const o = document.createElement('option');
+      o.value = v; o.textContent = label; mp.appendChild(o);
+    });
+    mp.value = want;
+  }
 
   /* Every OTHER endpoint, because falling through to yourself is a loop and
      falling through to a house is asking the thing that just declined. Built
@@ -3805,11 +3754,12 @@ function blockPaint(blk, r){
     voice: (r.greeting ? '“' + r.greeting.slice(0, 28)
                        + (r.greeting.length > 28 ? '…' : '') + '” · ' : 'shared greeting · ')
          + (r.voice || 'shared voice'),
-    conn: r.provider === 'demo' ? 'demo — built-in replies'
-        : r.provider === 'homeassistant'
-        ? 'Home Assistant · ' + (r.agent_id || 'default agent')
-          + (r.has_key ? ' · token stored' : ' · no token')
-        : (r.model || 'no model') + (r.has_key ? ' · key stored' : ''),
+    conn: (()=>{
+      const pool = (DPCFG && DPCFG.models) || [];
+      const p = pool.filter(x=> x.id === (r.model_profile || ''))[0]
+             || pool.filter(x=> x.id === ((DPCFG && DPCFG.model_default) || ''))[0];
+      return p ? p.name : 'no model profile';
+    })(),
     limits: r.provider === 'homeassistant' ? r.timeout + 's'
           : r.max_tokens + ' tokens · '
           + (r.history_turns ? r.history_turns + ' turns' : 'no context') + ' · '
@@ -3850,7 +3800,6 @@ function blockPaint(blk, r){
   };
   set('default', !r.id || r.is_default || r.enabled === false);
   set('enable',  !r.id, r.enabled === false ? 'SWITCH ON' : 'SWITCH OFF');
-  set('forget',  !r.id);
   set('test',    !r.id);
   // always offered: a draft you cannot back out of is a trap
   set('delete',  false, r.id ? 'DELETE' : 'DISCARD');
@@ -3985,8 +3934,9 @@ function blockCollect(blk){
     const el = blk.querySelector('[data-s="' + k + '"]');
     if (el) body[k] = parseFloat(el.value);
   });
-  const prov = blk.querySelector('[data-f="provider"] button.on');
-  body.provider = prov ? prov.dataset.v : 'demo';
+  /* No provider, base URL, model or key here any more: they belong to the
+     model profile. Sending them would publish a stale copy — and reading a
+     control that is gone sent every endpoint back as DEMO. */
   const strict = blk.querySelector('[data-f="strict"] button.on');
   body.strict = !!strict && strict.dataset.v === '1';
   const who = blk.querySelector('[data-f="restricted"] button.on');
@@ -4031,6 +3981,10 @@ function wireBlock(blk){
      is a change rather than an input. */
   blk.addEventListener('change', e=>{
     if (e.target.closest('[data-r="displays"]')) blockSyncWho(blk);
+    /* Which limits and which notes apply is the PROFILE's provider, so
+       choosing a different profile rearranges the block the same way choosing
+       a different provider used to. */
+    if (e.target.closest('[data-f="model_profile"]')) blockSyncProvider(blk);
   });
   blk.addEventListener('input', e=>{
     const f = e.target.closest('[data-f]');
@@ -4058,49 +4012,10 @@ function wireBlock(blk){
     if (h5){ h5.parentNode.classList.toggle('open'); return; }
     const b = e.target.closest('button');
     if (!b) return;
-    const seg = b.closest('.seg[data-f], .seg[data-r="preset"]');
+    const seg = b.closest('.seg[data-f]');
     if (seg){
-      const was = seg.dataset.f === 'provider' ? seg.querySelector('button.on') : null;
-      const from = was ? was.dataset.v : '';
       seg.querySelectorAll('button').forEach(x=> x.classList.toggle('on', x === b));
-      if (seg.dataset.f === 'provider'){
-        /* A base URL and a key belong to a provider, and neither survives a
-           change of one — the server refuses to carry them across, and this
-           panel used to defeat that by sending the field back unchanged with
-           every save. Left alone, an endpoint switched to a hosted provider
-           kept whatever address it had, so a hosted key went to whatever was
-           listening on the old URL: a failure in the one direction that looks
-           like success. Cleared here, visibly, rather than on the server
-           where nobody would see it happen. */
-        if (from && from !== b.dataset.v){
-          const url = F(blk, 'base_url');
-          if (url){
-            url.value = b.dataset.v === 'anthropic' ? 'https://api.anthropic.com'
-                      : b.dataset.v === 'homeassistant' ? ''
-                      : b.dataset.v === 'openai' ? 'http://127.0.0.1:11434/v1' : '';
-            url.dataset.touched = '1';
-          }
-          const key = F(blk, 'api_key');
-          if (key) key.value = '';
-          if (b.dataset.v !== 'demo')
-            blockNote(blk, 'address and key cleared — they belonged to the '
-                         + 'endpoint you just switched away from');
-        }
-        blockSyncProvider(blk);
-      }
       if (seg.dataset.f === 'restricted') blockSyncWho(blk);
-      if (seg.dataset.r === 'preset'){
-        const pre = BK_PRESETS[b.dataset.v];
-        if (pre){
-          F(blk, 'base_url').value = pre.base_url;
-          F(blk, 'keep_alive').value = pre.keep_alive;
-          if (pre.hint) F(blk, 'model').placeholder = pre.hint;
-          blk.querySelectorAll('[data-f="provider"] button').forEach(x=>
-            x.classList.toggle('on', x.dataset.v === pre.provider));
-          blockSyncProvider(blk);
-          blockNote(blk, 'preset filled in — set the model, then SAVE');
-        }
-      }
       return;
     }
     const act = b.dataset.a;
@@ -4168,10 +4083,9 @@ async function blockAction(blk, act, btn){
                  + 'reaching anything immediately, and its key goes with it.')) return;
   }
   const path = {default:'/routes/default', enable:'/routes/enable',
-                delete:'/routes/delete', forget:'/routes/save'}[act];
+                delete:'/routes/delete'}[act];
   if (!path) return;
   const body = act === 'enable' ? {id: rid, enabled: rec.enabled === false}
-             : act === 'forget' ? {id: rid, clear_key: true}
              : {id: rid};
   blockNote(blk, 'working…');
   try{
@@ -4577,6 +4491,11 @@ async function saveDp(body, slot){
     DPCFG = j.settings;
     paintDpSettings();
     await refreshDisplays();
+    /* An endpoint names a model profile, so renaming one, adding one or
+       removing one changes what its picker should be offering. Rebuilt from
+       the settings that just came back rather than left until the AI tab is
+       next opened, where it would be showing a name that no longer exists. */
+    if (RT.routes.length) paintBlocks();
     dpNote('saved', false, slot);
   }catch(e){ dpNote(e.message, true, slot); }
 }

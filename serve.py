@@ -638,6 +638,12 @@ ROUTE_DEFAULTS.update({
     # Which speech profile answers for this route. Blank is the deployment's
     # default, the same rule a device follows.
     "speech": "",
+    # …and which model profile it speaks to. Same rule again, and it has to be
+    # a default rather than an incidental key: read_routes rebuilds each record
+    # from this map, so a field missing here is a field silently dropped on the
+    # next read — and an endpoint that forgot which model it uses is an
+    # endpoint that answers as DEMO without saying why.
+    "model_profile": "",
     "wakeword": "resonance",
     "aliases": [],
     # Exact matching, for routes that DO things rather than answer. The same
@@ -920,15 +926,19 @@ def resolve_route(doc, rid):
     """Which route answers. An id nobody recognises falls back to the default
     rather than failing: a display holding a route that was deleted while it
     was awake should keep working, and the alternative is a screen that has
-    gone quiet for a reason nobody standing in front of it can see."""
+    gone quiet for a reason nobody standing in front of it can see.
+
+    The record comes back with its connection already resolved from the model
+    profile it names — a copy, never the stored record, so nothing downstream
+    can write a profile's credential back into a route."""
     if rid and rid in doc["routes"] and doc["routes"][rid].get("enabled", True):
-        return rid, doc["routes"][rid]
+        return rid, with_model(doc["routes"][rid])
     d = doc["default"]
     if d in doc["routes"] and doc["routes"][d].get("enabled", True):
-        return d, doc["routes"][d]
+        return d, with_model(doc["routes"][d])
     for r in route_order(doc):
         if doc["routes"][r].get("enabled", True):
-            return r, doc["routes"][r]
+            return r, with_model(doc["routes"][r])
     return "", None
 
 
@@ -961,6 +971,19 @@ def validate_route(obj, current, doc, rid=None):
                               "carries the wake word, so two endpoints sharing "
                               "one would answer to the same name" % other)
         rec["speech"] = pid
+    if "model_profile" in obj:
+        mid = str(obj["model_profile"] or "")[:16]
+        if mid and not any(p["id"] == mid
+                           for p in display_settings()["models"]):
+            return None, ("that model profile no longer exists — reload the "
+                          "panel to see the current list")
+        rec["model_profile"] = mid
+        # Sharing one is fine and expected — several endpoints can speak to the
+        # same model. What is NOT kept is the route's own copy of the
+        # connection: a stale key sitting in routes.json reads as live, and
+        # leaves with_model two answers to choose between.
+        for k in MODEL_KEYS:
+            rec[k] = "demo" if k == "provider" else ""
     if not rec["name"]:
         return None, "a route needs a name"
     if "strict" in obj:
@@ -1758,12 +1781,29 @@ def validate_display_settings(obj, current):
         # The panel is never sent a key, so it cannot send one back. A profile
         # arriving without one keeps what is stored rather than blanking it —
         # otherwise every save would forget the credential.
-        stored = {p["id"]: (p.get("values") or {}).get("api_key", "")
-                  for p in cfg["models"]}
+        stored = {p["id"]: dict(p.get("values") or {}) for p in cfg["models"]}
         rows = clean_profiles(obj["models"], "n", MAX_LOOKS)
         for r in rows:
-            if not r["values"].get("api_key") and stored.get(r["id"]):
-                r["values"]["api_key"] = stored[r["id"]]
+            had = stored.get(r["id"]) or {}
+            # Kept only while the provider is the same one. The panel never
+            # shows a key, so it sends none unless you type one — and carrying
+            # the stored one across a provider change would hand Home
+            # Assistant's token to api.anthropic.com, which is the one failure
+            # validate_backend exists to refuse. Same provider, no key typed:
+            # keep it, or every save would forget the credential.
+            if ((r["values"].get("provider") or "demo")
+                    == (had.get("provider") or "demo")
+                    and not r["values"].get("api_key") and had.get("api_key")):
+                r["values"]["api_key"] = had["api_key"]
+            # The same connection check routes used to get. It has to run here
+            # or nowhere now: an endpoint no longer carries a connection to
+            # check, and a profile saved without the key its provider needs
+            # would fail silently, in front of somebody, mid-sentence.
+            base = dict(BACKEND_DEFAULTS)
+            base.update(had)
+            _, err = validate_backend(r["values"], base)
+            if err:
+                return None, "%s: %s" % (r["name"], err)
         cfg["models"] = rows
     for key, prefix in (("motions", "m"), ("speeches", "p")):
         if key not in obj:
@@ -4037,10 +4077,9 @@ class Handler(SimpleHTTPRequestHandler):
             write_routes(doc)
             # The wake word and the adapter kind, and never the key or the
             # URL it points at: a log is read by more people than the panel.
-            print("route %s (%s) saved by %s: wake=%s adapter=%s key=%s"
+            print("route %s (%s) saved by %s: wake=%s model=%s"
                   % (rid, rec["name"], s["user"], rec["wakeword"],
-                     rec["provider"], "set" if rec["api_key"] else "none"),
-                  flush=True)
+                     rec.get("model_profile") or "(default)"), flush=True)
             return self._json(200, {"ok": True, "id": rid,
                                     "routes": admin_routes(doc),
                                     "default": doc["default"]})
@@ -4149,7 +4188,9 @@ class Handler(SimpleHTTPRequestHandler):
             rid = str(obj.get("id") or "")
             if rid not in doc["routes"]:
                 return self._json(404, {"error": "no such route"})
-            rec = doc["routes"][rid]
+            # Resolved the same way /ask resolves it: a test that asked the
+            # route's own fields would be testing something no utterance uses.
+            rec = with_model(doc["routes"][rid])
             if rec["provider"] == "demo":
                 return self._json(200, {"demo": True, "name": rec["name"],
                                         "reply": "", "ms": 0})
@@ -4519,7 +4560,10 @@ class Handler(SimpleHTTPRequestHandler):
                   % (s["user"], "on" if cfg["guest_requests"] else "off",
                      cfg["max_displays"], cfg["max_pending"], cfg["guest_days"],
                      len(cfg["form"])), flush=True)
-            return self._json(200, {"ok": True, "settings": cfg,
+            # Read back rather than echoed: `cfg` is what went to disk, keys
+            # and all, and the panel is never sent one. The save response was
+            # the one path that would have handed them back.
+            return self._json(200, {"ok": True, "settings": panel_settings(),
                                     "displays": admin_displays()})
 
         if parsed.path == "/displays/decide":
@@ -5056,7 +5100,10 @@ def main():
     # rather than silently on the first question anybody asks.
     _doc = read_routes()
     for _rid in route_order(_doc):
-        _r = _doc["routes"][_rid]
+        # Resolved through the model profile, like every other reader: printing
+        # the route's own fields would have shown DEMO for everything the
+        # moment those fields stopped being kept.
+        _r = with_model(_doc["routes"][_rid])
         print("route %-10s “%s”%s%s%s" % (
             _r["name"], _r["wakeword"],
             "" if _r["provider"] == "demo" else

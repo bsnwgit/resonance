@@ -566,7 +566,8 @@ thing they belong to.
 `settings.json` is served to anything that can reach the display port. That is
 deliberate — the display is built from it, and the browser needs it to render
 and to match wake words. It holds no credential: API keys, tokens and upstream
-addresses are in `backend.json`, which no browser ever sees.
+addresses live with the model profiles in `displays.json`, which no browser
+ever sees — the panel is told only whether a profile has a key.
 
 **The network is still the stronger boundary.** In order of
 effect:
@@ -605,12 +606,12 @@ what the server will answer, not in what the page carries.
 | File | Holds | Visible to |
 |---|---|---|
 | `settings.json` | the shared interface settings | everyone — the display is built from it |
-| `routes.json` | every AI endpoint, including its API key | admin only, mode 600 |
+| `routes.json` | every AI endpoint, and which model profile it names | admin only, mode 600 |
 | `users.json` | accounts and password hashes | nobody over HTTP |
 | `app.json` | ports, binding and session lifetime | admin only |
 | `backend.json` | the single assistant this server had before endpoints | read once, at the migration, then never again |
 | `embeds.json` | embed keys, hashed, and what each one grants | admin only, mode 600 |
-| `displays.json` | every display, its token hashed, and whether it is approved | admin only, mode 600 |
+| `displays.json` | every display, its token hashed, whether it is approved, and the profiles — including the model profiles' API keys | admin only, mode 600 |
 
 **Two things live outside this directory.** Piper voices are in `voices/`, and
 the transcription models are cached by faster-whisper under
