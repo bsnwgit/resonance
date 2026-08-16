@@ -125,14 +125,23 @@ A display is one device — a screen on a wall, a TV, a laptop, somebody's phone
 — as distinct from a browser tab somebody opened. Anything with a browser and a
 microphone counts.
 
-The DEVICES tab holds four topics:
+The DEVICES tab holds six topics:
+
+| | |
+|---|---|
+| | left | middle | right |
+|---|---|---|---|
+| **top** | Requested Access | Created Access | Screensaver profiles |
+| **bottom** | The request form | Connected devices | Appearance profiles |
 
 | | |
 |---|---|
 | **Requested Access** | whether a general user needs approval at all, and what a grant to one is worth once given |
+| **The request form** | what a request asks for, under the setting that decides whether anyone is asked at all |
 | **Created Access** | the queue: everything waiting on a decision, on a code being typed in, or on somebody asking again — and where you add one |
 | **Connected devices** | everything that is simply working, most recently heard from first |
-| **The request form** | what a request asks for |
+| **Screensaver profiles** | what a screen on a wall does when nobody is there |
+| **Appearance profiles** | what a place looks like, for the handful of values that cannot be shared |
 
 Created Access and Connected devices are separate lists on purpose. One is a to-do list and empties as
 you work through it; the other is a register you read when somebody asks what
@@ -192,6 +201,187 @@ would be a word on a row rather than a thing that happened.
 laptop can open the page on their phone and ask again from a clean row. That is
 what device identity is — anything stronger needs an identity that person
 carries, which is what a dedicated URL will be.
+
+### On a wall
+
+Most rows in a real deployment are not on a wall — a guest's laptop, somebody's
+phone — so it is one tick that turns the rest of it on. Tick **On a wall** on a
+device and three controls appear: whether it is voice only, which appearance
+profile it uses, and which screensaver profile. Untick it and the screen goes
+back to being an ordinary page, with all three kept: putting the device back up
+restores what you chose.
+
+**A wall is voice only and speak only from the moment you tick it.** Both
+follow from what the thing is rather than being two more boxes to find:
+
+- **No text box.** Voice only arrives already ticked. Untick it for the case
+  that wants a transcript — a television in a meeting room, a screen somebody
+  reads — but the default is the geometry alone.
+- **No keyboard.** Push-to-talk holds the SPACE bar, and a tablet bolted to a
+  wall has no space bar. So a wall is always in the listening mode, and the
+  SPACE button is removed from that screen rather than left there. This is also
+  what makes the wake word real: the gate is inactive in push-to-talk, so on a
+  wall the name is the way in.
+
+TALK and AUDIO stay. A browser will not open a microphone unless somebody asks
+it to, so TALK is pressed once when the screen is commissioned and the wake word
+carries it from there.
+
+**And it goes full screen on the first touch.** An address bar, a tab strip and
+somebody's bookmarks across the top of a hallway screen is a browser that
+happens to be running a display. The page cannot remove that chrome — no page
+can — but it can ask to be shown full screen, and a browser grants that off a
+gesture, which is why it happens on a touch rather than on load.
+
+Only on a wall. A tab you opened is yours, and a page that went full screen the
+moment you clicked it would be a page you never opened twice.
+
+**It does not fight you.** Press Escape and it stays out for a minute, because
+somebody leaving full screen is nearly always the person installing the screen
+wanting the address bar back — and asking again on their next tap would make it
+unusable exactly while they are working on it. After that minute a wall goes
+back to being a wall.
+
+Neither changes what this server will answer. This is entirely what the screen
+looks like.
+
+**Voice only** is the geometry alone: no transcript and no composer. That is
+what a screen in a hallway wants. It is not a workstation, and a page of
+scrolling text on a wall is neither useful nor discreet.
+
+This is the one setting that **beats the viewer's own control.** The three
+buttons in the bar were built to override the shared settings deliberately,
+because somebody standing in front of a screen knows better than a document
+does. This is the exception: it is a policy for a *place* rather than the
+preference of whoever walked past last. Where it applies, the TEXT button is
+**removed from that screen rather than disabled** — a control that is present
+and ignores you is worse than one that was never offered. What it does not do
+is overwrite anyone's stored choice, so a tablet taken off the wall and used as
+an ordinary tab gets that person's own setting back.
+
+TALK, AUDIO and SPACE stay. A browser will not open a microphone without
+somebody asking it to, so a display with no TALK button is a display that could
+never hear its own wake word. Voice only means no text, not no controls.
+
+**It says what to say to it.** A screen on a wall is walked past by people who
+have never used it, and nothing about a silent figure suggests that it listens.
+So a wall display carries one dim line low in the frame — *say “kitchen”*, in
+whatever the wake words actually are. It is there only while nobody is talking
+to it, only where a wake word exists, and never on a browser tab: somebody who
+opened the page did so on purpose.
+
+While the screensaver drifts, that line is **drawn into the picture** and moves
+with it. Taking it away would lose it for exactly the person it is for — who
+walks up to a screen that has been idle for hours — and leaving it where it was
+would be the one thing on a drifting screen that never moved.
+
+**Both profiles are chosen from lists set centrally**, under *Appearance
+profiles* and *Screensaver profiles*. All three settings are deliberately
+separate axes: a wall screen can be voice only without ever drifting, a shared
+television can drift while still showing its transcript, and a laptop can be
+given larger type without being told to do either.
+
+### Appearance profiles
+
+The LOOK tab is **one document for everybody**, and that is right for almost
+all of it — tune the bloom once and every screen in the building gets it. It is
+wrong for exactly four values.
+
+A screen in a hallway is read from three metres. A laptop is read from fifty
+centimetres. One type size cannot be right for both, and neither can one
+layout: a wall wants the figure filling the frame, a desk wants room for the
+transcript beside it. So four values become a profile that a device names:
+
+| | |
+| --- | --- |
+| **Type size** | NORMAL, LARGER, LARGEST — the range the LOOK tab offers |
+| **Palette** | which of the five |
+| **Layout** | HERO, or FULL BLEED for a screen that is mostly being looked at |
+| **Figure** | STACK, DISC, ORB or KNOT |
+
+Everything else stays shared. That is the point of the shortlist rather than
+"override anything": a per-place setting that could cover the whole document
+would quietly end the ability to change something once for everyone.
+
+**A device that names no profile shows what the LOOK tab says**, which is what
+every display did before this existed. Deleting a profile puts every device
+that named it back to that, rather than to nothing — so the fall-back is always
+a working appearance.
+
+**PREVIEW** lays a profile over the live preview without saving it, and follows
+the controls as you change them. STOP puts the shared document back, and so
+does touching anything on LOOK, MOTION or SPEECH.
+
+One limit worth knowing before a screen goes up: **type size tops out at
+LARGEST**, because that is the range the LOOK tab offers. If that is not enough
+at three metres, the range itself is the thing to change.
+
+### Screensaver profiles
+
+A tablet showing a mostly-stationary figure for years will burn it into the
+panel. The usual answer replaces the screen with something else. This one keeps
+the same face — every appearance setting still applied — and moves it.
+
+**Set them once, pick them per device.** A deployment has a handful of *kinds*
+of place — a hallway, a bedroom, a shop floor — not one setting per screen.
+Change **night** and every screen using it changes together. The alternative is
+twelve rows quietly drifting out of step with each other and nothing on screen
+telling you which had.
+
+Up to eight profiles, each a name and three numbers:
+
+| | what it does |
+| --- | --- |
+| **Idle seconds** | how long with nobody speaking to it and nobody touching it. **0 never starts**, which is how you park a profile without deleting it and unpicking every device that names it |
+| **Shrinks to %** | how far down it scales first. Shrinking is what creates the margin to move within: drawn edge to edge there is nowhere to go, and moving it would only clip the sides |
+| **Dims by %** | how much light comes off it while it drifts |
+| **Dark from / until** | the hours a dim runs regardless of anybody being there. Set them the same for no dark window; a start later than an end wraps midnight, so **22:00** to **07:00** is what you mean |
+| **Dark by %** | how much light comes off it during those hours |
+
+Four things worth knowing about the behaviour:
+
+- **It scales down, then drifts** — slowly and continuously rather than bouncing
+  between corners. It covers more of the panel over a night that way, and it is
+  calmer to share a room with. The travel is exactly the margin the shrink
+  bought, so nothing is ever cut off, and the path does not repeat: two nights
+  running do not light the same pixels in the same order.
+- **Dark hours are a different question from the idle delay**, and that is why
+  they are both here. Idle asks whether anybody has been here recently; only a
+  clock keeps a hallway dark after somebody walks past it at three in the
+  morning. The two dims never add up — whichever is darker at that moment wins,
+  so a screen already drifting at night does not go past black. The hours are
+  read off **the device's own clock**, not the server's, so a building with
+  screens in two time zones has each of them dark at its own two in the morning.
+- **The dim does more than the movement does.** Reducing brightness is the
+  strongest thing available against burn-in, and it is independently what a
+  screen in a hallway should do at two in the morning. It is not the same as
+  switching the screen off: you can still see across a room that it is working.
+- **It ends on the wake word or on a touch**, easing back to the centre rather
+  than snapping. On a voice-only display touch is the only signal that is not
+  speech, so it has to count. The transcript, the composer and the status line
+  hide while it drifts — text sliding around a screen is worse than either state
+  on its own — and they come back the instant you touch it. It also never starts
+  while an answer is being thought about or spoken.
+- **A device is never told the list.** It is handed the three numbers of the
+  profile it uses and nothing else. The list of names is a description of a
+  building, and no screen has any use for the names of places it is not in.
+
+**PREVIEW tries a profile without saving it.** Nobody can pick a scale and a
+dim by reading two numbers, and nobody should have to stand in front of a screen
+waiting out three minutes of idle to find out what they chose. It drives the
+live preview on the right; SAVE is what gives it to the devices that name it.
+
+**Deleting a profile clears it from every device that named it**, the same way
+deleting a display clears it from every endpoint that named that. A setting
+pointing at something nobody can see is a setting nobody can change.
+
+**When a device picks a change up.** One still waiting on a decision is asking
+this server every twenty seconds and takes it within seconds. One that is
+already working has nothing left to ask about, so it takes it the next time its
+page loads — reload it on the screen, or use OPEN DISPLAY here. Making a working
+screen poll continuously for a setting that changes twice a year would be the
+wrong trade.
+
 
 ### The settings above the list
 

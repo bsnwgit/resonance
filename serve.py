@@ -1111,7 +1111,107 @@ DISPLAY_DEFAULTS = {
     # phone is a new row with a fresh ask. Anything stronger needs an identity,
     # which is what a dedicated URL is for.
     "deny_repeat": True,
+    # ---- what makes this one a wall display rather than a browser tab ----
+    #
+    # Is this device ON A WALL? Most rows in a real deployment are not: a
+    # guest's laptop and a phone are displays too, and neither wants any of
+    # this. So it is one tick that turns the rest of it on, and while it is off
+    # the two settings below are stored and not applied — untick it, the screen
+    # goes back to being an ordinary page, tick it again and what you chose is
+    # still there.
+    "wall": False,
+    # Voice only: the geometry alone, no transcript and no composer. It is the
+    # one setting that OUTRANKS the viewer's own control, because a hallway is
+    # not a workstation and a screen of scrolling text in one is neither useful
+    # nor discreet. Where it applies the TEXT button is removed rather than
+    # disabled — a control that is present and ignores you is worse than one
+    # that was never offered.
+    #
+    # PER DEVICE rather than part of a screensaver profile, because they are
+    # separate axes: a wall screen can be voice only without ever drifting, and
+    # a shared television can drift while still showing its transcript.
+    #
+    # ON BY DEFAULT, which is safe precisely because `wall` gates it: a row
+    # that is not on a wall carries this and does not apply it. What it buys is
+    # that ticking "on a wall" is one gesture rather than two — a screen bolted
+    # to a wall is voice only unless somebody says otherwise, which is the way
+    # round that matches what the thing is for.
+    "voice_only": True,
+    # …and WHICH SCREENSAVER, by the id of a profile in the settings below.
+    # Empty is none, and none is the default: an upgrade that quietly started
+    # moving every screen in a building would be this deciding something nobody
+    # asked it to — the same rule that made ANY DISPLAY the default on a route.
+    #
+    # An ID rather than the numbers themselves. That is the whole point of a
+    # profile: change *night* once and every screen using it changes together,
+    # instead of twelve rows drifting out of step with each other and no way to
+    # see which had. It is also why renaming a profile cannot orphan anything.
+    "saver": "",
+    # …and WHICH APPEARANCE, by the id of a profile in the settings below.
+    # Empty means whatever the shared document says, which is what every screen
+    # got before this existed and is a working appearance rather than a blank
+    # one — so a deleted profile falls back to it rather than to nothing.
+    "look": "",
 }
+
+#: How many screensaver profiles may exist. A deployment has a handful of
+#: KINDS of place — a hallway, a bedroom, a shop floor — not one per screen. A
+#: list long enough to need scrolling is a list somebody has stopped curating.
+MAX_SAVERS = 8
+#: (low, high) for the three numbers in a profile. `delay` takes 0 as well and
+#: means the profile never starts, which is how you park one without deleting
+#: it and unpicking every device that names it.
+SAVER_LIMITS = {"delay": (15, 24 * 3600),
+                # Under a third of the frame is a postage stamp somebody has to
+                # walk up to; over nine tenths there is no margin left to drift
+                # within and the shrink has bought nothing.
+                "scale": (30, 90),
+                # Not 100: a screen dimmed the whole way is switched off, and
+                # switching a screen off is a different feature with different
+                # consequences — you cannot see that it is still working.
+                "dim": (0, 85),
+                # ---- and the same again, on a clock ----
+                # A hallway at two in the morning should be dark whether or not
+                # anybody has just walked past it, which the idle dim above
+                # cannot express: somebody walking by at 3am wakes the screen to
+                # full brightness for the rest of the night.
+                #
+                # The hours the dark runs between. EQUAL MEANS OFF — one field
+                # cannot say "no window" on its own, and a separate switch to
+                # say it would be a third control for a thing two already
+                # imply. A `from` later than `to` wraps midnight, which is the
+                # ordinary case rather than the exception.
+                "night_from": (0, 23), "night_to": (0, 23),
+                "night_dim": (0, 85)}
+#: What a device gets when it names no profile, or names one that has since
+#: been deleted. Off, in both cases, and deliberately the same answer: a screen
+#: pointing at a profile nobody can see any more must not keep drifting to
+#: numbers that exist nowhere in the panel.
+SAVER_OFF = {"delay": 0, "scale": 70, "dim": 45,
+             "night_from": 0, "night_to": 0, "night_dim": 0}
+
+#: The appearance a PLACE overrides, and the whole of it. Everything else on
+#: LOOK, MOTION and SPEECH stays in the one shared document, so tuning the
+#: bloom once still reaches every screen in the building — which is the point
+#: of a shared document and the thing a per-place override quietly destroys if
+#: it is allowed to cover everything.
+#:
+#: These four are the ones that actually differ between a hallway read at three
+#: metres and a laptop at fifty centimetres: how big the type is, how bright it
+#: is, whether the figure fills the frame, and which figure it is.
+#:
+#: Validated against the values the panel offers rather than stored as typed. A
+#: palette name that is not a palette is not a screen that looks wrong, it is
+#: `PALETTES[S.palette].ink` throwing once per frame forever.
+LOOK_VALUES = {
+    "fs":      ("1", "1.12", "1.25"),
+    "palette": ("blue", "milk", "ice", "amber", "bone"),
+    "layout":  ("hero", "bleed"),
+    "mode":    ("stack", "disc", "orb", "knot"),
+}
+#: How many appearance profiles may exist — the same reasoning and the same
+#: number as the screensavers. A place, not a screen.
+MAX_LOOKS = 8
 
 #: The displays document's own settings, as opposed to the rows in it. Set in
 #: the panel, and none of them needs a restart.
@@ -1144,6 +1244,18 @@ DISPLAY_SETTINGS = {
     # box for a reason somebody needs a paragraph to give. Empty means nobody
     # has built one yet.
     "form": [],
+    # The appearance profiles, each {id, name, fs, palette, layout, mode}.
+    # A place — a hallway, a shop floor — not a screen, and named from a device
+    # exactly as a screensaver is. Its own list rather than a field on the
+    # screensaver profile, because the two are different axes: day and night in
+    # one hallway share an appearance and differ only in the dim, and a laptop
+    # can want larger type without being told to drift.
+    "looks": [],
+    # The screensaver profiles, each {id, name, delay, scale, dim}. CENTRAL,
+    # and named from a device rather than copied into it — see the `saver`
+    # field on a row. A deployment has a handful of kinds of place, and the
+    # numbers that suit a hallway suit every hallway in the building.
+    "savers": [],
 }
 MAX_FORM_FIELDS = 5
 #: (low, high) for each number the panel can set
@@ -1192,6 +1304,91 @@ def clean_form(raw):
     return out
 
 
+def clean_savers(raw):
+    """The screensaver profiles, sanitised, in the order the panel put them.
+
+    An id is minted for a profile that arrives without one, and kept for every
+    profile that has one — a device names a profile by id, so a rename must not
+    orphan it and a reorder must not silently move a screen onto somebody
+    else's numbers. Duplicate ids are re-minted for the same reason: two rows
+    claiming the same id is one row nobody can point at."""
+    out, seen = [], set()
+    for s in (raw or [])[:MAX_SAVERS]:
+        if not isinstance(s, dict):
+            continue
+        name = str(s.get("name") or "").strip()[:40]
+        if not name:
+            continue                     # a profile with no name is unpickable
+        sid = str(s.get("id") or "")[:16]
+        if not sid or sid in seen:
+            sid = "s" + secrets.token_hex(4)
+        seen.add(sid)
+        row = {"id": sid, "name": name}
+        for k, (lo, hi) in SAVER_LIMITS.items():
+            try:
+                v = int(s.get(k, SAVER_OFF[k]))
+            except (TypeError, ValueError):
+                v = SAVER_OFF[k]
+            row[k] = 0 if (k == "delay" and v <= 0) else min(hi, max(lo, v))
+        # A window of zero length is no window, however it was written.
+        if row["night_from"] == row["night_to"]:
+            row["night_dim"] = 0
+        out.append(row)
+    return out
+
+
+def clean_looks(raw):
+    """The appearance profiles, sanitised. Same id discipline as the
+    screensavers — see clean_savers — and every value checked against the list
+    the panel offers, with anything unrecognised falling back to the first
+    entry rather than being dropped: a profile missing a field is one the
+    display has to guess about, and the panel would draw an empty select."""
+    out, seen = [], set()
+    for s in (raw or [])[:MAX_LOOKS]:
+        if not isinstance(s, dict):
+            continue
+        name = str(s.get("name") or "").strip()[:40]
+        if not name:
+            continue
+        lid = str(s.get("id") or "")[:16]
+        if not lid or lid in seen:
+            lid = "l" + secrets.token_hex(4)
+        seen.add(lid)
+        row = {"id": lid, "name": name}
+        for k, allowed in LOOK_VALUES.items():
+            v = str(s.get(k, ""))
+            row[k] = v if v in allowed else allowed[0]
+        out.append(row)
+    return out
+
+
+def find_look(lid, looks=None):
+    """The appearance a row names, or None for "whatever everybody gets".
+
+    None where it names nothing and None where it names one that has been
+    deleted — the same fail-quiet as a missing screensaver, and here it means
+    the screen falls back to the shared document, which is a working
+    appearance rather than a blank one."""
+    if not lid:
+        return None
+    for s in (looks if looks is not None else display_settings()["looks"]):
+        if s["id"] == lid:
+            return {k: s[k] for k in LOOK_VALUES}
+    return None
+
+
+def find_saver(sid, savers=None):
+    """The profile a row names, resolved to numbers. Off where it names none,
+    and off where it names one that has been deleted — a screen must not go on
+    drifting to a profile nobody can find in the panel to change."""
+    if not sid:
+        return dict(SAVER_OFF)
+    for s in (savers if savers is not None else display_settings()["savers"]):
+        if s["id"] == sid:
+            return {k: s[k] for k in SAVER_OFF}
+    return dict(SAVER_OFF)
+
+
 def display_settings():
     """Kept beside the displays rather than in the shared settings document,
     which is world readable and belongs to the interface. Who may ask this
@@ -1207,6 +1404,8 @@ def display_settings():
             cfg[k] = DISPLAY_SETTINGS[k]
     cfg["guest_requests"] = bool(cfg["guest_requests"])
     cfg["form"] = clean_form(cfg.get("form"))
+    cfg["savers"] = clean_savers(cfg.get("savers"))
+    cfg["looks"] = clean_looks(cfg.get("looks"))
     return cfg
 
 
@@ -1244,6 +1443,53 @@ def validate_display_settings(obj, current):
             if isinstance(f, dict) and not str(f.get("label") or "").strip():
                 return None, "every field needs a label — it is what somebody reads"
         cfg["form"] = clean_form(obj["form"])
+    if "savers" in obj:
+        if not isinstance(obj["savers"], (list, tuple)):
+            return None, "the screensaver profiles must be a list"
+        if len(obj["savers"]) > MAX_SAVERS:
+            return None, "there is room for %d screensaver profiles" % MAX_SAVERS
+        for s in obj["savers"]:
+            if not isinstance(s, dict):
+                return None, "a screensaver profile must be a set of fields"
+            if not str(s.get("name") or "").strip():
+                return None, ("every profile needs a name — it is what you pick "
+                              "on a device")
+            # Refused rather than clamped, because this is somebody typing a
+            # number and pressing save: quietly storing 90 where they asked for
+            # 900 is the panel lying about what it did. clean_savers clamps
+            # instead, and it is reading a file rather than answering a person.
+            for k, (lo, hi) in SAVER_LIMITS.items():
+                if k not in s:
+                    continue
+                try:
+                    v = int(s[k])
+                except (TypeError, ValueError):
+                    return None, "%s must be a whole number" % k
+                if k == "delay" and v <= 0:
+                    continue             # never starts, which is a real answer
+                if not (lo <= v <= hi):
+                    return None, ("%s must be between %d and %d" % (k, lo, hi)
+                                  + (" — or 0 for never" if k == "delay" else "")
+                                  + (" (an hour of the day)"
+                                     if k.startswith("night_") and k != "night_dim"
+                                     else ""))
+        cfg["savers"] = clean_savers(obj["savers"])
+    if "looks" in obj:
+        if not isinstance(obj["looks"], (list, tuple)):
+            return None, "the appearance profiles must be a list"
+        if len(obj["looks"]) > MAX_LOOKS:
+            return None, "there is room for %d appearance profiles" % MAX_LOOKS
+        for s in obj["looks"]:
+            if not isinstance(s, dict):
+                return None, "an appearance profile must be a set of fields"
+            if not str(s.get("name") or "").strip():
+                return None, ("every profile needs a name — it is what you pick "
+                              "on a device")
+            for k, allowed in LOOK_VALUES.items():
+                if k in s and str(s[k]) not in allowed:
+                    return None, ("%s must be one of: %s"
+                                  % (k, ", ".join(allowed)))
+        cfg["looks"] = clean_looks(obj["looks"])
     if "guest_requests" in obj:
         cfg["guest_requests"] = bool(obj["guest_requests"])
     return cfg, None
@@ -1303,6 +1549,59 @@ def display_label(rec):
         if a.get("value"):
             return str(a["value"])[:40]
     return "unnamed display"
+
+
+WALL_FIELDS = ("wall", "voice_only", "saver", "look")
+
+
+def wall_of(rec, savers=None, looks=None):
+    """What the place this display sits in looks like, resolved and clamped:
+    whether the transcript is there at all, and the numbers of the screensaver
+    profile this row names.
+
+    Resolved HERE rather than on the display, so a browser is handed three
+    numbers and never the list of profiles. That list is a description of a
+    building — *hallway*, *ward*, *shop floor* — and no display has any use for
+    the names of places it is not in.
+
+    Everything is off where the row is not on a wall. The two settings stay
+    stored, so unticking is not the same as forgetting: a device taken down and
+    put back up comes back as what it was."""
+    if not rec.get("wall"):
+        return {"wall": False, "voice_only": False, "look": None,
+                "saver": dict(SAVER_OFF)}
+    # `wall` is published in its own right and not merely implied by the
+    # settings under it, because being on a wall means things none of them
+    # covers — a rig instrument in the corner of a hallway screen is the first.
+    return {"wall": True, "voice_only": bool(rec.get("voice_only")),
+            "look": find_look(str(rec.get("look") or ""), looks),
+            "saver": find_saver(str(rec.get("saver") or ""), savers)}
+
+
+def validate_wall(obj, rec, savers, looks):
+    """Returns (the three fields, error). Separate from
+    validate_display_settings for the same reason the panel has a SAVE per
+    block: these belong to one screen, those to the deployment, and one commit
+    writing both would publish an edit somebody was halfway through."""
+    out = {k: rec.get(k, DISPLAY_DEFAULTS[k]) for k in WALL_FIELDS}
+    if "wall" in obj:
+        out["wall"] = bool(obj["wall"])
+    if "voice_only" in obj:
+        out["voice_only"] = bool(obj["voice_only"])
+    # Named and gone is an ERROR here, where it is merely a fall-back in
+    # wall_of. The two are not inconsistent: a screen must fail quiet, and a
+    # person pressing save must be told, or a panel left open while somebody
+    # else deleted a profile silently sets a device to nothing.
+    for key, pool, what in (("saver", savers, "screensaver"),
+                            ("look", looks, "appearance")):
+        if key not in obj:
+            continue
+        pid = str(obj[key] or "")[:16]
+        if pid and not any(p["id"] == pid for p in pool):
+            return None, ("that %s profile no longer exists — reload the panel "
+                          "to see the current list" % what)
+        out[key] = pid
+    return out, None
 
 
 def find_display(token):
@@ -1601,6 +1900,10 @@ def admin_displays():
                 "approved_by", "approved_at", "answers", "requested_at",
                 "expires", "renewals", "denied", "deny_reason", "deny_note",
                 "deny_repeat")}
+        # The row's own three fields, NOT the resolved numbers: the panel is
+        # editing what this device names, and the numbers behind that name are
+        # on the profile where they can be changed once for every screen.
+        row.update({k: rec.get(k, DISPLAY_DEFAULTS[k]) for k in WALL_FIELDS})
         ref = _display_refusals.get(did)
         live = bool(rec.get("code")) and (rec.get("code_expires") or 0) > now_
         row.update(id=did, label=display_label(rec),
@@ -2387,7 +2690,7 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      # /displays, one letter and a whole boundary apart.
                      "/displays", "/displays/approve", "/displays/rename",
                      "/displays/delete", "/displays/new", "/displays/reissue",
-                     "/displays/decide", "/displays/settings",
+                     "/displays/decide", "/displays/settings", "/displays/wall",
                      "/groups", "/groups/save", "/groups/delete")
 #: where an enrolment code is typed. On the display listeners only — it hands
 #: out a display's token, and the admin listener is not a display.
@@ -2608,7 +2911,14 @@ class Handler(SimpleHTTPRequestHandler):
                # already on the row, and making somebody retype it every month
                # is how a form stops being answered honestly.
                "answered": bool(rec.get("answers")),
-               "renewals": rec.get("renewals") or 0}
+               "renewals": rec.get("renewals") or 0,
+               # …and what this place looks like. Sent whatever the state is:
+               # a tablet nobody has approved yet is still a tablet on a wall,
+               # and the panel that has not been opened is exactly the case
+               # where a screen sits burning an image into itself. It is also
+               # this display's own row and nobody else's, so there is nothing
+               # here to leak — it went out through the token that asked.
+               "wall": wall_of(rec)}
         if may_ask:
             out["form"] = cfg["form"]
         if rec.get("denied"):
@@ -2672,6 +2982,17 @@ class Handler(SimpleHTTPRequestHandler):
         # the honest answer, because on this listener it genuinely is not.
         if not self.admin_port and (path in ADMIN_ONLY_FILES
                                     or path in ADMIN_ONLY_ROUTES
+                                    # A PREFIX, not a list, and it is the list
+                                    # above that is the belt. Adding
+                                    # /displays/wall and forgetting to name it
+                                    # there left one admin route answering 401
+                                    # on a listener where every one of its
+                                    # siblings answers 404 — which is the route
+                                    # announcing it exists. The next one added
+                                    # is covered whether anybody remembers or
+                                    # not. `/display/hello` is one letter and a
+                                    # whole boundary away, and unaffected.
+                                    or path.startswith("/displays/")
                                     or path.startswith("/auth/")
                                     or path == "/docs"
                                     or path.startswith("/docs/")):
@@ -3655,6 +3976,25 @@ class Handler(SimpleHTTPRequestHandler):
                     "Make an endpoint that is open to any display the default "
                     "first."})
             write_display_settings(cfg)
+            # A device pointing at a profile that has just been deleted is a
+            # setting nobody can see and nobody can change — the same fault as
+            # an allow-list naming a display that no longer exists, and cleared
+            # the same way. wall_of already fails it off, so nothing was ever
+            # drifting to numbers that had gone; this is so the panel says so.
+            displays = read_displays()
+            touched = 0
+            for key, what in (("saver", "screensaver"), ("look", "appearance")):
+                live = {p["id"] for p in cfg[key + "s"]}
+                gone = [d for d, r in displays.items()
+                        if r.get(key) and r[key] not in live]
+                for d in gone:
+                    displays[d][key] = ""
+                if gone:
+                    touched += len(gone)
+                    print("%s profile deleted — cleared from %d device(s)"
+                          % (what, len(gone)), flush=True)
+            if touched:
+                write_displays(displays)
             print("display settings saved by %s: requests=%s max=%d "
                   "pending=%d guest=%dd form=%d field(s)"
                   % (s["user"], "on" if cfg["guest_requests"] else "off",
@@ -3780,6 +4120,32 @@ class Handler(SimpleHTTPRequestHandler):
                      "approved" if on else "approval withdrawn", s["user"]),
                   flush=True)
             return self._json(200, {"ok": True, "displays": admin_displays()})
+
+        if parsed.path == "/displays/wall":
+            # What this screen looks like where it hangs. Its own endpoint
+            # rather than a field on rename, because they are saved by
+            # different gestures at different moments: a name is typed once
+            # when a device arrives, and these are tuned while watching a
+            # preview move.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            did = str(obj.get("id") or "")
+            displays = read_displays()
+            if did not in displays:
+                return self._json(404, {"error": "no such display"})
+            cfg = display_settings()
+            fields, err = validate_wall(obj, displays[did],
+                                        cfg["savers"], cfg["looks"])
+            if err:
+                return self._json(400, {"error": err})
+            displays[did].update(fields)
+            write_displays(displays)
+            return self._json(200, {"ok": True, "id": did,
+                                    "displays": admin_displays()})
 
         if parsed.path == "/displays/rename":
             s = self._require("admin")

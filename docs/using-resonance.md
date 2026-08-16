@@ -63,6 +63,50 @@ Hides the transcript and gives the space to the figure. The conversation still
 happens — this only affects what is on screen. Turn it off for a display that
 is mostly being looked at rather than read.
 
+**On some screens this button is not there.** A display mounted on a wall is
+voice only, and then there is no transcript and no typing on that screen at all
+— only the figure and your voice. The button is taken away rather than left
+there refusing you, because a control that ignores you is worse than one that
+was never offered.
+
+**A wall screen has no SPACE button either.** Holding the space bar is a way of
+talking to it that assumes a keyboard, and a screen on a wall does not have one.
+Those screens always listen, so you say the wake word instead — which is what
+the line low on the screen is telling you.
+
+**A wall screen fills the display when you touch it.** The browser's own bars
+disappear and the figure takes the whole panel. If you need them back — to read
+the address, or to reload — press Escape, and they stay for a minute before it
+goes full screen again.
+
+## What to say to it
+
+A screen on a wall shows one dim line near the bottom: **say “kitchen”**, or
+whatever it has been named. That is the whole instruction. Say it, wait for the
+figure to react, then ask your question.
+
+The line is not there while you are talking to it — the answer is more use than
+the instruction — and it comes back when the conversation ends. If the screen
+has drifted into its screensaver, the line has drifted with it and is sitting
+under the figure wherever that has got to.
+
+## When the screen shrinks and dims
+
+Leave a display alone for long enough and the figure gets smaller, dims, and
+begins to drift slowly around the screen. Nothing is wrong: this is the
+screensaver, and it is the same picture with the same settings, moved.
+
+Screens that show the same bright shape in the same place for years end up
+keeping a ghost of it permanently. Making it smaller, darker and slowly moving
+is what prevents that. It is also simply what a screen in a hallway should be
+doing in the middle of the night.
+
+**Say the wake word or touch the screen and it comes straight back**, easing
+back to the middle rather than snapping. The transcript and the buttons return
+the moment you touch it. It will not start while it is thinking about an answer
+or speaking one, and if nothing happens when you leave a screen alone, then
+whoever runs it has not switched it on for that display.
+
 ## Typing instead of talking
 
 The field along the bottom takes typed questions. Press Enter to send. Talking

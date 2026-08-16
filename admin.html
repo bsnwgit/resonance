@@ -600,6 +600,57 @@
     border:1px solid rgba(var(--glass),.16);outline:0;
   }
   .cols2 input:focus{border-color:var(--hue-dim)}
+  /* An appearance profile picks from lists rather than typing numbers, so the
+     column has to hold a select the same way it holds a field. */
+  .cols2 select{
+    width:100%;margin-top:auto;padding:5px 6px;font:inherit;
+    font-size:calc(9.5px * var(--fs));letter-spacing:.06em;
+    background:rgba(0,0,0,.6);color:var(--text);
+    border:1px solid rgba(var(--glass),.16);outline:0;
+  }
+  .cols2 select:focus{border-color:var(--hue-dim)}
+  /* What a device looks like where it hangs, inside its own row. Set off by a
+     rule rather than a box: it is the one part of a row that is a SETTING
+     somebody changes rather than a fact about the device they are reading, and
+     it wants to be told apart from the lines above it at a glance. */
+  .wall{margin:9px 0 2px;padding-top:8px;
+        border-top:1px solid rgba(var(--glass),.10)}
+  .wall .vo{display:flex;align-items:center;gap:7px;margin:4px 0 2px;
+            font-size:calc(9px * var(--fs));letter-spacing:.06em;
+            color:rgba(var(--paper),.8);cursor:pointer}
+  .wall .vo.hd{color:rgba(var(--paper),.96);letter-spacing:.1em}
+  .wall .vo input{flex:0 0 auto}
+  /* Everything a wall setting implies, revealed by the tick above it. Most
+     rows in a real deployment are a laptop or a phone; three controls that do
+     not apply to them, on every one of fifty rows, is a register nobody reads.
+     Indented under the tick that turns it on, so it reads as belonging to it
+     rather than as three more settings of its own. */
+  .wall .wallon{margin-left:18px;padding-left:8px;
+                border-left:1px solid rgba(var(--glass),.14)}
+  .wall .wallon.off{display:none}
+  .wall .acts{margin-top:7px}
+  /* A profile is drawn with the device register's own .erow — the same
+     caret, the same one-open-at-a-time, the same name-as-title. They are the
+     same kind of thing in the same panel, and a second row style that behaved
+     almost the same would be one more thing to keep in step. All that is left
+     here is the one part a device row has no equivalent of: three short
+     numbers side by side, where reading them as a row is the point. */
+  .svnums{display:flex;gap:8px;margin-top:4px}
+  .svnums > div{flex:1 1 0;min-width:0;display:flex;flex-direction:column}
+  .svnums input{
+    width:100%;margin-top:auto;padding:5px 6px;font:inherit;
+    font-size:calc(9.5px * var(--fs));
+    background:rgba(0,0,0,.6);color:var(--text);
+    border:1px solid rgba(var(--glass),.16);outline:0;
+  }
+  .svnums input:focus{border-color:var(--hue-dim)}
+  /* PREVIEW is a toggle, and the profile it is showing has to be the one that
+     looks pressed — otherwise two rows both offer to start it and neither says
+     which one the screen is actually running. */
+  .erow .acts button.on{border-color:var(--hue-dim);color:var(--hue);
+                        background:rgba(var(--glass),.06)}
+  /* A device picks a profile, it does not type one. */
+  .wall select.nmedit{flex:1 1 auto;min-width:110px}
   /* One row per field of the request form: what it is called, whether it has
      to be answered, whether it is a paragraph, and a way to remove it. */
   .fldrow{display:flex;align-items:center;gap:8px;margin:4px 0}
@@ -1588,7 +1639,6 @@ by noise.</div>
   <div class="note" id="dpnote"></div>
     </div>
   </section>
-
   <section class="grp" data-tab="displays">
     <h4>Created Access</h4>
     <div class="grpbody">
@@ -1637,30 +1687,106 @@ DELETE is the revocation: that token stops matching anything, and the device
 is back to being a browser that has never been here.</div>
     </div>
   </section>
-
-  <!-- Everything that is simply working. Its own topic, because the list
-       above is a queue — read when something needs deciding — and this one is
-       a register, read when somebody asks what is out there. Three rows that
-       need attention buried among fifty that do not is how a request sits
-       unanswered for a week. -->
+  <!-- Central, and named from a device rather than copied into it. A
+       deployment has a handful of kinds of place, not one setting per screen. -->
   <section class="grp" data-tab="displays">
-    <h4>Connected devices</h4>
+    <h4>Screensaver profiles</h4>
     <div class="grpbody">
-  <div id="connlist"></div>
-  <div class="note" id="connnote"></div>
-  <div class="note help" style="margin-top:10px">Every device that is working,
-most recently heard from first. <b>last seen</b> is the last time one asked
-this server anything, so a screen that has been unplugged for a week says so
-here before anybody notices the wall.
+  <div id="dp_savers"></div>
+  <div class="seg" style="margin-top:6px">
+    <button id="b_addsaver">ADD A PROFILE</button>
+  </div>
+  <div class="note help">A screen showing the same bright figure in the same
+place for years keeps a ghost of it permanently. A profile is the answer to
+that, and it is <b>still the product</b>: the same face, every appearance
+setting still applied, scaled down and drifting.
 
-Devices on a granted request carry <b>access runs out</b>; those you issued a
-code for do not, and never will.
+<b>Set them here, pick them on a device.</b> A hallway, a bedroom, a shop floor
+— that is a handful of kinds of place, not one setting per screen. Change
+<b>night</b> once and every screen using it changes together; the alternative
+is twelve rows quietly drifting out of step with no way to see which had.
 
-<b>WITHDRAW</b> takes access away and puts the row back under Created Access.
-<b>DELETE</b> goes further and forgets the device entirely.</div>
+<b>Idle seconds</b> is how long with nobody speaking to it and nobody touching
+it. <b>0 never starts</b>, which is how you park a profile without deleting it
+and unpicking every device that names it.
+
+<b>Shrinks to</b> is what makes the drift possible at all: drawn edge to edge
+there is nowhere to go, and moving it would only clip the sides. The travel is
+exactly the margin the shrink buys, so nothing is ever cut off.
+
+<b>Dims by</b> does more against a ghost than the movement does, and is
+independently what a hallway should do at two in the morning. It stops short of
+switching the screen off — you can still see across a room that it is working.
+
+<b>PREVIEW</b> tries a profile in the preview on the right without saving it.
+Nobody picks a scale and a dim by reading two numbers.
+
+<b>It ends on the wake word or on a touch</b>, easing back to the middle rather
+than snapping, and it never starts while an answer is being thought about or
+spoken. The transcript, the composer and the status line hide while it drifts,
+and come back the instant the screen is touched.
+
+<b>Dark from / until</b> is a different question from the idle delay, and the
+reason it exists: idle asks whether anybody has been here recently, and only a
+clock keeps a hallway dark after somebody walks past it at three in the
+morning. Set the two hours the same and there is no dark window. A start later
+than an end wraps midnight, which is the ordinary case — <b>22:00</b> to
+<b>07:00</b> is what you mean.
+
+The two dims never add up. Whichever is darker at that moment wins, so a screen
+already drifting at night does not go past black.
+
+The hours are read off <b>the device's own clock</b>, not this server's. A
+building with screens in two time zones wants each of them dark at its own two
+in the morning.
+
+Deleting a profile clears it from every device that named it, the same way
+deleting a display clears it from every endpoint. Nothing keeps drifting to
+numbers that are no longer here.
+
+<b>On a device</b>, under Created Access, tick <b>On a wall</b> and three
+controls appear: an appearance profile, a screensaver profile, and whether it
+is <b>voice only</b>. Untick it and the screen goes back to being an ordinary
+page; what you chose is kept, so putting it back up restores it.
+
+<b>A wall is voice only and speak only the moment you tick it.</b> No text box
+— voice only arrives already ticked, and you untick it for the case that wants
+a transcript. And no keyboard: push-to-talk holds the SPACE bar, which a tablet
+on a wall does not have, so a wall always listens and the SPACE button is
+removed from that screen. That is also what makes the wake word real, because
+the gate is inactive in push-to-talk.
+
+TEXT and SPACE are <i>removed</i> rather than left there refusing. TALK and
+AUDIO stay — a browser will not open a microphone unless somebody asks it to,
+so TALK is pressed once when the screen is commissioned.
+
+<b>It goes full screen on the first touch.</b> An address bar and a tab strip
+across the top of a hallway screen is a browser that happens to be running a
+display. No page can remove that chrome, but it can ask to be shown full
+screen, and a browser grants that off a gesture — which is why a touch and not
+a load. Press Escape and it stays out for a minute, because whoever left full
+screen is nearly always the person installing the screen.
+
+<b>It says what to say to it.</b> A wall carries one dim line low in the frame
+— <i>say “kitchen”</i>, in whatever the wake words are — for the person walking
+past who has no way of knowing it listens. Never on a browser tab, and not
+while somebody is talking to it. While the screensaver drifts it is drawn into
+the picture and travels with it, because taking it away would lose it for
+exactly the person it is for.
+
+<b>When a device takes a change.</b> One still waiting on a decision asks this
+server every twenty seconds and takes it within seconds. One that is already
+working has nothing left to ask about, so it takes it the next time its page
+loads — reload it there, or use OPEN DISPLAY. Making a working screen poll for
+a setting that changes twice a year would be the wrong trade.</div>
+
+  <div class="seg" style="margin-top:8px">
+    <button id="b_saversave" class="act-save">SAVE THE PROFILES</button>
+    <button id="b_saverrevert" class="act-undo">REVERT</button>
+  </div>
+  <div class="note" id="savernote"></div>
     </div>
   </section>
-
   <!-- The form itself, which is a different job again: this one is written
        once, in somebody's own words, and read by strangers. -->
   <section class="grp" data-tab="displays">
@@ -1685,6 +1811,66 @@ nothing but that id.</div>
     <button id="b_formrevert" class="act-undo">REVERT</button>
   </div>
   <div class="note" id="formnote"></div>
+    </div>
+  </section>
+  <!-- Everything that is simply working. Its own topic, because the list
+       above is a queue — read when something needs deciding — and this one is
+       a register, read when somebody asks what is out there. Three rows that
+       need attention buried among fifty that do not is how a request sits
+       unanswered for a week. -->
+  <section class="grp" data-tab="displays">
+    <h4>Connected devices</h4>
+    <div class="grpbody">
+  <div id="connlist"></div>
+  <div class="note" id="connnote"></div>
+  <div class="note help" style="margin-top:10px">Every device that is working,
+most recently heard from first. <b>last seen</b> is the last time one asked
+this server anything, so a screen that has been unplugged for a week says so
+here before anybody notices the wall.
+
+Devices on a granted request carry <b>access runs out</b>; those you issued a
+code for do not, and never will.
+
+<b>WITHDRAW</b> takes access away and puts the row back under Created Access.
+<b>DELETE</b> goes further and forgets the device entirely.</div>
+    </div>
+  </section>
+  <!-- The other half of a place: what it looks like when somebody IS there.
+       Its own list, because appearance and the screensaver are different axes. -->
+  <section class="grp" data-tab="displays">
+    <h4>Appearance profiles</h4>
+    <div class="grpbody">
+  <div id="dp_looks"></div>
+  <div class="seg" style="margin-top:6px">
+    <button id="b_addlook">ADD A PROFILE</button>
+  </div>
+  <div class="note help">The LOOK tab is <b>one document for everybody</b>, and
+that is right for almost all of it — tune the bloom once and every screen in
+the building gets it. It is wrong for exactly four values.
+
+A screen in a hallway is read from three metres. A laptop is read from fifty
+centimetres. One type size cannot be right for both, and neither can one
+layout: a wall wants the figure filling the frame, a desk wants room for the
+transcript beside it. So <b>type size, palette, layout and the figure</b>
+become a profile a device names, and everything else stays shared.
+
+A device that names none of these shows what the LOOK tab says, which is what
+every display did before this existed. Deleting a profile puts every device
+that named it back to that, rather than to nothing.
+
+<b>PREVIEW</b> lays a profile over the preview on the right without saving it,
+and follows the controls as you change them. Pressing STOP — or touching
+anything on LOOK, MOTION or SPEECH — puts the shared document back.
+
+<b>Type size tops out at LARGEST</b>, which is the range the LOOK tab offers.
+If that turns out not to be enough on a real wall, the range is the thing to
+change, not this.</div>
+
+  <div class="seg" style="margin-top:8px">
+    <button id="b_looksave" class="act-save">SAVE THE PROFILES</button>
+    <button id="b_lookrevert" class="act-undo">REVERT</button>
+  </div>
+  <div class="note" id="looknote"></div>
     </div>
   </section>
 
@@ -3714,6 +3900,8 @@ function paintDpSettings(){
   $('dp_max').value = DPCFG.max_displays;
   $('dp_pending').value = DPCFG.max_pending;
   paintDpForm(DPCFG.form || []);
+  paintLooks(DPCFG.looks || []);
+  paintSavers(DPCFG.savers || []);
 }
 
 /* One row per field. Rebuilt from an array rather than read off the DOM,
@@ -3818,6 +4006,522 @@ $('b_formrevert').addEventListener('click', ()=>{
 $('b_formsave').addEventListener('click', ()=>{
   saveDp({form: DPFORM.filter(f=> (f.label || '').trim())}, 'formnote');
 });
+
+$('b_addlook').addEventListener('click', ()=>{
+  if (DPLOOKS.length >= 8) return;
+  const row = {id: '', name: ''};
+  // The panel's own defaults, so a new profile starts as what a display
+  // already gets rather than as four empty boxes.
+  LOOK_FIELDS.forEach(([k, , opts])=>{ row[k] = opts[0][0]; });
+  OPENLK = DPLOOKS.length;
+  DPLOOKS.push(row);
+  paintLooks(DPLOOKS);
+});
+$('b_lookrevert').addEventListener('click', ()=>{
+  stopLookPreview();
+  paintLooks((DPCFG && DPCFG.looks) || []);
+  dpNote('back to what is saved', false, 'looknote');
+});
+$('b_looksave').addEventListener('click', ()=>{
+  stopLookPreview();
+  saveDp({looks: DPLOOKS.filter(s=> (s.name || '').trim())}, 'looknote');
+});
+
+$('b_addsaver').addEventListener('click', ()=>{
+  if (DPSAVERS.length >= 8) return;
+  /* Something sensible rather than an empty row: three minutes, three
+     quarters, and enough dim to matter. Nobody's first act should be typing
+     numbers into a thing they have not seen yet — press PREVIEW, then adjust. */
+  DPSAVERS.push({id: '', name: '', delay: 180, scale: 70, dim: 45,
+                 night_from: 0, night_to: 0, night_dim: 0});
+  // Open, because it is the one you just made and the whole reason you
+  // pressed the button. A new row that arrived shut would be a list that
+  // grew by one line and nothing else.
+  OPENSV = DPSAVERS.length - 1;
+  paintSavers(DPSAVERS);
+});
+$('b_saverrevert').addEventListener('click', ()=>{
+  stopSaverPreview();
+  paintSavers((DPCFG && DPCFG.savers) || []);
+  dpNote('back to what is saved', false, 'savernote');
+});
+$('b_saversave').addEventListener('click', ()=>{
+  /* The preview is showing an unsaved profile. Put it back before the list
+     changes underneath it, or the screen keeps drifting to numbers that are no
+     longer on any row. */
+  stopSaverPreview();
+  saveDp({savers: DPSAVERS.filter(s=> (s.name || '').trim())}, 'savernote');
+});
+
+/* ---- the appearance profiles, which are also central ----
+   A hallway read at three metres and a laptop at fifty centimetres cannot both
+   be right in one shared document, and today they have to be. So the four
+   values a PLACE changes become a profile, and a device names one.
+
+   Its own list rather than a field on a screensaver profile, because they are
+   different axes: day and night in one hallway share an appearance and differ
+   only in the dim, and a laptop can want larger type without being told to
+   drift. Same row, same caret, same one-open-at-a-time as everything else. */
+const LOOK_FIELDS = [
+  ['fs',      'Type size', [['1', 'NORMAL'], ['1.12', 'LARGER'], ['1.25', 'LARGEST']]],
+  ['palette', 'Palette',   [['blue', 'BLUE'], ['milk', 'MILK'], ['ice', 'ICE'],
+                            ['amber', 'AMBER'], ['bone', 'BONE']]],
+  ['layout',  'Layout',    [['hero', 'HERO'], ['bleed', 'FULL BLEED']]],
+  ['mode',    'Figure',    [['stack', 'STACK'], ['disc', 'DISC'],
+                            ['orb', 'ORB'], ['knot', 'KNOT']]],
+];
+let DPLOOKS = [];
+let OPENLK = -1;
+let LKSHOWN = -1;
+function stopLookPreview(){
+  if (LKSHOWN < 0) return;
+  LKSHOWN = -1;
+  cmd('wall', {});
+  // The panel pushes the whole document, which is exactly what puts the
+  // shared appearance back over the profile that was being tried.
+  push();
+}
+
+function paintLooks(list){
+  DPLOOKS = (list || []).map(s=>{
+    const row = {id: s.id || '', name: s.name || ''};
+    LOOK_FIELDS.forEach(([k, , opts])=>{
+      row[k] = opts.some(o=> o[0] === s[k]) ? s[k] : opts[0][0];
+    });
+    return row;
+  });
+  const box = $('dp_looks');
+  if (!box) return;
+  box.innerHTML = '';
+  if (!DPLOOKS.length){
+    const em = document.createElement('div');
+    em.className = 'note';
+    em.textContent = 'No profiles. Every device shows what the LOOK tab says, '
+                   + 'which is what they all did before this existed.';
+    box.appendChild(em);
+  }
+  DPLOOKS.forEach((s, i)=>{
+    const row = document.createElement('div');
+    row.className = 'erow';
+    if (OPENLK !== i) row.classList.add('shut');
+
+    const top = document.createElement('div');
+    top.className = 'top';
+    const nmt = document.createElement('span');
+    nmt.className = 'nm';
+    top.appendChild(nmt);
+    const sum = document.createElement('span');
+    sum.className = 'badge';
+    top.appendChild(sum);
+    const live = document.createElement('span');
+    live.className = 'badge';
+    live.textContent = 'IN THE PREVIEW';
+    live.style.display = LKSHOWN === i ? '' : 'none';
+    top.appendChild(live);
+    const word = (k)=>{
+      const f = LOOK_FIELDS.find(x=> x[0] === k);
+      const o = f[2].find(x=> x[0] === s[k]);
+      return o ? o[1] : s[k];
+    };
+    const retitle = ()=>{
+      nmt.textContent = (s.name || '').trim() || 'unnamed profile';
+      sum.textContent = word('palette') + ' · ' + word('layout') + ' · '
+                      + word('mode') + ' · ' + word('fs');
+    };
+    retitle();
+    top.onclick = (e)=>{
+      if (e.target.closest('input, button, select, textarea')) return;
+      const opening = row.classList.contains('shut');
+      OPENLK = opening ? i : -1;
+      box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+      row.classList.toggle('shut', !opening);
+    };
+    row.appendChild(top);
+
+    const namerow = document.createElement('div');
+    namerow.className = 'namerow';
+    const nlab = document.createElement('b');
+    nlab.textContent = 'Name';
+    namerow.appendChild(nlab);
+    const nm = document.createElement('input');
+    nm.type = 'text'; nm.className = 'nmedit'; nm.value = s.name;
+    nm.spellcheck = false;
+    nm.placeholder = 'Hallway';
+    nm.onkeydown = (e)=>{ if (e.key === 'Enter') nm.blur(); };
+    nm.oninput = ()=>{ DPLOOKS[i].name = s.name = nm.value; retitle(); };
+    namerow.appendChild(nm);
+    row.appendChild(namerow);
+
+    /* Two to a line rather than four, for the same reason every other block
+       here is: four controls across a 425px column is four nobody can read. */
+    const cols = document.createElement('div');
+    cols.className = 'cols2';
+    LOOK_FIELDS.forEach(([k, label, opts])=>{
+      const w = document.createElement('div');
+      const l = document.createElement('label');
+      l.className = 'bklab';
+      l.textContent = label;
+      const sel = document.createElement('select');
+      opts.forEach(([v, t])=>{
+        const o = document.createElement('option');
+        o.value = v; o.textContent = t;
+        sel.appendChild(o);
+      });
+      sel.value = s[k];
+      sel.onchange = ()=>{
+        DPLOOKS[i][k] = s[k] = sel.value;
+        retitle();
+        // Being previewed right now: show the change rather than making
+        // somebody press the button again to see what they just chose.
+        if (LKSHOWN === i) cmd('wall', {look: lookOf(s)});
+      };
+      w.appendChild(l); w.appendChild(sel);
+      cols.appendChild(w);
+    });
+    row.appendChild(cols);
+
+    const acts = document.createElement('div');
+    acts.className = 'acts';
+    const show = document.createElement('button');
+    show.textContent = LKSHOWN === i ? 'STOP' : 'PREVIEW';
+    show.title = 'try this appearance in the preview, without saving it';
+    if (LKSHOWN === i) show.className = 'on';
+    show.onclick = ()=>{
+      const on = LKSHOWN !== i;
+      if (LKSHOWN >= 0) stopLookPreview();
+      if (on){ LKSHOWN = i; cmd('wall', {look: lookOf(s)}); }
+      paintLooks(DPLOOKS);
+    };
+    acts.appendChild(show);
+    const del = document.createElement('button');
+    del.textContent = 'REMOVE';
+    del.className = 'act-danger';
+    del.onclick = ()=>{
+      stopLookPreview();
+      OPENLK = -1;
+      DPLOOKS.splice(i, 1);
+      paintLooks(DPLOOKS);
+    };
+    acts.appendChild(del);
+    row.appendChild(acts);
+    box.appendChild(row);
+  });
+  const btn = $('b_addlook');
+  if (btn) btn.disabled = DPLOOKS.length >= 8;
+}
+/* Just the numbers, without the id and the name — what a display is sent and
+   what the preview is driven with. */
+function saverOf(s){
+  return {delay: s.delay, scale: s.scale, dim: s.dim,
+          night_from: s.night_from, night_to: s.night_to,
+          night_dim: s.night_dim};
+}
+
+/* Just the four values, without the id and the name — what a display is sent
+   and what the preview is driven with. */
+function lookOf(s){
+  const out = {};
+  LOOK_FIELDS.forEach(([k])=>{ out[k] = s[k]; });
+  return out;
+}
+
+/* ---- the screensaver profiles, which are central ----
+   A deployment has a handful of KINDS of place — a hallway, a bedroom, a shop
+   floor — not one setting per screen. So the numbers live here, once, under a
+   name, and a device names one. Change *night* and every screen using it
+   changes together, which is the whole difference between this and twelve
+   rows quietly drifting out of step with no way to see which had.
+
+   Rebuilt from an array rather than read off the DOM, the same as the request
+   form above: ADD and REMOVE both change the list, and a builder that edits
+   itself in place loses a row the moment two things happen at once. */
+let DPSAVERS = [];
+function paintSavers(list){
+  DPSAVERS = (list || []).map(s=> ({id: s.id || '', name: s.name || '',
+                                    delay: s.delay | 0, scale: s.scale | 0,
+                                    dim: s.dim | 0,
+                                    night_from: s.night_from | 0,
+                                    night_to: s.night_to | 0,
+                                    night_dim: s.night_dim | 0}));
+  const box = $('dp_savers');
+  if (!box) return;
+  box.innerHTML = '';
+  if (!DPSAVERS.length){
+    const em = document.createElement('div');
+    em.className = 'note';
+    em.textContent = 'No profiles. Devices on a wall have nothing to choose, '
+                   + 'so none of them drifts.';
+    box.appendChild(em);
+  }
+  DPSAVERS.forEach((s, i)=>{
+    /* The same row the device register uses, and the same class, so a profile
+       and a device read as the same kind of thing in the same panel — a title
+       you open, with the settings underneath it. */
+    const row = document.createElement('div');
+    row.className = 'erow';
+    if (OPENSV !== i) row.classList.add('shut');
+
+    /* The name is a TITLE here and a field inside, exactly as it is on a
+       device. An editable box in a header is one somebody clicks by accident
+       while trying to look at what is underneath it. */
+    const top = document.createElement('div');
+    top.className = 'top';
+    const nmt = document.createElement('span');
+    nmt.className = 'nm';
+    top.appendChild(nmt);
+    const sum = document.createElement('span');
+    sum.className = 'badge';
+    top.appendChild(sum);
+    const live = document.createElement('span');
+    live.className = 'badge';
+    live.textContent = 'IN THE PREVIEW';
+    live.style.display = SVSHOWN === i ? '' : 'none';
+    top.appendChild(live);
+    /* What a shut row says, so a list of eight can be read without opening
+       any of them — and it has to follow what is being typed, because the
+       title of the row somebody is editing is the one thing on screen that
+       must not still say what it used to. */
+    const retitle = ()=>{
+      nmt.textContent = (s.name || '').trim() || 'unnamed profile';
+      const drift = s.delay ? s.delay + 's · ' + s.scale + '% · dim ' + s.dim + '%'
+                            : 'never drifts';
+      const hr = (h)=> (h < 10 ? '0' : '') + h + ':00';
+      const dark = (s.night_dim && s.night_from !== s.night_to)
+        ? ' · dark ' + hr(s.night_from) + '–' + hr(s.night_to) + ' by ' + s.night_dim + '%'
+        : '';
+      sum.textContent = (drift + dark) === 'never drifts' ? 'DOES NOTHING'
+                                                          : drift + dark;
+    };
+    retitle();
+    top.onclick = (e)=>{
+      if (e.target.closest('input, button, select, textarea')) return;
+      const opening = row.classList.contains('shut');
+      OPENSV = opening ? i : -1;
+      // One at a time, the same as the device register: eight profiles you
+      // scroll through is a list nobody reads.
+      box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+      row.classList.toggle('shut', !opening);
+    };
+    row.appendChild(top);
+
+    const namerow = document.createElement('div');
+    namerow.className = 'namerow';
+    const nlab = document.createElement('b');
+    nlab.textContent = 'Name';
+    namerow.appendChild(nlab);
+    const nm = document.createElement('input');
+    nm.type = 'text'; nm.className = 'nmedit'; nm.value = s.name;
+    nm.spellcheck = false;
+    nm.placeholder = 'Hallway';
+    nm.onkeydown = (e)=>{ if (e.key === 'Enter') nm.blur(); };
+    nm.oninput = ()=>{ DPSAVERS[i].name = s.name = nm.value; retitle(); };
+    namerow.appendChild(nm);
+    row.appendChild(namerow);
+
+    /* Six controls, two to a line. The first three are what it does when
+       nobody has been there; the last three are what it does at night
+       whether anybody has or not. */
+    const nums = document.createElement('div');
+    nums.className = 'cols2';
+    const cell = (label)=>{
+      const w = document.createElement('div');
+      const l = document.createElement('label');
+      l.className = 'bklab';
+      l.textContent = label;
+      w.appendChild(l);
+      nums.appendChild(w);
+      return w;
+    };
+    [['delay', 'Idle seconds', 0, 86400],
+     ['scale', 'Shrinks to %', 30, 90],
+     ['dim',   'Dims by %',    0, 85]].forEach(([k, label, lo, hi])=>{
+      const inp = document.createElement('input');
+      inp.type = 'number'; inp.min = lo; inp.max = hi; inp.value = s[k];
+      inp.oninput = ()=>{
+        DPSAVERS[i][k] = s[k] = parseInt(inp.value, 10) || 0;
+        retitle();
+        if (SVSHOWN === i) cmd('wall', {saver: saverOf(s)});
+      };
+      cell(label).appendChild(inp);
+    });
+    [['night_from', 'Dark from'], ['night_to', 'Dark until']].forEach(([k, label])=>{
+      const sel = document.createElement('select');
+      for (let h = 0; h < 24; h++){
+        const o = document.createElement('option');
+        o.value = String(h);
+        o.textContent = (h < 10 ? '0' : '') + h + ':00';
+        sel.appendChild(o);
+      }
+      sel.value = String(s[k]);
+      sel.onchange = ()=>{
+        DPSAVERS[i][k] = s[k] = parseInt(sel.value, 10) || 0;
+        retitle();
+        if (SVSHOWN === i) cmd('wall', {saver: saverOf(s)});
+      };
+      cell(label).appendChild(sel);
+    });
+    const nd = document.createElement('input');
+    nd.type = 'number'; nd.min = 0; nd.max = 85; nd.value = s.night_dim;
+    nd.oninput = ()=>{
+      DPSAVERS[i].night_dim = s.night_dim = parseInt(nd.value, 10) || 0;
+      retitle();
+      if (SVSHOWN === i) cmd('wall', {saver: saverOf(s)});
+    };
+    cell('Dark by %').appendChild(nd);
+    row.appendChild(nums);
+
+    const acts = document.createElement('div');
+    acts.className = 'acts';
+    /* What a scale and a dim actually look like is a property of the PROFILE,
+       and this is where somebody is choosing them. The preview on the right is
+       the real display page, so it shows the real thing — and without this
+       nobody can pick either number except by hanging a screen and waiting. */
+    const show = document.createElement('button');
+    show.textContent = SVSHOWN === i ? 'STOP' : 'PREVIEW';
+    show.title = 'try this profile in the preview, without saving it';
+    if (SVSHOWN === i) show.className = 'on';
+    show.onclick = ()=>{
+      const on = SVSHOWN !== i;
+      SVSHOWN = on ? i : -1;
+      cmd('wall', {voice_only: false, saver: saverOf(s)});
+      cmd('drift', on);
+      paintSavers(DPSAVERS);
+    };
+    acts.appendChild(show);
+
+    const del = document.createElement('button');
+    del.textContent = 'REMOVE';
+    del.className = 'act-danger';
+    del.onclick = ()=>{
+      // Removing renumbers everything after it, so neither the preview nor the
+      // open row is still pointing at what it was found under.
+      stopSaverPreview();
+      OPENSV = -1;
+      DPSAVERS.splice(i, 1);
+      paintSavers(DPSAVERS);
+    };
+    acts.appendChild(del);
+    row.appendChild(acts);
+    box.appendChild(row);
+  });
+  const btn = $('b_addsaver');
+  if (btn) btn.disabled = DPSAVERS.length >= 8;
+}
+/* Which profile is open, and which one the preview is showing — both by
+   INDEX and not by the object, because paintSavers rebuilds the array every
+   time it runs: an object captured before a repaint would never match the one
+   drawn after it, so the row would never stay open and the button would never
+   look pressed. A profile that has not been saved yet has no id to use
+   either. Both are reset by anything that renumbers the list. */
+let OPENSV = -1;
+let SVSHOWN = -1;
+function stopSaverPreview(){
+  if (SVSHOWN < 0) return;
+  SVSHOWN = -1;
+  cmd('drift', false);
+}
+
+/* ---- which of them a device uses ----
+   Two ticks and a list, and no prose: what these mean is under the ? on the
+   sections, where every other explanation in this panel lives.
+
+   Its own SAVE, like every block here. One commit across the whole row would
+   mean fixing a typo in a name also published a wall setting somebody was
+   halfway through choosing. */
+function wallBlock(d){
+  const box = document.createElement('div');
+  box.className = 'wall';
+
+  const tick = (label, on)=>{
+    const l = document.createElement('label');
+    l.className = 'vo';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = !!on;
+    l.appendChild(cb);
+    l.appendChild(document.createTextNode(label));
+    return [l, cb];
+  };
+
+  const [wlab, wall] = tick('On a wall', d.wall);
+  wlab.className = 'vo hd';
+  box.appendChild(wlab);
+
+  /* Everything below appears only once this is a wall. Most rows in a real
+     deployment are a laptop or a phone, and three controls that do not apply
+     to them on every one of fifty rows is a register nobody can read. */
+  const inner = document.createElement('div');
+  inner.className = 'wallon';
+  const [vlab, voice] = tick('Voice only', d.voice_only);
+  inner.appendChild(vlab);
+
+  /* One list each, because they are separate axes — see the two profile
+     sections. A row summary in the option text so a choice can be made here
+     without scrolling up to read what the profile holds. */
+  const picker = (label, blank, list, chosen, summary)=>{
+    const wrap = document.createElement('div');
+    wrap.className = 'namerow';
+    const b = document.createElement('b');
+    b.textContent = label;
+    wrap.appendChild(b);
+    const sel = document.createElement('select');
+    sel.className = 'nmedit';
+    const none = document.createElement('option');
+    none.value = ''; none.textContent = blank;
+    sel.appendChild(none);
+    (list || []).forEach(p=>{
+      const o = document.createElement('option');
+      o.value = p.id;
+      o.textContent = p.name + '  ·  ' + summary(p);
+      sel.appendChild(o);
+    });
+    sel.value = chosen || '';
+    wrap.appendChild(sel);
+    inner.appendChild(wrap);
+    return sel;
+  };
+  const looksel = picker('Appearance', 'SHARED — whatever the LOOK tab says',
+    (DPCFG && DPCFG.looks) || [], d.look,
+    p=> [p.palette, p.layout, p.mode, 'size ' + p.fs].join(' · '));
+  const sel = picker('Screensaver', 'NONE — it never drifts',
+    (DPCFG && DPCFG.savers) || [], d.saver,
+    p=> (p.delay ? p.delay + 's, ' + p.scale + '%, dim ' + p.dim + '%' : 'never drifts')
+        + (p.night_dim && p.night_from !== p.night_to
+           ? ', dark by ' + p.night_dim + '%' : ''));
+  box.appendChild(inner);
+
+  const sync = ()=> inner.classList.toggle('off', !wall.checked);
+  wall.onchange = sync;
+  sync();
+
+  const acts = document.createElement('div');
+  acts.className = 'acts';
+  const said = document.createElement('div');
+  said.className = 'note';
+  const save = document.createElement('button');
+  save.className = 'act-save';
+  save.textContent = 'SAVE';
+  save.onclick = async ()=>{
+    said.className = 'note';
+    said.textContent = 'saving…';
+    try{
+      const j = await api('/displays/wall', {method:'POST', body: JSON.stringify({
+        id: d.id, wall: wall.checked, voice_only: voice.checked,
+        saver: sel.value, look: looksel.value})});
+      /* The cache, not the list. Rebuilding the rows here would throw away the
+         row somebody has open and this message with it, and nothing else on
+         screen draws these three values. */
+      if (j.displays) DISPLAYS = j.displays;
+      said.textContent = 'saved';
+    }catch(e){
+      said.className = 'note bad';
+      said.textContent = e.message;
+    }
+  };
+  acts.appendChild(save);
+  box.appendChild(acts);
+  box.appendChild(said);
+  return box;
+}
 
 /* What a row IS, and it decides which of the two lists it belongs in as well
    as what the row says. `live` is a device that is working; everything else
@@ -4066,6 +4770,10 @@ async function refreshDisplays(){
     });
 
     row.appendChild(meta);
+    /* Under the facts and above the buttons that end the row's life. A screen
+       can be told what it will look like before it has ever been switched on,
+       the same way its endpoints can be ticked before it arrives. */
+    row.appendChild(wallBlock(d));
     row.appendChild(r);
     (st === 'live' ? conn : box).appendChild(row);
   });

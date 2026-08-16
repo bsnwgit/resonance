@@ -71,15 +71,16 @@ accounts with roles, with a live preview of the real display — the backend
 adapters that put a real assistant behind it, including a house through Home
 Assistant, routes, so several names reach several destinations from one
 display, displays the server knows about, so a name can be restricted to the
-tablets you approved, and the embed API that lets another application put this
-interface inside its own page.
+tablets you approved, the embed API that lets another application put this
+interface inside its own page, and what a wall display looks like — voice only
+and speak only, an appearance a place can have of its own, and a screensaver
+that is still the product.
 
-**Not done, in the order it matters:** what a wall display actually looks like
-— voice only, and a screensaver that is still the product, because burn-in
-starts the day the first tablet goes up. Then staying up unattended. Then
-identity and memory, so a conversation can mean something an hour later — the
-embed is deliberately memoryless until that lands. Then packaging it as a
-library other projects can install.
+**Not done, in the order it matters:** staying up unattended, because a tablet
+on a wall is a browser tab running for a year. Then identity and memory, so a
+conversation can mean something an hour later — the embed is deliberately
+memoryless until that lands. Then packaging it as a library other projects can
+install.
 
 The [Roadmap](#roadmap) carries the reasoning for each, including the
 decisions already taken about how identity and memory should work.
@@ -1060,7 +1061,7 @@ two people in one room with three listening microphones between them.
 | 1a | ~~**Routes**~~ **— done** | three names reaching three destinations, verifiable with no Home Assistant involved | — | none |
 | 1b | ~~**The Home Assistant adapter**~~ **— done** | saying the house name switches a light on | 1a | none |
 | 2 | ~~**Displays, and binding a route to one**~~ **— done** | only the tablets you approved can actuate the house, whatever anyone's browser is set to | 1b | none |
-| 3 | **What a wall display looks like** | voice only, and a screensaver that is still the product | 2 | none |
+| 3 | ~~**What a wall display looks like**~~ **— done** | voice only and speak only, an appearance per place, and a screensaver that is still the product | 2 | none |
 | 4 | **Staying up unattended** | a tablet nobody touches for a year is still working | 3 | **all of it** · not designed |
 | 5 | **Identity and the PIN** | a person, as distinct from a place | 2 | **1** · whether an identity carries its own Home Assistant token |
 | 6 | **Personal wake words** | one person addressing a tablet stops triggering another person's device | 5 | none |
@@ -1071,9 +1072,9 @@ The last column counts decisions that need **you**, not implementation choices
 made while building and shown afterwards. A phase reading *none* is ready to
 start.
 
-**Nothing outstanding blocks starting.** Everything before phase 4 reads
-*none*, and phase 4 is a design problem to think through rather than a
-question to answer — its position will move once it has been. The three
+**Nothing outstanding blocks starting.** Phase 4 is next and is a design
+problem to think through rather than a question to answer — its position will
+move once it has been. The three
 remaining are each answerable when their own phase comes up, and one of them
 is deliberately waiting on experience rather than on a decision.
 
@@ -1082,6 +1083,18 @@ a local model and a hosted one are three destinations reachable by three
 names, and wake-word routing can be shaken out on a test box before Home
 Assistant is anywhere near it. If the refactor breaks something, that is when
 you find out, rather than while also debugging a new adapter.
+
+**3 is done**, and it grew past its entry the way two did. The entry asked for
+two settings; what closed it was those two plus an appearance a place can have
+of its own, a wall that is speak only because push-to-talk needs a space bar
+nobody has, a line telling a passer-by what to say, dark hours on a clock, and
+the full screen. Both profile lists are central and named from a device, which
+was the shape asked for once the first version put the numbers on each row.
+
+What it turned up along the way is in the log below, and two of them were
+faults nobody was looking for: an admin route answering 401 where its siblings
+answer 404, and the frame rate readout — a rig instrument — sitting on every
+wall in the building, in the one place a screensaver could not save it.
 
 **2 is done.** A display is issued an unguessable token on its first visit, an
 admin approves it, and a route can be restricted to the ones it names — where
@@ -1126,11 +1139,11 @@ phase 2 is server-side enforcement and gate logic, phase 3 is canvas and
 presentation. Splitting them keeps each verifiable in one sitting, and stops a
 safety property waiting on a screensaver.
 
-**Three sits where it does because burn-in is a clock, not a backlog item.**
+**Three sat where it did because burn-in is a clock, not a backlog item.**
 Every day a tablet runs without it is damage that cannot be taken back, and
-that clock starts the day the first one goes on a wall — which, now that two
-has landed, is any day from here. Everything after it can wait; this cannot
-wait as cheaply.
+that clock starts the day the first one goes on a wall. Everything after it
+could wait; this could not wait as cheaply — which is why it was built before
+anything with a longer payoff.
 
 **The admin interface is part of each phase, not a phase of its own.** A route
 you cannot configure is not a feature, and a phase whose settings are only
@@ -1509,9 +1522,9 @@ it. Each entry below carries its own panel scope.
   what a tablet bolted to a wall wants: it is not a workstation, and a screen
   of scrolling text in a hallway is neither useful nor discreet.
 
-  Most of this exists. `data-text="off"` already hides the transcript and the
+  Most of this already existed. `data-text="off"` hides the transcript and the
   composer together, and the embed chrome does the same through
-  `data-noparts`. What is missing is somewhere for an admin to say it once,
+  `data-noparts`. What was missing was somewhere for an admin to say it once,
   per display, rather than it being whatever the last person to touch the
   screen chose.
 
@@ -1543,8 +1556,43 @@ it. Each entry below carries its own panel scope.
   speech, so it has to count. The transcript hides while it drifts — text
   sliding around a screen is worse than either state on its own.
 
-  *Panel:* voice only, and the screensaver's idle delay, scale and dim, on
-  each display in the list the phase above builds.
+  **An appearance a place can have of its own.** Added while building, and
+  not in the original entry — the same way phase 2 grew past its own. The LOOK
+  tab is one document for everybody, which is right for almost all of it and
+  wrong for exactly four values: a hallway read at three metres and a laptop at
+  fifty centimetres cannot share a type size, and a wall wants the figure
+  filling the frame where a desk wants room for the transcript beside it. So
+  type size, palette, layout and the figure become a profile a device names,
+  and everything else stays shared.
+
+  **Shortlisted rather than "override anything"**, deliberately. A per-place
+  setting that could cover the whole document would quietly end the ability to
+  change something once for everyone, which is the reason the shared document
+  exists at all.
+
+  **Both profile lists are central and named by id**, and they are separate
+  axes: day and night in one hallway share an appearance and differ only in the
+  dim, and a laptop can be given larger type without being told to drift.
+
+  **Speak only, and it says what to say.** A wall is voice only and in the
+  listening mode from the moment it is marked one — push-to-talk holds a SPACE
+  bar that a tablet on a wall does not have. And because a silent figure tells
+  a passer-by nothing, a wall carries one dim line naming the wake word, drawn
+  into the picture and travelling with it while the screensaver drifts.
+
+  **Full screen on the first touch.** No page can remove a browser's own
+  chrome, but it can ask to be shown full screen, and a browser grants that off
+  a gesture — so it happens on a touch rather than on load. Only on a wall, and
+  a manual exit buys a minute of quiet: whoever left full screen is nearly
+  always the person installing the screen.
+
+  **Dark hours beside the idle dim.** Idle asks whether anybody has been here
+  recently; only a clock keeps a hallway dark after somebody walks past it at
+  three in the morning.
+
+  *Panel:* on a wall, voice only, and one profile from each list, on each
+  display in the list the phase above builds — with the profiles themselves set
+  once, centrally.
 
 - **Staying up unattended.** *Not designed yet — this entry states the problem
   and nothing else. Its position in the order is provisional.*
@@ -1858,6 +1906,205 @@ on a desk. A tablet bolted to a wall, answering a household, moves them:
 ## Progress log
 
 Newest first.
+
+### 2026-08-15 — the screensaver is still the product
+
+Phase 3: what a wall display looks like. Appearance and screensaver profiles
+set centrally, three settings on each device's row, and nothing in any of them
+that touches what this server will answer — it is entirely canvas and presentation, which is the whole
+reason it was split from phase 2.
+
+- **Full screen is asked for on a gesture, and it does not fight.** An address
+  bar and a tab strip across a hallway screen is a browser that happens to be
+  running a display. The chrome is not removable by any page; being shown full
+  screen is askable, and only off user activation — so the same first touch
+  that ends the screensaver asks for it. A manual exit records the time and
+  buys sixty seconds, because somebody leaving full screen is nearly always
+  commissioning the screen and wants the address bar for a minute; asking again
+  on their next tap would make it unusable exactly then. Never in an embed:
+  taking over somebody else's viewport from inside their iframe is the rudest
+  thing a guest can do.
+- **A wall is voice only and speak only from one tick.** Both follow from what
+  the thing is rather than being boxes to find. Voice only defaults on, which
+  is safe only because `wall` gates it — a row that is not on a wall carries it
+  and does not apply it. And push-to-talk holds the SPACE bar: a tablet bolted
+  to a wall has no space bar, so a screen whose interaction model needs a
+  keyboard nobody standing in front of it has is a workstation somebody screwed
+  to a wall. SPACE is removed there, the same way TEXT is, and forced off in
+  `setPtt` rather than at each caller.
+- **That is also what made the resting prompt true.** The wake gate is inactive
+  in push-to-talk, so *say the name* was an instruction that did nothing — the
+  prompt correctly refused to draw itself, which is how the default was found
+  at all.
+- **A screen on a wall now says what to say to it.** One dim line low in the
+  frame, for the person walking past who has no way of knowing a silent figure
+  listens — and on a voice-only display there is no transcript or composer to
+  suggest otherwise. Never on a browser tab, which somebody opened on purpose,
+  and not while a conversation is happening, when everything else on screen is
+  saying more than it could.
+- **While it drifts the prompt is painted into the picture**, travelling with
+  the figure and fading with the ease. Left in the DOM it would have been the
+  one thing holding still on a screen whose entire purpose at that moment is
+  that nothing does; removed altogether it would have been missing for exactly
+  the person it is for, who walks up to a screen that has been idle for hours.
+- **Dark hours, because idle cannot express "it is three in the morning".**
+  Somebody walking past at 3am wakes an idle-dimmed screen to full brightness
+  for the rest of the night. So a screensaver profile carries a window and a
+  dim of its own, read off the DEVICE's clock — a building with screens in two
+  time zones wants each dark at its own two. Equal endpoints are no window; a
+  start later than an end wraps midnight, which is the ordinary case. The two
+  dims resolve to the darker rather than the sum, so nothing goes past black.
+- **A touch target is about fingers, not window width.** The 44-pixel minimum
+  was keyed to `max-width: 560px`, which is right for a phone and wrong for
+  every tablet: a wall screen in portrait at 800 points never reaches that
+  breakpoint and was handing a finger a 22-pixel-high button. On a voice-only
+  display that is not cosmetic — TALK is the only thing that can open a
+  microphone, so the one control that had to be hittable was the smallest thing
+  on the screen. `pointer: coarse` asks what was actually meant; width still
+  decides whether the words fit.
+- **Portrait was measured rather than assumed, and the geometry was fine.** The
+  figure is scaled by the shorter side, so it holds a constant 85% of the width
+  in portrait against 50% in landscape and never approaches an edge at any
+  aspect — checked at three sizes. What portrait turned up was the touch
+  targets above, which are not a portrait bug at all; they were simply invisible
+  until somebody looked at a screen shaped like a wall display.
+- **A place can have an appearance of its own.** The LOOK tab was one
+  document for every viewer, so a deployment with a hallway screen and a laptop
+  in it had no arrangement where both were right — one of them was wrong by
+  construction. Four values now come from a profile a device names: type size,
+  palette, layout and the figure. Everything else stays shared, and that
+  shortlist is the design rather than a first cut. An override that could cover
+  the whole document would quietly end "change it once for everyone", which is
+  the only reason the shared document exists.
+- **A missing appearance falls back; a missing screensaver switches off.** Both
+  fail quiet and they fail to different places, because the safe answer differs:
+  a screen with no appearance still has to look like something, and a screen
+  with no screensaver simply does not drift. Deleting a profile clears it from
+  every device that named it, so neither state is one somebody has to discover.
+- **Values are checked against the list the panel offers, not stored as
+  typed.** A palette name that is not a palette is not a screen that looks
+  wrong, it is `PALETTES[S.palette].ink` throwing once per frame forever. Out of
+  range is refused when a person presses save and clamped when a file is read —
+  the same split the screensaver numbers use.
+- **The look is re-applied after the settings load, not when it arrives.** The
+  display asks for both documents at once and they race; loading the shared
+  settings overwrites `S` wholesale. A place's own appearance applied when the
+  display answered first would be silently undone a moment later by the very
+  document it exists to override.
+- **The numbers are central, not per device.** A deployment has a handful of
+  *kinds* of place — a hallway, a bedroom, a shop floor — not one setting per
+  screen, so a profile is a name and three numbers and a device names one by
+  **id**. Change *night* once and every screen using it changes together; the
+  alternative is twelve rows quietly drifting out of step with each other and
+  nothing on screen saying which had. By id and not by name, so renaming a
+  profile cannot orphan a screen, and clean_savers re-mints a duplicate id
+  because two rows claiming one is a row nobody can point at.
+- **One tick reveals the rest.** Most rows in a real deployment are a laptop or
+  a phone. *On a wall* is the gate, and while it is off the two settings under
+  it are stored and not applied — untick, and the screen is an ordinary page;
+  tick it again and what was chosen is still there. Three controls that do not
+  apply, on every one of fifty rows, is a register nobody reads.
+- **Voice only stayed per device, deliberately.** It and the screensaver are
+  separate axes: a wall screen can be voice only without ever drifting, and a
+  shared television can drift while still showing its transcript. Folding one
+  into the other would have made a profile a thing you cannot reuse.
+- **A display is never told the list.** `wall_of` resolves the profile server
+  side and hands over three numbers. The list of names is a description of a
+  building — *ward*, *shop floor*, *back office* — and no screen has any use
+  for the names of places it is not in.
+- **Named and gone is off on a screen and an error in the panel**, and the two
+  are not inconsistent. A screen has to fail quiet, or deleting a profile
+  leaves tablets drifting to numbers nobody can find to change; a person
+  pressing SAVE has to be told, or a panel left open overnight silently sets a
+  device to a profile that no longer exists. Deleting also clears the id from
+  every device that named it, the same way deleting a display clears it from
+  every endpoint.
+- **It does not take the rest of the bar with it.** The first cut hid `#bar`
+  entirely, which reads correctly — *the geometry alone* — and would have made
+  every voice-only display permanently deaf: a browser will not open a
+  microphone without somebody asking it to, and TALK is the only thing that
+  asks. Voice only means no text, not no controls.
+- **Scale down, then drift.** Drawn full bleed there is nowhere to go and
+  translating only clips the edges. The travel is *exactly* the margin the
+  shrink bought — `(1 - scale) / 2` of the frame — so the figure reaches the
+  edge of the panel and never crosses it. Verified over eight simulated hours:
+  peak offset equals the available margin to four decimal places.
+- **Two sines that do not divide into each other**, rather than a rectangle
+  bouncing between four corners. It covers more of the panel over a night and is
+  calmer to share a room with, and the clock behind it never resets — so two
+  nights running do not light the same pixels in the same order.
+- **The margin collapsing IS the ease back to the centre.** The drift is the
+  sine times that margin, and the margin is a function of the same smoothstep
+  the scale is. One number eases and the figure returns to the middle at full
+  size with nothing animating it there. Six seconds in, so nobody catches it
+  starting; under half a second out, so somebody who just touched the screen
+  believes it answered them.
+- **The dim is black over the finished frame**, not a scaled palette. It is the
+  panel's light output that burns in and that is too bright at two in the
+  morning, so what has to fall is absolute light — on a pale palette as much as
+  a dark one. Capped below 100: a screen dimmed the whole way is a screen
+  switched off, and you cannot see that one is still working.
+- **The milk wash travels with the figure.** It is drawn from a fixed point in
+  the frame, so left alone it would have been the one stationary bright region
+  left on the panel — the exact thing the drift exists to prevent.
+- **Idle is read off `Drive.phase`, not off the wake word.** A display with no
+  wake word at all still thinks and still speaks, and that path never touches
+  `Wake`. Every path that keeps a display awake does come through `Wake.touch`,
+  though, which is why that is the single place the wake word ends the drift.
+- **Off is the default, on every device.** Same rule that made `ANY DISPLAY` the
+  default on a route: an upgrade that quietly started moving every screen in a
+  building would be this phase deciding something nobody asked it to.
+- **PREVIEW sits on the profile, not on the device.** What a scale and a dim
+  actually look like is a property of the profile, and the profile is where
+  somebody is choosing them. It drives the real preview with unsaved values,
+  because nobody picks either number by reading it, and nobody should stand in
+  front of a screen waiting out three minutes of idle to find out.
+- **The panel says none of this out loud.** Every word of explanation is behind
+  the `?` on its section, where the rest of the panel's prose already lives —
+  the first cut printed four paragraphs into every device row, which is exactly
+  the habit that rule exists to stop. What stays visible in a row is the
+  controls and whatever the server is saying right now.
+- **A rig instrument was on every wall in the building.** The frame rate
+  readout was hidden for embeds and nowhere else, so every real display carried
+  it — fixed at the top left, never moving, small and bright. On a wall that is
+  not untidiness: it was the one thing left that drifting the whole figure away
+  could not save, which is the exact failure the drift exists to prevent. The
+  reasoning was already written beside the rule and had only ever been applied
+  to the embed; a tablet in somebody's hallway is as much somebody else's
+  product as an embed is.
+- **A new admin route is not admin-only because it calls `_require("admin")`.**
+  `/displays/wall` did, and answered **401** on the display listeners where
+  every one of its siblings answers **404** — which is the route confirming it
+  exists on a listener it is supposed to be absent from. The gate is a
+  hand-maintained list of paths, and a list is a thing somebody forgets. Named
+  it, then made the list a belt and `/displays/` a prefix rule underneath it, so
+  the next route added is covered whether anybody remembers or not. `/display/`
+  singular — how a display gets its token — is one letter and a whole boundary
+  away, and untouched.
+- **Two CSS rules of equal specificity, and the later one wins.** The
+  screensaver's rules sat with the rest of the wall rules near the top of the
+  sheet, above `body[data-request] #request`. Both are one id, one attribute and
+  one element, so source order decided it and an unanswered request stayed lit
+  through the entire drift — the one stationary bright rectangle actually worth
+  moving. They are now last in the sheet, with a comment saying why they are
+  not where they look like they belong.
+- **Proven in a browser, not yet on a panel.** The geometry is verified — the
+  travel equals the margin to four decimal places over eight simulated hours,
+  and the renderer a wall runs is the same file a tab runs, so there is no
+  second implementation that could differ. What no browser can answer is
+  whether 70% and dim 45% are the right *kind* of numbers seen from three
+  metres in a dim hallway, and whether six seconds of ease-in is short enough
+  to miss and long enough not to startle. Those are judgements about a room.
+  The third thing a panel would settle — whether the burn-in is actually
+  prevented — takes months and cannot be tested at all, which is why the design
+  leans on the two mechanisms known to work rather than on measuring one.
+- **What it does not do is push to a screen already on the wall.** A device
+  waiting on a decision polls every twenty seconds and takes these immediately;
+  one that is working has nothing left to ask about and takes them on its next
+  load. Making a working screen poll for a setting that changes twice a year is
+  the wrong trade, and a display that keeps itself current across a restart is
+  what phase 4 is for. The panel says which case a row is in rather than leaving
+  it to be discovered.
 
 ### 2026-08-15 — a name for a set of them, and a panel that reads as one
 
