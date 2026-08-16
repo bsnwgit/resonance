@@ -47,7 +47,7 @@ At the foot, pinned so they are always reachable:
 
 - **APP SETTINGS** — how the server itself is wired: where it can be reached
   from, signing in, ports, sessions, and what the two transcript labels say.
-- **PROFILES** — the appearance, screensaver and kiosk profiles a screen can be
+- **PROFILES** — the appearance, screensaver and device profiles a screen can be
   pointed at.
 - **ACCOUNTS** — who can sign in, and the groups access is granted to.
 - **ACCESS** — what may use this server, and what each may reach.
@@ -168,12 +168,12 @@ the same question:
 |---|---|
 | **Appearance profiles** | what a place looks like, for the handful of values that cannot be shared |
 | **Screensaver profiles** | what a kiosk does when nobody is there |
-| **Kiosk profiles** | what a public screen is: voice only, full screen, the prompt line, and which of the two above it uses |
+| **Device profiles** | what a public screen is: voice only, full screen, the prompt line, and which of the lists above it uses |
 
 They are in that order on the tab because it is the order you build in: the two
 pieces first, then the thing that names them.
 
-**A kiosk profile is composed, not self-contained.** It names an appearance and
+**A device profile is composed, not self-contained.** It names an appearance and
 a screensaver rather than carrying copies of their values, so changing what a
 hallway looks like once still reaches every kiosk using it. Day and night in
 one hallway share an appearance and differ only in the dim — that case is the

@@ -2084,9 +2084,9 @@ a setting that changes twice a year would be the wrong trade.</div>
     </div>
   </section>
   <!-- What a public screen IS, and the only one of the three a device names.
-       The other two lists are things a kiosk profile points at. -->
+       The other lists are things a device profile points at. -->
   <section class="grp" data-tab="profiles">
-    <h4>Kiosk profiles</h4>
+    <h4>Device profiles</h4>
     <div class="grpbody">
   <div id="dp_kiosks"></div>
   <div class="seg addrow">
@@ -2300,7 +2300,7 @@ button to download it as a PDF.</div>
   </div>
   <!-- One commit for the whole tab, the way the shared-settings tabs have one.
        The three lists are three parts of a single document, so three SAVEs was
-       three buttons writing the same file — and a kiosk profile naming an
+       three buttons writing the same file — and a device profile naming an
        appearance you had just added, but not yet saved, could only be stored
        by pressing them in the right order. -->
   <div id="profrow">
@@ -4782,7 +4782,7 @@ function paintSavers(list){
     btn.disabled = fresh || DPSAVERS.length >= 8;
   }
 }
-/* ---- the kiosk profiles ----
+/* ---- the device profiles ----
    The one list a device names. Same row, same caret, same one-open-at-a-time
    as everything else in this panel, because they are the same kind of thing.
 
@@ -5484,7 +5484,7 @@ async function refreshDisplays(){
 
 /* ---- one commit for all three lists ----
    They are three parts of one document, so they are written in one request.
-   Three separate saves meant a kiosk profile naming an appearance you had just
+   Three separate saves meant a device profile naming an appearance you had just
    added could only be stored by pressing the buttons in the right order, and
    the server validates the three together anyway. */
 $('b_profsave').addEventListener('click', ()=>{
@@ -5492,7 +5492,7 @@ $('b_profsave').addEventListener('click', ()=>{
   stopLookPreview();
   const kiosks = DPKIOSKS.filter(k=> (k.name || '').trim());
   if (!kiosks.length){
-    dpNote('there has to be at least one kiosk profile — a screen ticked as a '
+    dpNote('there has to be at least one device profile — a screen ticked as a '
            + 'kiosk needs something to be', true, 'profnote');
     return;
   }
