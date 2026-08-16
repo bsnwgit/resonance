@@ -337,6 +337,12 @@
      that read across need the room, and a device row has four things on it
      before the profile picker lands. */
   #grpbox .grp.bare{grid-column:1 / -1}
+  /* Inside a profile the controls are part of the row, not topics in the box:
+     no frame of their own, indented under the name they belong to. */
+  .profsettings{margin:8px 0 2px;padding-left:9px;
+                border-left:2px solid rgba(var(--glass),.22)}
+  .profsettings .grp{border:0;margin:0;padding:0}
+  .profsettings .grp + .grp{margin-top:9px}
 
   /* the first topic's own top rule would double up with the box edge */
   #grpbox .grp:first-of-type{border-top:0;margin-top:6px}
@@ -2308,6 +2314,8 @@ button to download it as a PDF.</div>
        three buttons writing the same file — and a device profile naming an
        appearance you had just added, but not yet saved, could only be stored
        by pressing them in the right order. -->
+  <!-- Where a tab's controls sit while none of its profiles is open. -->
+  <div id="profstash" hidden></div>
   <div id="profrow">
     <div class="note" id="profnote"></div>
     <div class="seg actrow">
@@ -4539,7 +4547,38 @@ async function saveProfileList(kind){
   }catch(e){ prNote(kind, e.message, true); }
 }
 
+function profSections(tab){
+  return [...document.querySelectorAll('#panel .grp[data-prof="' + tab + '"]')];
+}
+function stashSections(tab){
+  const st = $('profstash');
+  if (st) profSections(tab).forEach(g=> st.appendChild(g));
+}
+
+/* The controls belong to whichever profile is open, and ONE function decides
+   where they are — called after a repaint and after a click, so the two cannot
+   disagree. Every earlier attempt had the click and the paint each doing half,
+   which is how a row ended up empty or gone. */
+function syncSections(kind){
+  stashSections(kind.tab);
+  const i = OPENPR[kind.key], box = $(kind.box);
+  if (i >= 0 && box){
+    const row = box.querySelector('.erow[data-i="' + i + '"]');
+    if (row){
+      let holder = row.querySelector('.profsettings');
+      if (!holder){
+        holder = document.createElement('div');
+        holder.className = 'profsettings';
+        row.insertBefore(holder, row.querySelector('.acts'));
+      }
+      profSections(kind.tab).forEach(g=> holder.appendChild(g));
+    }
+  }
+  reRender();
+}
+
 function paintProfiles(kind, list, def){
+  stashSections(kind.tab);
   if (def !== undefined) DPDEF[kind.key] = def || '';
   /* A list is never empty. The first profile is seeded from what the tab is
      showing right now — which is what every display is already showing — so a
@@ -4564,6 +4603,7 @@ function paintProfiles(kind, list, def){
   arr.forEach((pr, i)=>{
     const row = document.createElement('div');
     row.className = 'erow';
+    row.dataset.i = i;
     if (OPENPR[kind.key] !== i) row.classList.add('shut');
 
     const top = document.createElement('div');
@@ -4600,7 +4640,9 @@ function paintProfiles(kind, list, def){
          gets. */
       if (opening) loadProfile(kind, pr);
       else loadProfile(kind, defaultOf(kind));
-      reRender();
+      syncSections(kind);
+      const ab = $(kind.add);
+      if (ab) ab.hidden = OPENPR[kind.key] >= 0 || arr.some(x=> x._new);
     };
     row.appendChild(top);
 
@@ -4688,6 +4730,7 @@ function paintProfiles(kind, list, def){
     btn.hidden = busy;
     btn.disabled = busy || arr.length >= 8;
   }
+  syncSections(kind);
 }
 
 /* Kept as the old name because plenty still calls it. */
