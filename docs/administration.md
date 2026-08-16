@@ -70,6 +70,13 @@ There is no single save button. **LOOK, MOTION and SPEECH each have their own
 SAVE FOR EVERYONE and REVERT**, at the foot of that tab, writing only the
 settings on that tab.
 
+Wherever a block commits itself, its buttons sit at the **bottom right** of
+that block — CREATE, SAVE and REVERT alike. One position for all of them, so
+the commit is where the eye already is rather than somewhere to be found again
+per topic. The one exception is an endpoint's action bar, which is a row of
+seven and keeps its own arrangement: SAVE at the left, and the destructive
+actions held apart at the right.
+
 That is not decoration. There used to be one button for all three, which meant
 pressing it while looking at MOTION also published whatever had been left
 half-adjusted on LOOK — a save whose scope was wider than the thing in front

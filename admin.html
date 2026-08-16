@@ -987,11 +987,16 @@
   .grp.shut .grpbody{display:none}
   .grpbody{padding-bottom:4px}
   .seg{display:flex;flex-wrap:wrap;gap:4px}
-  /* The one thing a section like this is FOR, in the corner every dialog puts
-     its commit in. Last and hard right, so it reads as the end of the form
-     rather than as another field in it — and below the note, so a refusal
-     appears between what you typed and the button you press again. */
-  .createrow{justify-content:flex-end;margin-top:10px}
+  /* Committing a block — CREATE, SAVE, REVERT — in the corner every dialog
+     puts its commit in. Last and hard right, so it reads as the end of the
+     form rather than as another field in it. One class for all of them: a
+     save that sits left on one topic and right on the next is a panel the eye
+     has to re-learn per section.
+
+     Not applied to .rtacts, which is a seven-button toolbar with its own
+     spacer holding the destructive actions apart. Right-aligning SAVE there
+     would park it against DELETE. */
+  .actrow{justify-content:flex-end;margin-top:10px}
   .seg button{
     font:inherit;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;padding:5px 8px;cursor:pointer;
     background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.9);
@@ -1581,7 +1586,7 @@ Short by default — this session configures what everyone else is looking at.
     <button data-v="admin">ADMIN</button>
   </div>
   <div class="note" id="usernote"></div>
-  <div class="seg createrow"><button id="b_adduser" class="act-save">CREATE</button></div>
+  <div class="seg actrow"><button id="b_adduser" class="act-save">CREATE</button></div>
     </div>
   </section>
   <!-- Whether uninvited devices may ask at all, and what a grant to one is
@@ -1618,7 +1623,7 @@ Short by default — this session configures what everyone else is looking at.
     </div>
   </div>
   <div class="note" id="groupnote"></div>
-  <div class="seg createrow"><button id="b_addgroup" class="act-save">CREATE</button></div>
+  <div class="seg actrow"><button id="b_addgroup" class="act-save">CREATE</button></div>
   <div class="note help" style="margin-top:10px">A group of <b>people</b> holds
 those who asked for access and were approved. A group of <b>devices</b> holds
 the screens you created and sent a code to. They are separate populations
@@ -1678,7 +1683,7 @@ When more than the waiting limit are queued, the oldest one waiting is dropped
 to make room — so set it high enough that a real request cannot be pushed out
 by noise.</div>
 
-  <div class="seg" style="margin-top:8px">
+  <div class="seg actrow">
     <button id="b_dpsave" class="act-save">SAVE GUEST ACCESS</button>
     <button id="b_dprevert" class="act-undo">REVERT</button>
   </div>
@@ -1826,7 +1831,7 @@ working has nothing left to ask about, so it takes it the next time its page
 loads — reload it there, or use OPEN DISPLAY. Making a working screen poll for
 a setting that changes twice a year would be the wrong trade.</div>
 
-  <div class="seg" style="margin-top:8px">
+  <div class="seg actrow">
     <button id="b_saversave" class="act-save">SAVE THE PROFILES</button>
     <button id="b_saverrevert" class="act-undo">REVERT</button>
   </div>
@@ -1852,7 +1857,7 @@ If you do not ask for a name, rows arrive labelled by their id and you approve
 them on whatever you did ask for. Ask for nothing at all and a request carries
 nothing but that id.</div>
 
-  <div class="seg" style="margin-top:8px">
+  <div class="seg actrow">
     <button id="b_formsave" class="act-save">SAVE THE FORM</button>
     <button id="b_formrevert" class="act-undo">REVERT</button>
   </div>
@@ -1912,7 +1917,7 @@ anything on LOOK, MOTION or SPEECH — puts the shared document back.
 If that turns out not to be enough on a real wall, the range is the thing to
 change, not this.</div>
 
-  <div class="seg" style="margin-top:8px">
+  <div class="seg actrow">
     <button id="b_looksave" class="act-save">SAVE THE PROFILES</button>
     <button id="b_lookrevert" class="act-undo">REVERT</button>
   </div>
@@ -2024,14 +2029,14 @@ button to download it as a PDF.</div>
 
   <div id="airow">
     <div class="note" id="rtlistnote"></div>
-    <div class="seg">
+    <div class="seg actrow">
       <button id="b_addroute" class="act-save">ADD INSTANCE</button>
     </div>
   </div>
   <div id="approw">
     <div class="note" id="appnote"></div>
     <div class="pending" id="apppending" hidden></div>
-    <div class="seg">
+    <div class="seg actrow">
       <button id="b_appsave" class="act-save">SAVE APP SETTINGS</button>
       <button id="b_apprevert" class="act-undo">REVERT</button>
     </div>
@@ -2076,7 +2081,7 @@ button to download it as a PDF.</div>
     <input id="pw_cur" type="password" autocomplete="current-password">
     <label class="bklab">New password</label>
     <input id="pw_new" type="password" autocomplete="new-password">
-    <div class="seg" style="margin-top:8px">
+    <div class="seg actrow">
       <button id="b_pw" class="act-save">CHANGE PASSWORD</button>
       <button id="b_mineclose" class="act-undo">CLOSE</button>
     </div>
@@ -2680,7 +2685,7 @@ function paintUiRows(){
     if (!row.dataset.built){
       row.dataset.built = '1';
       row.innerHTML = '<div class="scope"></div>'
-                    + '<div class="seg">'
+                    + '<div class="seg actrow">'
                     + '<button class="act-save" data-do="save">SAVE FOR EVERYONE</button>'
                     + '<button class="act-undo" data-do="revert">REVERT</button></div>'
                     + '<div class="state"></div>';
@@ -3161,7 +3166,7 @@ memory so the next question isn't the slow one.</div>
     <h5>System prompt<span class="subsum"></span></h5>
     <div class="subbody">
   <textarea data-f="system" rows="7" spellcheck="false"></textarea>
-  <div class="seg" style="margin-top:6px">
+  <div class="seg actrow">
     <button data-a="resetprompt" class="act-undo" title="back to the wording this ships with">RESET</button>
   </div>
   <div class="note help">Sent ahead of every question this endpoint is asked.
@@ -4562,7 +4567,7 @@ function wallBlock(d){
   sync();
 
   const acts = document.createElement('div');
-  acts.className = 'acts';
+  acts.className = 'acts actrow';
   const said = document.createElement('div');
   said.className = 'note';
   const save = document.createElement('button');
