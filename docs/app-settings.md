@@ -3,16 +3,22 @@
 Everything in this document is about how the server itself is wired, as
 opposed to how the interface looks.
 
-## Reach and sign-in
+## Reachable at, and signing in
 
 Two settings, deliberately not one "mode": **what it is reachable at**, and
-**what it takes to get in**. They are independent, and a single label covering
+**what it takes to sign in**. They are independent, and a single label covering
 both starts lying the moment somebody changes half of it — "personal" would
 still read personal after the binding moved to every interface on the machine.
-The panel shows the pair and states the arrangement underneath in the words it
-actually means.
 
-| Reachable at | To get in | Fits |
+They are two topics under APP SETTINGS for the same reason. **EXT Access**
+holds where the server can be reached from; **Sign in** holds what it takes to
+get past the door. The posture line — what it is reachable at and what the door
+is, in the words it actually means — is stated under EXT Access, because what
+it warns about is exposure.
+
+They are still read as a pair:
+
+| Reachable at | Sign in | Fits |
 |---|---|---|
 | this machine only | nothing | your own machine; nothing else can reach it |
 | one address | nothing | your own home network, your call, stated plainly |
@@ -180,6 +186,64 @@ the two.
 Changing a role or a password drops that account's existing sessions, so the
 new rights or the new password take effect at the next sign-in rather than
 whenever the old session happens to expire.
+
+## Speaker label
+
+The two labels down the left of the transcript. They are here rather than
+under APPEARANCE because what they SAY is closer to how this server is set
+up than to how the figure looks — but they are still part of the **shared**
+settings document, not `app.json`. That is why this tab carries two commits:
+**SAVE FOR EVERYONE** publishes these, **SAVE APP SETTINGS** rewires the
+server, and neither stands in for the other.
+
+They default to **operator** and **resonance**, and either can be a fixed word
+or a variable.
+
+| Variable | Becomes |
+|---|---|
+| `{name}` | the word you say to reach whoever is answering, capitalised |
+| `{assistant}` | what that assistant is called |
+| `{display}` | the name of the device being viewed at |
+
+`{assistant}` is the **default** for *the assistant*, and with more than one
+endpoint it is the only label that can be right — a fixed word attributes
+every answer to the same name however many answered.
+
+Each line keeps the name of whoever gave it. Switching endpoints
+mid-conversation does not rewrite what is already on screen, and changing this
+field still relabels the whole transcript so you can tune it against a live
+one.
+
+An install that predates endpoints and still holds the old shipped word is
+carried across to the variable on the way out of the settings file. On a
+single endpoint of that name it renders identically; once there is a second,
+it is correct instead of wrong.
+
+`{name}` is the same variable the greeting and farewell fields already use, so
+renaming what the assistant answers to can rename what it is called in the
+transcript — put `{name}` in *the assistant* and the two never drift apart.
+
+`{display}` is the useful one for *the person*. One setting then attributes
+each transcript to the device it is being read at, with no setting per device:
+a laptop approved as *Sarah laptop* labels her lines with that, and a wall
+screen named *Kitchen* labels its own.
+
+It resolves to the first of these that exists:
+
+1. the name you gave that row under **ACCESS**
+2. `?display=` from the URL it was opened with
+3. the first thing typed on its request form
+
+A person's name as distinct from the device they are standing at — the same
+name following somebody from laptop to phone — needs an identity they carry,
+and does not exist yet.
+
+Variables mix with ordinary text: `{display} shift lead` is fine. A variable
+that resolves to nothing falls back to the default, so `{display}` on a URL
+that declared no name still reads *operator* rather than leaving the line
+attributed to nobody. A variable that is not recognised is left standing
+rather than blanked, so a typo is visible instead of silently disappearing.
+
 
 ## Accounts
 

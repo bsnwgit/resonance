@@ -1,4 +1,4 @@
-# Appearance & motion
+# Appearance & geometry
 
 Everything here writes the shared settings document, so it changes what
 **every** display shows. Move a control and the preview responds immediately;
@@ -7,26 +7,11 @@ nothing reaches anyone else until you press SAVE FOR EVERYONE.
 There is no wrong setting in this document — none of it can break the app —
 so the honest advice is to open the preview and push the sliders around.
 
-## LOOK
-
-### Geometry
-
-Four figures. They are genuinely different shapes rather than presets of one
-shape, so try each rather than assuming.
-
-| Mode | Reads as |
-|---|---|
-| STACK | layered horizontal waves — the most legible for speech |
-| DISC | a rotating ring |
-| ORB | a sphere of lines |
-| KNOT | a closed looping curve |
-
-STACK is the safest default: it maps most directly onto sound, so a viewer
-learns what the movement means fastest.
+## APPEARANCE
 
 ### Palette
 
-BLUE, MILK, ICE, AMBER, BONE. Only the figure's colour channel changes — the
+BLUE, MILK, ICE, AMBER, RUST. Only the figure's colour channel changes — the
 text stays fixed neutral white deliberately, so the transcript stays readable
 no matter how dark the geometry goes.
 
@@ -69,57 +54,22 @@ These are cumulative and easy to overdo. Bloom plus milk plus grain at once
 turns a sharp figure into fog. If the display looks muddy, this is where to
 look first.
 
-### Who is speaking
+## GEOMETRY
 
-The two labels down the left of the transcript. They default to **operator**
-and **resonance**, and either can be a fixed word or a variable.
+### Pattern
 
-| Variable | Becomes |
+Four figures. They are genuinely different shapes rather than presets of one
+shape, so try each rather than assuming.
+
+| Mode | Reads as |
 |---|---|
-| `{name}` | the word you say to reach whoever is answering, capitalised |
-| `{assistant}` | what that assistant is called |
-| `{display}` | the name of the device being viewed at |
+| STACK | layered horizontal waves — the most legible for speech |
+| DISC | a rotating ring |
+| ORB | a sphere of lines |
+| KNOT | a closed looping curve |
 
-`{assistant}` is the **default** for *the assistant*, and with more than one
-endpoint it is the only label that can be right — a fixed word attributes
-every answer to the same name however many answered.
-
-Each line keeps the name of whoever gave it. Switching endpoints
-mid-conversation does not rewrite what is already on screen, and changing this
-field still relabels the whole transcript so you can tune it against a live
-one.
-
-An install that predates endpoints and still holds the old shipped word is
-carried across to the variable on the way out of the settings file. On a
-single endpoint of that name it renders identically; once there is a second,
-it is correct instead of wrong.
-
-`{name}` is the same variable the greeting and farewell fields already use, so
-renaming what the assistant answers to can rename what it is called in the
-transcript — put `{name}` in *the assistant* and the two never drift apart.
-
-`{display}` is the useful one for *the person*. One setting then attributes
-each transcript to the device it is being read at, with no setting per device:
-a laptop approved as *Sarah laptop* labels her lines with that, and a wall
-screen named *Kitchen* labels its own.
-
-It resolves to the first of these that exists:
-
-1. the name you gave that row under **DEVICES**
-2. `?display=` from the URL it was opened with
-3. the first thing typed on its request form
-
-A person's name as distinct from the device they are standing at — the same
-name following somebody from laptop to phone — needs an identity they carry,
-and does not exist yet.
-
-Variables mix with ordinary text: `{display} shift lead` is fine. A variable
-that resolves to nothing falls back to the default, so `{display}` on a URL
-that declared no name still reads *operator* rather than leaving the line
-attributed to nobody. A variable that is not recognised is left standing
-rather than blanked, so a typo is visible instead of silently disappearing.
-
-## MOTION
+STACK is the safest default: it maps most directly onto sound, so a viewer
+learns what the movement means fastest.
 
 ### Rotation
 
@@ -164,7 +114,7 @@ this exists; too much of it reads as noise. A little goes a long way.
 
 ## Test drive
 
-Under SPEECH, not LOOK, but it belongs in this workflow: **IDLE**,
+Under SPEECH, not APPEARANCE, but it belongs in this workflow: **IDLE**,
 **THINKING** and **SPEAK SAMPLE** drive the figure through each state without
 needing a microphone or a real question. This is the fastest way to judge a
 palette or a motion setting, because you can see all three states in a few

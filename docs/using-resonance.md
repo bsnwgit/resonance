@@ -63,26 +63,29 @@ Hides the transcript and gives the space to the figure. The conversation still
 happens — this only affects what is on screen. Turn it off for a display that
 is mostly being looked at rather than read.
 
-**On some screens this button is not there.** A display mounted on a wall is
-voice only, and then there is no transcript and no typing on that screen at all
+**On some screens this button is not there.** A display set up as a kiosk — on
+a wall, a stand, a counter — is usually voice only, and then there is no
+transcript and no typing on that screen at all
 — only the figure and your voice. The button is taken away rather than left
 there refusing you, because a control that ignores you is worse than one that
 was never offered.
 
-**A wall screen has no SPACE button either.** Holding the space bar is a way of
-talking to it that assumes a keyboard, and a screen on a wall does not have one.
+**A kiosk has no SPACE button either.** Holding the space bar is a way of
+talking to it that assumes a keyboard, and a screen people walk up to does not
+have one.
 Those screens always listen, so you say the wake word instead — which is what
 the line low on the screen is telling you.
 
-**A wall screen fills the display when you touch it.** The browser's own bars
+**A kiosk usually fills the display when you touch it.** The browser's own bars
 disappear and the figure takes the whole panel. If you need them back — to read
 the address, or to reload — press Escape, and they stay for a minute before it
 goes full screen again.
 
 ## What to say to it
 
-A screen on a wall shows one dim line near the bottom: **say “kitchen”**, or
-whatever it has been named. That is the whole instruction. Say it, wait for the
+A kiosk usually shows one dim line near the bottom: **say “kitchen”**, or
+whatever it has been named — or whatever whoever set it up chose to write
+there. That is the whole instruction. Say it, wait for the
 figure to react, then ask your question.
 
 The line is not there while you are talking to it — the answer is more use than

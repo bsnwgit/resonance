@@ -109,5 +109,13 @@ case "${1:-status}" in
       ss -ltnp 2>/dev/null | grep "pid=$p," | awk '{print "   " $4}'
     fi
     ;;
-  *) echo "usage: $0 start|stop|status"; exit 1;;
+  restart)
+    # There was no restart verb, and asking for one printed the usage and
+    # exited 1 — which looks close enough to "done" that a server can go on
+    # running yesterday's code for hours while somebody wonders why a new
+    # setting will not save. stop is idempotent, so this is safe from down.
+    "$0" stop
+    "$0" start
+    ;;
+  *) echo "usage: $0 start|stop|restart|status"; exit 1;;
 esac

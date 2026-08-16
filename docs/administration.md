@@ -35,16 +35,23 @@ At the top:
 - **filter settings** — type to search across every topic in every tab at
   once. This is the fastest way to find a control when you know roughly what
   it is called but not which tab it lives under.
-- **LOOK / MOTION / SPEECH** and **AI** — the four tabs that edit the shared
-  interface.
+- **APPEARANCE / GEOMETRY / SPEECH**, **AI** and **DEVICES** — the user
+  interface row. The first three edit the shared interface. AI holds the
+  endpoints, each of which saves itself. DEVICES is the register: every device
+  this server knows about, and where each one is set up.
+- **?**, beside the SETTINGS title — these documents. It is blue, and it is the
+  same blue as every ? beside a topic heading, so help is one colour wherever
+  you meet it.
 
 At the foot, pinned so they are always reachable:
 
-- **APP SETTINGS** — how the server itself is wired.
+- **APP SETTINGS** — how the server itself is wired: where it can be reached
+  from, signing in, ports, sessions, and what the two transcript labels say.
+- **PROFILES** — the appearance, screensaver and device profiles a screen can be
+  pointed at.
 - **ACCOUNTS** — who can sign in, and the groups access is granted to.
-- **DEVICES** — what may use this server, and what each may reach.
+- **ACCESS** — what may use this server, and what each may reach.
 - **EMBEDS** — keys that let another application frame this interface.
-- **DOCUMENTATION** — these documents.
 - Your own name, your role, and **SIGN OUT**.
 
 **Your own account is behind your name.** Click it for the box that changes
@@ -60,22 +67,36 @@ nothing for anybody else. The state is yours until you commit it.
 
 ### Every part of the panel commits itself
 
-There is no single save button. **LOOK, MOTION and SPEECH each have their own
+There is no single save button. **APPEARANCE, GEOMETRY and SPEECH each have their own
 SAVE FOR EVERYONE and REVERT**, at the foot of that tab, writing only the
 settings on that tab.
 
+Wherever a block commits itself, its buttons sit at the **bottom right** of
+that block — SAVE and REVERT alike, with anything that MAKES a new thing at the
+left of the same row.
+
+Colour says which kind of act a button is: **green** commits, **red** destroys,
+**amber** brings something new into existence, **yellow** takes something back
+without destroying it, **blue** explains. CREATE and
+SAVE used to share green, which made pressing one feel like pressing the
+other — only one of them adds a row you then have to name. One position for all of them, so
+the commit is where the eye already is rather than somewhere to be found again
+per topic. The one exception is an endpoint's action bar, which is a row of
+seven and keeps its own arrangement: SAVE at the left, and the destructive
+actions held apart at the right.
+
 That is not decoration. There used to be one button for all three, which meant
-pressing it while looking at MOTION also published whatever had been left
-half-adjusted on LOOK — a save whose scope was wider than the thing in front
+pressing it while looking at GEOMETRY also published whatever had been left
+half-adjusted on APPEARANCE — a save whose scope was wider than the thing in front
 of you, and no way to tell from the screen. Each row now says what it covers:
 *19 settings on this tab, shared with every viewer*.
 
-The consequence worth knowing: you can leave MOTION unsaved while saving LOOK,
+The consequence worth knowing: you can leave GEOMETRY unsaved while saving APPEARANCE,
 and the preview will keep showing both. Each row carries its own unsaved
 warning, in red, so the tab with work waiting behind it says so.
 
 **REVERT** puts that tab's settings back to what the server holds and leaves
-every other tab alone — reverting LOOK should not throw away an hour spent on
+every other tab alone — reverting APPEARANCE should not throw away an hour spent on
 SPEECH.
 
 An unsaved change is flagged in red on that tab's row. Walking away from a
@@ -92,8 +113,11 @@ Each of these writes a different document, so each has its own button:
 | SAVE APP SETTINGS | ports, binding, session lifetime | only after a restart |
 
 Offering one button that meant all of them is how somebody presses the wrong
-one. A tab that writes nothing shared shows no save row at all — the AI tab
-has none, because each endpoint saves itself.
+one. A tab that writes nothing shared shows no SAVE FOR EVERYONE at all — the
+AI tab has none, because each endpoint saves itself from inside its own block.
+PROFILES has a commit of its own instead: **SAVE PROFILES** writes all three
+lists together, because they are three parts of one document and a kiosk
+profile can name an appearance added in the same sitting.
 
 ## The live preview
 
@@ -125,28 +149,53 @@ A display is one device — a screen on a wall, a TV, a laptop, somebody's phone
 — as distinct from a browser tab somebody opened. Anything with a browser and a
 microphone counts.
 
-The DEVICES tab holds six topics:
-
-| | |
-|---|---|
-| | left | middle | right |
-|---|---|---|---|
-| **top** | Requested Access | Created Access | Screensaver profiles |
-| **bottom** | The request form | Connected devices | Appearance profiles |
+The ACCESS tab holds three topics — the rules about who may be here:
 
 | | |
 |---|---|
 | **Requested Access** | whether a general user needs approval at all, and what a grant to one is worth once given |
 | **The request form** | what a request asks for, under the setting that decides whether anyone is asked at all |
-| **Created Access** | the queue: everything waiting on a decision, on a code being typed in, or on somebody asking again — and where you add one |
-| **Connected devices** | everything that is simply working, most recently heard from first |
-| **Screensaver profiles** | what a screen on a wall does when nobody is there |
-| **Appearance profiles** | what a place looks like, for the handful of values that cannot be shared |
+| **Created Access** | where you invite a device: name it and take the code to the screen |
 
-Created Access and Connected devices are separate lists on purpose. One is a to-do list and empties as
-you work through it; the other is a register you read when somebody asks what
-is out there. Three rows that need attention buried among fifty that do not is
-how a request sits unanswered for a week.
+The register itself is on its own tab, **DEVICES**, on the user interface row —
+every device this server knows about, in one list.
+
+The profile lists live on the **PROFILES** tab instead, beside the deployment's
+own settings — what a screen looks like and what it is allowed to do were never
+the same question:
+
+| | |
+|---|---|
+| **Appearance profiles** | what a place looks like, for the handful of values that cannot be shared |
+| **Screensaver profiles** | what a kiosk does when nobody is there |
+| **Device profiles** | what a public screen is: voice only, full screen, the prompt line, and which of the lists above it uses |
+
+They are in that order on the tab because it is the order you build in: the two
+pieces first, then the thing that names them.
+
+**A device profile is composed, not self-contained.** It names an appearance and
+a screensaver rather than carrying copies of their values, so changing what a
+hallway looks like once still reaches every kiosk using it. Day and night in
+one hallway share an appearance and differ only in the dim — that case is the
+reason the three lists stayed three.
+
+**One of them is the default**, and you choose which. A device that names no
+profile gets it, so a screen hung and never configured behaves like the rest of
+the building rather than like nothing. It is stored by name rather than being
+"the first in the list", so reordering the panel cannot quietly change what
+every unconfigured screen is doing.
+
+**Devices is one register, and it used to be two.** The split — a queue of
+things wanting a decision, and a list of things simply working — was there so
+that three rows needing attention were not buried among fifty that did not.
+What actually carried that is the ordering, and the ordering survived the
+merge: anything waiting sorts to the top by how much it wants attention, and
+everything working follows by what was heard from most recently.
+
+What the split cost was somewhere to look. A device you had just plugged in was
+in one list or the other depending on whether it had been approved yet, which
+is precisely the moment you are hunting for it. Now it appears under Devices
+either way.
 
 **There are two ways one gets into the list**, and which you use depends on
 whether you knew it was coming.
@@ -202,17 +251,28 @@ laptop can open the page on their phone and ask again from a clean row. That is
 what device identity is — anything stronger needs an identity that person
 carries, which is what a dedicated URL will be.
 
-### On a wall
+### Kiosk mode
 
-Most rows in a real deployment are not on a wall — a guest's laptop, somebody's
-phone — so it is one tick that turns the rest of it on. Tick **On a wall** on a
-device and three controls appear: whether it is voice only, which appearance
-profile it uses, and which screensaver profile. Untick it and the screen goes
-back to being an ordinary page, with all three kept: putting the device back up
-restores what you chose.
+A **kiosk** is a screen people walk up to, that nobody has open and nobody is
+sitting at — a wall, a stand, a reception counter, a tabletop. The mounting was
+never what any of this followed from: what it follows from is that nobody owns
+the session and nobody has a keyboard. It was called *on a wall* until
+2026-08-16, which told anybody deploying on a stand that the feature was not
+for them.
 
-**A wall is voice only and speak only from the moment you tick it.** Both
-follow from what the thing is rather than being two more boxes to find:
+Most rows in a real deployment are not kiosks — a guest's laptop, somebody's
+phone — so it is one tick. Tick **Kiosk mode** on a device and one control
+appears: **which kiosk it is**, chosen from the profiles on the PROFILES tab.
+Untick it and the screen goes back to being an ordinary page, with the choice
+kept: putting the device back up restores what you had.
+
+What a kiosk *does* is the profile's business, not the row's. That is the whole
+point of the split — the settings that used to be edited one device at a time
+are now edited once, where they are named, and every screen using that profile
+changes with them.
+
+**A kiosk is voice only and speak only by default.** Both follow from what the
+thing is rather than being two more boxes to find:
 
 - **No text box.** Voice only arrives already ticked. Untick it for the case
   that wants a transcript — a television in a meeting room, a screen somebody
@@ -227,13 +287,13 @@ TALK and AUDIO stay. A browser will not open a microphone unless somebody asks
 it to, so TALK is pressed once when the screen is commissioned and the wake word
 carries it from there.
 
-**And it goes full screen on the first touch.** An address bar, a tab strip and
+**And it goes full screen on the first touch**, unless the profile says otherwise. An address bar, a tab strip and
 somebody's bookmarks across the top of a hallway screen is a browser that
 happens to be running a display. The page cannot remove that chrome — no page
 can — but it can ask to be shown full screen, and a browser grants that off a
 gesture, which is why it happens on a touch rather than on load.
 
-Only on a wall. A tab you opened is yours, and a page that went full screen the
+Only on a kiosk. A tab you opened is yours, and a page that went full screen the
 moment you clicked it would be a page you never opened twice.
 
 **It does not fight you.** Press Escape and it stays out for a minute, because
@@ -247,7 +307,7 @@ looks like.
 
 **Voice only** is the geometry alone: no transcript and no composer. That is
 what a screen in a hallway wants. It is not a workstation, and a page of
-scrolling text on a wall is neither useful nor discreet.
+scrolling text on a kiosk is neither useful nor discreet.
 
 This is the one setting that **beats the viewer's own control.** The three
 buttons in the bar were built to override the shared settings deliberately,
@@ -263,10 +323,13 @@ TALK, AUDIO and SPACE stay. A browser will not open a microphone without
 somebody asking it to, so a display with no TALK button is a display that could
 never hear its own wake word. Voice only means no text, not no controls.
 
-**It says what to say to it.** A screen on a wall is walked past by people who
+**It says what to say to it.** A kiosk is walked past by people who
 have never used it, and nothing about a silent figure suggests that it listens.
-So a wall display carries one dim line low in the frame — *say “kitchen”*, in
-whatever the wake words actually are. It is there only while nobody is talking
+So a kiosk carries one dim line low in the frame — *say “kitchen”*, in
+whatever the wake words actually are. **The profile can turn that line off, or
+give it words of your own**; leave the text empty and it writes itself from the
+wake words the screen is currently answering to, which stays right when you
+rename one. It is there only while nobody is talking
 to it, only where a wake word exists, and never on a browser tab: somebody who
 opened the page did so on purpose.
 
@@ -276,14 +339,15 @@ walks up to a screen that has been idle for hours — and leaving it where it wa
 would be the one thing on a drifting screen that never moved.
 
 **Both profiles are chosen from lists set centrally**, under *Appearance
-profiles* and *Screensaver profiles*. All three settings are deliberately
+profiles* and *Screensaver profiles* on the **PROFILES** tab. All three
+settings are deliberately
 separate axes: a wall screen can be voice only without ever drifting, a shared
 television can drift while still showing its transcript, and a laptop can be
 given larger type without being told to do either.
 
 ### Appearance profiles
 
-The LOOK tab is **one document for everybody**, and that is right for almost
+The APPEARANCE tab is **one document for everybody**, and that is right for almost
 all of it — tune the bloom once and every screen in the building gets it. It is
 wrong for exactly four values.
 
@@ -294,7 +358,7 @@ transcript beside it. So four values become a profile that a device names:
 
 | | |
 | --- | --- |
-| **Type size** | NORMAL, LARGER, LARGEST — the range the LOOK tab offers |
+| **Type size** | NORMAL, LARGER, LARGEST — the range the APPEARANCE tab offers |
 | **Palette** | which of the five |
 | **Layout** | HERO, or FULL BLEED for a screen that is mostly being looked at |
 | **Figure** | STACK, DISC, ORB or KNOT |
@@ -303,17 +367,17 @@ Everything else stays shared. That is the point of the shortlist rather than
 "override anything": a per-place setting that could cover the whole document
 would quietly end the ability to change something once for everyone.
 
-**A device that names no profile shows what the LOOK tab says**, which is what
+**A device that names no profile shows what the APPEARANCE tab says**, which is what
 every display did before this existed. Deleting a profile puts every device
 that named it back to that, rather than to nothing — so the fall-back is always
 a working appearance.
 
 **PREVIEW** lays a profile over the live preview without saving it, and follows
 the controls as you change them. STOP puts the shared document back, and so
-does touching anything on LOOK, MOTION or SPEECH.
+does touching anything on APPEARANCE, GEOMETRY or SPEECH.
 
 One limit worth knowing before a screen goes up: **type size tops out at
-LARGEST**, because that is the range the LOOK tab offers. If that is not enough
+LARGEST**, because that is the range the APPEARANCE tab offers. If that is not enough
 at three metres, the range itself is the thing to change.
 
 ### Screensaver profiles
