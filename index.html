@@ -3594,6 +3594,9 @@ const Wake = {
     return list.filter(Boolean);
   },
   sleepCandidates(){ return this._list(S.sleepword, S.sleepaliases); },
+  /* The same, for the word that WAKES it — which is a setting now rather than
+     a property of a route, so it is asked for the same way. */
+  wakeCandidates(){ return this._list(S.wakeword, S.wakealiases); },
 
   /* Ending a conversation on purpose beats waiting out a timer — say the
      sleep word and it stops listening immediately, so you can talk
@@ -3816,14 +3819,12 @@ const Learn = {
     });
   },
 
-  start(target, routeId){
+  start(target){
     this.target = target || 'wake';
-    this.route = this.target === 'wake' ? (routeId || Routes.currentId()) : '';
+    /* No route to pick any more: the wake word belongs to the speech profile
+       being edited, the same way the sleep word belongs to the display. */
+    this.route = '';
     this.clearNotes();
-    if (this.target === 'wake' && !Routes.byId(this.route)){
-      this.say('Pick a route to teach first.');
-      return;
-    }
     if (!Mic.active || !Listen.on){
       this.say('Press TALK first (bottom right), then try again.');
       return;
@@ -3847,8 +3848,7 @@ const Learn = {
     this.on = false;
     const isWake = this.target === 'wake';
     const r = isWake ? Routes.byId(this.route) : null;
-    const have = isWake ? Routes.words(r).map(w=> Wake.norm(w))
-                        : Wake.sleepCandidates();
+    const have = isWake ? Wake.wakeCandidates() : Wake.sleepCandidates();
     const add = [...new Set(this.got)].filter(x => x && have.indexOf(x) < 0);
     if (!add.length){
       this.say('Nothing new to add — “' + this.got.join('”, “') +
@@ -3864,22 +3864,18 @@ const Learn = {
                'well as “' + S.sleepword + '”.');
       return;
     }
-    /* A wake word belongs to a route, and routes are written from the admin
-       listener by somebody signed in — this page has no route that accepts a
-       write and should not grow one. So the words go up the channel that is
-       already there and land in the panel's field, unsaved, for the admin to
-       look at and commit.
-
-       They are applied to this page's own copy of the route at the same
-       time, so the very next thing you say is tested against what was just
-       learned. That copy dies with the page, which is the honest state of
-       affairs until somebody presses SAVE. */
-    r.aliases = [...new Set([...(r.aliases || []), ...add])];
+    /* Into the profile's own field, unsaved, for the admin to look at and
+       commit — the same path the sleep word takes. It used to be relayed to a
+       route's box in the panel; a route has no wake word to teach now. */
+    const cur = (S.wakealiases||'').split(/[\n,]/).map(x=>x.trim()).filter(Boolean);
+    S.wakealiases = [...new Set([...cur, ...add])].join('\n');
+    const el = document.getElementById('wakealiases');
+    if (el) el.value = S.wakealiases;
     if (window.parent !== window)
-      window.parent.postMessage({rsn:1, kind:'learned', route:this.route,
+      window.parent.postMessage({rsn:1, kind:'learned', field:'wakealiases',
                                  words:add}, '*');
-    this.say('Learned: ' + add.join(', ') + ' — ' + r.name + ' answers to ' +
-             'these now, and will keep doing so once you SAVE the route.');
+    this.say('Learned: ' + add.join(', ') + ' — this profile now answers to ' +
+             'these as well as “' + (S.wakeword || '') + '”.');
   }
 };
 
@@ -4018,7 +4014,7 @@ if (!window.isSecureContext || !Mic.ok){
 }
 /* LEARN takes the route it is teaching, because a wake word belongs to one
    now. The panel sends which one along with the command. */
-CMD.learnwake  = (routeId)=> Learn.start('wake', routeId);
+CMD.learnwake  = ()=> Learn.start('wake');
 CMD.learnsleep = ()=> Learn.start('sleep');
 
 const sleepIn = $('sleepword');

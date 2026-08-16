@@ -909,6 +909,18 @@ def validate_route(obj, current, doc, rid=None):
                            for p in display_settings()["speeches"]):
             return None, ("that speech profile no longer exists — reload the "
                           "panel to see the current list")
+        # One endpoint per profile. A speech profile carries the WAKE WORD, so
+        # two endpoints naming the same one answer to the same name and cannot
+        # be told apart — the utterance would reach whichever matched first.
+        # Refused here rather than left to be discovered by talking to it.
+        if pid:
+            taken = [k for k, r in doc["routes"].items()
+                     if k != rid and r.get("speech") == pid]
+            if taken:
+                other = doc["routes"][taken[0]].get("name") or "another endpoint"
+                return None, ("%s already uses that speech profile — a profile "
+                              "carries the wake word, so two endpoints sharing "
+                              "one would answer to the same name" % other)
         rec["speech"] = pid
     if not rec["name"]:
         return None, "a route needs a name"
@@ -954,8 +966,11 @@ def validate_route(obj, current, doc, rid=None):
         rec["groups"] = out[:MAX_GROUPS]
     if "wakeword" in obj:
         rec["wakeword"] = _norm_word(obj["wakeword"])[:40]
-    if not rec["wakeword"]:
-        return None, "a route needs a wake word — it is how anybody reaches it"
+    # No longer required on the route. The word lives in the speech profile the
+    # route names, and demanding one here would refuse every endpoint saved
+    # from a panel that no longer has the field. What a route DOES still need
+    # is a way to be reached, and that is now the profile — checked above.
+    rec.setdefault("wakeword", "")
     if "aliases" in obj:
         raw = obj["aliases"]
         if not isinstance(raw, (list, tuple)):
@@ -968,18 +983,12 @@ def validate_route(obj, current, doc, rid=None):
                 out.append(w)
         rec["aliases"] = out[:20]
 
-    # Two routes answering to the same word is not a preference, it is a
-    # route nobody can reach. Refused here at the point of entry; words that
-    # are merely CLOSE are the personal-wake-word phase's problem, and want
-    # the matcher that does the waking rather than a string comparison.
-    mine = set([rec["wakeword"]] + list(rec["aliases"]))
-    for other, o in doc["routes"].items():
-        if other == rid:
-            continue
-        clash = mine & set([o["wakeword"]] + list(o.get("aliases") or []))
-        if clash:
-            return None, ("“%s” already reaches %s"
-                          % (sorted(clash)[0], o["name"]))
+    # Two routes answering to the same word is still a route nobody can reach,
+    # but it is no longer checked HERE: the words live in speech profiles now,
+    # every route carries the same vestigial default, and comparing those
+    # refused every save. What prevents the clash instead is one endpoint per
+    # profile, refused above — two endpoints cannot share a word because they
+    # cannot share the profile the word is in.
     return rec, None
 
 

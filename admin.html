@@ -1488,6 +1488,8 @@ picks.</div>
   <label class="bklab">Also accept</label>
   <textarea id="wakealiases" rows="3" spellcheck="false"
             placeholder="one per line — what a transcriber actually hears"></textarea>
+  <div class="seg" style="margin-top:6px"><button id="b_learnwake">LEARN HOW I SAY IT (3x)</button></div>
+  <div id="learnwakenote" class="learnnote"></div>
   <label class="bklab">Matching</label>
   <div class="seg" data-set="wakestrict">
     <button data-v="0" class="on">FUZZY</button>
@@ -2835,7 +2837,7 @@ function buildControls(){
   const ACTIONS = {
     b_reo:'reorient', b_idle:'idle', b_think:'thinking', b_speak:'speak',
     b_beep:'beep', b_test:'testvoice', b_diag:'diagnose', b_cal:'calibrate',
-    b_mic:'miconly', b_learnsleep:'learnsleep',
+    b_mic:'miconly', b_learnsleep:'learnsleep', b_learnwake:'learnwake',
     b_bye:'farewell', b_greet:'greet'
   };
   Object.keys(ACTIONS).forEach(id=>{
