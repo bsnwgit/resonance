@@ -620,19 +620,12 @@
                 border-left:1px solid rgba(var(--glass),.14)}
   .wall .wallon.off{display:none}
   .wall .acts{margin-top:7px}
-  /* One profile: its name and what it does on the first line, its three
-     numbers on the second. Four boxes and two buttons on one line at this
-     width is six controls nobody can read. */
-  .svrow{margin:6px 0 10px;padding-bottom:8px;
-         border-bottom:1px solid rgba(var(--glass),.08)}
-  .svtop{display:flex;align-items:center;gap:8px}
-  .svtop input{
-    flex:1;min-width:0;padding:5px 6px;font:inherit;
-    font-size:calc(9.5px * var(--fs));letter-spacing:.06em;
-    background:rgba(0,0,0,.6);color:var(--text);
-    border:1px solid rgba(var(--glass),.16);outline:0;
-  }
-  .svtop input:focus{border-color:var(--hue-dim)}
+  /* A profile is drawn with the device register's own .erow — the same
+     caret, the same one-open-at-a-time, the same name-as-title. They are the
+     same kind of thing in the same panel, and a second row style that behaved
+     almost the same would be one more thing to keep in step. All that is left
+     here is the one part a device row has no equivalent of: three short
+     numbers side by side, where reading them as a row is the point. */
   .svnums{display:flex;gap:8px;margin-top:4px}
   .svnums > div{flex:1 1 0;min-width:0;display:flex;flex-direction:column}
   .svnums input{
@@ -645,8 +638,8 @@
   /* PREVIEW is a toggle, and the profile it is showing has to be the one that
      looks pressed — otherwise two rows both offer to start it and neither says
      which one the screen is actually running. */
-  .svtop button.on{border-color:var(--hue-dim);color:var(--hue);
-                   background:rgba(var(--glass),.06)}
+  .erow .acts button.on{border-color:var(--hue-dim);color:var(--hue);
+                        background:rgba(var(--glass),.06)}
   /* A device picks a profile, it does not type one. */
   .wall select.nmedit{flex:1 1 auto;min-width:110px}
   /* One row per field of the request form: what it is called, whether it has
@@ -1687,56 +1680,6 @@ is back to being a browser that has never been here.</div>
     </div>
   </section>
 
-  <!-- Everything that is simply working. Its own topic, because the list
-       above is a queue — read when something needs deciding — and this one is
-       a register, read when somebody asks what is out there. Three rows that
-       need attention buried among fifty that do not is how a request sits
-       unanswered for a week. -->
-  <section class="grp" data-tab="displays">
-    <h4>Connected devices</h4>
-    <div class="grpbody">
-  <div id="connlist"></div>
-  <div class="note" id="connnote"></div>
-  <div class="note help" style="margin-top:10px">Every device that is working,
-most recently heard from first. <b>last seen</b> is the last time one asked
-this server anything, so a screen that has been unplugged for a week says so
-here before anybody notices the wall.
-
-Devices on a granted request carry <b>access runs out</b>; those you issued a
-code for do not, and never will.
-
-<b>WITHDRAW</b> takes access away and puts the row back under Created Access.
-<b>DELETE</b> goes further and forgets the device entirely.</div>
-    </div>
-  </section>
-
-  <!-- The form itself, which is a different job again: this one is written
-       once, in somebody's own words, and read by strangers. -->
-  <section class="grp" data-tab="displays">
-    <h4>The request form</h4>
-    <div class="grpbody">
-  <div id="dp_form"></div>
-  <div class="seg" style="margin-top:6px">
-    <button id="b_addfield">ADD A FIELD</button>
-  </div>
-  <div class="note help">Up to five fields, and they are yours — this server has
-no opinion about what a request should ask. Somebody running a campus wants a
-name and a department; somebody running a house wants none of it. Tick
-<b>message</b> on one field to make it a box big enough for a reason, and mark
-the ones that must be answered.
-
-If you do not ask for a name, rows arrive labelled by their id and you approve
-them on whatever you did ask for. Ask for nothing at all and a request carries
-nothing but that id.</div>
-
-  <div class="seg" style="margin-top:8px">
-    <button id="b_formsave" class="act-save">SAVE THE FORM</button>
-    <button id="b_formrevert" class="act-undo">REVERT</button>
-  </div>
-  <div class="note" id="formnote"></div>
-    </div>
-  </section>
-
   <!-- Central, and named from a device rather than copied into it. A
        deployment has a handful of kinds of place, not one setting per screen. -->
   <section class="grp" data-tab="displays">
@@ -1805,6 +1748,56 @@ a setting that changes twice a year would be the wrong trade.</div>
     <button id="b_saverrevert" class="act-undo">REVERT</button>
   </div>
   <div class="note" id="savernote"></div>
+    </div>
+  </section>
+
+  <!-- The form itself, which is a different job again: this one is written
+       once, in somebody's own words, and read by strangers. -->
+  <section class="grp" data-tab="displays">
+    <h4>The request form</h4>
+    <div class="grpbody">
+  <div id="dp_form"></div>
+  <div class="seg" style="margin-top:6px">
+    <button id="b_addfield">ADD A FIELD</button>
+  </div>
+  <div class="note help">Up to five fields, and they are yours — this server has
+no opinion about what a request should ask. Somebody running a campus wants a
+name and a department; somebody running a house wants none of it. Tick
+<b>message</b> on one field to make it a box big enough for a reason, and mark
+the ones that must be answered.
+
+If you do not ask for a name, rows arrive labelled by their id and you approve
+them on whatever you did ask for. Ask for nothing at all and a request carries
+nothing but that id.</div>
+
+  <div class="seg" style="margin-top:8px">
+    <button id="b_formsave" class="act-save">SAVE THE FORM</button>
+    <button id="b_formrevert" class="act-undo">REVERT</button>
+  </div>
+  <div class="note" id="formnote"></div>
+    </div>
+  </section>
+
+  <!-- Everything that is simply working. Its own topic, because the list
+       above is a queue — read when something needs deciding — and this one is
+       a register, read when somebody asks what is out there. Three rows that
+       need attention buried among fifty that do not is how a request sits
+       unanswered for a week. -->
+  <section class="grp" data-tab="displays">
+    <h4>Connected devices</h4>
+    <div class="grpbody">
+  <div id="connlist"></div>
+  <div class="note" id="connnote"></div>
+  <div class="note help" style="margin-top:10px">Every device that is working,
+most recently heard from first. <b>last seen</b> is the last time one asked
+this server anything, so a screen that has been unplugged for a week says so
+here before anybody notices the wall.
+
+Devices on a granted request carry <b>access runs out</b>; those you issued a
+code for do not, and never will.
+
+<b>WITHDRAW</b> takes access away and puts the row back under Created Access.
+<b>DELETE</b> goes further and forgets the device entirely.</div>
     </div>
   </section>
 
@@ -3946,6 +3939,10 @@ $('b_addsaver').addEventListener('click', ()=>{
      quarters, and enough dim to matter. Nobody's first act should be typing
      numbers into a thing they have not seen yet — press PREVIEW, then adjust. */
   DPSAVERS.push({id: '', name: '', delay: 180, scale: 70, dim: 45});
+  // Open, because it is the one you just made and the whole reason you
+  // pressed the button. A new row that arrived shut would be a list that
+  // grew by one line and nothing else.
+  OPENSV = DPSAVERS.length - 1;
   paintSavers(DPSAVERS);
 });
 $('b_saverrevert').addEventListener('click', ()=>{
@@ -3987,50 +3984,63 @@ function paintSavers(list){
     box.appendChild(em);
   }
   DPSAVERS.forEach((s, i)=>{
+    /* The same row the device register uses, and the same class, so a profile
+       and a device read as the same kind of thing in the same panel — a title
+       you open, with the settings underneath it. */
     const row = document.createElement('div');
-    row.className = 'svrow';
+    row.className = 'erow';
+    if (OPENSV !== i) row.classList.add('shut');
 
+    /* The name is a TITLE here and a field inside, exactly as it is on a
+       device. An editable box in a header is one somebody clicks by accident
+       while trying to look at what is underneath it. */
     const top = document.createElement('div');
-    top.className = 'svtop';
-    const nm = document.createElement('input');
-    nm.type = 'text'; nm.value = s.name; nm.spellcheck = false;
-    nm.placeholder = 'Hallway';
-    nm.oninput = ()=>{ DPSAVERS[i].name = nm.value; };
-    top.appendChild(nm);
-
-    /* Beside the name, not down in a device row: what a scale and a dim
-       actually look like is a property of the PROFILE, and this is where
-       somebody is choosing them. The preview on the right is the real display
-       page, so it shows the real thing — and without this nobody can pick
-       either number except by hanging a screen and waiting. */
-    const show = document.createElement('button');
-    show.textContent = 'PREVIEW';
-    show.title = 'try this profile in the preview, without saving it';
-    show.onclick = ()=>{
-      const live = SVSHOWN === i;
-      SVSHOWN = live ? -1 : i;
-      cmd('wall', {voice_only: false,
-                   saver: {delay: DPSAVERS[i].delay, scale: DPSAVERS[i].scale,
-                           dim: DPSAVERS[i].dim}});
-      cmd('drift', !live);
-      paintSavers(DPSAVERS);
+    top.className = 'top';
+    const nmt = document.createElement('span');
+    nmt.className = 'nm';
+    top.appendChild(nmt);
+    const sum = document.createElement('span');
+    sum.className = 'badge';
+    top.appendChild(sum);
+    const live = document.createElement('span');
+    live.className = 'badge';
+    live.textContent = 'IN THE PREVIEW';
+    live.style.display = SVSHOWN === i ? '' : 'none';
+    top.appendChild(live);
+    /* What a shut row says, so a list of eight can be read without opening
+       any of them — and it has to follow what is being typed, because the
+       title of the row somebody is editing is the one thing on screen that
+       must not still say what it used to. */
+    const retitle = ()=>{
+      nmt.textContent = (s.name || '').trim() || 'unnamed profile';
+      sum.textContent = s.delay ? s.delay + 's · ' + s.scale + '% · dim ' + s.dim + '%'
+                                : 'NEVER STARTS';
     };
-    if (SVSHOWN === i) show.className = 'on';
-    top.appendChild(show);
-
-    const del = document.createElement('button');
-    del.textContent = 'REMOVE';
-    del.onclick = ()=>{
-      // Removing renumbers everything after it, so whatever the preview was
-      // showing is no longer at the index it was found under. Stop it rather
-      // than leave a screen drifting to a profile the pressed button no longer
-      // points at.
-      stopSaverPreview();
-      DPSAVERS.splice(i, 1);
-      paintSavers(DPSAVERS);
+    retitle();
+    top.onclick = (e)=>{
+      if (e.target.closest('input, button, select, textarea')) return;
+      const opening = row.classList.contains('shut');
+      OPENSV = opening ? i : -1;
+      // One at a time, the same as the device register: eight profiles you
+      // scroll through is a list nobody reads.
+      box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+      row.classList.toggle('shut', !opening);
     };
-    top.appendChild(del);
     row.appendChild(top);
+
+    const namerow = document.createElement('div');
+    namerow.className = 'namerow';
+    const nlab = document.createElement('b');
+    nlab.textContent = 'Name';
+    namerow.appendChild(nlab);
+    const nm = document.createElement('input');
+    nm.type = 'text'; nm.className = 'nmedit'; nm.value = s.name;
+    nm.spellcheck = false;
+    nm.placeholder = 'Hallway';
+    nm.onkeydown = (e)=>{ if (e.key === 'Enter') nm.blur(); };
+    nm.oninput = ()=>{ DPSAVERS[i].name = s.name = nm.value; retitle(); };
+    namerow.appendChild(nm);
+    row.appendChild(namerow);
 
     const nums = document.createElement('div');
     nums.className = 'svnums';
@@ -4043,21 +4053,60 @@ function paintSavers(list){
       l.textContent = label;
       const inp = document.createElement('input');
       inp.type = 'number'; inp.min = lo; inp.max = hi; inp.value = s[k];
-      inp.oninput = ()=>{ DPSAVERS[i][k] = parseInt(inp.value, 10) || 0; };
+      inp.oninput = ()=>{
+        DPSAVERS[i][k] = s[k] = parseInt(inp.value, 10) || 0;
+        retitle();
+      };
       w.appendChild(l); w.appendChild(inp);
       nums.appendChild(w);
     });
     row.appendChild(nums);
+
+    const acts = document.createElement('div');
+    acts.className = 'acts';
+    /* What a scale and a dim actually look like is a property of the PROFILE,
+       and this is where somebody is choosing them. The preview on the right is
+       the real display page, so it shows the real thing — and without this
+       nobody can pick either number except by hanging a screen and waiting. */
+    const show = document.createElement('button');
+    show.textContent = SVSHOWN === i ? 'STOP' : 'PREVIEW';
+    show.title = 'try this profile in the preview, without saving it';
+    if (SVSHOWN === i) show.className = 'on';
+    show.onclick = ()=>{
+      const on = SVSHOWN !== i;
+      SVSHOWN = on ? i : -1;
+      cmd('wall', {voice_only: false,
+                   saver: {delay: s.delay, scale: s.scale, dim: s.dim}});
+      cmd('drift', on);
+      paintSavers(DPSAVERS);
+    };
+    acts.appendChild(show);
+
+    const del = document.createElement('button');
+    del.textContent = 'REMOVE';
+    del.className = 'act-danger';
+    del.onclick = ()=>{
+      // Removing renumbers everything after it, so neither the preview nor the
+      // open row is still pointing at what it was found under.
+      stopSaverPreview();
+      OPENSV = -1;
+      DPSAVERS.splice(i, 1);
+      paintSavers(DPSAVERS);
+    };
+    acts.appendChild(del);
+    row.appendChild(acts);
     box.appendChild(row);
   });
   const btn = $('b_addsaver');
   if (btn) btn.disabled = DPSAVERS.length >= 8;
 }
-/* Which profile the preview is showing, by index, so pressing PREVIEW on it
-   again stops rather than restarting it. By INDEX and not by the object,
-   because paintSavers rebuilds the array every time it runs — an object
-   captured before a repaint would never match the one drawn after it, and the
-   button would never look pressed. A new profile has no id to use either. */
+/* Which profile is open, and which one the preview is showing — both by
+   INDEX and not by the object, because paintSavers rebuilds the array every
+   time it runs: an object captured before a repaint would never match the one
+   drawn after it, so the row would never stay open and the button would never
+   look pressed. A profile that has not been saved yet has no id to use
+   either. Both are reset by anything that renumbers the list. */
+let OPENSV = -1;
 let SVSHOWN = -1;
 function stopSaverPreview(){
   if (SVSHOWN < 0) return;
