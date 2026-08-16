@@ -2240,7 +2240,10 @@ function buildHelp(){
     /* A bare section has no heading to hang the ? on, so it gets a thin row of
        its own rather than losing its help — the prose is only reachable behind
        that button, so no button would mean no help at all. */
-    let h4 = g.querySelector('h4');
+    /* The existing row first. buildHelp runs again whenever the sections are
+       rebuilt, and looking only for an h4 meant a bare section minted a second
+       header every time — two ? on the same section, then three. */
+    let h4 = g.querySelector('h4') || g.querySelector('.barehead');
     if (!h4 && g.classList.contains('bare') && g.querySelector('.note.help')){
       h4 = document.createElement('div');
       h4.className = 'barehead';
@@ -5852,7 +5855,15 @@ function panelNav(){
          it, so the column stays short enough to take in at a glance rather
          than becoming a wall you scroll through hunting for a control.
          Clicking the open one closes it, which is a legitimate state. */
-      g.querySelector('h4').addEventListener('click', ()=>{
+      /* A bare section has no heading to click and never collapses, so there
+         is nothing to wire. This has to be guarded rather than left to
+         querySelector: it returned null straight into addEventListener, which
+         threw and aborted rescan halfway — so nothing after it was wired, the
+         initial render never ran, and every section on every tab came up
+         permanently open. */
+      const head = g.querySelector('h4');
+      if (!head) return;
+      head.addEventListener('click', ()=>{
         const wasOpen = !shut.get(g);
         groups.forEach(x=>{ if (x.dataset.tab === g.dataset.tab) shut.set(x, true); });
         shut.set(g, wasOpen);
