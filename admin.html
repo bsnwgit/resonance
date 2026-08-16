@@ -636,11 +636,15 @@
      it wants to be told apart from the lines above it at a glance. */
   .kiosk{margin:9px 0 2px;padding-top:8px;
          border-top:1px solid rgba(var(--glass),.10)}
-  .kiosk .vo{display:flex;align-items:center;gap:7px;margin:4px 0 2px;
-             font-size:calc(9px * var(--fs));letter-spacing:.06em;
-             color:rgba(var(--paper),.8);cursor:pointer}
-  .kiosk .vo.hd{color:rgba(var(--paper),.96);letter-spacing:.1em}
-  .kiosk .vo input{flex:0 0 auto}
+  /* A tick and its words, one to a line. NOT scoped to .kiosk — the profile
+     builder draws the same control inside an .erow, and a rule that only
+     applied on the device row left three of them with no layout at all,
+     running together on one line. One rule, wherever the control appears. */
+  .vo{display:flex;align-items:center;gap:7px;margin:6px 0 2px;
+      font-size:calc(9px * var(--fs));letter-spacing:.06em;
+      color:rgba(var(--paper),.8);cursor:pointer}
+  .vo.hd{color:rgba(var(--paper),.96);letter-spacing:.1em}
+  .vo input{flex:0 0 auto}
   /* What a kiosk IS lives in its profile, so a row carries one choice rather
      than a panel of settings. Revealed by the tick above it: most rows in a
      real deployment are a laptop or a phone, and a control that does not apply
