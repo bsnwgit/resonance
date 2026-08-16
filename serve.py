@@ -638,6 +638,10 @@ ROUTE_DEFAULTS.update({
     # Which speech profile answers for this route. Blank is the deployment's
     # default, the same rule a device follows.
     "speech": "",
+    # Which network profile — that is, which port of its own — this endpoint
+    # answers on. Blank is the shared display port, which is where they all
+    # were before this existed.
+    "network": "",
     # …and which model profile it speaks to. Same rule again, and it has to be
     # a default rather than an incidental key: read_routes rebuilds each record
     # from this map, so a field missing here is a field silently dropped on the
@@ -971,6 +975,24 @@ def validate_route(obj, current, doc, rid=None):
                               "carries the wake word, so two endpoints sharing "
                               "one would answer to the same name" % other)
         rec["speech"] = pid
+    if "network" in obj:
+        nid = str(obj["network"] or "")[:16]
+        pool = display_settings()["networks"]
+        if nid and not any(p["id"] == nid for p in pool):
+            return None, ("that network profile no longer exists — reload the "
+                          "panel to see the current list")
+        # One port, one endpoint. Sharing a model profile is the point of
+        # having them; sharing a port is not possible — a listener answers as
+        # exactly one endpoint, and the second one to claim it would simply
+        # never be reached.
+        if nid:
+            other = [k for k, r in doc["routes"].items()
+                     if k != rid and r.get("network") == nid]
+            if other:
+                who = doc["routes"][other[0]].get("name") or "another endpoint"
+                return None, ("%s already answers on that port — a port "
+                              "reaches one endpoint" % who)
+        rec["network"] = nid
     if "model_profile" in obj:
         mid = str(obj["model_profile"] or "")[:16]
         if mid and not any(p["id"] == mid
@@ -1386,6 +1408,13 @@ DISPLAY_SETTINGS = {
     # of carrying its own copy — two endpoints on the same model used to be the
     # same credential typed twice.
     "models": [],
+    # A port, under a name, that one endpoint answers on. No nominated default
+    # here and deliberately so: every other list has one because a row naming
+    # nothing still has to look like something, and an endpoint naming no
+    # network profile is not missing a setting — it is on the shared display
+    # port, which is where every endpoint was before this existed. A default
+    # would silently move one onto a port of its own.
+    "networks": [],
     "model_default": "",
     "look_default": "",
     "motion_default": "",
@@ -1805,6 +1834,39 @@ def validate_display_settings(obj, current):
             if err:
                 return None, "%s: %s" % (r["name"], err)
         cfg["models"] = rows
+    if "networks" in obj:
+        if not isinstance(obj["networks"], (list, tuple)):
+            return None, "the network profiles must be a list"
+        if len(obj["networks"]) > MAX_LOOKS:
+            return None, "there is room for %d network profiles" % MAX_LOOKS
+        rows = clean_profiles(obj["networks"], "w", MAX_LOOKS)
+        app = read_app()
+        taken = {app["http_port"]: "the plain HTTP port",
+                 app["https_port"]: "the display port",
+                 app["admin_port"]: "the admin port"}
+        seen = {}
+        for r in rows:
+            try:
+                pv = int(r["values"].get("port"))
+            except (TypeError, ValueError):
+                return None, "%s: give it a port number" % r["name"]
+            if not (PORT_MIN <= pv <= PORT_MAX):
+                return None, ("%s: the port must be between %d and %d — below "
+                              "%d needs root, and this server runs as an "
+                              "ordinary user" % (r["name"], PORT_MIN, PORT_MAX,
+                                                 PORT_MIN))
+            # Two endpoints cannot listen on one port, and a network profile
+            # cannot sit on top of the server's own — either would be found
+            # out at the next restart, by the server failing to come up.
+            if pv in taken:
+                return None, ("%s: %d is already %s" % (r["name"], pv, taken[pv]))
+            if pv in seen:
+                return None, ("%s and %s are both on port %d"
+                              % (seen[pv], r["name"], pv))
+            seen[pv] = r["name"]
+            r["values"]["port"] = pv
+            r["values"]["open"] = bool(r["values"].get("open"))
+        cfg["networks"] = rows
     for key, prefix in (("motions", "m"), ("speeches", "p")):
         if key not in obj:
             continue
@@ -3293,10 +3355,19 @@ class Handler(SimpleHTTPRequestHandler):
     #: callers to instead of answering. None means it answers normally.
     redirect_to = None
 
-    def __init__(self, *args, admin_port=False, redirect_to=None, **kw):
+    #: set per-listener by make_server: the endpoint id this port answers as,
+    #: and whether reaching the port is itself the grant. Blank means the
+    #: shared display port, which answers as all of them.
+    pinned_route = ""
+    pinned_open = False
+
+    def __init__(self, *args, admin_port=False, redirect_to=None,
+                 pinned_route="", pinned_open=False, **kw):
         # must land before super().__init__, which serves the request outright
         self.admin_port = admin_port
         self.redirect_to = redirect_to
+        self.pinned_route = pinned_route
+        self.pinned_open = pinned_open
         super().__init__(*args, **kw)
 
     def _redirected(self):
@@ -3463,6 +3534,12 @@ class Handler(SimpleHTTPRequestHandler):
                  else "none")
         may_ask = (cfg["guest_requests"] and not working
                    and not (rec.get("denied") and not rec.get("deny_repeat", True)))
+        if self.pinned_open:
+            # Reaching this port is the grant. There is nothing to ask for and
+            # nothing to wait on, so the page gets its composer rather than a
+            # form — the row still exists and still says what this device is,
+            # and it is this PORT that has stopped gating on it.
+            working, state, may_ask = True, "approved", False
         out = {"id": rec.get("id", ""), "name": display_label(rec),
                "approved": working, "state": state,
                "can_request": bool(may_ask),
@@ -3701,7 +3778,20 @@ class Handler(SimpleHTTPRequestHandler):
             # page that draws correctly and answers to nothing. The connection
             # half is not here at all, at any tier.
             doc = read_routes()
-            return self._json(200, {"routes": public_routes(doc, self._display()),
+            rows = public_routes(doc, self._display())
+            if self.pinned_route:
+                # This port IS one endpoint, so the page built from this
+                # answer has one to show and nothing to choose between. The
+                # others are not filtered out of a list the browser then
+                # ignores — they never leave here, which is the same rule the
+                # connection half follows.
+                rows = [r for r in rows if r["id"] == self.pinned_route]
+                if self.pinned_open:
+                    for r in rows:
+                        r["allowed"] = True
+                return self._json(200, {"routes": rows,
+                                        "default": self.pinned_route})
+            return self._json(200, {"routes": rows,
                                     "default": doc["default"]})
         if path == "/routes/all":
             if not self._require("admin"):
@@ -4781,7 +4871,17 @@ class Handler(SimpleHTTPRequestHandler):
             # name at all when it was typed into the composer or pushed
             # through an embed, and that is what the default route is for.
             doc = read_routes()
-            rid, cfg = resolve_route(doc, str(obj.get("route") or "")[:32])
+            # A pinned port ignores what was asked for. The browser it serves
+            # was only ever told about one endpoint, so anything else arriving
+            # here is a caller talking to the wrong door — answered as this
+            # port's endpoint rather than refused, because that is what the
+            # port means.
+            want = (self.pinned_route
+                    or str(obj.get("route") or "")[:32])
+            rid, cfg = resolve_route(doc, want)
+            if self.pinned_route and rid != self.pinned_route:
+                return self._json(503, {"error": "the endpoint on this port is "
+                                                 "not answering"})
             if not cfg:
                 return self._json(503, {"error": "no route is answering"})
             # The route is named back on every reply, not just when it
@@ -4797,7 +4897,7 @@ class Handler(SimpleHTTPRequestHandler):
             # one: its rights come from its key, so it reaches the endpoints
             # anything can reach and no others.
             disp = None if emb else self._display()
-            if not display_may(disp, cfg):
+            if not (self.pinned_open or display_may(disp, cfg)):
                 note_display_refused(disp, cfg["name"])
                 print("refused: %s may not use %s (%s)"
                       % (disp["id"] if disp else "a display with no token",
@@ -5007,14 +5107,19 @@ class Handler(SimpleHTTPRequestHandler):
         })
 
 
-def make_server(port, admin_port=False, host="0.0.0.0", redirect_to=None):
+def make_server(port, admin_port=False, host="0.0.0.0", redirect_to=None,
+                pinned_route="", pinned_open=False):
     handler = functools.partial(Handler, directory=ROOT, admin_port=admin_port,
-                                redirect_to=redirect_to)
+                                redirect_to=redirect_to,
+                                pinned_route=pinned_route,
+                                pinned_open=pinned_open)
     return ThreadingHTTPServer((host, port), handler)
 
 
-def start_tls(port, cert, key, admin_port=False, host="0.0.0.0"):
-    srv = make_server(port, admin_port=admin_port, host=host)
+def start_tls(port, cert, key, admin_port=False, host="0.0.0.0",
+              pinned_route="", pinned_open=False):
+    srv = make_server(port, admin_port=admin_port, host=host,
+                      pinned_route=pinned_route, pinned_open=pinned_open)
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.load_cert_chain(cert, key)
     srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
@@ -5110,6 +5215,43 @@ def main():
             " · %s · %s" % (route_dest(_r), _r["base_url"]),
             "  (default)" if _rid == _doc["default"] else "",
             "" if _r.get("enabled", True) else "  — not answering"), flush=True)
+
+    # A port of its own for every endpoint that names a network profile. Bound
+    # here rather than on save, and reported the same way the other ports are:
+    # a listening socket is not something to open and close under an admin's
+    # mouse, and the app's own ports have always taken a restart for the same
+    # reason.
+    _nets = {n["id"]: n for n in display_settings()["networks"]}
+    for _rid in route_order(_doc):
+        _r = _doc["routes"][_rid]
+        _n = _nets.get(_r.get("network") or "")
+        if not _n or not _r.get("enabled", True):
+            continue
+        _vals = _n.get("values") or {}
+        try:
+            _p = int(_vals.get("port"))
+        except (TypeError, ValueError):
+            continue
+        _open = bool(_vals.get("open"))
+        try:
+            if have_tls:
+                start_tls(_p, cert, key, host=host, pinned_route=_rid,
+                          pinned_open=_open)
+            else:
+                _srv = make_server(_p, host=host, pinned_route=_rid,
+                                   pinned_open=_open)
+                threading.Thread(target=_srv.serve_forever, daemon=True).start()
+        except OSError as exc:
+            # One endpoint's port being taken is not a reason for the server
+            # not to come up: everything else still answers, and the admin
+            # needs the panel in order to fix it.
+            print("network %-10s port %d NOT bound: %s"
+                  % (_n.get("name") or "?", _p, exc), flush=True)
+            continue
+        print("%-5s on %s:%d  → %s only%s"
+              % ("HTTPS" if have_tls else "HTTP", host, _p, _r["name"],
+                 "  (no approval — the port is the grant)" if _open else ""),
+              flush=True)
 
     if redirect_plain:
         print("HTTP  on %s:%d  → redirects to HTTPS on %d"

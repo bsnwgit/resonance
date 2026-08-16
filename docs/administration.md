@@ -35,9 +35,11 @@ At the top:
 - **filter settings** — type to search across every topic in every tab at
   once. This is the fastest way to find a control when you know roughly what
   it is called but not which tab it lives under.
-- **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER / DEVICE** — the profile
-  settings group. Each is a list of profiles, and the controls for one appear
-  inside it when you open it.
+- **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER / GROUPS / MODELS / NETWORK /
+  DEVICE** — the profile settings group. Each is a list of profiles, and the
+  controls for one appear inside it when you open it. MODELS and NETWORK are
+  the two halves of an endpoint that are not the endpoint: what it speaks to,
+  and what it answers on.
 - **AI** and **DEVICES** — the connections group, to the right of a rule. AI
   holds the endpoints, each naming a speech profile. DEVICES is the register:
   every device this server knows about, and where each one is set up.
@@ -47,7 +49,7 @@ At the top:
 
 At the foot, pinned so they are always reachable:
 
-- **APP SETTINGS** — how the server itself is wired: where it can be reached
+- **ADMIN SETTINGS** — how the server itself is wired: where it can be reached
   from, signing in, ports and sessions.
 - **ACCOUNTS** — who can sign in, and the groups access is granted to.
 - **ACCESS** — what may use this server, and what each may reach.
@@ -114,7 +116,7 @@ Each of these writes a different document, so each has its own button:
 |---|---|---|
 | SAVE FOR EVERYONE (per tab) | the shared interface settings on that tab | immediately, everywhere |
 | SAVE, inside an AI endpoint's box | that endpoint alone | immediately, next question |
-| SAVE APP SETTINGS | ports, binding, session lifetime | only after a restart |
+| SAVE, on ADMIN SETTINGS | ports, binding, session lifetime | only after a restart |
 
 Offering one button that meant all of them is how somebody presses the wrong
 one. A tab that writes nothing shared shows no SAVE FOR EVERYONE at all — the
@@ -578,7 +580,7 @@ effect:
 
 1. **Put the wall displays on their own VLAN** and let nothing else onto it.
    A device that cannot open a connection needs no other control.
-2. **Bind to one address** rather than every interface, in APP SETTINGS →
+2. **Bind to one address** rather than every interface, in ADMIN SETTINGS →
    Reach & sign-in. A machine that later joins another network then does not
    follow you onto it.
 3. **Firewall the display ports** to the addresses that should have them.

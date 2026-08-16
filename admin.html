@@ -1441,6 +1441,9 @@
     <button data-tab="savers">SCREENSAVER</button>
     <button id="tab_account" data-tab="account">GROUPS</button>
     <button data-tab="models">MODELS</button>
+    <!-- Beside MODELS because they are the two halves of an endpoint that are
+         not the endpoint: what it speaks to, and what it answers on. -->
+    <button data-tab="network">NETWORK</button>
     <button data-tab="devprof">DEVICE</button>
   </div>
 
@@ -1545,7 +1548,7 @@ size it is setting, so you read the choice while making it.</div>
        else on this tab: what the transcript calls each speaker is part of how
        a place reads, and a hallway screen and a laptop can want different
        answers. It writes the shared settings document, which is what the rest
-       of this tab writes — it was on APP SETTINGS, which meant the one tab
+       of this tab writes — it was on ADMIN SETTINGS, which meant the one tab
        carried two different commits. -->
   <section class="grp" data-prof="look" data-tab="look">
     <h4>Speaker label</h4>
@@ -2143,6 +2146,42 @@ which is how you tell a fault in the interface from a fault in whatever it is
 pointed at.</div>
     </div>
   </section>
+  <!-- A port, under a name. The ports on ADMIN SETTINGS are the admin
+       portal's own; what the app answers on is here, with the rest of what an
+       endpoint is made of. -->
+  <section class="grp bare proflist" data-tab="network">
+    <div class="barehead"><span class="listtitle">Network profiles</span></div>
+    <div class="grpbody">
+  <div id="dp_networks"></div>
+  <div class="note" id="networknote"></div>
+  <div class="seg addrow">
+    <button id="b_addnetwork" class="act-add">ADD A PROFILE</button>
+  </div>
+  <div class="note help">A port of this server's own, answering as one
+endpoint and nothing else. An endpoint on the AI tab picks one; an endpoint
+that picks none is reached on the shared display port, by its wake word, as
+they all were before this existed.
+
+What a browser opening that port gets is the ordinary interface built from
+that endpoint's own settings — its speech profile, its greeting, its voice —
+with no other endpoint offered and nothing to address by name.
+
+<b>The port is the grant</b> turns off the request form on that port alone: a
+device that can reach it uses the endpoint straight away. That is a statement
+about your network, not about this server — it is right when the port is on a
+VLAN only the intended devices are on, and wrong the moment it is not.
+
+TLS is the same certificate the display port uses, because the microphone
+needs a secure context and a second certificate for the same machine would be
+one more thing to renew.
+
+<b>Ports are bound when the server starts.</b> Adding a profile, changing a
+port or pointing a different endpoint at one takes a restart, exactly as the
+ports on ADMIN SETTINGS do — a listening socket is not something to open and
+close under a mouse.</div>
+    </div>
+  </section>
+
 
   <section class="grp bare proflist" data-tab="savers">
     <div class="barehead"><span class="listtitle">Screensaver profiles</span></div>
@@ -2465,7 +2504,7 @@ button to download it as a PDF.</div>
     <div class="tabside">
     <div class="tabgroup">Admin settings</div>
     <div class="tabs" id="foottabs">
-      <button id="tab_app" data-tab="app">APP SETTINGS</button>
+      <button id="tab_app" data-tab="app">ADMIN SETTINGS</button>
       <!-- A profile is a kind of place — a hallway, a shop floor — rather than
            a screen, so it belongs beside the deployment's own settings and not
            in with who may use the server. Both lists moved off ACCESS: what a
@@ -3132,7 +3171,7 @@ function status(m, bad, tab){
 /* Tabs carrying settings from the SHARED document, and therefore a
    SAVE FOR EVERYONE of their own. `app` was here while the speaker labels sat
    on it; they are an appearance setting again, so the tab is back to writing
-   only app.json under SAVE APP SETTINGS — one document, one button. */
+   only app.json under its own SAVE — one document, one button. */
 /* Empty now. APPEARANCE, GEOMETRY and SPEECH stopped being settings tabs: what
    every viewer gets is whichever profile is nominated default, published when
    that profile is saved. Leaving them here put a SAVE FOR EVERYONE beside each
@@ -3410,7 +3449,8 @@ $('b_appsave').addEventListener('click', async ()=>{
    the speech profile carries them, and an endpoint names a profile. */
 /* The connection went the way of the greeting and the wake word: a model
    profile carries it, and an endpoint names one. */
-const RT_FIELDS = ['name','speech','model_profile','system','keep_alive'];
+const RT_FIELDS = ['name','speech','model_profile','network','system',
+                   'keep_alive'];
 const RT_SLIDERS = {max_tokens:  v=> v,
                     temperature: v=> (+v).toFixed(2),
                     history_turns: v=> v == 0 ? 'none' : v,
@@ -3535,6 +3575,24 @@ they used the wrong word. It only fires when the house recognised no command
 at all, which an LLM-backed agent essentially never reports: leave it at
 nothing for one of those.</div>
   </div>
+    </div>
+  </div>
+  <div class="subgrp" data-g="net">
+    <h5>Network<span class="subsum"></span></h5>
+    <div class="subbody">
+  <select data-f="network" class="ppick"></select>
+  <div class="note help">A <b>port of this server's own</b> that reaches this
+endpoint and nothing else — built under PROFILES ▸ NETWORK and named here.
+Leave it at the shared display port and this endpoint is reached the way they
+all are, by saying its name.
+
+A browser opening that port gets the ordinary interface built from this
+endpoint's settings, with no other endpoint offered and nothing to address by
+name. One port reaches one endpoint, so a profile another endpoint already
+answers on is not offered here.
+
+<b>The port is bound when the server starts</b>, so choosing one here takes a
+restart to come into effect — the same as the ports on ADMIN SETTINGS.</div>
     </div>
   </div>
 <div class="subgrp" data-g="limits">
@@ -3711,6 +3769,29 @@ function blockPaint(blk, r){
   /* The model picker, by profile name. A profile that has been deleted is
      still offered on the endpoint naming it, marked, rather than silently
      reading as the default. */
+  /* The ports, less the ones another endpoint already answers on — a port
+     reaches one endpoint, so offering a taken one would be offering a save
+     the server is going to refuse. Its own stays offered, obviously. */
+  const nw = F(blk, 'network');
+  if (nw){
+    const want = r.network || '';
+    const taken = {};
+    (RT.routes || []).forEach(x=>{ if (x.id !== r.id && x.network)
+                                     taken[x.network] = x.name; });
+    const pool = ((DPCFG && DPCFG.networks) || []).filter(x=> !taken[x.id]);
+    nw.innerHTML = '';
+    const opts = [['', 'THE SHARED DISPLAY PORT']]
+                   .concat(pool.map(x=> [x.id,
+                     x.name + ((x.values || {}).port ? ' · ' + x.values.port : '')]));
+    if (want && !pool.some(x=> x.id === want))
+      opts.push([want, 'a profile that no longer exists']);
+    opts.forEach(([v, label])=>{
+      const o = document.createElement('option');
+      o.value = v; o.textContent = label; nw.appendChild(o);
+    });
+    nw.value = want;
+  }
+
   const mp = F(blk, 'model_profile');
   if (mp){
     const want = r.model_profile || '';
@@ -4422,6 +4503,7 @@ function paintDpSettings(){
   paintSavers(DPCFG.savers || []);
   paintKiosks(DPCFG.kiosks || [], DPCFG.kiosk_default || '');
   paintModels(DPCFG.models || [], DPCFG.model_default || '');
+  paintNetworks(DPCFG.networks || []);
 }
 
 /* The two profile lists live on their own tab now, and they are painted from
@@ -4688,6 +4770,146 @@ function paintModels(list, def){
     btn.disabled = busy || DPMODELS.length >= 8;
   }
 }
+
+/* ---- the network profiles ----
+   A port, under a name, that one endpoint answers on. Same row and same
+   one-open-at-a-time as every other list, with one difference: there is no
+   MAKE DEFAULT. Every other list has one because a row naming nothing still
+   has to look like something; an endpoint naming no network profile is not
+   missing a setting, it is on the shared display port. A nominated default
+   here would move endpoints onto ports of their own without being asked. */
+let DPNETS = [], OPENNW = -1;
+
+function paintNetworks(list){
+  DPNETS = (list || []).map(n=> ({id: n.id || '', _new: !!n._new,
+                                  name: n.name || '',
+                                  values: Object.assign({}, n.values || {})}));
+  const box = $('dp_networks');
+  if (!box) return;
+  box.innerHTML = '';
+  DPNETS.forEach((n, i)=>{
+    const v = n.values;
+    const row = document.createElement('div');
+    row.className = 'erow';
+    if (OPENNW !== i) row.classList.add('shut');
+
+    const top = document.createElement('div'); top.className = 'top';
+    const nmt = document.createElement('span'); nmt.className = 'nm';
+    top.appendChild(nmt);
+    const sum = document.createElement('span'); sum.className = 'badge';
+    top.appendChild(sum);
+    /* Which endpoint answers here, read off the endpoints rather than stored
+       twice: the route names the profile, so the profile has no field to go
+       stale. A profile nothing names is a port that will not be bound, and
+       saying so is the whole of what somebody needs to know about it. */
+    const used = document.createElement('span'); used.className = 'badge';
+    top.appendChild(used);
+    const retitle = ()=>{
+      nmt.textContent = (n.name || '').trim() || 'unnamed profile';
+      sum.textContent = (v.port ? 'port ' + v.port : 'no port')
+                      + (v.open ? ' · no approval' : '');
+      const on = (RT.routes || []).filter(r=> r.network === n.id)[0];
+      used.textContent = on ? on.name : 'no endpoint';
+    };
+    retitle();
+    top.onclick = (e)=>{
+      if (e.target.closest('input, button, select, textarea')) return;
+      const opening = row.classList.contains('shut');
+      OPENNW = opening ? i : -1;
+      box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+      row.classList.toggle('shut', !opening);
+      const ab = $('b_addnetwork');
+      if (ab){ ab.hidden = OPENNW >= 0; ab.disabled = OPENNW >= 0; }
+    };
+    row.appendChild(top);
+
+    const field = (label, el)=>{
+      const w = document.createElement('div'); w.className = 'namerow';
+      const b = document.createElement('b'); b.textContent = label;
+      w.appendChild(b); w.appendChild(el); row.appendChild(w); return el;
+    };
+
+    const nm = document.createElement('input');
+    nm.type = 'text'; nm.className = 'nmedit'; nm.value = n.name;
+    nm.spellcheck = false; nm.placeholder = 'Reception';
+    nm.oninput = ()=>{ n.name = nm.value; retitle(); };
+    field('Name', nm);
+
+    const pt = document.createElement('input');
+    pt.type = 'number'; pt.className = 'nmedit portedit';
+    pt.min = 1024; pt.max = 65535; pt.inputMode = 'numeric';
+    pt.value = v.port || ''; pt.placeholder = '9711';
+    pt.oninput = ()=>{ v.port = pt.value; retitle(); };
+    field('Port', pt);
+
+    const seg = document.createElement('div');
+    seg.className = 'seg';
+    [['1', 'YES'], ['0', 'NO']].forEach(([val, label])=>{
+      const b = document.createElement('button');
+      b.dataset.v = val; b.textContent = label;
+      b.classList.toggle('on', (val === '1') === !!v.open);
+      b.onclick = ()=>{
+        v.open = val === '1';
+        seg.querySelectorAll('button').forEach(x=>
+          x.classList.toggle('on', x === b));
+        retitle();
+      };
+      seg.appendChild(b);
+    });
+    field('The port is the grant', seg);
+
+    const acts = document.createElement('div'); acts.className = 'acts';
+    const gap = document.createElement('span'); gap.className = 'spacer';
+    acts.appendChild(gap);
+
+    const save = document.createElement('button');
+    save.textContent = 'SAVE'; save.className = 'act-save';
+    save.onclick = ()=>{
+      const keep = DPNETS.filter(x=> (x.name || '').trim());
+      if (!keep.length){
+        dpNote('a profile needs a name before it can be saved', true,
+               'networknote');
+        return;
+      }
+      n._new = false; OPENNW = -1;
+      saveDp({networks: keep.map(x=> ({id:x.id, name:x.name,
+                                       values:{port: parseInt(x.values.port, 10),
+                                               open: !!x.values.open}}))},
+             'networknote');
+    };
+    acts.appendChild(save);
+
+    const del = document.createElement('button');
+    del.textContent = 'REMOVE'; del.className = 'act-danger';
+    /* A profile an endpoint is answering on cannot be removed from under it —
+       the endpoint would keep naming an id that is gone and quietly fall back
+       to the shared port at the next restart, which is a port disappearing
+       with nothing said about it. */
+    const on = (RT.routes || []).filter(r=> r.network === n.id)[0];
+    if (on){ del.disabled = true;
+      del.title = on.name + ' answers on this port — point it elsewhere first'; }
+    else del.onclick = ()=>{
+      OPENNW = -1; DPNETS.splice(i, 1); paintNetworks(DPNETS);
+    };
+    acts.appendChild(del);
+    row.appendChild(acts);
+    box.appendChild(row);
+  });
+  const btn = $('b_addnetwork');
+  if (btn){
+    const busy = OPENNW >= 0 || DPNETS.some(x=> x._new);
+    btn.hidden = busy;
+    btn.disabled = busy || DPNETS.length >= 8;
+  }
+}
+
+$('b_addnetwork').addEventListener('click', ()=>{
+  if (DPNETS.length >= 8) return;
+  DPNETS.push({id: profileId('w'), _new: true, name: '',
+               values: {port: '', open: false}});
+  OPENNW = DPNETS.length - 1;
+  paintNetworks(DPNETS);
+});
 
 $('b_addmodel').addEventListener('click', ()=>{
   if (DPMODELS.length >= 8) return;
@@ -6771,7 +6993,7 @@ function panelNav(){
     });
     /* The app tab's own commit row. Only on that tab, and only when nothing
        is being filtered — a filter mixes sections from every tab, so a row
-       labelled SAVE APP SETTINGS sitting under a match from SPEECH would be
+       labelled SAVE sitting under a match from SPEECH would be
        offering to save something that is not on screen. */
     const ar = $('approw');
     if (ar) ar.classList.toggle('on',
@@ -6808,7 +7030,12 @@ function panelNav(){
        to visit PROFILES first, which on a panel that opens on APPEARANCE
        meant they were blank. */
     if (tab === 'savers' || tab === 'devprof' || tab === 'models'
-        || PROF_OF[tab]) refreshProfiles();
+        || tab === 'network' || PROF_OF[tab]) refreshProfiles();
+    /* NETWORK says which endpoint answers on each port, and that is read off
+       the endpoints — which this tab has never fetched. Repainted once they
+       arrive rather than left saying "no endpoint" about every port. */
+    if (tab === 'network')
+      Promise.resolve(loadBackend()).then(()=> paintNetworks(DPNETS));
     if (tab === 'embeds') refreshEmbeds();
     if (tab === 'app') loadApp();
     if (tab === 'ai'){

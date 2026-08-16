@@ -1,4 +1,4 @@
-# App settings & accounts
+# Admin settings & accounts
 
 Everything in this document is about how the server itself is wired, as
 opposed to how the interface looks.
@@ -10,7 +10,7 @@ Two settings, deliberately not one "mode": **what it is reachable at**, and
 both starts lying the moment somebody changes half of it — "personal" would
 still read personal after the binding moved to every interface on the machine.
 
-They are two topics under APP SETTINGS for the same reason. **EXT Access**
+They are two topics under ADMIN SETTINGS for the same reason. **EXT Access**
 holds where the server can be reached from; **Sign in** holds what it takes to
 get past the door. The posture line — what it is reachable at and what the door
 is, in the words it actually means — is stated under EXT Access, because what

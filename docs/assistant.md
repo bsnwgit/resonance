@@ -170,6 +170,45 @@ one edit rather than six.
 
 The four kinds below are what a profile can be.
 
+## Network profiles
+
+A port of this server's own, under a name: **PROFILES ▸ NETWORK**. An endpoint
+names one and answers there and nowhere else; an endpoint naming none is
+reached on the shared display port by its wake word, as they all were before
+this existed.
+
+A browser opening that port gets the ordinary interface, built from that
+endpoint's own settings — its speech profile, its greeting, its voice — with
+no other endpoint offered and nothing to address by name. **One port reaches
+one endpoint**, so a profile another endpoint already answers on is not
+offered, and the server refuses a save that would put two on one port.
+
+There is no MAKE DEFAULT here, and that is deliberate. Every other list has one
+because a row naming nothing still has to look like something; an endpoint
+naming no network profile is not missing a setting. A nominated default would
+move endpoints onto ports of their own without being asked.
+
+| Field | What it does |
+|---|---|
+| Port | 1024–65535. Refused if it is one of the admin portal's own ports, or one another profile already has. |
+| The port is the grant | **YES** turns the request form off on that port alone — a device that can reach it uses the endpoint straight away, approved or not. **NO** applies the ordinary rules. |
+
+**The port is the grant** is a statement about your network rather than about
+this server. It is right when the port is on a VLAN only the intended devices
+are on, and wrong the moment it is not. It applies to that port only: the same
+device arriving on the shared display port is treated exactly as before.
+
+TLS is the same certificate the display port uses — the microphone needs a
+secure context, and a second certificate for the same machine would be one
+more thing to renew.
+
+**Ports are bound when the server starts.** Adding a profile, changing a port
+or pointing a different endpoint at one takes a restart, the same as the ports
+on ADMIN SETTINGS: a listening socket is not something to open and close under
+a mouse. A port that turns out to be taken is reported and skipped rather than
+stopping the server — everything else still answers, and you need the panel in
+order to fix it.
+
 ## The four providers
 
 ### DEMO
