@@ -2973,7 +2973,12 @@ function status(m, bad, tab){
    live on it now: the tab also has SAVE APP SETTINGS, and the two are not
    interchangeable — one publishes what every viewer sees, the other rewires
    the server. Two documents, two buttons, each saying which it writes. */
-const UI_TABS = ['look', 'motion', 'speech'];
+/* Empty now. APPEARANCE, GEOMETRY and SPEECH stopped being settings tabs: what
+   every viewer gets is whichever profile is nominated default, published when
+   that profile is saved. Leaving them here put a SAVE FOR EVERYONE beside each
+   profile list — a second commit on the same tab, and one that would publish
+   whichever profile happened to be open to every display in the building. */
+const UI_TABS = [];
 function paintUiRows(){
   UI_TABS.forEach(t=>{
     const row = $('uirow_' + t);
@@ -4468,6 +4473,9 @@ function profileSum(kind, pr){
 
 /* Which profile each list hands to a display that names none. */
 const DPDEF = {looks: '', motions: '', speeches: ''};
+/* Seeded at most once per list per page. Without this a failed save would seed
+   again on the repaint that followed it, and again on the next. */
+const SEEDED = {looks: false, motions: false, speeches: false};
 const DEF_KEY = {looks: 'look_default', motions: 'motion_default',
                  speeches: 'speech_default'};
 
@@ -4524,8 +4532,15 @@ function paintProfiles(kind, list, def){
      showing right now — which is what every display is already showing — so a
      deployment arrives with "what this looks like today" under a name rather
      than with nothing and no way back. */
-  if (!(list || []).length && S)
+  let seeding = false;
+  if (!(list || []).length && S && !SEEDED[kind.key]){
     list = [{id: profileId(kind.pre), name: 'Default', values: tabKeys(kind.tab)}];
+    /* Once, and then written. Seeding only in memory is what made these lists
+       look blank on every reload: the Default was invented on each paint and
+       never reached the server, so nothing was ever there to come back. */
+    SEEDED[kind.key] = true;
+    seeding = true;
+  }
   const arr = PROFILES[kind.key] = (list || []).map(p=> ({
     id: p.id || '', _new: !!p._new, name: p.name || '',
     values: Object.assign({}, p.values || {})}));
@@ -4634,6 +4649,7 @@ function paintProfiles(kind, list, def){
     row.appendChild(acts);
     box.appendChild(row);
   });
+  if (seeding) saveProfileList(kind);
   const btn = $(kind.add);
   if (btn){
     const fresh = arr.some(x=> x._new);
@@ -6372,7 +6388,7 @@ function panelNav(){
      about. Nothing on the AI tab writes the shared document now, so
      SAVE FOR EVERYONE there would be a button that saves nothing on the tab
      it is sitting on. Each endpoint saves itself, from inside its block. */
-  const SETTINGS_TABS = new Set(['look', 'motion', 'speech']);
+  const SETTINGS_TABS = new Set();
   function syncSaveRow(){
     const show = SETTINGS_TABS.has(tab) ? '' : 'none';
     UI_TABS.forEach(t=>{
