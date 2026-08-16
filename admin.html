@@ -292,11 +292,11 @@
   /* The app tab's own commit row, at the foot of the box. Hidden outright
      on every other tab: a save button that belongs to settings you cannot
      currently see is a save button somebody will eventually press. */
-  #approw,#airow,#profrow,.uirow{display:none;margin-top:14px;padding-top:10px;
+  #approw,#profrow,.uirow{display:none;margin-top:14px;padding-top:10px;
           border-top:1px solid rgba(var(--glass),.30)}
-  #approw.on,#airow.on,#profrow.on,.uirow.on{display:block}
-  #approw .seg,#airow .seg,#profrow .seg,.uirow .seg{justify-content:flex-end;margin-top:8px}
-  #approw .seg button,#airow .seg button,#profrow .seg button,
+  #approw.on,#profrow.on,.uirow.on{display:block}
+  #approw .seg,#profrow .seg,.uirow .seg{justify-content:flex-end;margin-top:8px}
+  #approw .seg button,#profrow .seg button,
   .uirow .seg button{border-width:2px;border-style:solid;padding:6px 10px}
   /* What this row's scope actually is. Worth a line, because "shared" is the
      property that separates these from the three controls a viewer keeps. */
@@ -311,7 +311,7 @@
   .uirow .state.alert{color:#eaa8a8}
   /* Spans every column once the topics tile, so it reads as the foot of the
      whole box rather than the tail of whichever column it landed in. */
-  @container (min-width:700px){ #approw,#airow,#profrow,.uirow{grid-column:1/-1} }
+  @container (min-width:700px){ #approw,#profrow,.uirow{grid-column:1/-1} }
 
   /* The caption over a row of tabs. Quieter than anything it labels — it is
      there to be read once and then ignored, not to compete with the tabs
@@ -598,6 +598,10 @@
         border-bottom:1px solid rgba(var(--glass),.08)}
   .erow .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .erow .nm{font-size:calc(10px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.96)}
+  /* An endpoint row wears the same title and badge as every other row in the
+     panel, so a list of endpoints reads like a list of profiles. */
+  .erow > .top > .rtname{font-size:calc(10px * var(--fs));letter-spacing:.08em;
+                         color:rgba(var(--paper),.96)}
   /* Each row collapses by its name, one open at a time — a register of fifty
      devices that you scroll through is one nobody reads. The header keeps the
      name and the badges, so a shut row still says what state it is in. */
@@ -1496,12 +1500,18 @@ size it is setting, so you read the choice while making it.</div>
   <div class="sl"><label>Scanlines</label><output id="o_scan"></output><input id="s_scan" type="range" min="0" max="1" step=".01"></div>
   <div class="sl"><label>Line weight</label><output id="o_lw"></output><input id="s_lw" type="range" min=".3" max="3" step=".05"></div></div>
   </section>
-  <!-- One block per AI endpoint, built at runtime by paintBlocks(), inserted
-       before this anchor. The AI tab holds nothing else: testing an endpoint
-       is the TEST inside that endpoint's own block, which uses its own
-       adapter — so it tests demo against demo and a real service against
-       that service, with nothing to keep in step. -->
-  <div id="ai_anchor" hidden></div>
+  <!-- One list, one row per endpoint, built at runtime by paintBlocks(). The
+       same shape as a profile list: rows shut by default, one open at a time,
+       everything about an endpoint inside the row you opened. -->
+  <section class="grp bare proflist" data-tab="ai">
+    <div class="grpbody">
+  <div id="rtlist"></div>
+  <div class="note" id="rtlistnote"></div>
+  <div class="seg addrow">
+    <button id="b_addroute" class="act-add">ADD INSTANCE</button>
+  </div>
+    </div>
+  </section>
 
   <section class="grp" data-prof="speech" data-tab="speech">
     <h4>Wake word</h4>
@@ -2352,13 +2362,7 @@ button to download it as a PDF.</div>
        left half-adjusted on APPEARANCE — a save whose scope was wider than the
        thing you were looking at. -->
 
-  <div id="airow">
-    <div class="note" id="rtlistnote"></div>
-    <div class="seg actrow">
-      <button id="b_addroute" class="act-add">ADD INSTANCE</button>
-    </div>
-  </div>
-  <!-- One commit for the whole tab, the way the shared-settings tabs have one.
+    <!-- One commit for the whole tab, the way the shared-settings tabs have one.
        The three lists are three parts of a single document, so three SAVEs was
        three buttons writing the same file — and a device profile naming an
        appearance you had just added, but not yet saved, could only be stored
@@ -3389,7 +3393,7 @@ const rtEsc = t => String(t == null ? '' : t)
    sets it up: what reaches it, then what it reaches, then what it is told. */
 function blockHTML(r){
   return `
-  <h4><span class="rtname"></span><span class="rtsum"></span></h4>
+  <div class="top"><span class="nm rtname"></span><span class="badge rtsum"></span></div>
   <div class="grpbody">
   <label class="bklab" style="margin-top:2px">Instance name</label>
   <input data-f="name" type="text" spellcheck="false" autocomplete="off"
@@ -4129,12 +4133,21 @@ async function blockAction(blk, act, btn){
 
    `keepOpen` is the endpoint whose block should be showing afterwards. */
 let DRAFT = null;
+/* Which endpoint is open, by id. A draft has no id yet, so it answers to a
+   name of its own until it is saved. */
+let OPENRT = '';
+
+function syncAddRoute(){
+  const b = $('b_addroute');
+  if (b){ b.hidden = !!OPENRT; b.disabled = !!OPENRT; }
+}
+
 function paintBlocks(keepOpen){
-  const anchor = $('ai_anchor');
+  const anchor = $('rtlist');
   if (!anchor) return;
   const list = RT.routes.slice();
   if (DRAFT) list.push(DRAFT);
-  const have = [...document.querySelectorAll('#panel .grp[data-tab="ai"][data-rid]')];
+  const have = [...anchor.querySelectorAll('.erow[data-rid]')];
   const kept = new Set(), order = [];
   let target = null;
   list.forEach(r=>{
@@ -4142,17 +4155,27 @@ function paintBlocks(keepOpen){
     let blk = have.find(g=> !kept.has(g) && g.dataset.rid === rid
                             && (!!rid || g.classList.contains('isdraft')));
     if (!blk){
-      blk = document.createElement('section');
-      blk.className = 'grp' + (rid ? '' : ' isdraft');
-      blk.dataset.tab = 'ai';
+      blk = document.createElement('div');
+      blk.className = 'erow' + (rid ? '' : ' isdraft');
       blk.dataset.rid = rid;
       blk.innerHTML = blockHTML(r);
-      anchor.parentNode.insertBefore(blk, anchor);
+      anchor.appendChild(blk);
       wireBlock(blk);
+      /* One open at a time, by id — the list is rebuilt on every save and an
+         index would move under it. */
+      blk.querySelector('.top').addEventListener('click', e=>{
+        if (e.target.closest('input, button, select, textarea')) return;
+        const opening = blk.classList.contains('shut');
+        OPENRT = opening ? (blk.dataset.rid || '(new)') : '';
+        anchor.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+        blk.classList.toggle('shut', !opening);
+        syncAddRoute();
+      });
       // a new endpoint opens on the two boxes you have to fill in
       if (!rid) blk.querySelectorAll('[data-g="wake"],[data-g="conn"]')
                    .forEach(x=> x.classList.add('open'));
     }
+    blk.classList.toggle('shut', OPENRT !== (rid || '(new)'));
     order.push(blk);
     kept.add(blk);
     blockPaint(blk, r);
@@ -4169,12 +4192,17 @@ function paintBlocks(keepOpen){
      element blurs it, and taking the cursor out of a field somebody is typing
      in is worse than a list briefly out of order. It settles on the next
      paint. */
-  const live = [...document.querySelectorAll('#panel .grp[data-tab="ai"][data-rid]')];
+  const live = [...anchor.querySelectorAll('.erow[data-rid]')];
   const same = live.length === order.length && live.every((g, i)=> g === order[i]);
   if (!same && !order.some(g=> g.contains(document.activeElement)))
-    order.forEach(g=> anchor.parentNode.insertBefore(g, anchor));
-  rescanGroups();
-  if (target) openTopic(target);
+    order.forEach(g=> anchor.appendChild(g));
+  syncAddRoute();
+  if (target){
+    OPENRT = target.dataset.rid || '(new)';
+    anchor.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+    target.classList.remove('shut');
+    syncAddRoute();
+  }
   rtListNote(RT.routes.length
     ? RT.routes.length + (RT.routes.length === 1 ? ' endpoint' : ' endpoints')
       + ' · say ' + RT.routes.map(r=> '“' + r.wakeword + '”').join(' or ')
@@ -6012,7 +6040,7 @@ function routesChanged(){
 $('b_addroute').addEventListener('click', ()=>{
   DRAFT = newInstance();
   paintBlocks('');
-  const blk = document.querySelector('#panel .grp.isdraft');
+  const blk = document.querySelector('#panel .erow.isdraft');
   if (blk){
     const n = F(blk, 'name');
     if (n) n.focus();
@@ -6620,9 +6648,6 @@ function panelNav(){
     // the screensavers alone.
     if (pr) pr.classList.toggle('on',
       tab === 'savers' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
-    const air = $('airow');
-    if (air) air.classList.toggle('on',
-      tab === 'ai' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
   }
   /* Takes a tab button, or a tab's NAME for a tab that no longer has one.
      Documentation is reached from the ? beside the panel title now, so there
