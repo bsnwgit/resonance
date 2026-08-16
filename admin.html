@@ -20,6 +20,14 @@
     --text:#f2f6fa;
     --ui:#c3cedb;
     --ui-bright:#dfe9f2;
+    /* Help, and nothing else. The panel already spends green on "this is the
+       live thing" and red on "this destroys something"; blue is the third
+       meaning it needs — "this explains itself" — and reserving a colour for
+       it is what makes a ? findable without reading the layout. Deliberately
+       NOT --hue, which resolves to a near-white in this panel and drew a help
+       button that was technically present and practically invisible. */
+    --help:#8fb6e8;
+    --help-line:122,166,224;
 
     /* Typography — the same three faces and three sizes the display has,
        kept identical to the block in index.html on purpose: the panel is
@@ -450,6 +458,19 @@
     border-bottom:1px solid rgba(var(--glass),.1);
     font-size:calc(9px * var(--fs));letter-spacing:.16em;color:rgba(var(--paper),.75);
   }
+  /* Bigger than the ? beside a section heading, and filled rather than
+     outlined. Those are one per section and have their heading for context;
+     this one has to be findable on its own from across the panel, which is
+     what "defined" has to mean for a control with a single character on it. */
+  #panelhelp{
+    flex:0 0 auto;width:19px;height:19px;padding:0;line-height:1;
+    display:inline-flex;align-items:center;justify-content:center;
+    font:inherit;font-size:calc(10px * var(--fs));letter-spacing:0;
+    border:1px solid rgba(var(--help-line),.75);border-radius:50%;
+    background:rgba(var(--help-line),.16);color:var(--help);cursor:pointer;
+  }
+  #panelhelp:hover{border-color:rgba(var(--help-line),1);color:#cfe2f8;
+                   background:rgba(var(--help-line),.30)}
   #panelbar .right{margin-left:auto}
   #whobox{display:flex;align-items:center;gap:8px;min-width:0}
   #whoname{font:inherit;background:none;border:0;padding:0;cursor:pointer;
@@ -941,13 +962,14 @@
     width:15px;height:15px;padding:0;line-height:1;
     display:inline-flex;align-items:center;justify-content:center;
     font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:0;
-    border:1px solid rgba(var(--glass),.28);border-radius:50%;
-    background:none;color:rgba(var(--paper),.7);cursor:pointer;
+    border:1px solid rgba(var(--help-line),.55);border-radius:50%;
+    background:rgba(var(--help-line),.10);color:var(--help);cursor:pointer;
   }
-  .helpbtn:hover{border-color:var(--hue);color:var(--hue)}
+  .helpbtn:hover{border-color:rgba(var(--help-line),1);color:#cfe2f8;
+                 background:rgba(var(--help-line),.22)}
   .grp.helpon .helpbtn{
-    border-color:var(--hue-dim);color:var(--hue);
-    background:rgba(var(--glass),.10);
+    border-color:rgba(var(--help-line),1);color:#cfe2f8;
+    background:rgba(var(--help-line),.22);
   }
   .note.help{display:none}
   .grp.helpon .note.help{
@@ -1126,6 +1148,13 @@
        tab's worth of settings. -->
   <div id="panelbar">
     <span>SETTINGS</span>
+    <!-- The way into the manual, beside the title rather than at the end of a
+         tab row: documentation is not a topic you configure, it is the thing
+         you reach for when a topic will not explain itself. Blue, and the
+         same blue as every ? beside a section heading — one colour meaning
+         one thing is what lets somebody find help without reading labels. -->
+    <button id="panelhelp" type="button"
+            title="open the documentation">?</button>
     <span class="right" id="whobox">
       <button id="whoname" title="your account">—</button>
       <span id="whorole"></span>
@@ -1150,6 +1179,12 @@
     <button data-tab="motion">MOTION</button>
     <button data-tab="speech">SPEECH</button>
     <button id="tab_ai" data-tab="ai">AI</button>
+    <!-- What a screen IS, as against who may use it — which is what ACCESS
+         became. Not in UI_TABS or SETTINGS_TABS: like AI, nothing here writes
+         the shared settings document, so SAVE FOR EVERYONE would be a button
+         saving nothing on the tab it sits on. What belongs to one screen is
+         saved from inside that screen's own block. -->
+    <button id="tab_devices" data-tab="devices">DEVICES</button>
   </div>
   <div class="rule"></div>
   </div><!-- /panelhead -->
@@ -2012,7 +2047,9 @@ button to download it as a PDF.</div>
       <button id="tab_accounts" data-tab="accounts">ACCOUNTS</button>
       <button id="tab_displays" data-tab="displays">ACCESS</button>
       <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
-      <button id="tab_docs" data-tab="docs">DOCUMENTATION</button>
+      <!-- DOCUMENTATION is not here any more. It is reached from the ? beside
+           the panel title, because it is not something you configure and it
+           was taking a slot in a row of things that are. -->
     </div>
   </div>
 </div>
@@ -5541,10 +5578,17 @@ function panelNav(){
     if (air) air.classList.toggle('on',
       tab === 'ai' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
   }
+  /* Takes a tab button, or a tab's NAME for a tab that no longer has one.
+     Documentation is reached from the ? beside the panel title now, so there
+     is no button in the row to light up — and nothing lighting up is the
+     honest answer there, because none of the tabs in the row is where you
+     are. */
   function selectTab(b){
-    tab = b.dataset.tab;
+    const btn = (typeof b === 'string')
+      ? tabButtons.find(x=> x.dataset.tab === b) : b;
+    tab = btn ? btn.dataset.tab : b;
     CURRENT_TAB = tab;
-    tabButtons.forEach(x=> x.classList.toggle('on', x === b));
+    tabButtons.forEach(x=> x.classList.toggle('on', x === btn));
     // arriving at a tab shows its topics closed, not whatever was left open
     groups.forEach(g=>{ if (g.dataset.tab === tab) shut.set(g, true); });
     render();
@@ -5558,6 +5602,8 @@ function panelNav(){
     if (tab === 'docs') loadDocs();
   }
   tabButtons.forEach(b=> b.addEventListener('click', ()=> selectTab(b)));
+  const phelp = $('panelhelp');
+  if (phelp) phelp.addEventListener('click', ()=> selectTab('docs'));
   /* Opening a section from somewhere other than its own heading: ADD has to
      take you to the block it just created. Assigned out to module scope
      because this closure is where the collapse state lives. */
