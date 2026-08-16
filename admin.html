@@ -4643,6 +4643,20 @@ function paintProfiles(kind, list, def){
     const acts = document.createElement('div');
     acts.className = 'acts';
 
+    const mk = document.createElement('button');
+    mk.textContent = 'MAKE DEFAULT';
+    if (pr.id && pr.id === DPDEF[kind.key]){
+      mk.disabled = true;
+      mk.title = 'this is what a display with no profile gets';
+    }else{
+      mk.onclick = ()=>{ DPDEF[kind.key] = pr.id; saveProfileList(kind); };
+    }
+    acts.appendChild(mk);
+
+    const gap = document.createElement('span');
+    gap.className = 'spacer';
+    acts.appendChild(gap);
+
     const save = document.createElement('button');
     save.textContent = 'SAVE';
     save.className = 'act-save';
@@ -4662,20 +4676,6 @@ function paintProfiles(kind, list, def){
       reRender();
     };
     acts.appendChild(save);
-
-    const mk = document.createElement('button');
-    mk.textContent = 'MAKE DEFAULT';
-    if (pr.id && pr.id === DPDEF[kind.key]){
-      mk.disabled = true;
-      mk.title = 'this is what a display with no profile gets';
-    }else{
-      mk.onclick = ()=>{ DPDEF[kind.key] = pr.id; saveProfileList(kind); };
-    }
-    acts.appendChild(mk);
-
-    const gap = document.createElement('span');
-    gap.className = 'spacer';
-    acts.appendChild(gap);
 
     const del = document.createElement('button');
     del.textContent = 'REMOVE';
