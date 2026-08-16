@@ -13,42 +13,34 @@ startup and disables both HTTPS and the admin port.
 Everything in this document that involves a microphone assumes a secure
 origin.
 
-## Speech out (TTS)
+## Wake word
 
-### Which engine
+Without a wake word, an AUTO display responds to any speech near it —
+including two people talking to each other. The wake word is what makes it
+usable in an occupied room.
 
-**NEURAL (server)** synthesises on the box. It sounds substantially better, it
-is identical on every machine that connects, and it needs no support from the
-viewer's browser. This is the one to use.
+**The words themselves are not here.** Each belongs to an assistant, on the AI
+tab: with more than one, the word is what picks between them, so it belongs to
+the thing it picks. LEARN, the alternative spellings and each one's own
+greeting are all there too. What is on this tab is the gate's behaviour, which
+is one thing for the whole display however many assistants it can reach.
 
-**BROWSER** uses whatever voices the viewer's own browser and operating system
-provide. Its advantage is that it needs nothing installed on the server; its
-disadvantage is that everybody hears something different, and some browsers
-provide nothing at all.
-
-Pick NEURAL unless it is unavailable.
-
-### Voices and delivery
-
-The voice list is populated from what is actually installed, so it reflects
-the box rather than a catalogue. **speech rate** applies to both engines;
-**pitch** only exists for BROWSER, because the neural voices do not expose it.
-
-**TEST VOICE** speaks a sample. **DIAGNOSE** reports what the server and the
-browser each think is available, which is the right first step when a voice
-does not come out.
-
-### What drives the figure while it speaks
-
-| Setting | The figure follows |
+| Mode | Behaviour |
 |---|---|
-| TOKEN | the arrival of words |
-| TTS | the audio actually being spoken |
-| BEEP | a synthetic tone |
+| OFF | no gate; anything heard is a question, and goes to the one marked DEFAULT |
+| AUTO ONLY | the gate applies in AUTO, and is skipped in push-to-talk |
+| ALWAYS | the gate applies in both modes |
 
-**TTS** is the honest one — the shape matches the sound leaving the speaker.
-TOKEN moves in time with words appearing rather than being heard, which is
-useful if audio is muted. BEEP is for testing.
+**AUTO ONLY** is the sensible default: holding SPACE is already an explicit
+statement that you are talking to it, so requiring a wake word as well is
+friction for nothing.
+
+**stays awake for** sets how long it keeps listening after being woken.
+Activity extends it.
+
+**greeting phrases** are the fallback for every assistant with no greeting of
+its own. `{name}` is the word that was said to reach whoever answered, so one line
+written here reads correctly whichever one answers.
 
 ## Speech in (mic, STT)
 
@@ -129,34 +121,42 @@ Two signal-processing profiles, and they genuinely conflict:
 Choose by what the display is for. A display people ask questions of wants
 CLEAN. A display that mostly looks good in a foyer wants RAW.
 
-## Wake word
+## Speech out (TTS)
 
-Without a wake word, an AUTO display responds to any speech near it —
-including two people talking to each other. The wake word is what makes it
-usable in an occupied room.
+### Which engine
 
-**The words themselves are not here.** Each belongs to an assistant, on the AI
-tab: with more than one, the word is what picks between them, so it belongs to
-the thing it picks. LEARN, the alternative spellings and each one's own
-greeting are all there too. What is on this tab is the gate's behaviour, which
-is one thing for the whole display however many assistants it can reach.
+**NEURAL (server)** synthesises on the box. It sounds substantially better, it
+is identical on every machine that connects, and it needs no support from the
+viewer's browser. This is the one to use.
 
-| Mode | Behaviour |
+**BROWSER** uses whatever voices the viewer's own browser and operating system
+provide. Its advantage is that it needs nothing installed on the server; its
+disadvantage is that everybody hears something different, and some browsers
+provide nothing at all.
+
+Pick NEURAL unless it is unavailable.
+
+### Voices and delivery
+
+The voice list is populated from what is actually installed, so it reflects
+the box rather than a catalogue. **speech rate** applies to both engines;
+**pitch** only exists for BROWSER, because the neural voices do not expose it.
+
+**TEST VOICE** speaks a sample. **DIAGNOSE** reports what the server and the
+browser each think is available, which is the right first step when a voice
+does not come out.
+
+### What drives the figure while it speaks
+
+| Setting | The figure follows |
 |---|---|
-| OFF | no gate; anything heard is a question, and goes to the one marked DEFAULT |
-| AUTO ONLY | the gate applies in AUTO, and is skipped in push-to-talk |
-| ALWAYS | the gate applies in both modes |
+| TOKEN | the arrival of words |
+| TTS | the audio actually being spoken |
+| BEEP | a synthetic tone |
 
-**AUTO ONLY** is the sensible default: holding SPACE is already an explicit
-statement that you are talking to it, so requiring a wake word as well is
-friction for nothing.
-
-**stays awake for** sets how long it keeps listening after being woken.
-Activity extends it.
-
-**greeting phrases** are the fallback for every assistant with no greeting of
-its own. `{name}` is the word that was said to reach whoever answered, so one line
-written here reads correctly whichever one answers.
+**TTS** is the honest one — the shape matches the sound leaving the speaker.
+TOKEN moves in time with words appearing rather than being heard, which is
+useful if audio is muted. BEEP is for testing.
 
 ## What the display tells you
 
