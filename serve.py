@@ -1600,9 +1600,14 @@ def validate_display_settings(obj, current):
         cfg["kiosks"] = clean_kiosks(obj["kiosks"])
     if "kiosk_default" in obj:
         want = str(obj["kiosk_default"] or "")
-        if not any(k["id"] == want for k in cfg["kiosks"]):
+        # Empty is "choose for me", not a mistake — it is what a deployment
+        # saving its very first profile has to send, since there was nothing to
+        # nominate before this request. Only a NAMED default that matches
+        # nothing is somebody's stale panel, and that is worth saying.
+        if want and not any(k["id"] == want for k in cfg["kiosks"]):
             return None, "the default has to be one of the kiosk profiles"
-        cfg["kiosk_default"] = want
+        if want:
+            cfg["kiosk_default"] = want
     # A default that named a profile somebody just deleted is corrected here
     # rather than refused: the deletion was the deliberate act, and leaving the
     # deployment pointing at nothing would take every unconfigured screen with

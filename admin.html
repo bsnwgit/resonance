@@ -4699,7 +4699,8 @@ let DPKDEF = '';
 let OPENKI = -1;
 
 function paintKiosks(list, def){
-  DPKIOSKS = (list || []).map(k=> ({id: k.id || '', name: k.name || '',
+  DPKIOSKS = (list || []).map(k=> ({id: k.id || '', _new: !!k._new,
+                                    name: k.name || '',
                                     voice_only: k.voice_only !== false,
                                     look: k.look || '', saver: k.saver || '',
                                     fullscreen: k.fullscreen !== false,
@@ -4843,12 +4844,7 @@ function paintKiosks(list, def){
     acts.className = 'acts';
     const mk = document.createElement('button');
     mk.textContent = 'MAKE DEFAULT';
-    if (!k.id){
-      /* An unsaved row has no id for the default to point at. Disabled and
-         saying why beats a button that silently does nothing. */
-      mk.disabled = true;
-      mk.title = 'save the profiles first — a default is stored by id';
-    }else if (k.id === DPKDEF){
+    if (k.id === DPKDEF){
       mk.disabled = true;
       mk.title = 'this is already the default';
     }else{
@@ -4882,15 +4878,26 @@ function paintKiosks(list, def){
      It comes back when the profiles are saved, or when the new one is
      reverted or removed. */
   if (btn){
-    const fresh = DPKIOSKS.some(x=> !x.id);
+    const fresh = DPKIOSKS.some(x=> x._new);
     btn.hidden = fresh;
     btn.disabled = fresh || DPKIOSKS.length >= 8;
   }
 }
 
+/* An id minted HERE rather than by the server on save. A default is stored by
+   id, so a profile without one cannot be made the default — which on the very
+   first profile meant it could never have a default at all, and the save then
+   refused for the want of one. clean_kiosks keeps an id it is given, so this
+   is the same id the server ends up storing. */
+function newProfileId(){
+  const b = new Uint8Array(4);
+  (window.crypto || window.msCrypto).getRandomValues(b);
+  return 'k' + [...b].map(x=> x.toString(16).padStart(2, '0')).join('');
+}
 $('b_addkiosk').addEventListener('click', ()=>{
   if (DPKIOSKS.length >= 8) return;
-  DPKIOSKS.push({id:'', name:'', voice_only:true, look:'', saver:'',
+  DPKIOSKS.push({id:newProfileId(), _new:true, name:'', voice_only:true,
+                 look:'', saver:'',
                  fullscreen:true, prompt:true, prompt_text:''});
   OPENKI = DPKIOSKS.length - 1;
   paintKiosks(DPKIOSKS);
@@ -5380,9 +5387,15 @@ $('b_profsave').addEventListener('click', ()=>{
            + 'kiosk needs something to be', true, 'profnote');
     return;
   }
-  saveDp({looks:  DPLOOKS.filter(x=> (x.name || '').trim()),
-          savers: DPSAVERS.filter(x=> (x.name || '').trim()),
-          kiosks: kiosks, kiosk_default: DPKDEF}, 'profnote');
+  /* Only when it names one of the profiles being sent. Otherwise it is left
+     out and the server nominates the first — which is the right answer for a
+     deployment saving its very first profile, and beats refusing the save for
+     the want of a choice nobody has been offered yet. */
+  const body = {looks:  DPLOOKS.filter(x=> (x.name || '').trim()),
+                savers: DPSAVERS.filter(x=> (x.name || '').trim()),
+                kiosks: kiosks};
+  if (kiosks.some(k=> k.id === DPKDEF)) body.kiosk_default = DPKDEF;
+  saveDp(body, 'profnote');
 });
 $('b_profrevert').addEventListener('click', ()=>{
   stopSaverPreview();
