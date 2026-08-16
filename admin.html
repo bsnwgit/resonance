@@ -730,6 +730,9 @@
     font-size:calc(8.5px * var(--fs));letter-spacing:.06em;
     color:rgba(var(--paper),.85);
   }
+  .bulkbar label{display:flex;align-items:center;gap:5px;cursor:pointer;
+                 white-space:nowrap}
+  .bulkbar label input{margin:0;accent-color:var(--hue)}
   .bulkbar select{flex:1 1 160px;min-width:0}
   .bulkbar .spacer{flex:1}
   .erow > .top.drow .dname{min-width:0;display:flex;flex-wrap:wrap;
@@ -739,12 +742,15 @@
     font-size:calc(8.5px * var(--fs));letter-spacing:.05em;
     color:rgba(var(--paper),.62);
   }
-  .erow > .top.drow .dkiosk{
-    display:flex;align-items:center;gap:5px;white-space:nowrap;
-    font-size:calc(8.5px * var(--fs));letter-spacing:.06em;
-    color:rgba(var(--paper),.72);cursor:pointer;
-  }
-  .erow > .top.drow .dkiosk input{margin:0;flex:0 0 auto}
+  .erow > .top.drow .dkstate{white-space:nowrap;color:rgba(var(--paper),.78)}
+  /* Shut, the name is a title; open, it is the field you rename in. Same cell
+     either way, so what you are editing does not jump when the row opens. */
+  .erow > .top.drow .dname .nmedit{display:none;flex:1 1 140px;min-width:0}
+  .erow:not(.shut) > .top.drow .dname .nm{display:none}
+  .erow:not(.shut) > .top.drow .dname .nmedit{display:block}
+  /* Open, the answers and the state have already been read — the row below is
+     saying all of it in full. */
+  .erow:not(.shut) > .top.drow .dcell{visibility:hidden}
   .erow > .top.drow .acts{justify-content:flex-end;margin:0}
   .erow .said{
     margin:6px 0 2px;padding:4px 0 4px 9px;
@@ -2039,7 +2045,7 @@ nothing but that id.</div>
   <section class="grp bare" data-tab="devices">
     <div class="grpbody">
   <div class="bulkbar" id="bulkbar" hidden>
-    <label class="dkiosk"><input type="checkbox" id="bulkall"> ALL</label>
+    <label><input type="checkbox" id="bulkall"> ALL</label>
     <span id="bulkcount">nothing selected</span>
     <span class="spacer"></span>
     <select id="bulkprofile" class="nmedit"></select>
@@ -4881,15 +4887,17 @@ function kioskBlock(d){
   const box = document.createElement('div');
   box.className = 'kiosk';
 
-  /* The tick goes in the row's header, beside the name — whether a screen is a
-     kiosk is a fact about it you should read without opening anything. Only
-     WHICH kiosk needs the room, and that stays down here. */
+  /* The tick sits on its own line under the name, and the picker under the
+     tick. The shut row says what it IS in words instead — a checkbox you
+     cannot press without opening the row would be a control pretending to be
+     a status. */
   const l = document.createElement('label');
-  l.className = 'dkiosk';
+  l.className = 'vo';
   const kb = document.createElement('input');
   kb.type = 'checkbox'; kb.checked = !!d.kiosk;
   l.appendChild(kb);
-  l.appendChild(document.createTextNode('Kiosk'));
+  l.appendChild(document.createTextNode('Kiosk mode'));
+  box.appendChild(l);
 
   const inner = document.createElement('div');
   inner.className = 'kioskon';
@@ -4962,7 +4970,14 @@ function kioskBlock(d){
      DELETE, because a row with two action rows — one for what this screen is,
      one for whether it may be here — reads as two things to press rather than
      one place to look. */
-  return {box: box, tick: l, save: save, said: said};
+  /* What the shut row prints. Resolved here because this is where the profile
+     list already is, and the row should not have to work out what "default"
+     means a second time. */
+  const named = kiosks.filter(k=> k.id === (d.kiosk_profile || ''))[0]
+              || (defOne || null);
+  const label = !d.kiosk ? '—'
+              : 'KIOSK' + (named ? ' · ' + named.name : '');
+  return {box: box, save: save, said: said, label: label};
 }
 
 /* What a row IS, and it decides which of the two lists it belongs in as well
@@ -5080,6 +5095,9 @@ async function refreshDisplays(){
     nmt.textContent = d.label;
     namecell.appendChild(nmt);
     top.appendChild(namecell);
+    /* Shut, the name is the row's title. Open, it is the field you rename it
+       in — same place, so the thing you are editing does not jump somewhere
+       else the moment you open the row. */
     top.onclick = (e)=>{
       if (e.target.closest('input, button, select, textarea')) return;
       const opening = row.classList.contains('shut');
@@ -5094,9 +5112,11 @@ async function refreshDisplays(){
     nm.type = 'text'; nm.className = 'nmedit'; nm.value = d.name || '';
     nm.placeholder = d.asked || 'unnamed display';
     nm.spellcheck = false;
+    nm.onclick = (e)=> e.stopPropagation();   // typing must not shut the row
     nm.onkeydown = (e)=>{ if (e.key === 'Enter') nm.blur(); };
     nm.onchange = ()=> displayAction('/displays/rename',
                                      {id: d.id, name: nm.value.trim()});
+    namecell.appendChild(nm);
     const badge = (t)=>{
       const b = document.createElement('span');
       b.className = 'badge'; b.textContent = t;
@@ -5128,7 +5148,10 @@ async function refreshDisplays(){
       .filter(a=> msgLabels.indexOf(a.label) < 0)
       .map(a=> a.label + ': ' + a.value).join('\n');
     top.appendChild(cell);
-    top.appendChild(kb.tick);
+    const kcell = document.createElement('div');
+    kcell.className = 'dcell dkstate';
+    kcell.textContent = kb.label;
+    top.appendChild(kcell);
     const r = document.createElement('div'); r.className = 'acts';
     /* Deciding is for a device that turned up on its own. A row created here
        was approved by being created, and has no device yet to decide about. */
@@ -5198,13 +5221,6 @@ async function refreshDisplays(){
     /* The whole thing somebody has to type, on its own line and big enough to
        read from across a room while typing it into a television with a
        remote. The address as well as the code: nobody is typing half a URL. */
-    const namerow = document.createElement('div');
-    namerow.className = 'namerow';
-    const nlab = document.createElement('b');
-    nlab.textContent = 'Name';
-    namerow.appendChild(nlab);
-    namerow.appendChild(nm);
-
     if (st === 'code'){
       const c = document.createElement('div');
       c.className = 'dcode';
@@ -5217,6 +5233,9 @@ async function refreshDisplays(){
     }else{
       row.appendChild(top);
     }
+    /* Directly under the name: what this screen IS comes before what somebody
+       said to get it here and before the machine detail. */
+    row.appendChild(kb.box);
 
     /* What they told you, in your own words — the labels are the ones you put
        on the form. This is the whole of what an admin who cannot see the
@@ -5287,14 +5306,10 @@ async function refreshDisplays(){
     });
 
     row.appendChild(meta);
-    /* The name is editable, so it belongs with the other things you change
-       rather than among the facts you read. */
-    row.appendChild(namerow);
     /* Under the facts and above the buttons that end the row's life. A screen
        can be told what it will look like before it has ever been switched on,
        the same way its endpoints can be ticked before it arrives. */
     top.appendChild(r);
-    row.appendChild(kb.box);
     row.appendChild(kb.said);
     conn.appendChild(row);
   });
