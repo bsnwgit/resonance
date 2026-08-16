@@ -1836,7 +1836,7 @@ recognised is left standing so a typo is visible rather than silent.</div>
        admin put somewhere. Named wherever access is granted — today an
        endpoint's allow-list, and anything later that grants something can name
        them the same way. -->
-  <section class="grp" data-tab="accounts">
+  <section class="grp" data-tab="account">
     <h4>Groups</h4>
     <div class="grpbody">
   <div id="grouplist"></div>
@@ -6519,7 +6519,10 @@ function panelNav(){
     render();
     syncSaveRow();
     $('panelscroll').scrollTop = 0;
-    if (tab === 'accounts'){ refreshUsers(); refreshGroups(); }
+    if (tab === 'accounts') refreshUsers();
+    // Groups moved to ACCOUNT, and it is populated by its own fetch — without
+    // this the list would be empty on the tab it now lives on.
+    if (tab === 'account') refreshGroups();
     if (tab === 'displays' || tab === 'devices') refreshDisplays();
     /* The three settings tabs ARE profile lists now, and those lists live in
        the displays document — so arriving at one has to fetch it, exactly as
