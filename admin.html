@@ -277,11 +277,12 @@
   .tabrow{display:flex;align-items:stretch;gap:14px;margin-bottom:2px}
   .tabside{display:flex;flex-direction:column;min-width:0}
   .tabside .tabs{margin-bottom:0}
-  /* Equal halves, so the rule lands in the middle of the row rather than
-     wherever the right-hand group's tabs happen to end. Connections still
-     sits hard against the preview edge inside its half. */
+  /* Equal halves, so the rule lands in the middle of the row. Connections sits
+     at the LEFT of its half, hard against the rule, so the two groups read as
+     a pair either side of it rather than as two things at opposite ends of a
+     wide row with nothing between them. */
   .tabside{flex:1 1 0}
-  .connside{align-items:flex-end}
+  .connside{align-items:flex-start}
   /* Heavy on purpose: this is a boundary between subjects, not a gap between
      controls, and the panel's hairlines read as the latter. */
   .tabsplit{flex:0 0 2px;align-self:stretch;
