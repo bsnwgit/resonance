@@ -720,16 +720,12 @@
      row that overflows is worse than one that is two lines tall. */
   .erow > .top.drow{
     display:grid;
-    grid-template-columns:auto minmax(0,1.4fr) minmax(0,1fr) auto auto;
+    grid-template-columns:auto minmax(0,1.4fr) minmax(0,1fr) auto;
     align-items:center;column-gap:8px;row-gap:5px;
   }
   .erow > .top.drow .dpick{margin:0;flex:0 0 auto;accent-color:var(--hue)}
   /* Wide enough and the actions sit on the same line as the name; narrow and
      they take one of their own rather than pushing the row off the edge. */
-  @container (max-width:640px){
-    .erow > .top.drow{grid-template-columns:auto minmax(0,1.4fr) minmax(0,1fr) auto}
-    .erow > .top.drow .acts{grid-column:1 / -1}
-  }
   .bulkbar{
     display:flex;align-items:center;gap:8px;flex-wrap:wrap;
     margin:2px 0 8px;padding:6px 8px;
@@ -759,7 +755,7 @@
   /* Open, the answers and the state have already been read — the row below is
      saying all of it in full. */
   .erow:not(.shut) > .top.drow .dcell{visibility:hidden}
-  .erow > .top.drow .acts{justify-content:flex-end;margin:0}
+  .erow > .acts{margin-top:9px}
   .erow .said{
     margin:6px 0 2px;padding:4px 0 4px 9px;
     border-left:2px solid rgba(var(--glass),.28);
@@ -4970,10 +4966,23 @@ function kioskBlock(d){
       said.textContent = e.message;
     }
   };
-  /* The button does not live here. It goes in the row's own bottom bar with
-     DELETE, because a row with two action rows — one for what this screen is,
-     one for whether it may be here — reads as two things to press rather than
-     one place to look. */
+  const undo = document.createElement('button');
+  undo.className = 'act-undo';
+  undo.textContent = 'REVERT';
+  undo.onclick = ()=>{
+    /* Back to what the server holds for THIS row, read off the record the list
+       was drawn from rather than re-fetched — a revert undoes what is on
+       screen, it does not go looking for what changed elsewhere meanwhile. */
+    kb.checked = !!d.kiosk;
+    sel.value = d.kiosk_profile || '';
+    sync();
+    said.className = 'note';
+    said.textContent = 'back to what is saved';
+  };
+  /* The buttons do not live here. They go in the row's own bottom bar, because
+     a row with two action rows — one for what this screen is, one for whether
+     it may be here — reads as two things to press rather than one place to
+     look. */
   /* What the shut row prints. Resolved here because this is where the profile
      list already is, and the row should not have to work out what "default"
      means a second time. */
@@ -4981,7 +4990,7 @@ function kioskBlock(d){
               || (defOne || null);
   const label = !d.kiosk ? '—'
               : 'KIOSK' + (named ? ' · ' + named.name : '');
-  return {box: box, save: save, said: said, label: label};
+  return {box: box, save: save, undo: undo, said: said, label: label};
 }
 
 /* What a row IS, and it decides which of the two lists it belongs in as well
@@ -5210,6 +5219,7 @@ async function refreshDisplays(){
     gap.className = 'spacer';
     r.appendChild(gap);
     r.appendChild(kb.save);
+    r.appendChild(kb.undo);
     const del = document.createElement('button');
     del.textContent = 'DELETE';
     del.className = 'act-danger';
@@ -5313,7 +5323,9 @@ async function refreshDisplays(){
     /* Under the facts and above the buttons that end the row's life. A screen
        can be told what it will look like before it has ever been switched on,
        the same way its endpoints can be ticked before it arrives. */
-    top.appendChild(r);
+    /* Last in the row: whether it may be here on the left, what it is and
+       whether that is saved on the right. */
+    row.appendChild(r);
     row.appendChild(kb.said);
     conn.appendChild(row);
   });
