@@ -1938,6 +1938,16 @@ thing they belong to.</div>
     </div>
   </section>
 
+  <!-- Empty on purpose, for now. The tab exists so what goes on it has a
+       home to be built into; nothing has been moved here from another tab,
+       because moving a control is a separate decision from making the place
+       for it. -->
+  <section class="grp" data-tab="security">
+    <h4>Security</h4>
+    <div class="grpbody">
+    </div>
+  </section>
+
   <section class="grp" data-tab="displays">
     <h4>Requested Access</h4>
     <div class="grpbody">
@@ -2464,6 +2474,10 @@ button to download it as a PDF.</div>
       <button id="tab_accounts" data-tab="accounts">ADMIN</button>
       <button id="tab_displays" data-tab="displays">ACCESS</button>
       <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
+      <!-- What this deployment is exposed as, as opposed to who may use it:
+           ACCESS answers "which device, which endpoint", and that is a
+           different question from how the server itself is defended. -->
+      <button id="tab_security" data-tab="security">SECURITY</button>
       <!-- DOCUMENTATION is not here any more. It is reached from the ? beside
            the panel title, because it is not something you configure and it
            was taking a slot in a row of things that are. -->

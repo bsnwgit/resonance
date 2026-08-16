@@ -52,6 +52,10 @@ At the foot, pinned so they are always reachable:
 - **ACCOUNTS** — who can sign in, and the groups access is granted to.
 - **ACCESS** — what may use this server, and what each may reach.
 - **EMBEDS** — keys that let another application frame this interface.
+- **SECURITY** — how this deployment is defended, as opposed to who may use
+  it. ACCESS answers which device may reach which endpoint; this tab is about
+  the server itself. **It is empty at present** — the tab exists, and what
+  belongs on it is being decided.
 - Your own name, your role, and **SIGN OUT**.
 
 **Your own account is behind your name.** Click it for the box that changes
