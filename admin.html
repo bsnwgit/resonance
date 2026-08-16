@@ -749,8 +749,11 @@
      may, and a select's content is its widest option. Without min-width the
      appearance picker sat at the width of its longest profile name and ran
      straight out of the box. */
-  #dp_kiosks .namerow{min-width:0}
-  #dp_kiosks .namerow select.ppick{
+  /* Not scoped to one list. The same picker appears on MODELS and on an AI
+     endpoint, and scoped to #dp_kiosks those two fell back to the browser's
+     own select — larger type than everything around them. */
+  .namerow{min-width:0}
+  select.ppick{
     flex:1 1 auto;min-width:0;max-width:100%;box-sizing:border-box;
     padding:3px 6px;font:inherit;
     font-size:calc(9px * var(--fs));letter-spacing:.06em;
