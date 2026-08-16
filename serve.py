@@ -1111,47 +1111,30 @@ DISPLAY_DEFAULTS = {
     # phone is a new row with a fresh ask. Anything stronger needs an identity,
     # which is what a dedicated URL is for.
     "deny_repeat": True,
-    # ---- what makes this one a wall display rather than a browser tab ----
+    # ---- what makes this one a kiosk rather than a browser tab ----
     #
-    # Is this device ON A WALL? Most rows in a real deployment are not: a
-    # guest's laptop and a phone are displays too, and neither wants any of
-    # this. So it is one tick that turns the rest of it on, and while it is off
-    # the two settings below are stored and not applied — untick it, the screen
-    # goes back to being an ordinary page, tick it again and what you chose is
-    # still there.
-    "wall": False,
-    # Voice only: the geometry alone, no transcript and no composer. It is the
-    # one setting that OUTRANKS the viewer's own control, because a hallway is
-    # not a workstation and a screen of scrolling text in one is neither useful
-    # nor discreet. Where it applies the TEXT button is removed rather than
-    # disabled — a control that is present and ignores you is worse than one
-    # that was never offered.
+    # Is this device a KIOSK — a screen people walk up to, that nobody has open
+    # and nobody is sitting at? A wall, a stand, a reception counter, a
+    # tabletop: the mounting was never what any of this followed from, and
+    # calling it "on a wall" told anybody deploying it on a stand that the
+    # feature was not for them.
     #
-    # PER DEVICE rather than part of a screensaver profile, because they are
-    # separate axes: a wall screen can be voice only without ever drifting, and
-    # a shared television can drift while still showing its transcript.
+    # Most rows in a real deployment are not kiosks: a guest's laptop and a
+    # phone are displays too and want none of it. So it is one tick, and while
+    # it is off the profile below is stored and not applied — untick it, the
+    # screen goes back to being an ordinary page; tick it again and what you
+    # chose is still there.
+    "kiosk": False,
+    # …and WHICH KIOSK it is, by the id of a profile in the settings below.
+    # Empty means the deployment's default, which an admin picks — so a screen
+    # hung on a wall and never configured still behaves like the other screens
+    # in the building rather than like nothing.
     #
-    # ON BY DEFAULT, which is safe precisely because `wall` gates it: a row
-    # that is not on a wall carries this and does not apply it. What it buys is
-    # that ticking "on a wall" is one gesture rather than two — a screen bolted
-    # to a wall is voice only unless somebody says otherwise, which is the way
-    # round that matches what the thing is for.
-    "voice_only": True,
-    # …and WHICH SCREENSAVER, by the id of a profile in the settings below.
-    # Empty is none, and none is the default: an upgrade that quietly started
-    # moving every screen in a building would be this deciding something nobody
-    # asked it to — the same rule that made ANY DISPLAY the default on a route.
-    #
-    # An ID rather than the numbers themselves. That is the whole point of a
-    # profile: change *night* once and every screen using it changes together,
-    # instead of twelve rows drifting out of step with each other and no way to
-    # see which had. It is also why renaming a profile cannot orphan anything.
-    "saver": "",
-    # …and WHICH APPEARANCE, by the id of a profile in the settings below.
-    # Empty means whatever the shared document says, which is what every screen
-    # got before this existed and is a working appearance rather than a blank
-    # one — so a deleted profile falls back to it rather than to nothing.
-    "look": "",
+    # An ID rather than the settings themselves. That is the whole point of a
+    # profile: change what a hallway screen does once, and every hallway screen
+    # changes with it, instead of twelve rows drifting out of step with no way
+    # to see which had.
+    "kiosk_profile": "",
 }
 
 #: How many screensaver profiles may exist. A deployment has a handful of
@@ -1256,6 +1239,17 @@ DISPLAY_SETTINGS = {
     # field on a row. A deployment has a handful of kinds of place, and the
     # numbers that suit a hallway suit every hallway in the building.
     "savers": [],
+    # The kiosk profiles, each {id, name, voice_only, look, saver}. A public
+    # screen people walk up to — a wall, a stand, a reception counter, a
+    # tabletop — as against a page somebody opened and is sitting at. The
+    # mounting was never the point: what these settings follow from is that
+    # nobody owns the session and nobody has a keyboard.
+    "kiosks": [],
+    # Which of them a device gets when it names none. An id rather than "the
+    # first in the list", so reordering the panel cannot silently change what
+    # every unconfigured screen in the building is doing — the same reason a
+    # route's default is stored by id.
+    "kiosk_default": "",
 }
 MAX_FORM_FIELDS = 5
 #: (low, high) for each number the panel can set
@@ -1389,6 +1383,67 @@ def find_saver(sid, savers=None):
     return dict(SAVER_OFF)
 
 
+#: How many kiosk profiles may exist. The same reasoning as the screensavers:
+#: a deployment has a handful of KINDS of public screen — a hallway, a
+#: reception desk, a shop floor — not one per screen.
+MAX_KIOSKS = 8
+
+#: What a kiosk profile holds, and the value of each where it says nothing.
+#:
+#: COMPOSED rather than self-contained: `look` and `saver` are ids into the two
+#: lists beside this one rather than copies of their values. Absorbing them
+#: would make a profile simpler to read and make a rebrand a job of editing
+#: eight of them — and it would lose the case that turns up first in any
+#: building with more than three screens, where day and night in one hallway
+#: share an appearance and differ only in the dim.
+KIOSK_OFF = {"voice_only": True, "look": "", "saver": ""}
+
+
+def clean_kiosks(raw):
+    """The kiosk profiles, sanitised, in the order the panel put them.
+
+    Ids are minted and kept exactly as they are for a screensaver: a device
+    names a profile by id, so a rename must not orphan it and a reorder must
+    not move a screen onto somebody else's settings."""
+    out, seen = [], set()
+    for k in (raw or [])[:MAX_KIOSKS]:
+        if not isinstance(k, dict):
+            continue
+        name = str(k.get("name") or "").strip()[:40]
+        if not name:
+            continue                     # a profile with no name is unpickable
+        kid = str(k.get("id") or "")[:16]
+        if not kid or kid in seen:
+            kid = "k" + secrets.token_hex(4)
+        seen.add(kid)
+        out.append({"id": kid, "name": name,
+                    "voice_only": bool(k.get("voice_only", KIOSK_OFF["voice_only"])),
+                    "look": str(k.get("look") or "")[:16],
+                    "saver": str(k.get("saver") or "")[:16]})
+    return out
+
+
+def find_kiosk(kid, kiosks=None, default_id=None):
+    """The profile a row names, or the deployment's default where it names
+    none — which is what "the admin picks which kiosk is the default" means at
+    the point it is read.
+
+    A row naming a profile that has since been deleted falls back to the
+    default rather than to nothing, for the same reason a missing screensaver
+    falls back to off: a screen must keep working, and the panel is where the
+    mistake is visible."""
+    pool = display_settings()["kiosks"] if kiosks is None else kiosks
+    if default_id is None:
+        default_id = display_settings()["kiosk_default"]
+    for want in (str(kid or ""), str(default_id or "")):
+        if not want:
+            continue
+        for k in pool:
+            if k["id"] == want:
+                return k
+    return None
+
+
 def display_settings():
     """Kept beside the displays rather than in the shared settings document,
     which is world readable and belongs to the interface. Who may ask this
@@ -1490,6 +1545,42 @@ def validate_display_settings(obj, current):
                     return None, ("%s must be one of: %s"
                                   % (k, ", ".join(allowed)))
         cfg["looks"] = clean_looks(obj["looks"])
+    if "kiosks" in obj:
+        if not isinstance(obj["kiosks"], (list, tuple)):
+            return None, "the kiosk profiles must be a list"
+        if len(obj["kiosks"]) > MAX_KIOSKS:
+            return None, "there is room for %d kiosk profiles" % MAX_KIOSKS
+        if not obj["kiosks"]:
+            return None, ("there has to be at least one kiosk profile — a "
+                          "screen ticked as a kiosk needs something to be")
+        for k in obj["kiosks"]:
+            if not isinstance(k, dict):
+                return None, "a kiosk profile must be a set of fields"
+            if not str(k.get("name") or "").strip():
+                return None, ("every profile needs a name — it is what you pick "
+                              "on a device")
+            # Named and gone, told rather than swallowed — the same rule as a
+            # device naming a deleted profile.
+            for key, pool, what in (("saver", cfg["savers"], "screensaver"),
+                                    ("look", cfg["looks"], "appearance")):
+                pid = str(k.get(key) or "")
+                if pid and not any(p["id"] == pid for p in pool):
+                    return None, ("a kiosk profile names a %s that no longer "
+                                  "exists — reload the panel to see the "
+                                  "current list" % what)
+        cfg["kiosks"] = clean_kiosks(obj["kiosks"])
+    if "kiosk_default" in obj:
+        want = str(obj["kiosk_default"] or "")
+        if not any(k["id"] == want for k in cfg["kiosks"]):
+            return None, "the default has to be one of the kiosk profiles"
+        cfg["kiosk_default"] = want
+    # A default that named a profile somebody just deleted is corrected here
+    # rather than refused: the deletion was the deliberate act, and leaving the
+    # deployment pointing at nothing would take every unconfigured screen with
+    # it.
+    if cfg["kiosks"] and not any(k["id"] == cfg.get("kiosk_default")
+                                 for k in cfg["kiosks"]):
+        cfg["kiosk_default"] = cfg["kiosks"][0]["id"]
     if "guest_requests" in obj:
         cfg["guest_requests"] = bool(obj["guest_requests"])
     return cfg, None
@@ -1532,6 +1623,88 @@ def write_displays(displays):
     _write_displays_doc(doc)
 
 
+def ensure_default_kiosk():
+    """There is always at least one kiosk profile, and always one nominated as
+    the default.
+
+    A tickbox whose only companion is an empty list is a control that appears
+    broken to the person meeting it first. Seeding one means ticking KIOSK on a
+    screen does something immediately, and the admin renames or re-points it
+    rather than being made to build one before anything works."""
+    doc = read_displays_doc()
+    cfg = doc.get("settings")
+    cfg = dict(cfg) if isinstance(cfg, dict) else {}
+    kiosks = clean_kiosks(cfg.get("kiosks"))
+    changed = False
+    if not kiosks:
+        kiosks = [dict(KIOSK_OFF, id="k" + secrets.token_hex(4), name="Default")]
+        changed = True
+    if cfg.get("kiosk_default") not in [k["id"] for k in kiosks]:
+        cfg["kiosk_default"] = kiosks[0]["id"]
+        changed = True
+    if not changed:
+        return
+    cfg["kiosks"] = kiosks
+    doc["settings"] = cfg
+    _write_displays_doc(doc)
+
+
+def migrate_kiosks():
+    """One-time: fold the old per-row wall settings into kiosk profiles.
+
+    This has to run before anything else reads a display, because
+    `read_displays` keeps only the keys in DISPLAY_DEFAULTS — so the moment
+    those defaults stopped naming `wall`, `voice_only`, `saver` and `look`, the
+    next write of any row would have dropped them on the floor. Nobody would
+    have seen it happen; the screen would simply have stopped being a kiosk one
+    day.
+
+    One profile per combination that was ACTUALLY IN USE, rather than one for
+    every row: a building with a hallway and a reception desk comes back with
+    both, and a building where twelve screens were set identically comes back
+    with one profile that twelve rows name. Rows that were not on a wall mint
+    nothing — their stored settings were never applied, so preserving them as a
+    profile would invent a place that never existed."""
+    doc = read_displays_doc()
+    rows = doc.get("displays")
+    if not isinstance(rows, dict):
+        return
+    legacy = [r for r in rows.values()
+              if isinstance(r, dict) and "wall" in r and "kiosk" not in r]
+    if not legacy:
+        return
+    cfg = doc.get("settings")
+    cfg = dict(cfg) if isinstance(cfg, dict) else {}
+    kiosks = clean_kiosks(cfg.get("kiosks"))
+    made = {}
+    for rec in legacy:
+        was = bool(rec.get("wall"))
+        rec["kiosk"] = was
+        rec["kiosk_profile"] = ""
+        if was:
+            key = (bool(rec.get("voice_only", KIOSK_OFF["voice_only"])),
+                   str(rec.get("saver") or ""), str(rec.get("look") or ""))
+            if key not in made:
+                prof = {"id": "k" + secrets.token_hex(4),
+                        "name": "Default" if not kiosks else
+                                "Kiosk %d" % (len(kiosks) + 1),
+                        "voice_only": key[0], "saver": key[1], "look": key[2]}
+                made[key] = prof
+                kiosks.append(prof)
+            rec["kiosk_profile"] = made[key]["id"]
+        for dead in ("wall", "voice_only", "saver", "look"):
+            rec.pop(dead, None)
+    cfg["kiosks"] = kiosks
+    if cfg.get("kiosk_default") not in [k["id"] for k in kiosks] and kiosks:
+        cfg["kiosk_default"] = kiosks[0]["id"]
+    doc["settings"] = cfg
+    doc["displays"] = rows
+    _write_displays_doc(doc)
+    print("kiosk migration: %d row(s), %d profile(s) made (%s)"
+          % (len(legacy), len(made),
+             ", ".join(p["name"] for p in made.values()) or "none"), flush=True)
+
+
 def display_label(rec):
     """What to call it. The admin's name where there is one, then the name it
     announced itself with, then the first thing the person typed on the request
@@ -1551,56 +1724,60 @@ def display_label(rec):
     return "unnamed display"
 
 
-WALL_FIELDS = ("wall", "voice_only", "saver", "look")
+KIOSK_FIELDS = ("kiosk", "kiosk_profile")
 
 
-def wall_of(rec, savers=None, looks=None):
-    """What the place this display sits in looks like, resolved and clamped:
-    whether the transcript is there at all, and the numbers of the screensaver
-    profile this row names.
+def kiosk_of(rec, savers=None, looks=None, kiosks=None, default_id=None):
+    """What this display is, resolved and clamped: whether it is a kiosk at
+    all, whether the transcript is there, and the numbers of the screensaver
+    the profile names.
 
     Resolved HERE rather than on the display, so a browser is handed three
     numbers and never the list of profiles. That list is a description of a
     building — *hallway*, *ward*, *shop floor* — and no display has any use for
-    the names of places it is not in.
+    the names of places it is not in. The same applies to the kiosk profiles
+    themselves: a screen is told what it is, never what the others are.
 
-    Everything is off where the row is not on a wall. The two settings stay
-    stored, so unticking is not the same as forgetting: a device taken down and
-    put back up comes back as what it was."""
-    if not rec.get("wall"):
-        return {"wall": False, "voice_only": False, "look": None,
+    Everything is off where the row is not a kiosk. The profile stays stored,
+    so unticking is not the same as forgetting: a device taken down and put
+    back up comes back as what it was."""
+    if not rec.get("kiosk"):
+        return {"kiosk": False, "voice_only": False, "look": None,
                 "saver": dict(SAVER_OFF)}
-    # `wall` is published in its own right and not merely implied by the
-    # settings under it, because being on a wall means things none of them
+    # `kiosk` is published in its own right and not merely implied by the
+    # settings under it, because being a kiosk means things none of them
     # covers — a rig instrument in the corner of a hallway screen is the first.
-    return {"wall": True, "voice_only": bool(rec.get("voice_only")),
-            "look": find_look(str(rec.get("look") or ""), looks),
-            "saver": find_saver(str(rec.get("saver") or ""), savers)}
+    prof = find_kiosk(rec.get("kiosk_profile"), kiosks, default_id) or {}
+    return {"kiosk": True,
+            "voice_only": bool(prof.get("voice_only", KIOSK_OFF["voice_only"])),
+            "look": find_look(str(prof.get("look") or ""), looks),
+            "saver": find_saver(str(prof.get("saver") or ""), savers)}
 
 
-def validate_wall(obj, rec, savers, looks):
-    """Returns (the three fields, error). Separate from
+def validate_kiosk(obj, rec, kiosks):
+    """Returns (the two fields, error). Separate from
     validate_display_settings for the same reason the panel has a SAVE per
     block: these belong to one screen, those to the deployment, and one commit
-    writing both would publish an edit somebody was halfway through."""
-    out = {k: rec.get(k, DISPLAY_DEFAULTS[k]) for k in WALL_FIELDS}
-    if "wall" in obj:
-        out["wall"] = bool(obj["wall"])
-    if "voice_only" in obj:
-        out["voice_only"] = bool(obj["voice_only"])
+    writing both would publish an edit somebody was halfway through.
+
+    Two fields now rather than four. What a kiosk DOES moved into the profile,
+    so a screen carries which kiosk it is and nothing else — and the settings
+    that used to be edited a row at a time are edited once, where they are
+    named."""
+    out = {k: rec.get(k, DISPLAY_DEFAULTS[k]) for k in KIOSK_FIELDS}
+    if "kiosk" in obj:
+        out["kiosk"] = bool(obj["kiosk"])
     # Named and gone is an ERROR here, where it is merely a fall-back in
-    # wall_of. The two are not inconsistent: a screen must fail quiet, and a
+    # kiosk_of. The two are not inconsistent: a screen must fail quiet, and a
     # person pressing save must be told, or a panel left open while somebody
-    # else deleted a profile silently sets a device to nothing.
-    for key, pool, what in (("saver", savers, "screensaver"),
-                            ("look", looks, "appearance")):
-        if key not in obj:
-            continue
-        pid = str(obj[key] or "")[:16]
-        if pid and not any(p["id"] == pid for p in pool):
-            return None, ("that %s profile no longer exists — reload the panel "
-                          "to see the current list" % what)
-        out[key] = pid
+    # else deleted a profile silently sets a device to something it did not
+    # choose.
+    if "kiosk_profile" in obj:
+        pid = str(obj["kiosk_profile"] or "")[:16]
+        if pid and not any(p["id"] == pid for p in kiosks):
+            return None, ("that kiosk profile no longer exists — reload the "
+                          "panel to see the current list")
+        out["kiosk_profile"] = pid
     return out, None
 
 
@@ -1903,7 +2080,7 @@ def admin_displays():
         # The row's own three fields, NOT the resolved numbers: the panel is
         # editing what this device names, and the numbers behind that name are
         # on the profile where they can be changed once for every screen.
-        row.update({k: rec.get(k, DISPLAY_DEFAULTS[k]) for k in WALL_FIELDS})
+        row.update({k: rec.get(k, DISPLAY_DEFAULTS[k]) for k in KIOSK_FIELDS})
         ref = _display_refusals.get(did)
         live = bool(rec.get("code")) and (rec.get("code_expires") or 0) > now_
         row.update(id=did, label=display_label(rec),
@@ -2690,7 +2867,7 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      # /displays, one letter and a whole boundary apart.
                      "/displays", "/displays/approve", "/displays/rename",
                      "/displays/delete", "/displays/new", "/displays/reissue",
-                     "/displays/decide", "/displays/settings", "/displays/wall",
+                     "/displays/decide", "/displays/settings", "/displays/kiosk",
                      "/groups", "/groups/save", "/groups/delete")
 #: where an enrolment code is typed. On the display listeners only — it hands
 #: out a display's token, and the admin listener is not a display.
@@ -2918,7 +3095,7 @@ class Handler(SimpleHTTPRequestHandler):
                # where a screen sits burning an image into itself. It is also
                # this display's own row and nobody else's, so there is nothing
                # here to leak — it went out through the token that asked.
-               "wall": wall_of(rec)}
+               "kiosk": kiosk_of(rec)}
         if may_ask:
             out["form"] = cfg["form"]
         if rec.get("denied"):
@@ -2984,7 +3161,7 @@ class Handler(SimpleHTTPRequestHandler):
                                     or path in ADMIN_ONLY_ROUTES
                                     # A PREFIX, not a list, and it is the list
                                     # above that is the belt. Adding
-                                    # /displays/wall and forgetting to name it
+                                    # /displays/kiosk and forgetting to name it
                                     # there left one admin route answering 401
                                     # on a listener where every one of its
                                     # siblings answers 404 — which is the route
@@ -3979,7 +4156,7 @@ class Handler(SimpleHTTPRequestHandler):
             # A device pointing at a profile that has just been deleted is a
             # setting nobody can see and nobody can change — the same fault as
             # an allow-list naming a display that no longer exists, and cleared
-            # the same way. wall_of already fails it off, so nothing was ever
+            # the same way. kiosk_of already fails it off, so nothing was ever
             # drifting to numbers that had gone; this is so the panel says so.
             displays = read_displays()
             touched = 0
@@ -4121,7 +4298,7 @@ class Handler(SimpleHTTPRequestHandler):
                   flush=True)
             return self._json(200, {"ok": True, "displays": admin_displays()})
 
-        if parsed.path == "/displays/wall":
+        if parsed.path == "/displays/kiosk":
             # What this screen looks like where it hangs. Its own endpoint
             # rather than a field on rename, because they are saved by
             # different gestures at different moments: a name is typed once
@@ -4138,8 +4315,7 @@ class Handler(SimpleHTTPRequestHandler):
             if did not in displays:
                 return self._json(404, {"error": "no such display"})
             cfg = display_settings()
-            fields, err = validate_wall(obj, displays[did],
-                                        cfg["savers"], cfg["looks"])
+            fields, err = validate_kiosk(obj, displays[did], cfg["kiosks"])
             if err:
                 return self._json(400, {"error": err})
             displays[did].update(fields)
@@ -4462,6 +4638,11 @@ def start_tls(port, cert, key, admin_port=False, host="0.0.0.0"):
 
 def main():
     global SESSION_IDLE, AUTH_MODE
+    # Before anything can read a display. read_displays keeps only the keys in
+    # DISPLAY_DEFAULTS, so the first write after an upgrade would drop the old
+    # wall settings silently — see migrate_kiosks.
+    migrate_kiosks()
+    ensure_default_kiosk()
     app = read_app()
     # Environment still wins, so a one-off run on a different port needs no
     # edit to the stored configuration. Setting PORT alone moves all three,
