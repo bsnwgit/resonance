@@ -1425,6 +1425,7 @@
     <button data-tab="motion">GEOMETRY</button>
     <button data-tab="speech">SPEECH</button>
     <button data-tab="savers">SCREENSAVER</button>
+    <button data-tab="models">MODELS</button>
     <button data-tab="devprof">DEVICE</button>
     <button id="tab_account" data-tab="account">GROUPS</button>
   </div>
@@ -2092,6 +2093,31 @@ what the tab says now.</div>
 
   <!-- Central, and named from a device rather than copied into it. A
        deployment has a handful of kinds of place, not one setting per screen. -->
+  <!-- The connection half of an endpoint, under a name. An endpoint names one
+       instead of carrying its own copy — two endpoints on the same model used
+       to be the same base URL and the same credential typed twice. -->
+  <section class="grp bare proflist" data-tab="models">
+    <div class="barehead"><span class="listtitle">Model profiles</span></div>
+    <div class="grpbody">
+  <div id="dp_models"></div>
+  <div class="note" id="modelnote"></div>
+  <div class="seg addrow">
+    <button id="b_addmodel" class="act-add">ADD A PROFILE</button>
+  </div>
+  <div class="note help">Where the connection lives: which provider, which base
+URL, which model, and the key for it. An endpoint on the AI tab picks one.
+
+<b>The key never comes back to this page.</b> It is stored on the server and
+the panel is told only whether there is one — so a profile shows
+<b>key stored</b> rather than the key, and saving without typing one keeps what
+is already there.
+
+<b>DEMO</b> needs nothing else: the display answers from built-in replies,
+which is how you tell a fault in the interface from a fault in whatever it is
+pointed at.</div>
+    </div>
+  </section>
+
   <section class="grp bare proflist" data-tab="savers">
     <div class="barehead"><span class="listtitle">Screensaver profiles</span></div>
     <div class="grpbody">
@@ -4451,6 +4477,7 @@ function paintDpSettings(){
                                           DPCFG[DEF_KEY[k.key]] || ''));
   paintSavers(DPCFG.savers || []);
   paintKiosks(DPCFG.kiosks || [], DPCFG.kiosk_default || '');
+  paintModels(DPCFG.models || [], DPCFG.model_default || '');
 }
 
 /* The two profile lists live on their own tab now, and they are painted from
@@ -4568,6 +4595,158 @@ $('b_formrevert').addEventListener('click', ()=>{
 });
 $('b_formsave').addEventListener('click', ()=>{
   saveDp({form: DPFORM.filter(f=> (f.label || '').trim())}, 'formnote');
+});
+
+/* ---- the model profiles ----
+   The connection, under a name. Same row, same caret, same one-open-at-a-time
+   as every other list; the key is the one field that is never read back from
+   the server, so an empty box means "keep what is stored" rather than "clear
+   it". */
+let DPMODELS = [], DPMDEF = '', OPENMD = -1;
+
+const PROVIDERS = [['demo','DEMO'], ['openai','OPENAI-COMPATIBLE'],
+                   ['anthropic','ANTHROPIC'], ['homeassistant','HOME ASSISTANT']];
+
+function paintModels(list, def){
+  if (def !== undefined) DPMDEF = def || '';
+  DPMODELS = (list || []).map(m=> ({id: m.id || '', _new: !!m._new,
+                                    name: m.name || '', has_key: !!m.has_key,
+                                    values: Object.assign({}, m.values || {})}));
+  const box = $('dp_models');
+  if (!box) return;
+  box.innerHTML = '';
+  if (!DPMDEF && DPMODELS.length) DPMDEF = DPMODELS[0].id;
+  DPMODELS.forEach((m, i)=>{
+    const v = m.values;
+    const row = document.createElement('div');
+    row.className = 'erow';
+    if (OPENMD !== i) row.classList.add('shut');
+
+    const top = document.createElement('div'); top.className = 'top';
+    const nmt = document.createElement('span'); nmt.className = 'nm';
+    top.appendChild(nmt);
+    const sum = document.createElement('span'); sum.className = 'badge';
+    top.appendChild(sum);
+    const dflag = document.createElement('span');
+    dflag.className = 'badge isdefault'; dflag.textContent = 'DEFAULT';
+    top.appendChild(dflag);
+    const retitle = ()=>{
+      nmt.textContent = (m.name || '').trim() || 'unnamed profile';
+      sum.textContent = v.provider === 'demo' ? 'demo — built-in replies'
+        : v.provider === 'homeassistant'
+          ? 'Home Assistant · ' + (v.agent_id || 'default agent')
+          : (v.model || 'no model') + (m.has_key ? ' · key stored' : '');
+      dflag.style.display = (m.id && m.id === DPMDEF) ? '' : 'none';
+    };
+    retitle();
+    top.onclick = (e)=>{
+      if (e.target.closest('input, button, select, textarea')) return;
+      const opening = row.classList.contains('shut');
+      OPENMD = opening ? i : -1;
+      box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+      row.classList.toggle('shut', !opening);
+      const ab = $('b_addmodel');
+      if (ab){ ab.hidden = OPENMD >= 0; ab.disabled = OPENMD >= 0; }
+    };
+    row.appendChild(top);
+
+    const field = (label, el)=>{
+      const w = document.createElement('div'); w.className = 'namerow';
+      const b = document.createElement('b'); b.textContent = label;
+      w.appendChild(b); w.appendChild(el); row.appendChild(w); return el;
+    };
+    const text = (label, key, ph, type)=>{
+      const inp = document.createElement('input');
+      inp.type = type || 'text'; inp.className = 'nmedit';
+      inp.value = v[key] || ''; inp.placeholder = ph || '';
+      inp.spellcheck = false;
+      inp.oninput = ()=>{ v[key] = inp.value; retitle(); };
+      return field(label, inp);
+    };
+
+    const nm = document.createElement('input');
+    nm.type = 'text'; nm.className = 'nmedit'; nm.value = m.name;
+    nm.spellcheck = false; nm.placeholder = 'Ollama';
+    nm.oninput = ()=>{ m.name = nm.value; retitle(); };
+    field('Name', nm);
+
+    const psel = document.createElement('select');
+    psel.className = 'ppick';
+    PROVIDERS.forEach(([val, label])=>{
+      const o = document.createElement('option');
+      o.value = val; o.textContent = label; psel.appendChild(o);
+    });
+    psel.value = v.provider || 'demo';
+    psel.onchange = ()=>{ v.provider = psel.value; retitle(); paintModels(DPMODELS); };
+    field('Preset', psel);
+
+    /* Only what this provider actually reads. DEMO answers from the display,
+       so it needs none of it. */
+    if (v.provider === 'openai' || v.provider === 'anthropic'){
+      text('Base URL', 'base_url', 'http://127.0.0.1:11434/v1');
+      text('Model', 'model', 'qwen2.5:3b');
+    }
+    if (v.provider === 'homeassistant'){
+      text('Base URL', 'base_url', 'http://homeassistant.local:8123');
+      text('Conversation agent', 'agent_id', 'leave blank for the default');
+    }
+    if (v.provider !== 'demo'){
+      const k = text('API key', 'api_key', m.has_key ? 'stored — type to replace'
+                                                     : '', 'password');
+      k.value = '';
+      k.oninput = ()=>{ v.api_key = k.value; };
+    }
+
+    const acts = document.createElement('div'); acts.className = 'acts';
+    const mk = document.createElement('button');
+    mk.textContent = 'MAKE DEFAULT';
+    if (m.id && m.id === DPMDEF){ mk.disabled = true;
+      mk.title = 'an endpoint naming no profile gets this one'; }
+    else mk.onclick = ()=>{ DPMDEF = m.id; paintModels(DPMODELS); };
+    acts.appendChild(mk);
+    const gap = document.createElement('span'); gap.className = 'spacer';
+    acts.appendChild(gap);
+
+    const save = document.createElement('button');
+    save.textContent = 'SAVE'; save.className = 'act-save';
+    save.onclick = ()=>{
+      const keep = DPMODELS.filter(x=> (x.name || '').trim());
+      if (!keep.length){
+        dpNote('a profile needs a name before it can be saved', true, 'modelnote');
+        return;
+      }
+      m._new = false; OPENMD = -1;
+      saveDp({models: keep.map(x=> ({id:x.id, name:x.name, values:x.values})),
+              model_default: DPMDEF}, 'modelnote');
+    };
+    acts.appendChild(save);
+
+    const del = document.createElement('button');
+    del.textContent = 'REMOVE'; del.className = 'act-danger';
+    if (m.id && m.id === DPMDEF){ del.disabled = true;
+      del.title = 'make another profile the default first'; }
+    else del.onclick = ()=>{
+      OPENMD = -1; DPMODELS.splice(i, 1); paintModels(DPMODELS);
+    };
+    acts.appendChild(del);
+    row.appendChild(acts);
+    box.appendChild(row);
+  });
+  const btn = $('b_addmodel');
+  if (btn){
+    const busy = OPENMD >= 0 || DPMODELS.some(x=> x._new);
+    btn.hidden = busy;
+    btn.disabled = busy || DPMODELS.length >= 8;
+  }
+}
+
+$('b_addmodel').addEventListener('click', ()=>{
+  if (DPMODELS.length >= 8) return;
+  DPMODELS.push({id: profileId('n'), _new: true, name: '', has_key: false,
+                 values: {provider: 'demo', base_url: '', model: '',
+                          api_key: '', agent_id: ''}});
+  OPENMD = DPMODELS.length - 1;
+  paintModels(DPMODELS);
 });
 
 $('b_addsaver').addEventListener('click', ()=>{
@@ -6679,7 +6858,8 @@ function panelNav(){
        PROFILES does. Without this the lists were painted only if you happened
        to visit PROFILES first, which on a panel that opens on APPEARANCE
        meant they were blank. */
-    if (tab === 'savers' || tab === 'devprof' || PROF_OF[tab]) refreshProfiles();
+    if (tab === 'savers' || tab === 'devprof' || tab === 'models'
+        || PROF_OF[tab]) refreshProfiles();
     if (tab === 'embeds') refreshEmbeds();
     if (tab === 'app') loadApp();
     if (tab === 'ai'){

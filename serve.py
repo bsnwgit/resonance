@@ -1648,6 +1648,25 @@ def write_display_settings(cfg):
     _write_displays_doc(doc)
 
 
+def panel_settings():
+    """display_settings() with the credentials taken out.
+
+    A model profile holds an API key, and the panel has no business receiving
+    one — the same rule a route's key has always followed. It is told WHETHER
+    there is a key, which is what an admin needs to tell a configured profile
+    from an unconfigured one, and never the key itself."""
+    cfg = dict(display_settings())
+    out = []
+    for m in cfg.get("models") or []:
+        row = dict(m)
+        vals = dict(row.get("values") or {})
+        row["has_key"] = bool(vals.pop("api_key", ""))
+        row["values"] = vals
+        out.append(row)
+    cfg["models"] = out
+    return cfg
+
+
 def validate_display_settings(obj, current):
     """Returns (settings, error). The one rule that is not a range: guest
     requests cannot be switched off while there is nowhere for a guest to go —
@@ -1725,6 +1744,27 @@ def validate_display_settings(obj, current):
         cfg["looks"] = clean_looks(obj["looks"])
     # The geometry and speech lists, validated exactly as the appearance one is:
     # a name, and a bag of settings the display checks as it applies them.
+    if "models" in obj:
+        if not isinstance(obj["models"], (list, tuple)):
+            return None, "the model profiles must be a list"
+        if len(obj["models"]) > MAX_LOOKS:
+            return None, "there is room for %d model profiles" % MAX_LOOKS
+        for m in obj["models"]:
+            if not isinstance(m, dict):
+                return None, "a model profile must be a set of fields"
+            if not str(m.get("name") or "").strip():
+                return None, ("every profile needs a name — it is what an "
+                              "endpoint picks")
+        # The panel is never sent a key, so it cannot send one back. A profile
+        # arriving without one keeps what is stored rather than blanking it —
+        # otherwise every save would forget the credential.
+        stored = {p["id"]: (p.get("values") or {}).get("api_key", "")
+                  for p in cfg["models"]}
+        rows = clean_profiles(obj["models"], "n", MAX_LOOKS)
+        for r in rows:
+            if not r["values"].get("api_key") and stored.get(r["id"]):
+                r["values"]["api_key"] = stored[r["id"]]
+        cfg["models"] = rows
     for key, prefix in (("motions", "m"), ("speeches", "p")):
         if key not in obj:
             continue
@@ -1784,7 +1824,7 @@ def validate_display_settings(obj, current):
     # moved between tabs cannot leave a stale copy of the answer on the server.
     # Seeding the first profile is the panel's job for the same reason.
     for dkey, lkey in (("look_default", "looks"), ("motion_default", "motions"),
-                       ("speech_default", "speeches")):
+                       ("speech_default", "speeches"), ("model_default", "models")):
         if dkey in obj:
             want = str(obj[dkey] or "")
             if want and not any(p["id"] == want for p in cfg[lkey]):
@@ -3601,7 +3641,7 @@ class Handler(SimpleHTTPRequestHandler):
             secure = RUNNING.get("https_port")
             doc = read_routes()
             return self._json(200, {"displays": admin_displays(),
-                                    "settings": display_settings(),
+                                    "settings": panel_settings(),
                                     "limits": DISPLAY_LIMITS,
                                     "max_fields": MAX_FORM_FIELDS,
                                     # Which endpoints there are to grant, and
