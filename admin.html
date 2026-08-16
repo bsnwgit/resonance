@@ -846,6 +846,23 @@
      action rather than the last of the same set. Labels never break, and a
      button gives up padding before the row gives up its line. */
   .erow .acts{display:flex;flex-wrap:nowrap;gap:4px;margin-top:7px}
+  /* A profile builder is a column of fields ending in buttons that do
+     something to the profile rather than to a field. A hairline reads as
+     another gap between settings; this has to read as the end of them.
+     Scoped to the three profile lists so the device register, whose rows are
+     a different shape, is untouched. */
+  #dp_kiosks .erow .acts,
+  #dp_savers .erow .acts,
+  #dp_looks  .erow .acts{
+    margin-top:11px;padding-top:10px;
+    border-top:2px solid rgba(var(--glass),.34);
+  }
+  /* …and the same again at the foot of the whole list, where SAVE THE
+     PROFILES commits every row above it rather than the one you were in. */
+  .grp[data-tab="profiles"] .actrow{
+    margin-top:14px;padding-top:11px;
+    border-top:2px solid rgba(var(--glass),.34);
+  }
   .erow .acts button{white-space:nowrap;min-width:0}
 
   /* Each endpoint keeps a full edge whether it is open or closed. The other
