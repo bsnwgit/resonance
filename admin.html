@@ -1211,8 +1211,16 @@
   </div><!-- /panelhead -->
 
   <div id="grpbox">
-  <section class="grp" data-tab="look">
-    <h4>Geometry</h4>
+  <!-- Which figure it is, and it belongs with how that figure moves rather
+       than with the surface treatment over it. It sits first on GEOMETRY
+       because it is the choice the rest of that tab is tuning: rotation and
+       spectrum mean different things to a stack than to a knot.
+
+       Its settings follow it. The per-tab SAVE publishes the keys of the
+       sections on that tab, so moving the section moves what GEOMETRY commits
+       and what APPEARANCE stops claiming. -->
+  <section class="grp" data-tab="motion">
+    <h4>Style</h4>
     <div class="grpbody">  <div class="seg" data-set="mode">
     <button data-v="stack" class="on">STACK</button>
     <button data-v="disc">DISC</button>

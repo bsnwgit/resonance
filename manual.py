@@ -34,9 +34,9 @@ DOCS = [
                 "the live preview, and approving the displays that may use "
                 "each assistant."},
     {"id": "look",    "file": "appearance.md",
-     "title": "Appearance & motion",   "audience": "admin",
-     "summary": "The geometry, palette and motion controls, and what each one "
-                "does to the figure."},
+     "title": "Appearance & geometry", "audience": "admin",
+     "summary": "The palette, layout and glass, the figure and how it "
+                "moves, and what each control does."},
     {"id": "speech",  "file": "speech.md",
      "title": "Speech in & out",       "audience": "admin",
      "summary": "Transcription models, voices, wake and sleep words, what the "

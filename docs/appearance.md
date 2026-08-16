@@ -1,4 +1,4 @@
-# Appearance & motion
+# Appearance & geometry
 
 Everything here writes the shared settings document, so it changes what
 **every** display shows. Move a control and the preview responds immediately;
@@ -8,21 +8,6 @@ There is no wrong setting in this document — none of it can break the app —
 so the honest advice is to open the preview and push the sliders around.
 
 ## APPEARANCE
-
-### Geometry
-
-Four figures. They are genuinely different shapes rather than presets of one
-shape, so try each rather than assuming.
-
-| Mode | Reads as |
-|---|---|
-| STACK | layered horizontal waves — the most legible for speech |
-| DISC | a rotating ring |
-| ORB | a sphere of lines |
-| KNOT | a closed looping curve |
-
-STACK is the safest default: it maps most directly onto sound, so a viewer
-learns what the movement means fastest.
 
 ### Palette
 
@@ -120,6 +105,21 @@ attributed to nobody. A variable that is not recognised is left standing
 rather than blanked, so a typo is visible instead of silently disappearing.
 
 ## GEOMETRY
+
+### Style
+
+Four figures. They are genuinely different shapes rather than presets of one
+shape, so try each rather than assuming.
+
+| Mode | Reads as |
+|---|---|
+| STACK | layered horizontal waves — the most legible for speech |
+| DISC | a rotating ring |
+| ORB | a sphere of lines |
+| KNOT | a closed looping curve |
+
+STACK is the safest default: it maps most directly onto sound, so a viewer
+learns what the movement means fastest.
 
 ### Rotation
 
