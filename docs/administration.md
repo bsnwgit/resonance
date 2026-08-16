@@ -45,8 +45,10 @@ At the top:
 
 At the foot, pinned so they are always reachable:
 
-- **APP SETTINGS** — how the server itself is wired.
-- **PROFILES** — the screensaver and appearance profiles a screen can be
+- **APP SETTINGS** — how the server itself is wired: signing in, ports,
+  sessions.
+- **EXT ACCESS** — where the server can be reached from.
+- **PROFILES** — the appearance, screensaver and kiosk profiles a screen can be
   pointed at.
 - **ACCOUNTS** — who can sign in, and the groups access is granted to.
 - **ACCESS** — what may use this server, and what each may reach.

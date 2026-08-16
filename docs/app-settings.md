@@ -3,16 +3,23 @@
 Everything in this document is about how the server itself is wired, as
 opposed to how the interface looks.
 
-## Reach and sign-in
+## Reachable at, and signing in
 
 Two settings, deliberately not one "mode": **what it is reachable at**, and
-**what it takes to get in**. They are independent, and a single label covering
+**what it takes to sign in**. They are independent, and a single label covering
 both starts lying the moment somebody changes half of it — "personal" would
 still read personal after the binding moved to every interface on the machine.
-The panel shows the pair and states the arrangement underneath in the words it
-actually means.
 
-| Reachable at | To get in | Fits |
+They now sit on two tabs for the same reason. **Reachable at** is on
+**EXT ACCESS**, because it is the one that decides whether anything outside
+this machine can see the server at all; **Sign in** is on **APP SETTINGS**
+with the ports and the sessions. The posture line — what it is reachable at and
+what the door is, in the words it actually means — is stated under Reachable
+at, because what it warns about is exposure.
+
+They are still read as a pair:
+
+| Reachable at | Sign in | Fits |
 |---|---|---|
 | this machine only | nothing | your own machine; nothing else can reach it |
 | one address | nothing | your own home network, your call, stated plainly |

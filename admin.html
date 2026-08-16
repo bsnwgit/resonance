@@ -1503,12 +1503,16 @@ it, which is why it lives beside the microphone and the voices.</div>
   <!-- Two settings, not one mode. A single label covering both starts lying
        the moment somebody changes half of it, so the panel shows the pair and
        states the arrangement underneath in the words it actually means. -->
-  <section class="grp" data-tab="app">
-    <h4>Reach &amp; sign-in</h4>
+  <!-- Where this server can be reached from. Its own tab: it is the setting
+       that decides whether anything outside this machine can see the thing at
+       all, and it was sharing a section with the question of what happens once
+       they have. The posture line lives here with it, because what it warns
+       about is exposure. -->
+  <section class="grp" data-tab="extaccess">
+    <h4>Reachable at</h4>
     <div class="grpbody">
   <div class="pending" id="posturewarn" hidden></div>
 
-  <label class="bklab">Reachable at</label>
   <div class="seg" id="ap_bind">
     <button data-v="loopback">THIS MACHINE ONLY</button>
     <button data-v="address">ONE ADDRESS</button>
@@ -1526,7 +1530,14 @@ laptop that later joins another network does not follow you onto it.
 http://localhost as a secure origin, so the microphone works unprompted and
 nothing crosses a network. Start it, open localhost, talk to it.</div>
 
-  <label class="bklab" style="margin-top:12px">To get in</label>
+  <div class="note" id="posturenow"></div>
+    </div>
+  </section>
+
+  <section class="grp" data-tab="app">
+    <h4>Sign in</h4>
+    <div class="grpbody">
+  <label class="bklab">Sign in</label>
   <div class="seg" id="ap_auth">
     <button data-v="none">NOTHING</button>
     <button data-v="pin" disabled title="arrives with identity">A SINGLE PIN</button>
@@ -1543,8 +1554,6 @@ that assumes it can be reached.
 <b>A single PIN</b> — one number for the whole display, no account management —
 is the middle rung and is not built yet. It is the PIN machinery from identity
 pointed at a display rather than a person, so it lands with that.</div>
-
-  <div class="note" id="posturenow"></div>
     </div>
   </section>
 
@@ -2110,6 +2119,7 @@ button to download it as a PDF.</div>
            in with who may use the server. Both lists moved off ACCESS: what a
            screen looks like and what it is allowed to do were never the same
            question. -->
+      <button id="tab_extaccess" data-tab="extaccess">EXT ACCESS</button>
       <button id="tab_profiles" data-tab="profiles">PROFILES</button>
       <!-- Accounts before devices: a group is made here and named over there,
            so the order follows the order you do them in. -->
@@ -5858,7 +5868,8 @@ function panelNav(){
        offering to save something that is not on screen. */
     const ar = $('approw');
     if (ar) ar.classList.toggle('on',
-      tab === 'app' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
+      (tab === 'app' || tab === 'extaccess')
+      && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
     /* ADD INSTANCE is not inside any block, because it makes one — it has to
        stay reachable whichever block happens to be open, or the only way to
        add a second endpoint is to first collapse the first. */
@@ -5886,7 +5897,7 @@ function panelNav(){
     if (tab === 'displays') refreshDisplays();
     if (tab === 'profiles') refreshProfiles();
     if (tab === 'embeds') refreshEmbeds();
-    if (tab === 'app') loadApp();
+    if (tab === 'app' || tab === 'extaccess') loadApp();
     if (tab === 'ai') loadBackend();
     if (tab === 'docs') loadDocs();
   }
