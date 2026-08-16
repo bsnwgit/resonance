@@ -869,10 +869,13 @@
     margin-top:11px;padding-top:10px;
     border-top:2px solid rgba(var(--glass),.34);
   }
-  /* …and the same again at the foot of the whole list, where SAVE THE
-     PROFILES commits every row above it rather than the one you were in. */
-  .grp[data-tab="profiles"] .actrow{
-    margin-top:14px;padding-top:11px;
+  /* …and again between the profiles and the button that makes another. It sits
+     directly under the list rather than after the help below it: with a
+     profile open the section is tall, and a button at the very bottom is one
+     you have to go looking for at the moment you have just used it. */
+  .addrow{
+    justify-content:flex-start;
+    margin-top:11px;padding-top:10px;
     border-top:2px solid rgba(var(--glass),.34);
   }
   .erow .acts button{white-space:nowrap;min-width:0}
@@ -1870,6 +1873,9 @@ is back to being a browser that has never been here.</div>
     <h4>Appearance profiles</h4>
     <div class="grpbody">
   <div id="dp_looks"></div>
+  <div class="seg addrow">
+    <button id="b_addlook">ADD A PROFILE</button>
+  </div>
   <div class="note help">The APPEARANCE tab is <b>one document for everybody</b>, and
 that is right for almost all of it — tune the bloom once and every screen in
 the building gets it. It is wrong for exactly four values.
@@ -1892,9 +1898,6 @@ anything on APPEARANCE, GEOMETRY or SPEECH — puts the shared document back.
 If that turns out not to be enough on a real wall, the range is the thing to
 change, not this.</div>
 
-  <div class="seg actrow">
-    <button id="b_addlook">ADD A PROFILE</button>
-  </div>
     </div>
   </section>
   <!-- Central, and named from a device rather than copied into it. A
@@ -1903,6 +1906,9 @@ change, not this.</div>
     <h4>Screensaver profiles</h4>
     <div class="grpbody">
   <div id="dp_savers"></div>
+  <div class="seg addrow">
+    <button id="b_addsaver">ADD A PROFILE</button>
+  </div>
   <div class="note help">A screen showing the same bright figure in the same
 place for years keeps a ghost of it permanently. A profile is the answer to
 that, and it is <b>still the product</b>: the same face, every appearance
@@ -1987,9 +1993,6 @@ working has nothing left to ask about, so it takes it the next time its page
 loads — reload it there, or use OPEN DISPLAY. Making a working screen poll for
 a setting that changes twice a year would be the wrong trade.</div>
 
-  <div class="seg actrow">
-    <button id="b_addsaver">ADD A PROFILE</button>
-  </div>
     </div>
   </section>
   <!-- What a public screen IS, and the only one of the three a device names.
@@ -1998,6 +2001,9 @@ a setting that changes twice a year would be the wrong trade.</div>
     <h4>Kiosk profiles</h4>
     <div class="grpbody">
   <div id="dp_kiosks"></div>
+  <div class="seg addrow">
+    <button id="b_addkiosk">ADD A PROFILE</button>
+  </div>
   <div class="note help">A <b>kiosk</b> is a screen people walk up to, that
 nobody has open and nobody is sitting at — a wall, a stand, a reception
 counter, a tabletop. The mounting was never what any of this followed from:
@@ -2024,9 +2030,6 @@ something only where the generated line is not the point.
 choose which one that is. A screen hung on a wall and never configured
 behaves like the rest of the building rather than like nothing.</div>
 
-  <div class="seg actrow">
-    <button id="b_addkiosk">ADD A PROFILE</button>
-  </div>
     </div>
   </section>
   <!-- The form itself, which is a different job again: this one is written
