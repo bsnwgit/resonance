@@ -1981,7 +1981,7 @@ nothing but that id.</div>
        a register, read when somebody asks what is out there. Three rows that
        need attention buried among fifty that do not is how a request sits
        unanswered for a week. -->
-  <section class="grp" data-tab="displays">
+  <section class="grp" data-tab="devices">
     <h4>Devices</h4>
     <div class="grpbody">
   <div id="connlist"></div>
@@ -5914,7 +5914,7 @@ function panelNav(){
     syncSaveRow();
     $('panelscroll').scrollTop = 0;
     if (tab === 'accounts'){ refreshUsers(); refreshGroups(); }
-    if (tab === 'displays') refreshDisplays();
+    if (tab === 'displays' || tab === 'devices') refreshDisplays();
     if (tab === 'profiles') refreshProfiles();
     if (tab === 'embeds') refreshEmbeds();
     if (tab === 'app') loadApp();

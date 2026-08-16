@@ -35,10 +35,10 @@ At the top:
 - **filter settings** — type to search across every topic in every tab at
   once. This is the fastest way to find a control when you know roughly what
   it is called but not which tab it lives under.
-- **APPEARANCE / GEOMETRY / SPEECH**, **AI** and **DEVICES** — the user interface row.
-  The first three edit the shared interface. AI holds the endpoints, each of
-  which saves itself. DEVICES is where a single screen's own settings live and
-  carries nothing yet.
+- **APPEARANCE / GEOMETRY / SPEECH**, **AI** and **DEVICES** — the user
+  interface row. The first three edit the shared interface. AI holds the
+  endpoints, each of which saves itself. DEVICES is the register: every device
+  this server knows about, and where each one is set up.
 - **?**, beside the SETTINGS title — these documents. It is blue, and it is the
   same blue as every ? beside a topic heading, so help is one colour wherever
   you meet it.
@@ -140,19 +140,16 @@ A display is one device — a screen on a wall, a TV, a laptop, somebody's phone
 — as distinct from a browser tab somebody opened. Anything with a browser and a
 microphone counts.
 
-The ACCESS tab holds four topics:
-
-| | left | right |
-|---|---|---|
-| **top** | Requested Access | Created Access |
-| **bottom** | The request form | Devices |
+The ACCESS tab holds three topics — the rules about who may be here:
 
 | | |
 |---|---|
 | **Requested Access** | whether a general user needs approval at all, and what a grant to one is worth once given |
 | **The request form** | what a request asks for, under the setting that decides whether anyone is asked at all |
 | **Created Access** | where you invite a device: name it and take the code to the screen |
-| **Devices** | every device this server knows about, in one register |
+
+The register itself is on its own tab, **DEVICES**, on the user interface row —
+every device this server knows about, in one list.
 
 The profile lists live on the **PROFILES** tab instead, beside the deployment's
 own settings — what a screen looks like and what it is allowed to do were never
