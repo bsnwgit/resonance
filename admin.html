@@ -1128,7 +1128,13 @@
   .grp.shut .grpbody{display:none}
   .grpbody{padding-bottom:4px}
   /* No title, so the ? has nothing to sit beside — give it a line. */
-  .barehead{display:flex;justify-content:flex-end;margin:2px 0 4px}
+  /* A title on the left, the ? on the right. No caret: there is nothing to
+     collapse — the list IS the tab, and an arrow on it would be a control that
+     does nothing. */
+  .barehead{display:flex;align-items:center;justify-content:space-between;
+            gap:8px;margin:2px 0 6px}
+  .listtitle{font-size:calc(10px * var(--fs));letter-spacing:.14em;
+             text-transform:uppercase;color:rgba(var(--paper),.9)}
   .grp.bare{border-top:0;padding-top:2px}
   .seg{display:flex;flex-wrap:wrap;gap:4px}
   /* Committing a block — CREATE, SAVE, REVERT — in the corner every dialog
@@ -1866,6 +1872,7 @@ recognised is left standing so a typo is visible rather than silent.</div>
   <!-- The tab is called GROUPS; a section called Groups inside it says the
        word twice. Bare, like the profile lists. -->
   <section class="grp bare proflist" data-tab="account">
+    <div class="barehead"><span class="listtitle">Groups</span></div>
     <div class="grpbody">
   <div id="grouplist"></div>
   <div class="labrow" id="gr_addrow" style="margin-top:10px">
@@ -1995,6 +2002,7 @@ is back to being a browser that has never been here.</div>
   <!-- The other half of a place: what it looks like when somebody IS there.
        Its own list, because appearance and the screensaver are different axes. -->
   <section class="grp bare proflist" data-tab="look">
+    <div class="barehead"><span class="listtitle">Appearance profiles</span></div>
     <div class="grpbody">
   <div id="dp_looks"></div>
   <div class="note" id="prnote_looks"></div>
@@ -2026,6 +2034,7 @@ change, not this.</div>
     </div>
   </section>
   <section class="grp bare proflist" data-tab="motion">
+    <div class="barehead"><span class="listtitle">Geometry profiles</span></div>
     <div class="grpbody">
   <div id="dp_motions"></div>
   <div class="note" id="prnote_motions"></div>
@@ -2044,6 +2053,7 @@ controls by hand.</div>
   </section>
 
   <section class="grp bare proflist" data-tab="speech">
+    <div class="barehead"><span class="listtitle">Speech profiles</span></div>
     <div class="grpbody">
   <div id="dp_speeches"></div>
   <div class="note" id="prnote_speeches"></div>
@@ -2063,7 +2073,7 @@ what the tab says now.</div>
   <!-- Central, and named from a device rather than copied into it. A
        deployment has a handful of kinds of place, not one setting per screen. -->
   <section class="grp bare proflist" data-tab="savers">
-    <h4>Screensaver profiles</h4>
+    <div class="barehead"><span class="listtitle">Screensaver profiles</span></div>
     <div class="grpbody">
   <div id="dp_savers"></div>
   <div class="seg addrow">
@@ -2158,7 +2168,7 @@ a setting that changes twice a year would be the wrong trade.</div>
   <!-- What a public screen IS, and the only one of the three a device names.
        The other lists are things a device profile points at. -->
   <section class="grp bare proflist" data-tab="devprof">
-    <h4>Device profiles</h4>
+    <div class="barehead"><span class="listtitle">Device profiles</span></div>
     <div class="grpbody">
   <div id="dp_kiosks"></div>
   <div class="note" id="kiosknote"></div>
