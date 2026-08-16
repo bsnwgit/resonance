@@ -337,6 +337,13 @@
      that read across need the room, and a device row has four things on it
      before the profile picker lands. */
   #grpbox .grp.bare{grid-column:1 / -1}
+  /* A settings section moved inside a profile row is not a topic in the box
+     any more — it is part of the row. Drop the box's own framing and let it
+     read as a column of controls under the name it belongs to. */
+  .profsettings{margin:8px 0 2px;padding-left:9px;
+                border-left:2px solid rgba(var(--glass),.22)}
+  .profsettings .grp{border:0;margin:0;padding:0}
+  .profsettings .grp + .grp{margin-top:9px}
 
   /* the first topic's own top rule would double up with the box edge */
   #grpbox .grp:first-of-type{border-top:0;margin-top:6px}
@@ -2308,6 +2315,11 @@ button to download it as a PDF.</div>
        three buttons writing the same file — and a device profile naming an
        appearance you had just added, but not yet saved, could only be stored
        by pressing them in the right order. -->
+  <!-- Where the settings sections live while no profile is open. They are
+       moved into whichever row is being edited and back out again — never
+       left inside one, because rebuilding the list clears it and would take
+       them with it. -->
+  <div id="profstash" hidden></div>
   <div id="profrow">
     <div class="note" id="profnote"></div>
     <div class="seg actrow">
@@ -4539,7 +4551,18 @@ async function saveProfileList(kind){
   }catch(e){ prNote(kind, e.message, true); }
 }
 
+/* The controls for this tab, wherever they currently are. */
+function profSections(tab){
+  return [...document.querySelectorAll('#panel .grp[data-prof="' + tab + '"]')];
+}
+function stashSections(tab){
+  const stash = $('profstash');
+  if (stash) profSections(tab).forEach(g=> stash.appendChild(g));
+}
+
 function paintProfiles(kind, list, def){
+  // Out of the rows first: box.innerHTML below would otherwise delete them.
+  stashSections(kind.tab);
   if (def !== undefined) DPDEF[kind.key] = def || '';
   /* A list is never empty. The first profile is seeded from what the tab is
      showing right now — which is what every display is already showing — so a
@@ -4675,6 +4698,15 @@ function paintProfiles(kind, list, def){
       };
     }
     acts.appendChild(del);
+    /* The settings belong to THIS profile, so they are drawn inside it — under
+       the row you opened, rather than under the whole list where a separate
+       section further down the tab would put them. */
+    if (OPENPR[kind.key] === i){
+      const holder = document.createElement('div');
+      holder.className = 'profsettings';
+      profSections(kind.tab).forEach(g=> holder.appendChild(g));
+      row.insertBefore(holder, acts);
+    }
     row.appendChild(acts);
     box.appendChild(row);
   });
