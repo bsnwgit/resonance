@@ -729,12 +729,15 @@
      numbers side by side, where reading them as a row is the point. */
   .svnums{display:flex;gap:8px;margin-top:4px}
   .svnums > div{flex:1 1 0;min-width:0;display:flex;flex-direction:column}
-  .svnums input{
+  .svnums input,
+  .svnums select{
     width:100%;margin-top:auto;padding:5px 6px;font:inherit;
     font-size:calc(9.5px * var(--fs));
     background:rgba(0,0,0,.6);color:var(--text);
     border:1px solid rgba(var(--glass),.16);outline:0;
   }
+  /* An hour is four characters wide whatever else is on the row. */
+  .svnums select{width:auto;max-width:100%}
   .svnums input:focus{border-color:var(--hue-dim)}
   /* PREVIEW is a toggle, and the profile it is showing has to be the one that
      looks pressed — otherwise two rows both offer to start it and neither says
@@ -753,8 +756,12 @@
      endpoint, and scoped to #dp_kiosks those two fell back to the browser's
      own select — larger type than everything around them. */
   .namerow{min-width:0}
+  /* As wide as its longest option, no wider. A select stretched to the box is
+     a control whose size says nothing about what is in it, and next to a short
+     list of profile names it reads as an empty field. Still allowed to shrink
+     and capped at the row, so a long name cannot push it past the edge. */
   select.ppick{
-    flex:1 1 auto;min-width:0;max-width:100%;box-sizing:border-box;
+    width:auto;flex:0 1 auto;min-width:0;max-width:100%;box-sizing:border-box;
     padding:3px 6px;font:inherit;
     font-size:calc(9px * var(--fs));letter-spacing:.06em;
     background:rgba(0,0,0,.55);color:rgba(var(--paper),.96);
