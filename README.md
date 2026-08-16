@@ -1062,21 +1062,36 @@ two people in one room with three listening microphones between them.
 | 1b | ~~**The Home Assistant adapter**~~ **— done** | saying the house name switches a light on | 1a | none |
 | 2 | ~~**Displays, and binding a route to one**~~ **— done** | only the tablets you approved can actuate the house, whatever anyone's browser is set to | 1b | none |
 | 3 | ~~**What a wall display looks like**~~ **— done** | voice only and speak only, an appearance per place, and a screensaver that is still the product | 2 | none |
-| 4 | **Staying up unattended** | a tablet nobody touches for a year is still working | 3 | **all of it** · not designed |
+| 4 | **Staying up unattended** | a tablet nobody touches for a year is still working | 3, and 8 for the alert | none · designed, not built |
 | 5 | **Identity and the PIN** | a person, as distinct from a place | 2 | **1** · whether an identity carries its own Home Assistant token |
 | 6 | **Personal wake words** | one person addressing a tablet stops triggering another person's device | 5 | none |
 | 7 | **Memory** | conversations that mean something across sessions | 5 | **1** · what the retained unit is — deliberately left to experience |
-| 8 | **Diagnostics** | a failing screen findable without standing in front of it | 2 | **1** · the retention default |
+| 8 | **Diagnostics and alerting** | a failing screen comes and finds you, rather than the other way round | 2 | **1** · the retention default |
 
 The last column counts decisions that need **you**, not implementation choices
 made while building and shown afterwards. A phase reading *none* is ready to
 start.
 
-**Nothing outstanding blocks starting.** Phase 4 is next and is a design
-problem to think through rather than a question to answer — its position will
-move once it has been. The three
-remaining are each answerable when their own phase comes up, and one of them
-is deliberately waiting on experience rather than on a decision.
+**Nothing outstanding blocks starting.** Four is designed and not started. It
+was a design problem rather than a question to answer, and working through it
+turned five open questions into a build: the display polls, reconnects by
+reloading, retries three times and then says so — spoken aloud on a wall,
+where there is nothing to read — refreshes itself nightly on its own clock, and
+gains a Maintenance section to configure all of that.
+
+**Alerting merged into eight rather than becoming a ninth phase**, because
+eight already collects the events an alert would fire on, and building the
+watcher separately would be a second pass over the same code. The consequence
+lands on four: the server can tell a stuck display to reload itself, and when
+that fails there is nothing left for it to do but tell somebody, which is
+eight's job. So **either eight moves up beside four, or four ships with the
+reload and gains its alert when eight lands** — an ordering call rather than a
+design one, and both answers work. Four is buildable either way; only its last
+paragraph waits.
+
+The three remaining decisions are each answerable when their own phase comes
+up, and one of them is deliberately waiting on experience rather than on a
+decision.
 
 **One is two deliveries rather than one.** Routes stand up on their own — demo,
 a local model and a hosted one are three destinations reachable by three
@@ -1130,8 +1145,10 @@ three faults that had nothing to do with Home Assistant, plus two secret
 disclosures, all of which would otherwise have been debugged through a new
 adapter.
 
-**Four is a placeholder, not a specification** — see its entry. Its position
-here is a guess and will move once it has been thought through.
+**Four stopped being a placeholder** — see its entry. What it turned out to be
+is a set of small mechanisms that only make sense together, and one of them,
+the poll, pays for four of the others. Its position held: designing it moved
+nothing, and turned up two real leaks in code that already shipped.
 
 Two and three were one phase until the wall-mounted side outgrew it. They
 share a substrate — a display the server knows about — but nothing else:
@@ -1594,36 +1611,116 @@ it. Each entry below carries its own panel scope.
   display in the list the phase above builds — with the profiles themselves set
   once, centrally.
 
-- **Staying up unattended.** *Not designed yet — this entry states the problem
-  and nothing else. Its position in the order is provisional.*
+- **Staying up unattended.** Everything built so far assumes a page somebody
+  opened and will close. A tablet on a wall is a browser tab running for a
+  year: through server restarts, network drops, Home Assistant reboots,
+  certificate renewals and its own operating system's ideas about
+  backgrounding, with nobody standing in front of it to notice or reload.
 
-  Everything built so far assumes a page somebody opened and will close. A
-  tablet on a wall is a browser tab running for a year: through server
-  restarts, network drops, Home Assistant reboots, certificate renewals and
-  its own operating system's ideas about backgrounding, with nobody standing
-  in front of it to notice or reload.
-
-  The questions, unanswered:
-
-  - does the page recover by itself when `serve.py` restarts, or does somebody
-    walk over and tap reload
-  - does a failed request retry, and how does it behave while the server is
-    down — quietly, or by saying so
-  - does anything leak over weeks: the canvas, the transcript, audio nodes,
-    the session
-  - what happens when the tablet's browser suspends a background tab, or the
-    screen sleeps, or the device reboots at 4am after an update
-  - how does anyone *find out* it stopped working, given the whole point of
-    the two phases above is that it shows very little
-
-  The failure mode worth designing against is specific: **a screen that looks
-  perfect and does nothing.** The geometry is still moving because it is
-  driven locally, the drift is still drifting, and nothing has reached the
+  The failure mode this is designed against is specific: **a screen that looks
+  perfect and does nothing.** The geometry is driven locally, so it keeps
+  drifting and breathing with no server involvement at all — somebody walks
+  past, sees it moving, and assumes it is fine, while nothing has reached the
   server in a week. That is worse than a blank screen, which at least gets
-  reported.
+  reported within the hour.
 
   It is not much work. It is invisible work, which is why it needs its own
   entry — nobody ever gets to it as part of something else.
+
+  **The display polls, and that one decision pays for four others.** A wall
+  display at rest issues no requests, so without a poll it would not discover
+  the server had come back until somebody walked up and spoke to it: the outage
+  would end and the screen would stay broken. The same poll keeps `last_seen`
+  fresh, gives the server somewhere to answer *reload yourself*, and turns a
+  dead screen into something the server can notice on its own.
+
+  **On reconnect it reloads the page rather than resuming in place.** Resuming
+  preserves a conversation nobody is having any more — the outage was minutes
+  and the person left — while a reload picks up a deploy and any settings
+  changed while it was down. Route and appearance are re-fetched as part of
+  that, because an admin who corrected a display's configuration during an
+  outage should not have to walk over afterwards to make it take.
+
+  **A failed request retries three times and then says so, and the number is a
+  setting.** Three is right for a restart and wrong for a severed cable, so the
+  count and the interval are configurable rather than baked in.
+
+  **How it says so depends on what the display is.** A wall display speaks the
+  failure once, after the third attempt — it has no transcript and no composer,
+  so a screen that shows nothing has no other way to tell anybody, and saying
+  it more than once would make an outage worse than the silence it replaced.
+  Anything not on a wall stays quiet until somebody tries to use it, and then
+  fails immediately rather than making them sit out three attempts. Somebody
+  who has just spoken is owed an answer now; a hallway nobody is standing in is
+  not.
+
+  **The banner clears itself.** Nobody is there to dismiss it, so an alert that
+  has to be acknowledged at the screen is an alert that stays up for a month.
+  Acknowledgement belongs where somebody actually is, which is the admin page —
+  see the diagnostics entry below.
+
+  **A forced nightly refresh, because a tab that never reloads accumulates.**
+  Admin-configurable, read off the *device's* clock for the same reason dark
+  hours are, and deferred until the conversation ends rather than reloading a
+  screen somebody is mid-sentence with. A building can refresh every screen at
+  once or stagger them by an interval, and that is a setting rather than a
+  default because twelve tablets reconnecting in the same second is a load the
+  server did not previously have.
+
+  **The refresh runs alongside fixing the leaks rather than instead of them.**
+  It is a net under work not yet done, and treating it as the fix would mean
+  shipping a leak and a nightly workaround for it in the same release. Two are
+  known:
+
+  - **Every spoken reply leaves an analyser behind.** Speech builds a fresh
+    `AnalyserNode` and `BufferSourceNode` per utterance and wires them to the
+    context destination; nothing disconnects them, and a node connected to the
+    destination is held alive by the audio graph rather than by the reference
+    the next utterance overwrites. A house speaking to a tablet a few dozen
+    times a day leaves thousands of live analysers behind in a year. Two lines
+    in `finishUp()`.
+  - **The rendered transcript has no cap.** `convo` is bounded —
+    `while (convo.length > CONVO_MAX) convo.shift()` — but the log element it
+    is drawn into is not. It never touches a voice-only wall display, and it
+    bites a desk tab left open for a month.
+
+  Checked and *not* leaking, so nobody looks twice: there are no blob URLs
+  anywhere, the microphone tears itself down with `getTracks().stop()` and
+  `ctx.close()`, and every `addEventListener` call is one-time startup wiring
+  rather than something added per utterance.
+
+  **The tablet's own behaviour is the device's problem, and one part of it is
+  nobody's.** Suspended background tabs, a sleeping screen and a wake are
+  browser-side and belong under Maintenance with everything else. A device that
+  reboots at 4am after an operating system update does not: it comes back to a
+  lock screen with no browser running, and there is nothing left for the server
+  to talk to. Relaunching a browser at a URL is kiosk mode, a launcher or
+  screen pinning — a deployment instruction in the manual rather than a setting
+  in the panel. Saying that plainly is better than a Maintenance page that
+  quietly fails to cover it.
+
+  **The server can force a reload and it cannot force a reboot.** Once, on the
+  next poll, for a display that is alive but stuck — free, given the poll is
+  there. A display that does not come back from that is one the server has no
+  channel to at all, which is exactly the condition being detected, and no
+  amount of server-side work reaches it. So it stops trying and raises an alert
+  instead: the server does what it can and reports what it cannot. That report
+  is the diagnostics entry below, which grew to meet this.
+
+  **A scheduled server restart presumes a supervisor, and there is not one.**
+  `serve.sh` launches with `setsid nohup`, and the absence of a systemd unit is
+  deliberate — it is what lets this be installed without sudo. So the server
+  half of Maintenance can schedule a stop and nothing would bring it back.
+  Either that setting waits for a supervisor somebody opts into, or the server
+  half is restricted to what does not need one. Recorded rather than designed
+  around, because a Maintenance page with a restart button that ends the
+  service is worse than one without.
+
+  *Panel:* a Maintenance section — retry count and interval, the nightly
+  refresh window and whether it staggers, and the browser-side device
+  behaviour, as a named profile picked per device the way appearance and
+  screensaver already are. The server half sits with the other server settings,
+  since a restart applies to one server rather than to twelve screens.
 
 - **Identity, in three strengths.** How a device or person identifies itself
   decides what may be kept, because the strength of the claim and the
@@ -1799,10 +1896,11 @@ it. Each entry below carries its own panel scope.
   *Panel:* retention window, what is held per identity, and deletion — for an
   admin over anybody, and for a person over themselves.
 
-- **Diagnostics.** Technical events keyed to a device: the microphone would not
-  open, transcription took four seconds, the voice service returned an error,
-  this browser has no recorder. A health view per device in the admin page, so
-  a failing screen can be found without anyone standing in front of it.
+- **Diagnostics and alerting.** Technical events keyed to a device: the
+  microphone would not open, transcription took four seconds, the voice service
+  returned an error, this browser has no recorder. A health view per device in
+  the admin page, so a failing screen can be found without anyone standing in
+  front of it — and something that comes and tells you when one does.
 
   Sits on the displays entry rather than on identity: the useful key is the
   device with the failing microphone, not whoever happened to be standing at
@@ -1842,8 +1940,83 @@ it. Each entry below carries its own panel scope.
   Retention is the control, since there is no other, and it wants a short
   default rather than a generous one.
 
+  **Alerting is the second half of this entry, and it was very nearly its own
+  phase.** Diagnostics is a pull — events collected, a health view somebody
+  goes and looks at. An alert is a push: it comes and finds you. Those are
+  genuinely different things, and the only reason they are one entry rather
+  than two is that building a health view and then separately building the
+  thing that watches it is two passes over the same data, with the second pass
+  living entirely inside the first one's code.
+
+  One half of it depends on none of that and could ship on its own: a device
+  asking to be here is already recorded and shown by the displays entry, so
+  alerting on a new request needs nothing this phase collects. It arrives
+  immediately rather than in a digest, because it is the one alert here with a
+  person attached to it — somebody is standing at a screen waiting to be let
+  in.
+
+  **What already exists makes this cheaper than the entry looks.** There is no
+  diagnostics, health or event endpoint in `serve.py` at all, so that part
+  starts from nothing. But `last_seen` per device is already kept and already
+  has a staleness check, which makes liveness nearly free once the display
+  polls; and the client already computes most of the events and discards them,
+  across twenty-odd `note()` sites and a round-trip timing pair that is
+  measured and thrown away. A good deal of this phase is *stop discarding this*
+  plus somewhere to put it.
+
+  **An alert clears itself and still has to be acknowledged**, which is four
+  states rather than two: open or resolved, acknowledged or not. The cell that
+  matters is resolved-but-unacknowledged — a screen that dropped off at two in
+  the morning and came back four minutes later leaves something in the list
+  until a person reads it. Self-healing nobody ever hears about is
+  indistinguishable from nothing having happened, and a display that heals
+  itself every night is a fault rather than a success.
+
+  **Delivery, cheapest reach first.** The admin list is the baseline and is not
+  optional, because the acknowledgement model has to live somewhere. A webhook
+  posting JSON is one standard-library client and reaches ntfy, Slack, Discord,
+  Gotify and whatever else somebody already runs — the most reach per line of
+  code available here. Home Assistant is the strongest for this deployment,
+  being already connected and a thing that can speak through the house: a
+  screen that dies gets announced by the building it is part of. Email is
+  `smtplib` and so costs no dependency, but it wants a server and credentials
+  and fails silently more often than the others, so it comes last.
+
+  **Home Assistant as an alert sink wants its own connection entry.** It is
+  currently a route's, and hanging alerting off a route means alerting
+  disappears when somebody deletes that route — a surprising way to lose the
+  thing that tells you a screen is dead.
+
+  **What is worth a threshold.** Liveness, from the poll: not seen for a number
+  of intervals, still absent after the one forced reload, and returned after
+  being away. The speech pipeline, from the notes that currently fade: a
+  microphone that will not open, a browser with no recorder at all — a fact
+  rather than an event, so it fires once per device and never again —
+  transcription past a number of seconds, and the neural voice falling back to
+  the browser voice, which today is a note nobody on a wall is ever there to
+  read and is silent degradation of the part people notice most. Routing, from
+  the decision trail above: fuzzy wake matches above a rate, which is how two
+  wake words cross-triggering is found at all, and `no_intent_match` above a
+  rate, which is a house being asked for things it cannot do.
+
+  **Backend latency is the exception, and has to be per route.** A Home
+  Assistant intent answers in about a tenth of a second and a hosted model
+  takes seconds; one threshold across both either never fires or never stops.
+
+  **Access events belong here too, and want their own severity.** A device
+  attempting a route it is not bound to — where the refusal is silent by
+  design, so repetition is the only signal that exists — and the admin sign-in
+  back-off engaging. Both are here because there is nowhere else for them, and
+  neither should sit at the same weight as a slow transcription.
+
+  **Quiet hours, on the device clock, for the same reason dark hours are.**
+  Announcing a dead hallway screen through the house speakers at three in the
+  morning is how alerting gets switched off in its first week.
+
   *Panel:* health per display and the conversation record, alongside the entry
-  that already lists them; retention window; deletion.
+  that already lists them; retention window; deletion. Alert channels and which
+  severities each carries; per alert, whether it is on, its threshold, its
+  severity, and whether it arrives immediately or in a digest; quiet hours.
 - **The embed, once there is an identity to attach to it.** The memoryless
   embed shipped first, deliberately: it is exactly the `named, no PIN → no
   memory` row above, so it needs no notion of a person at all. What remains
