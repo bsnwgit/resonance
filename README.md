@@ -71,15 +71,16 @@ accounts with roles, with a live preview of the real display — the backend
 adapters that put a real assistant behind it, including a house through Home
 Assistant, routes, so several names reach several destinations from one
 display, displays the server knows about, so a name can be restricted to the
-tablets you approved, and the embed API that lets another application put this
-interface inside its own page.
+tablets you approved, the embed API that lets another application put this
+interface inside its own page, and what a wall display looks like — voice only
+and speak only, an appearance a place can have of its own, and a screensaver
+that is still the product.
 
-**Not done, in the order it matters:** what a wall display actually looks like
-— voice only, and a screensaver that is still the product, because burn-in
-starts the day the first tablet goes up. Then staying up unattended. Then
-identity and memory, so a conversation can mean something an hour later — the
-embed is deliberately memoryless until that lands. Then packaging it as a
-library other projects can install.
+**Not done, in the order it matters:** staying up unattended, because a tablet
+on a wall is a browser tab running for a year. Then identity and memory, so a
+conversation can mean something an hour later — the embed is deliberately
+memoryless until that lands. Then packaging it as a library other projects can
+install.
 
 The [Roadmap](#roadmap) carries the reasoning for each, including the
 decisions already taken about how identity and memory should work.
@@ -1060,7 +1061,7 @@ two people in one room with three listening microphones between them.
 | 1a | ~~**Routes**~~ **— done** | three names reaching three destinations, verifiable with no Home Assistant involved | — | none |
 | 1b | ~~**The Home Assistant adapter**~~ **— done** | saying the house name switches a light on | 1a | none |
 | 2 | ~~**Displays, and binding a route to one**~~ **— done** | only the tablets you approved can actuate the house, whatever anyone's browser is set to | 1b | none |
-| 3 | **What a wall display looks like** | voice only, and a screensaver that is still the product | 2 | none |
+| 3 | ~~**What a wall display looks like**~~ **— done** | voice only and speak only, an appearance per place, and a screensaver that is still the product | 2 | none |
 | 4 | **Staying up unattended** | a tablet nobody touches for a year is still working | 3 | **all of it** · not designed |
 | 5 | **Identity and the PIN** | a person, as distinct from a place | 2 | **1** · whether an identity carries its own Home Assistant token |
 | 6 | **Personal wake words** | one person addressing a tablet stops triggering another person's device | 5 | none |
@@ -1071,9 +1072,9 @@ The last column counts decisions that need **you**, not implementation choices
 made while building and shown afterwards. A phase reading *none* is ready to
 start.
 
-**Nothing outstanding blocks starting.** Everything before phase 4 reads
-*none*, and phase 4 is a design problem to think through rather than a
-question to answer — its position will move once it has been. The three
+**Nothing outstanding blocks starting.** Phase 4 is next and is a design
+problem to think through rather than a question to answer — its position will
+move once it has been. The three
 remaining are each answerable when their own phase comes up, and one of them
 is deliberately waiting on experience rather than on a decision.
 
@@ -1082,6 +1083,18 @@ a local model and a hosted one are three destinations reachable by three
 names, and wake-word routing can be shaken out on a test box before Home
 Assistant is anywhere near it. If the refactor breaks something, that is when
 you find out, rather than while also debugging a new adapter.
+
+**3 is done**, and it grew past its entry the way two did. The entry asked for
+two settings; what closed it was those two plus an appearance a place can have
+of its own, a wall that is speak only because push-to-talk needs a space bar
+nobody has, a line telling a passer-by what to say, dark hours on a clock, and
+the full screen. Both profile lists are central and named from a device, which
+was the shape asked for once the first version put the numbers on each row.
+
+What it turned up along the way is in the log below, and two of them were
+faults nobody was looking for: an admin route answering 401 where its siblings
+answer 404, and the frame rate readout — a rig instrument — sitting on every
+wall in the building, in the one place a screensaver could not save it.
 
 **2 is done.** A display is issued an unguessable token on its first visit, an
 admin approves it, and a route can be restricted to the ones it names — where
@@ -1126,11 +1139,11 @@ phase 2 is server-side enforcement and gate logic, phase 3 is canvas and
 presentation. Splitting them keeps each verifiable in one sitting, and stops a
 safety property waiting on a screensaver.
 
-**Three sits where it does because burn-in is a clock, not a backlog item.**
+**Three sat where it did because burn-in is a clock, not a backlog item.**
 Every day a tablet runs without it is damage that cannot be taken back, and
-that clock starts the day the first one goes on a wall — which, now that two
-has landed, is any day from here. Everything after it can wait; this cannot
-wait as cheaply.
+that clock starts the day the first one goes on a wall. Everything after it
+could wait; this could not wait as cheaply — which is why it was built before
+anything with a longer payoff.
 
 **The admin interface is part of each phase, not a phase of its own.** A route
 you cannot configure is not a feature, and a phase whose settings are only
@@ -1509,9 +1522,9 @@ it. Each entry below carries its own panel scope.
   what a tablet bolted to a wall wants: it is not a workstation, and a screen
   of scrolling text in a hallway is neither useful nor discreet.
 
-  Most of this exists. `data-text="off"` already hides the transcript and the
+  Most of this already existed. `data-text="off"` hides the transcript and the
   composer together, and the embed chrome does the same through
-  `data-noparts`. What is missing is somewhere for an admin to say it once,
+  `data-noparts`. What was missing was somewhere for an admin to say it once,
   per display, rather than it being whatever the last person to touch the
   screen chose.
 
