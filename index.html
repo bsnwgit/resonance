@@ -240,8 +240,14 @@
   /* a composer with nothing in it is a strip of furniture, not a control */
   body[data-nobar] #bar{display:none}
   /* the frame rate counter is a rig instrument; it has no business in
-     somebody else's product */
-  body[data-embed] #fps{display:none}
+     somebody else's product — and a tablet bolted to somebody's hallway wall
+     is as much somebody else's product as an embed is. It was worse than
+     untidy there: fixed at the top left, never moving, small and bright, it
+     was the one thing on a wall screen that a screensaver drifting the whole
+     figure away could not save. The reasoning was already written here; it
+     had only ever been applied to the embed. */
+  body[data-embed] #fps,
+  body[data-wall]  #fps{display:none}
 
   /* ---------- composer ---------- */
   #bar{
@@ -440,6 +446,7 @@
   body[data-saver] #log,
   body[data-saver] #bar,
   body[data-saver] #status,
+  body[data-saver] #fps,
   body[data-saver] #request,
   body[data-saver] #verdict{display:none}
   body[data-saver] #screen{flex:1 1 auto}
@@ -768,6 +775,7 @@ const Display = {
    back into an ordinary tab gets that person's own choice back rather than
    the policy's. */
 const Wall = {
+  onWall: false,
   voiceOnly: false,
   /* The button and the place it came from, so removing it is REVERSIBLE.
      Turning the policy off has to give the control back without somebody
@@ -777,12 +785,14 @@ const Wall = {
 
   take(w){
     w = w || {};
+    this.onWall = !!w.wall;
     this.voiceOnly = !!w.voice_only;
     Saver.configure(w.saver);
     this.apply();
   },
 
   apply(){
+    document.body.toggleAttribute('data-wall', this.onWall);
     document.body.toggleAttribute('data-voiceonly', this.voiceOnly);
     if (!this._btn){
       this._btn = $('textbtn');

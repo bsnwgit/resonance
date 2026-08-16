@@ -1450,8 +1450,11 @@ def wall_of(rec, savers=None):
     stored, so unticking is not the same as forgetting: a device taken down and
     put back up comes back as what it was."""
     if not rec.get("wall"):
-        return {"voice_only": False, "saver": dict(SAVER_OFF)}
-    return {"voice_only": bool(rec.get("voice_only")),
+        return {"wall": False, "voice_only": False, "saver": dict(SAVER_OFF)}
+    # `wall` is published in its own right and not merely implied by the two
+    # settings under it, because being on a wall means things neither of them
+    # covers — a rig instrument in the corner of a hallway screen is the first.
+    return {"wall": True, "voice_only": bool(rec.get("voice_only")),
             "saver": find_saver(str(rec.get("saver") or ""), savers)}
 
 
