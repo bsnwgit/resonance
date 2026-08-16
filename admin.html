@@ -1503,6 +1503,23 @@ itself; <b>{name}</b> is the word that was said to reach whoever answered.</div>
   <div id="wakestate" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5"></div></div>
     </section>
   <section class="grp" data-prof="speech" data-tab="speech">
+    <h4>Sleep word</h4>
+    <div class="grpbody">
+  <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:0">word that ends the conversation at once</label>
+  <input id="sleepword" type="text" spellcheck="false" autocomplete="off" placeholder="e.g. goodbye">
+  <div class="seg" style="margin-top:6px"><button id="b_learnsleep">LEARN HOW I SAY IT (3x)</button></div>
+  <div id="learnsleepnote" class="learnnote"></div>
+  <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:10px">also accept (learned)</label>
+  <textarea id="sleepaliases" rows="2" spellcheck="false" placeholder="one per line"></textarea>
+
+  <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:10px">farewell phrases</label>
+  <textarea id="farewells" rows="3" spellcheck="false" placeholder="one per line — {name} inserts the word you said"></textarea>
+  <div class="seg"><button id="b_bye">TEST FAREWELL</button></div>
+  
+    <div id="sleepstate" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5"></div>
+    </div>
+</section>
+  <section class="grp" data-prof="speech" data-tab="speech">
     <h4>Speech in (mic, STT)</h4>
     <div class="grpbody">
   <label class="bklab" style="margin-top:2px">How it decides you have finished</label>
@@ -1578,23 +1595,6 @@ measures the room rather than asking you to guess at the gate.</div>
   <div id="ttsnote" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:8px;line-height:1.5"></div></div>
   </section>
 
-  <section class="grp" data-prof="speech" data-tab="speech">
-    <h4>Sleep word</h4>
-    <div class="grpbody">
-  <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:0">word that ends the conversation at once</label>
-  <input id="sleepword" type="text" spellcheck="false" autocomplete="off" placeholder="e.g. goodbye">
-  <div class="seg" style="margin-top:6px"><button id="b_learnsleep">LEARN HOW I SAY IT (3x)</button></div>
-  <div id="learnsleepnote" class="learnnote"></div>
-  <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:10px">also accept (learned)</label>
-  <textarea id="sleepaliases" rows="2" spellcheck="false" placeholder="one per line"></textarea>
-
-  <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:10px">farewell phrases</label>
-  <textarea id="farewells" rows="3" spellcheck="false" placeholder="one per line — {name} inserts the word you said"></textarea>
-  <div class="seg"><button id="b_bye">TEST FAREWELL</button></div>
-  
-    <div id="sleepstate" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5"></div>
-    </div>
-</section>
 <section class="grp" data-prof="speech" data-tab="speech">
     <h4>Commissioning check</h4>
     <div class="grpbody">

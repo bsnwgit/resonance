@@ -41,6 +41,16 @@ Activity extends it.
 **greeting phrases** are the fallback for every assistant with no greeting of
 its own. `{name}` is the word that was said to reach whoever answered, so one line
 written here reads correctly whichever one answers.
+## Sleep word
+
+One word, shared by all of them: there is one way out of a conversation
+whichever assistant you are in it with. It ends the conversation deliberately rather than
+waiting for the timeout, and **clears the conversation history**. Farewells
+to answer with, aliases for near-misses, and the same three-times learning.
+
+Also here: whether it says a farewell when it times out, or just goes quiet.
+On a wall display in a quiet office, quiet is usually the better manners.
+
 
 ## Speech in (mic, STT)
 
@@ -224,12 +234,3 @@ It lives here rather than on the AI tab because most of what it checks is on
 this one. It is not an AI test — each endpoint has its own **TEST**, which
 puts a question to that endpoint's own service.
 
-## Sleep word
-
-One word, shared by all of them: there is one way out of a conversation
-whichever assistant you are in it with. It ends the conversation deliberately rather than
-waiting for the timeout, and **clears the conversation history**. Farewells
-to answer with, aliases for near-misses, and the same three-times learning.
-
-Also here: whether it says a farewell when it times out, or just goes quiet.
-On a wall display in a quiet office, quiet is usually the better manners.
