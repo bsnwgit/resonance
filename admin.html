@@ -2676,6 +2676,12 @@ window.addEventListener('message', e=>{
        which is exactly the habit the unsaved warning needs you not to have. */
     status(reverting ? 'reloaded from the server' : '');
     reverting = false;
+    /* The profile lists are seeded from the live settings, so they cannot be
+       built until those settings exist — and they arrive here, in the preview's
+       handshake, not at sign-in. Without this the panel opened on APPEARANCE
+       with an empty list and no way to get one. Admin only: the fetch behind
+       it is refused for a viewer. */
+    if (ME && ME.role === 'admin') refreshProfiles();
   } else if (m.kind === 'status'){
     /* The wake-word LEARN prompts belong beside the button that started
        them, and that button is now inside one endpoint's block. */
@@ -6410,7 +6416,12 @@ function panelNav(){
     $('panelscroll').scrollTop = 0;
     if (tab === 'accounts'){ refreshUsers(); refreshGroups(); }
     if (tab === 'displays' || tab === 'devices') refreshDisplays();
-    if (tab === 'profiles') refreshProfiles();
+    /* The three settings tabs ARE profile lists now, and those lists live in
+       the displays document — so arriving at one has to fetch it, exactly as
+       PROFILES does. Without this the lists were painted only if you happened
+       to visit PROFILES first, which on a panel that opens on APPEARANCE
+       meant they were blank. */
+    if (tab === 'profiles' || PROF_OF[tab]) refreshProfiles();
     if (tab === 'embeds') refreshEmbeds();
     if (tab === 'app') loadApp();
     if (tab === 'ai') loadBackend();
