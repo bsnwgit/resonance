@@ -3501,25 +3501,33 @@ nothing for one of those.</div>
          placeholder="30m">
   </div>
   <div class="note" data-r="anthnote" style="display:none">Temperature and
-keep-alive are not sent to Anthropic — steer it with the system prompt.</div>
+keep-alive are not sent to Anthropic.</div>
+  <!-- One line, because it is STATE: which of these apply to what this
+       endpoint is currently pointed at. The reasoning behind it moved under
+       the ? with the rest of the prose. -->
   <div class="note" data-r="hanote" style="display:none">Only the timeout
-applies to Home Assistant. It holds the conversation itself, and what the
-agent is told is configured over there — so the reply limit, the temperature,
-the context length and the whole System prompt section are not shown here:
-nothing would read them. Any wording already typed is kept, and comes back if
-this endpoint is pointed at a model again.
-
-Set the timeout to the <b>agent</b>, not to "Home Assistant": the built-in
-intent engine answers in about a tenth of a second, while an LLM-backed one is
-two model passes with your exposed entities in the prompt each time. On modest
-hardware that is tens of seconds, and a timeout chosen for the first cuts off
-the second just before it succeeds.</div>
+applies to Home Assistant.</div>
   <div class="note help">A cold model can take half a minute to load before it
 says anything, so keep the timeout generous — one tuned to a warm model looks
 like a dead server every morning. <b>turns of context</b> is how much of the
 conversation goes back with each question: at zero, "and the other one?" means
 nothing. <b>keep model loaded</b> is an Ollama extension that holds it in
-memory so the next question isn't the slow one.</div>
+memory so the next question isn't the slow one.
+
+<b>Home Assistant holds the conversation itself</b>, and what the agent is told
+is configured over there — so the reply limit, the temperature, the context
+length and the whole System prompt section are not shown when it is pointed at
+one: nothing would read them. Any wording already typed is kept, and comes back
+if this endpoint is pointed at a model again.
+
+Set the timeout to the <b>agent</b>, not to "Home Assistant": the built-in
+intent engine answers in about a tenth of a second, while an LLM-backed one is
+two model passes with your exposed entities in the prompt each time. On modest
+hardware that is tens of seconds, and a timeout chosen for the first cuts off
+the second just before it succeeds.
+
+<b>Anthropic</b> is not sent the temperature or the keep-alive — steer it with
+the system prompt.</div>
     </div>
   </div>
 
