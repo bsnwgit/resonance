@@ -35,10 +35,11 @@ At the top:
 - **filter settings** — type to search across every topic in every tab at
   once. This is the fastest way to find a control when you know roughly what
   it is called but not which tab it lives under.
-- **APPEARANCE / GEOMETRY / SPEECH**, **AI** and **DEVICES** — the user
-  interface row. The first three edit the shared interface. AI holds the
-  endpoints, each of which saves itself. DEVICES is the register: every device
-  this server knows about, and where each one is set up.
+- **APPEARANCE / GEOMETRY / SPEECH**, **AI** and **DEVICES** — the profile
+  settings row. The first three are lists of profiles, and the controls for one
+  appear inside it when you open it. AI holds the endpoints, each naming a
+  speech profile. DEVICES is the register: every device this server knows
+  about, and where each one is set up.
 - **?**, beside the SETTINGS title — these documents. It is blue, and it is the
   same blue as every ? beside a topic heading, so help is one colour wherever
   you meet it.
@@ -157,7 +158,8 @@ The ACCESS tab holds three topics — the rules about who may be here:
 | **The request form** | what a request asks for, under the setting that decides whether anyone is asked at all |
 | **Created Access** | where you invite a device: name it and take the code to the screen |
 
-The register itself is on its own tab, **DEVICES**, on the user interface row —
+The register itself is on its own tab, **DEVICES**, on the profile settings
+row —
 every device this server knows about, in one list.
 
 The profile lists live on the **PROFILES** tab instead, beside the deployment's
