@@ -610,6 +610,8 @@
      labelled field rather than a box somebody clicks by accident while trying
      to open the thing. */
   .erow .namerow{display:flex;align-items:center;gap:8px;margin:7px 0 2px}
+  /* …and anything destructive on that line sits at the far end of it. */
+  .erow .namerow > button.act-danger{margin-left:auto}
   .erow .namerow > b{
     font-weight:400;letter-spacing:.1em;font-size:calc(8px * var(--fs));
     color:rgba(var(--paper),.5);white-space:nowrap;
@@ -4291,6 +4293,19 @@ async function refreshGroups(){
     nm.onkeydown = (e)=>{ if (e.key === 'Enter') nm.blur(); };
     nm.onchange = ()=> groupAction('/groups/save', {id: g.id, name: nm.value.trim()});
     namerow.appendChild(nm);
+    /* On the name's own line, hard right. Deleting a group is the one thing
+       here that cannot be undone, and it belongs beside the thing it names
+       rather than at the foot of a list of ticks. */
+    const del = document.createElement('button');
+    del.textContent = 'DELETE';
+    del.className = 'act-danger';
+    del.onclick = ()=>{
+      if (confirm('Delete the group "' + g.name + '"? It is removed from every '
+                  + 'endpoint that names it. Nothing in it is deleted — a group '
+                  + 'is a way of referring to them, not a thing they belong to.'))
+        groupAction('/groups/delete', {id: g.id});
+    };
+    namerow.appendChild(del);
     row.appendChild(namerow);
 
     /* Membership is the group. Ticked in place rather than behind an EDIT,
@@ -4337,19 +4352,6 @@ async function refreshGroups(){
     });
     row.appendChild(meta);
 
-    const acts = document.createElement('div');
-    acts.className = 'acts';
-    const del = document.createElement('button');
-    del.textContent = 'DELETE';
-    del.className = 'act-danger';
-    del.onclick = ()=>{
-      if (confirm('Delete the group "' + g.name + '"? It is removed from every '
-                  + 'endpoint that names it. Nothing in it is deleted — a group '
-                  + 'is a way of referring to them, not a thing they belong to.'))
-        groupAction('/groups/delete', {id: g.id});
-    };
-    acts.appendChild(del);
-    row.appendChild(acts);
     box.appendChild(row);
   });
 }
