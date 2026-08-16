@@ -1079,6 +1079,10 @@
      spacer holding the destructive actions apart. Right-aligning SAVE there
      would park it against DELETE. */
   .actrow{justify-content:flex-end;margin-top:10px}
+  /* Where a row carries both, ADD sits hard left and the commits hard right:
+     making another profile is not the same kind of act as publishing the ones
+     already there, and the gap between them says so. */
+  .actrow .spacer{flex:1;min-width:8px}
   .seg button{
     font:inherit;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;padding:5px 8px;cursor:pointer;
     background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.9);
@@ -1854,9 +1858,6 @@ is back to being a browser that has never been here.</div>
     <h4>Appearance profiles</h4>
     <div class="grpbody">
   <div id="dp_looks"></div>
-  <div class="seg" style="margin-top:6px">
-    <button id="b_addlook">ADD A PROFILE</button>
-  </div>
   <div class="note help">The APPEARANCE tab is <b>one document for everybody</b>, and
 that is right for almost all of it — tune the bloom once and every screen in
 the building gets it. It is wrong for exactly four values.
@@ -1880,6 +1881,8 @@ If that turns out not to be enough on a real wall, the range is the thing to
 change, not this.</div>
 
   <div class="seg actrow">
+    <button id="b_addlook">ADD A PROFILE</button>
+    <span class="spacer"></span>
     <button id="b_looksave" class="act-save">SAVE THE PROFILES</button>
     <button id="b_lookrevert" class="act-undo">REVERT</button>
   </div>
@@ -1892,9 +1895,6 @@ change, not this.</div>
     <h4>Screensaver profiles</h4>
     <div class="grpbody">
   <div id="dp_savers"></div>
-  <div class="seg" style="margin-top:6px">
-    <button id="b_addsaver">ADD A PROFILE</button>
-  </div>
   <div class="note help">A screen showing the same bright figure in the same
 place for years keeps a ghost of it permanently. A profile is the answer to
 that, and it is <b>still the product</b>: the same face, every appearance
@@ -1980,6 +1980,8 @@ loads — reload it there, or use OPEN DISPLAY. Making a working screen poll for
 a setting that changes twice a year would be the wrong trade.</div>
 
   <div class="seg actrow">
+    <button id="b_addsaver">ADD A PROFILE</button>
+    <span class="spacer"></span>
     <button id="b_saversave" class="act-save">SAVE THE PROFILES</button>
     <button id="b_saverrevert" class="act-undo">REVERT</button>
   </div>
@@ -1992,9 +1994,6 @@ a setting that changes twice a year would be the wrong trade.</div>
     <h4>Kiosk profiles</h4>
     <div class="grpbody">
   <div id="dp_kiosks"></div>
-  <div class="seg" style="margin-top:6px">
-    <button id="b_addkiosk">ADD A PROFILE</button>
-  </div>
   <div class="note help">A <b>kiosk</b> is a screen people walk up to, that
 nobody has open and nobody is sitting at — a wall, a stand, a reception
 counter, a tabletop. The mounting was never what any of this followed from:
@@ -2022,6 +2021,8 @@ choose which one that is. A screen hung on a wall and never configured
 behaves like the rest of the building rather than like nothing.</div>
 
   <div class="seg actrow">
+    <button id="b_addkiosk">ADD A PROFILE</button>
+    <span class="spacer"></span>
     <button id="b_kiosksave" class="act-save">SAVE THE PROFILES</button>
     <button id="b_kioskrevert" class="act-undo">REVERT</button>
   </div>
