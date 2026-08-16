@@ -6527,7 +6527,13 @@ function panelNav(){
     if (tab === 'profiles' || PROF_OF[tab]) refreshProfiles();
     if (tab === 'embeds') refreshEmbeds();
     if (tab === 'app') loadApp();
-    if (tab === 'ai') loadBackend();
+    if (tab === 'ai'){
+      /* The endpoint blocks list SPEECH PROFILES, and those live in the
+         displays document — which this tab never fetched. Painted before it
+         arrives, every picker on every endpoint is empty but for DEFAULT.
+         Load first, then paint. */
+      Promise.resolve(refreshProfiles()).then(loadBackend);
+    }
     if (tab === 'docs') loadDocs();
   }
   tabButtons.forEach(b=> b.addEventListener('click', ()=> selectTab(b)));
