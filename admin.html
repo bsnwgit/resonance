@@ -681,7 +681,15 @@
   .erow .acts button.on{border-color:var(--hue-dim);color:var(--hue);
                         background:rgba(var(--glass),.06)}
   /* A device picks a profile, it does not type one. */
-  .kiosk select.nmedit{flex:1 1 auto;min-width:110px}
+  /* Reads as part of the line above it: the same size as the tick's own
+     words, and only as wide as the longest thing it can say rather than
+     stretched across the row. */
+  .kiosk select.kpick{
+    width:auto;max-width:100%;padding:3px 6px;font:inherit;
+    font-size:calc(9px * var(--fs));letter-spacing:.06em;
+    background:rgba(0,0,0,.55);color:rgba(var(--paper),.96);
+    border:1px solid rgba(var(--glass),.16);outline:0;
+  }
   /* One row per field of the request form: what it is called, whether it has
      to be answered, whether it is a paragraph, and a way to remove it. */
   .fldrow{display:flex;align-items:center;gap:8px;margin:4px 0}
@@ -4902,13 +4910,10 @@ function kioskBlock(d){
   const inner = document.createElement('div');
   inner.className = 'kioskon';
 
-  const wrap = document.createElement('div');
-  wrap.className = 'namerow';
-  const b = document.createElement('b');
-  b.textContent = 'Kiosk';
-  wrap.appendChild(b);
+  /* No label beside it. The tick immediately above says Kiosk mode, and a
+     second "Kiosk" on the line under it is the same word twice. */
   const sel = document.createElement('select');
-  sel.className = 'nmedit';
+  sel.className = 'kpick';
 
   const kiosks = (DPCFG && DPCFG.kiosks) || [];
   const defId  = (DPCFG && DPCFG.kiosk_default) || '';
@@ -4937,8 +4942,7 @@ function kioskBlock(d){
     sel.appendChild(o);
   });
   sel.value = d.kiosk_profile || '';
-  wrap.appendChild(sel);
-  inner.appendChild(wrap);
+  inner.appendChild(sel);
   box.appendChild(inner);
 
   const sync = ()=> inner.classList.toggle('off', !kb.checked);
