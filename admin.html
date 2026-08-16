@@ -1106,6 +1106,30 @@
     background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.9);
   }
   .seg button.on{border-color:var(--hue-dim);color:var(--hue);background:rgba(var(--glass),.06)}
+  /* A palette button in the colour it picks. Five words in one grey told
+     nobody what any of them looked like, and the swatch IS the setting — so
+     each carries the display's own `glass` triple for that palette and a
+     readable version of its hue. One pair of variables per palette, two rules
+     for every state, rather than a rule per palette per state. */
+  .seg[data-set="palette"] button[data-v="blue"] {--sw:120,186,255;--swt:#9cc8f5}
+  .seg[data-set="palette"] button[data-v="milk"] {--sw:236,244,252;--swt:#dfe9f4}
+  .seg[data-set="palette"] button[data-v="ice"]  {--sw:169,220,242;--swt:#b6e2f6}
+  .seg[data-set="palette"] button[data-v="amber"]{--sw:242,196,137;--swt:#f0c98d}
+  .seg[data-set="palette"] button[data-v="bone"] {--sw:216,210,196;--swt:#ddd7c8}
+  .seg[data-set="palette"] button[data-v="rust"] {--sw:242,168,150;--swt:#f0a795}
+  .seg[data-set="palette"] button{
+    color:var(--swt);border-color:rgba(var(--sw),.45);
+    background:rgba(var(--sw),.08);
+  }
+  .seg[data-set="palette"] button:hover{
+    border-color:rgba(var(--sw),.85);background:rgba(var(--sw),.16);
+  }
+  /* Chosen: the swatch fills rather than outlines, which reads at a glance on
+     a row where every button is already coloured. */
+  .seg[data-set="palette"] button.on{
+    border-color:rgba(var(--sw),1);background:rgba(var(--sw),.30);
+    color:#fff;
+  }
   .sl{display:grid;grid-template-columns:1fr auto;gap:2px 8px;margin:9px 0;align-items:center}
   .sl label{font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9)}
   .sl output{font-size:calc(9.5px * var(--fs));color:var(--text)}
@@ -1351,6 +1375,7 @@
     <button data-v="ice">ICE</button>
     <button data-v="amber">AMBER</button>
     <button data-v="bone">BONE</button>
+    <button data-v="rust">RUST</button>
   </div></div>
   </section>
   <section class="grp" data-tab="look">
@@ -4342,7 +4367,8 @@ $('b_addsaver').addEventListener('click', ()=>{
 const LOOK_FIELDS = [
   ['fs',      'Type size', [['1', 'NORMAL'], ['1.12', 'LARGER'], ['1.25', 'LARGEST']]],
   ['palette', 'Palette',   [['blue', 'BLUE'], ['milk', 'MILK'], ['ice', 'ICE'],
-                            ['amber', 'AMBER'], ['bone', 'BONE']]],
+                            ['amber', 'AMBER'], ['bone', 'BONE'],
+                            ['rust', 'RUST']]],
   ['layout',  'Layout',    [['hero', 'HERO'], ['bleed', 'FULL BLEED']]],
   ['mode',    'Figure',    [['stack', 'STACK'], ['disc', 'DISC'],
                             ['orb', 'ORB'], ['knot', 'KNOT']]],

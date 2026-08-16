@@ -11,7 +11,7 @@ so the honest advice is to open the preview and push the sliders around.
 
 ### Palette
 
-BLUE, MILK, ICE, AMBER, BONE. Only the figure's colour channel changes — the
+BLUE, MILK, ICE, AMBER, BONE, RUST. Only the figure's colour channel changes — the
 text stays fixed neutral white deliberately, so the transcript stays readable
 no matter how dark the geometry goes.
 
