@@ -1387,7 +1387,7 @@
         <button data-tab="speech">SPEECH</button>
         <button data-tab="savers">SCREENSAVER</button>
         <button data-tab="devprof">DEVICE</button>
-        <button id="tab_account" data-tab="account">ACCOUNT</button>
+        <button id="tab_account" data-tab="account">GROUPS</button>
       </div>
     </div>
     <div class="tabsplit"></div>
@@ -1856,11 +1856,12 @@ recognised is left standing so a typo is visible rather than silent.</div>
        admin put somewhere. Named wherever access is granted — today an
        endpoint's allow-list, and anything later that grants something can name
        them the same way. -->
-  <section class="grp" data-tab="account">
-    <h4>Groups</h4>
+  <!-- The tab is called GROUPS; a section called Groups inside it says the
+       word twice. Bare, like the profile lists. -->
+  <section class="grp bare proflist" data-tab="account">
     <div class="grpbody">
   <div id="grouplist"></div>
-  <div class="labrow" style="margin-top:10px">
+  <div class="labrow" id="gr_addrow" style="margin-top:10px">
     <input id="gr_name" type="text" spellcheck="false" autocomplete="off"
            placeholder="Physics department">
     <div class="seg" id="gr_kind">
@@ -4220,6 +4221,10 @@ function groupNote(m, bad){
   el.textContent = m || '';
 }
 
+/* Which group is open, by id rather than index: every membership tick
+   repaints the whole list, and an index would move under it. */
+let OPENGR = '';
+
 async function refreshGroups(){
   const box = $('grouplist');
   if (!box || ME.role !== 'admin'){ if (box) box.textContent = ''; return; }
@@ -4232,21 +4237,53 @@ async function refreshGroups(){
     return;
   }
   box.className = '';
-  GROUPS.forEach(g=>{
+  // A repaint happens on every tick, so the add row's state is decided here
+  // rather than only in the click that opened a group.
+  const addrow = $('gr_addrow');
+  if (addrow) addrow.hidden = !!OPENGR && GROUPS.some(x=> x.id === OPENGR);
+  GROUPS.forEach((g, i)=>{
     const row = document.createElement('div');
     row.className = 'erow';
+    if (OPENGR !== g.id) row.classList.add('shut');
 
+    /* Shut, the name is the row's title and the badge says which population it
+       is drawn from. Open, the name is the field you rename it in — the same
+       arrangement a profile row uses, so the two read alike. */
     const top = document.createElement('div'); top.className = 'top';
-    const nm = document.createElement('input');
-    nm.type = 'text'; nm.className = 'nm'; nm.value = g.name; nm.spellcheck = false;
-    nm.onkeydown = (e)=>{ if (e.key === 'Enter') nm.blur(); };
-    nm.onchange = ()=> groupAction('/groups/save', {id: g.id, name: nm.value.trim()});
-    top.appendChild(nm);
+    const nmt = document.createElement('span');
+    nmt.className = 'nm';
+    nmt.textContent = (g.name || '').trim() || 'unnamed group';
+    top.appendChild(nmt);
     const b = document.createElement('span');
     b.className = 'badge';
     b.textContent = g.kind === 'user' ? 'PEOPLE' : 'DEVICES';
     top.appendChild(b);
+    const cnt = document.createElement('span');
+    cnt.className = 'badge';
+    cnt.textContent = g.members.length + (g.members.length === 1 ? ' member' : ' members');
+    top.appendChild(cnt);
+    top.onclick = (e)=>{
+      if (e.target.closest('input, button, select, textarea')) return;
+      const opening = row.classList.contains('shut');
+      OPENGR = opening ? g.id : '';
+      box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+      row.classList.toggle('shut', !opening);
+      const ab = $('gr_addrow');
+      if (ab) ab.hidden = !!OPENGR;
+    };
     row.appendChild(top);
+
+    const namerow = document.createElement('div');
+    namerow.className = 'namerow';
+    const nlab = document.createElement('b');
+    nlab.textContent = 'Name';
+    namerow.appendChild(nlab);
+    const nm = document.createElement('input');
+    nm.type = 'text'; nm.className = 'nmedit'; nm.value = g.name; nm.spellcheck = false;
+    nm.onkeydown = (e)=>{ if (e.key === 'Enter') nm.blur(); };
+    nm.onchange = ()=> groupAction('/groups/save', {id: g.id, name: nm.value.trim()});
+    namerow.appendChild(nm);
+    row.appendChild(namerow);
 
     /* Membership is the group. Ticked in place rather than behind an EDIT,
        because the list is short and the whole reason to open a group is to

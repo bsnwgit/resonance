@@ -778,6 +778,45 @@ def route_order(doc):
     return ([doc["default"]] if doc["default"] in doc["routes"] else []) + rest
 
 
+#: What a model profile carries. `fallthrough` is deliberately NOT here: it
+#: names another endpoint, so it belongs to the endpoint rather than to a
+#: connection several of them might share.
+MODEL_KEYS = ("provider", "base_url", "model", "api_key", "agent_id")
+
+
+def _model_pool():
+    try:
+        return display_settings()["models"]
+    except Exception:
+        return []
+
+
+def with_model(rec):
+    """A route's connection, resolved from the model profile it names.
+
+    Overlaid rather than replacing the record, so everything that is still the
+    ROUTE's — its system prompt, its limits, where it falls through to — is
+    untouched. A route naming no profile gets the deployment's default; one
+    whose profile has been deleted falls back to it too, rather than quietly
+    talking to whatever base URL was last typed."""
+    pool = _model_pool()
+    if not pool:
+        return rec
+    prof = find_look(str(rec.get("model_profile") or ""), pool)
+    if prof is None:
+        try:
+            prof = find_look(display_settings()["model_default"], pool)
+        except Exception:
+            prof = None
+    if not prof:
+        return rec
+    out = dict(rec)
+    for k in MODEL_KEYS:
+        if k in prof:
+            out[k] = prof[k]
+    return out
+
+
 def _speech_pool():
     try:
         return display_settings()["speeches"]
@@ -1319,6 +1358,12 @@ DISPLAY_SETTINGS = {
     # Which profile in each list an ordinary display gets. One per list, always
     # set, and the profile it names cannot be removed — a list whose default
     # points at nothing would leave every screen with no appearance at all.
+    # The connection half of an endpoint, under a name: which provider, which
+    # base URL, which model, and the key for it. An endpoint names one instead
+    # of carrying its own copy — two endpoints on the same model used to be the
+    # same credential typed twice.
+    "models": [],
+    "model_default": "",
     "look_default": "",
     "motion_default": "",
     "speech_default": "",
