@@ -1991,8 +1991,10 @@ nothing but that id.</div>
        thin row of its own. -->
   <section class="grp bare" data-tab="devices">
     <div class="grpbody">
-  <div id="connlist"></div>
+  <!-- Above the list, not below it. Underneath, a register holding one device
+       reads as a sentence about that device rather than about the register. -->
   <div class="note" id="connnote"></div>
+  <div id="connlist"></div>
   <div class="note help" style="margin-top:10px">Every device this server knows
 about, in one register. A display is one device — a screen on a wall, a TV, a
 laptop, somebody's phone — and anything with a browser and a microphone counts.
@@ -4922,7 +4924,6 @@ async function refreshDisplays(){
     if (conn) conn.textContent = '';
     return;
   }
-  const note = $('dispnote');
   await loadDisplays();
   // The settings above the list are painted from the same fetch, so the two
   // can never be describing different states of the same document.
@@ -5166,25 +5167,27 @@ async function refreshDisplays(){
     row.appendChild(kb.said);
     conn.appendChild(row);
   });
+  /* One line describing the whole register, since there is one register now.
+     The pending counts used to be written into the Created Access note, which
+     stopped making sense the moment the list moved off that section: it was
+     counting rows nobody could see from there. */
   const count = (st)=> pending.filter(d=> dispState(d) === st).length;
-  if (note){
-    const bits = [];
-    if (count('asked')) bits.push(count('asked') + ' asking for access');
-    if (count('expired')) bits.push(count('expired') + ' expired');
-    if (count('code')) bits.push(count('code') + ' waiting for a code to be typed in');
-    if (count('waiting')) bits.push(count('waiting') + ' here but not approved');
-    if (count('denied')) bits.push(count('denied') + ' refused');
-    if (count('stale')) bits.push(count('stale') + ' whose code ran out');
-    note.className = 'note';
-    note.textContent = bits.join(' · ');
-  }
   const cnote = $('connnote');
   if (cnote){
-    const guests = live.filter(d=> d.guest).length;
+    const bits = [];
+    if (DISPLAYS.length){
+      bits.push(DISPLAYS.length + (DISPLAYS.length === 1 ? ' device' : ' devices'));
+      const guests = live.filter(d=> d.guest).length;
+      if (guests) bits.push(guests + ' on a grant that runs out');
+      if (count('asked')) bits.push(count('asked') + ' asking for access');
+      if (count('expired')) bits.push(count('expired') + ' expired');
+      if (count('code')) bits.push(count('code') + ' waiting for a code to be typed in');
+      if (count('waiting')) bits.push(count('waiting') + ' here but not approved');
+      if (count('denied')) bits.push(count('denied') + ' refused');
+      if (count('stale')) bits.push(count('stale') + ' whose code ran out');
+    }
     cnote.className = 'note';
-    cnote.textContent = !live.length ? ''
-      : live.length + (live.length === 1 ? ' device' : ' devices')
-        + (guests ? ' · ' + guests + ' on a grant that runs out' : '');
+    cnote.textContent = bits.join(' · ');
   }
 }
 
