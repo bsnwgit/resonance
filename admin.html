@@ -281,7 +281,8 @@
      at the LEFT of its half, hard against the rule, so the two groups read as
      a pair either side of it rather than as two things at opposite ends of a
      wide row with nothing between them. */
-  .tabside{flex:1 1 0}
+  .tabside{flex:2 1 0}
+  .connside{flex:1 1 0}
   .connside{align-items:flex-start}
   /* Heavy on purpose: this is a boundary between subjects, not a gap between
      controls, and the panel's hairlines read as the latter. */
@@ -537,26 +538,6 @@
   .note.bad{color:#ff8a8a}
   #whoname:hover{color:var(--hue);text-decoration-color:var(--hue)}
   /* Your own account, over the panel rather than inside it. */
-  #mine{
-    display:none;position:fixed;inset:0;z-index:60;
-    align-items:center;justify-content:center;padding:24px;
-    background:rgba(0,0,0,.72);
-  }
-  #mine.on{display:flex}
-  #minebox{
-    width:100%;max-width:360px;padding:20px 22px;
-    background:#0b0e12;border:1px solid rgba(var(--glass),.4);
-  }
-  #minehead{
-    font-size:calc(11px * var(--fs));letter-spacing:.16em;text-transform:uppercase;
-    color:rgba(var(--paper),.6);margin-bottom:10px;
-  }
-  #minebox input{
-    width:100%;margin:4px 0;font:inherit;font-size:calc(9.5px * var(--fs));
-    padding:5px 6px;background:rgba(0,0,0,.6);color:var(--text);
-    border:1px solid rgba(var(--glass),.16);outline:0;
-  }
-  #minebox input:focus{border-color:var(--hue-dim)}
   .whoami{font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.92);
           padding-bottom:6px}
   .bklab{display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;
@@ -1386,6 +1367,7 @@
         <button data-tab="speech">SPEECH</button>
         <button data-tab="savers">SCREENSAVER</button>
         <button data-tab="devprof">DEVICE</button>
+        <button id="tab_account" data-tab="account">ACCOUNT</button>
       </div>
     </div>
     <div class="tabsplit"></div>
@@ -2363,6 +2345,24 @@ button to download it as a PDF.</div>
        appearance you had just added, but not yet saved, could only be stored
        by pressing them in the right order. -->
   <!-- Where a tab's controls sit while none of its profiles is open. -->
+  <!-- Your own account, and only yours. ADMIN is where somebody else's is
+       managed; this is the one thing on the page you do to yourself, and it
+       used to be a box over the whole panel opened from your name. -->
+  <section class="grp" data-tab="account" data-signin>
+    <h4>Your account</h4>
+    <div class="grpbody">
+  <div class="whoami" id="whoami"></div>
+  <label class="bklab">Current password</label>
+  <input id="pw_cur" type="password" autocomplete="current-password">
+  <label class="bklab">New password</label>
+  <input id="pw_new" type="password" autocomplete="new-password">
+  <div class="seg actrow">
+    <button id="b_pw" class="act-save">CHANGE PASSWORD</button>
+  </div>
+  <div class="note" id="pwnote"></div>
+    </div>
+  </section>
+
   <div id="profstash" hidden></div>
   <div id="profrow">
     <div class="note" id="profnote"></div>
@@ -2397,7 +2397,7 @@ button to download it as a PDF.</div>
            question. -->
       <!-- Accounts before devices: a group is made here and named over there,
            so the order follows the order you do them in. -->
-      <button id="tab_accounts" data-tab="accounts">ACCOUNTS</button>
+      <button id="tab_accounts" data-tab="accounts">ADMIN</button>
       <button id="tab_displays" data-tab="displays">ACCESS</button>
       <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
       <!-- DOCUMENTATION is not here any more. It is reached from the ? beside
@@ -2410,21 +2410,6 @@ button to download it as a PDF.</div>
 <!-- Your own account, opened from your name in the corner rather than
      sitting as a topic on a tab about everybody else's. It is one thing you do
      to yourself — change your password — and it belongs where your name is. -->
-<div id="mine">
-  <div id="minebox">
-    <div id="minehead">Your account</div>
-    <div class="whoami" id="whoami"></div>
-    <label class="bklab">Current password</label>
-    <input id="pw_cur" type="password" autocomplete="current-password">
-    <label class="bklab">New password</label>
-    <input id="pw_new" type="password" autocomplete="new-password">
-    <div class="seg actrow">
-      <button id="b_pw" class="act-save">CHANGE PASSWORD</button>
-      <button id="b_mineclose" class="act-undo">CLOSE</button>
-    </div>
-    <div class="note" id="pwnote"></div>
-  </div>
-</div>
 
 <div id="stage">
     <div id="stagebar">
@@ -2673,18 +2658,15 @@ document.addEventListener('keydown', e=>{
 });
 
 /* Your own account, from your name in the corner. */
+/* The name is still the way in, but it goes to the tab rather than opening a
+   box over everything. */
 $('whoname').addEventListener('click', ()=>{
   if (ME && ME.no_auth) return;          // nothing to change
   $('pwnote').textContent = '';
   $('pw_cur').value = ''; $('pw_new').value = '';
-  $('mine').classList.add('on');
+  const b = $('tab_account');
+  if (b) b.click();
   $('pw_cur').focus();
-});
-const closeMine = ()=> $('mine').classList.remove('on');
-$('b_mineclose').addEventListener('click', closeMine);
-$('mine').addEventListener('click', e=>{ if (e.target.id === 'mine') closeMine(); });
-document.addEventListener('keydown', e=>{
-  if (e.key === 'Escape' && $('mine').classList.contains('on')) closeMine();
 });
 
 $('b_signout').addEventListener('click', async ()=>{
