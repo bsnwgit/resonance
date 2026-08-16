@@ -1731,19 +1731,18 @@ by noise.</div>
            placeholder="kitchen wall">
     <button id="b_adddisp" class="act-save">GET A CODE</button>
   </div>
-  <div id="displist"></div>
   <div class="note" id="dispnote"></div>
-  <div class="note help" style="margin-top:10px">A display is one device — a
-screen on a wall, a TV, a laptop, somebody's phone — and this is every one that
-has loaded the page. Anything with a browser and a microphone counts.
+  <div class="note help" style="margin-top:10px">How a device comes to exist.
+The register itself is under <b>Devices</b> below; this is the half where you
+invite one.
 
-<b>Two ways one gets here.</b> Name it above and you are given a six-character
+<b>Two ways one gets there.</b> Name it above and you are given a six-character
 code: type <b>&lt;this server&gt;/e/CODE</b> into that screen once and it is
 that display, already named, already holding whatever endpoints you ticked for
 it. The code lasts ten minutes, works once, and case and dashes do not matter —
 <b>k7qp4m</b> is the same as <b>K7QP-4M</b>. Or a device simply opens the
-display page, in which case it turns up below as WAITING and you approve it by
-hand.
+display page, in which case it turns up under Devices as WAITING and you
+approve it by hand.
 
 <b>REISSUE</b> is for a screen that lost its cookie, or was replaced by a
 different one in the same place. The row keeps its name and every endpoint that
@@ -1755,7 +1754,8 @@ to move it ends the old one there and then.
 <b>?display=kitchen</b> into a URL. The token is what says this really is that
 device, and it lives in a cookie the page itself cannot read. Somebody who
 types a wall screen's URL into their own phone is issued a <i>new</i> token,
-which nobody approved — and turns up here as a row you were not expecting.
+which nobody approved — and turns up under Devices as a row you were not
+expecting.
 
 <b>Approve it and it works; leave it and it still renders.</b> The appearance
 settings are public, so a device that has just arrived looks right immediately
@@ -1982,19 +1982,28 @@ nothing but that id.</div>
        need attention buried among fifty that do not is how a request sits
        unanswered for a week. -->
   <section class="grp" data-tab="displays">
-    <h4>Connected devices</h4>
+    <h4>Devices</h4>
     <div class="grpbody">
   <div id="connlist"></div>
   <div class="note" id="connnote"></div>
-  <div class="note help" style="margin-top:10px">Every device that is working,
-most recently heard from first. <b>last seen</b> is the last time one asked
-this server anything, so a screen that has been unplugged for a week says so
-here before anybody notices the wall.
+  <div class="note help" style="margin-top:10px">Every device this server knows
+about, in one register. A display is one device — a screen on a wall, a TV, a
+laptop, somebody's phone — and anything with a browser and a microphone counts.
+
+<b>Anything waiting on you sorts to the top</b>, by how much it wants
+attention: asked, expired, holding a code, waiting, refused, then gone quiet.
+Everything that is simply working follows, most recently heard from first.
+<b>last seen</b> is the last time one asked this server anything, so a screen
+unplugged for a week says so here before anybody notices the wall.
+
+A device that has just connected appears here straight away, whether or not
+anybody has approved it yet — which is the moment you are usually looking for
+it.
 
 Devices on a granted request carry <b>access runs out</b>; those you issued a
 code for do not, and never will.
 
-<b>WITHDRAW</b> takes access away and puts the row back under Created Access.
+<b>WITHDRAW</b> takes access away; the row stays here, no longer working.
 <b>DELETE</b> goes further and forgets the device entirely.</div>
     </div>
   </section>
@@ -4891,9 +4900,8 @@ const dispState = (d)=> !d.enrolled ? (d.code ? 'code' : 'stale')
                       : d.approved  ? 'live' : 'waiting';
 
 async function refreshDisplays(){
-  const box = $('displist'), conn = $('connlist');
-  if (!box || ME.role !== 'admin'){
-    if (box) box.textContent = '';
+  const conn = $('connlist');
+  if (!conn || ME.role !== 'admin'){
     if (conn) conn.textContent = '';
     return;
   }
@@ -4902,14 +4910,17 @@ async function refreshDisplays(){
   // The settings above the list are painted from the same fetch, so the two
   // can never be describing different states of the same document.
   paintDpSettings();
-  box.innerHTML = '';
   conn.innerHTML = '';
-  /* Two lists, because they are read for opposite reasons. This one is a
-     queue — everything in it is waiting on a decision, a code being typed, or
-     somebody asking again — and it is empty when there is nothing to do.
-     Devices that are simply working are not a to-do list, and burying three
-     rows that need attention among fifty that do not is how a request sits
-     unanswered for a week. */
+  /* ONE register, not two. It was split — a queue of things wanting a
+     decision, and a list of things simply working — on the reasoning that
+     burying three rows that need attention among fifty that do not is how a
+     request sits unanswered for a week. The ordering below is what actually
+     carried that, and it survives the merge: anything waiting sorts to the
+     top, by how much it wants attention, and everything working follows by
+     what was heard from most recently. What the split cost was somewhere to
+     look: a device you had just plugged in was in one list or the other
+     depending on whether it had been approved yet, which is exactly the moment
+     you are looking for it. */
   const rank = {asked: 0, expired: 1, code: 2, waiting: 3, denied: 4, stale: 5};
   const rows = DISPLAYS.slice().sort((a, b)=>
     (rank[dispState(a)] - rank[dispState(b)]) || (b.created || 0) - (a.created || 0));
@@ -4917,19 +4928,12 @@ async function refreshDisplays(){
   const live = DISPLAYS.slice()
     .filter(d=> dispState(d) === 'live')
     .sort((a, b)=> (b.last_seen || 0) - (a.last_seen || 0));
-  if (!pending.length){
-    box.className = 'note';
-    box.textContent = DISPLAYS.length
-      ? 'Nothing waiting. Every device here is working.'
-      : 'No displays yet. Name one above to get a code, or open the display '
-        + 'page on any device and it appears here.';
-  }else box.className = '';
-  if (!live.length){
+  if (!DISPLAYS.length){
     conn.className = 'note';
-    conn.textContent = 'Nothing connected yet.';
+    conn.textContent = 'No devices yet. Name one under Created Access to get a '
+                     + 'code, or open the display page on any device and it '
+                     + 'appears here.';
   }else conn.className = '';
-  /* Each list in its own order: the queue by how much it wants attention, the
-     connected list by what was heard from most recently. */
   pending.concat(live).forEach(d=>{
     const st = dispState(d);
     const row = document.createElement('div');
@@ -4953,8 +4957,8 @@ async function refreshDisplays(){
       if (e.target.closest('input, button, select, textarea')) return;
       const opening = row.classList.contains('shut');
       OPENROW = opening ? d.id : '';
-      // One at a time, across both lists: they are two halves of one register.
-      document.querySelectorAll('#displist .erow, #connlist .erow')
+      // One at a time. It used to say "across both lists"; there is one now.
+      document.querySelectorAll('#connlist .erow')
               .forEach(x=> x.classList.add('shut'));
       row.classList.toggle('shut', !opening);
     };
@@ -5133,7 +5137,7 @@ async function refreshDisplays(){
        the same way its endpoints can be ticked before it arrives. */
     row.appendChild(kioskBlock(d));
     row.appendChild(r);
-    (st === 'live' ? conn : box).appendChild(row);
+    conn.appendChild(row);
   });
   const count = (st)=> pending.filter(d=> dispState(d) === st).length;
   if (note){

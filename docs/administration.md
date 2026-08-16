@@ -145,14 +145,14 @@ The ACCESS tab holds four topics:
 | | left | right |
 |---|---|---|
 | **top** | Requested Access | Created Access |
-| **bottom** | The request form | Connected devices |
+| **bottom** | The request form | Devices |
 
 | | |
 |---|---|
 | **Requested Access** | whether a general user needs approval at all, and what a grant to one is worth once given |
 | **The request form** | what a request asks for, under the setting that decides whether anyone is asked at all |
-| **Created Access** | the queue: everything waiting on a decision, on a code being typed in, or on somebody asking again — and where you add one |
-| **Connected devices** | everything that is simply working, most recently heard from first |
+| **Created Access** | where you invite a device: name it and take the code to the screen |
+| **Devices** | every device this server knows about, in one register |
 
 The profile lists live on the **PROFILES** tab instead, beside the deployment's
 own settings — what a screen looks like and what it is allowed to do were never
@@ -179,10 +179,17 @@ the building rather than like nothing. It is stored by name rather than being
 "the first in the list", so reordering the panel cannot quietly change what
 every unconfigured screen is doing.
 
-Created Access and Connected devices are separate lists on purpose. One is a to-do list and empties as
-you work through it; the other is a register you read when somebody asks what
-is out there. Three rows that need attention buried among fifty that do not is
-how a request sits unanswered for a week.
+**Devices is one register, and it used to be two.** The split — a queue of
+things wanting a decision, and a list of things simply working — was there so
+that three rows needing attention were not buried among fifty that did not.
+What actually carried that is the ordering, and the ordering survived the
+merge: anything waiting sorts to the top by how much it wants attention, and
+everything working follows by what was heard from most recently.
+
+What the split cost was somewhere to look. A device you had just plugged in was
+in one list or the other depending on whether it had been approved yet, which
+is precisely the moment you are hunting for it. Now it appears under Devices
+either way.
 
 **There are two ways one gets into the list**, and which you use depends on
 whether you knew it was coming.
