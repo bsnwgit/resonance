@@ -271,6 +271,20 @@
   #panelhead > .findrow,
   #panelhead > .tabgroup,
   #panelhead > .tabs{max-width:560px}
+  /* …but the tab row itself runs the whole width, out to the edge of the
+     preview, because it now carries two groups that have to sit apart. */
+  #panelhead > .tabrow{max-width:none}
+  .tabrow{display:flex;align-items:stretch;gap:14px;margin-bottom:2px}
+  .tabside{display:flex;flex-direction:column;min-width:0}
+  .tabside .tabs{margin-bottom:0}
+  /* The left group takes the slack, so the right one is hard against the
+     preview edge however many tabs each ends up with. */
+  .tabside:first-child{flex:1 1 auto}
+  .connside{flex:0 0 auto;align-items:flex-end}
+  /* Heavy on purpose: this is a boundary between subjects, not a gap between
+     controls, and the panel's hairlines read as the latter. */
+  .tabsplit{flex:0 0 2px;align-self:stretch;
+            background:rgba(var(--glass),.34);margin-bottom:10px}
 
   /* The app tab's own commit row, at the foot of the box. Hidden outright
      on every other tab: a save button that belongs to settings you cannot
@@ -1351,25 +1365,36 @@
        every viewer sees, and how the server itself is run. Saying so is
        cheaper than leaving somebody to infer it from which tabs happen to
        carry the SAVE FOR EVERYONE button. -->
-  <div class="tabgroup">Profile settings</div>
-  <div class="tabs">
-    <!-- APPEARANCE rather than LOOK, so the tab and the "Appearance profiles"
-         under PROFILES read as the same subject. data-tab stays "look": it is
-         the storage key for these settings, and renaming it would rewrite
-         every stored document for a label change. -->
-    <button data-tab="look"   class="on">APPEARANCE</button>
-<!-- GEOMETRY rather than MOTION. data-tab stays "motion": it is the
-         storage key these settings are saved under, and renaming it would
-         rewrite every stored document for a label. -->
-    <button data-tab="motion">GEOMETRY</button>
-    <button data-tab="speech">SPEECH</button>
-    <button id="tab_ai" data-tab="ai">AI</button>
-    <!-- What a screen IS, as against who may use it — which is what ACCESS
-         became. Not in UI_TABS or SETTINGS_TABS: like AI, nothing here writes
-         the shared settings document, so SAVE FOR EVERYONE would be a button
-         saving nothing on the tab it sits on. What belongs to one screen is
-         saved from inside that screen's own block. -->
-    <button id="tab_devices" data-tab="devices">DEVICES</button>
+  <!-- Two groups on one row, full width to the edge of the preview. What a
+       display LOOKS and SOUNDS like on the left; what it is wired to and which
+       machines are here on the right. The rule between them is the point: they
+       are different subjects that happen to share a row. -->
+  <div class="tabrow">
+    <div class="tabside">
+      <div class="tabgroup">Profile settings</div>
+      <div class="tabs">
+        <!-- APPEARANCE rather than LOOK, so the tab and the "Appearance
+             profiles" read as the same subject. data-tab stays "look": it is
+             the storage key, and renaming it would rewrite every stored
+             document for a label. -->
+        <button data-tab="look" class="on">APPEARANCE</button>
+        <!-- GEOMETRY rather than MOTION, and data-tab stays "motion" for the
+             same reason. -->
+        <button data-tab="motion">GEOMETRY</button>
+        <button data-tab="speech">SPEECH</button>
+      </div>
+    </div>
+    <div class="tabsplit"></div>
+    <div class="tabside connside">
+      <div class="tabgroup">Connections</div>
+      <div class="tabs">
+        <button id="tab_ai" data-tab="ai">AI</button>
+        <!-- The register: every device this server knows about. Not in
+             UI_TABS or SETTINGS_TABS — like AI, nothing here writes the shared
+             settings document. -->
+        <button id="tab_devices" data-tab="devices">DEVICES</button>
+      </div>
+    </div>
   </div>
   <div class="rule"></div>
   </div><!-- /panelhead -->
