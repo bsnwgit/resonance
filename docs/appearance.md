@@ -69,7 +69,7 @@ These are cumulative and easy to overdo. Bloom plus milk plus grain at once
 turns a sharp figure into fog. If the display looks muddy, this is where to
 look first.
 
-### Who is speaking
+### Speaker label
 
 The two labels down the left of the transcript. They default to **operator**
 and **resonance**, and either can be a fixed word or a variable.
