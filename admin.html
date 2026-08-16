@@ -2151,6 +2151,7 @@ a setting that changes twice a year would be the wrong trade.</div>
     <h4>Device profiles</h4>
     <div class="grpbody">
   <div id="dp_kiosks"></div>
+  <div class="note" id="kiosknote"></div>
   <div class="seg addrow">
     <button id="b_addkiosk" class="act-add">ADD A PROFILE</button>
   </div>
@@ -5129,6 +5130,8 @@ function paintKiosks(list, def){
       if (e.target.closest('input, button, select, textarea')) return;
       const opening = row.classList.contains('shut');
       OPENKI = opening ? i : -1;
+      const ab = $('b_addkiosk');
+      if (ab){ ab.hidden = OPENKI >= 0; ab.disabled = OPENKI >= 0; }
       box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
       row.classList.toggle('shut', !opening);
     };
@@ -5229,6 +5232,32 @@ function paintKiosks(list, def){
     }
     acts.appendChild(mk);
 
+    /* Each profile commits itself, the way appearance, geometry and speech do.
+       One SAVE at the foot of the tab published every row at once, including
+       any somebody was halfway through. */
+    const gap = document.createElement('span');
+    gap.className = 'spacer';
+    acts.appendChild(gap);
+
+    const save = document.createElement('button');
+    save.textContent = 'SAVE';
+    save.className = 'act-save';
+    save.onclick = ()=>{
+      const keep = DPKIOSKS.filter(x=> (x.name || '').trim());
+      if (!keep.length){
+        dpNote('a profile needs a name before it can be saved', true, 'kiosknote');
+        return;
+      }
+      k._new = false;
+      OPENKI = -1;
+      saveDp({kiosks: keep.map(x=> ({id:x.id, name:x.name, voice_only:x.voice_only,
+                                     look:x.look, motion:x.motion, speech:x.speech,
+                                     saver:x.saver, fullscreen:x.fullscreen,
+                                     prompt:x.prompt, prompt_text:x.prompt_text})),
+              kiosk_default: DPKDEF}, 'kiosknote');
+    };
+    acts.appendChild(save);
+
     const del = document.createElement('button');
     del.textContent = 'REMOVE';
     del.className = 'act-danger';
@@ -5255,9 +5284,9 @@ function paintKiosks(list, def){
      It comes back when the profiles are saved, or when the new one is
      reverted or removed. */
   if (btn){
-    const fresh = DPKIOSKS.some(x=> x._new);
-    btn.hidden = fresh;
-    btn.disabled = fresh || DPKIOSKS.length >= 8;
+    const busy = DPKIOSKS.some(x=> x._new) || OPENKI >= 0;
+    btn.hidden = busy;
+    btn.disabled = busy || DPKIOSKS.length >= 8;
   }
 }
 
@@ -6587,9 +6616,10 @@ function panelNav(){
        stay reachable whichever block happens to be open, or the only way to
        add a second endpoint is to first collapse the first. */
     const pr = $('profrow');
+    // Device profiles each carry their own SAVE now, so this row belongs to
+    // the screensavers alone.
     if (pr) pr.classList.toggle('on',
-      (tab === 'savers' || tab === 'devprof')
-      && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
+      tab === 'savers' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
     const air = $('airow');
     if (air) air.classList.toggle('on',
       tab === 'ai' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
