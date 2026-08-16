@@ -282,8 +282,8 @@
      a pair either side of it rather than as two things at opposite ends of a
      wide row with nothing between them. */
   .tabside{flex:2 1 0}
-  .connside{flex:1 1 0}
-  .connside{align-items:flex-start}
+  .connside{flex:1 1 0;align-items:flex-start}
+
   /* Heavy on purpose: this is a boundary between subjects, not a gap between
      controls, and the panel's hairlines read as the latter. */
   .tabsplit{flex:0 0 2px;align-self:stretch;
@@ -322,6 +322,8 @@
     margin:0 0 5px;
   }
   #panelfoot .tabgroup{margin-top:2px}
+  #panelfoot .tabrow{align-items:flex-end}
+  #panelfoot .tabside .tabs{margin-bottom:0}
   #panelfoot{
     flex:0 0 auto;padding:10px 14px 12px;
     /* same strength as the rules bracketing the save row: this separates the
@@ -1372,36 +1374,24 @@
        display LOOKS and SOUNDS like on the left; what it is wired to and which
        machines are here on the right. The rule between them is the point: they
        are different subjects that happen to share a row. -->
-  <div class="tabrow">
-    <div class="tabside">
-      <div class="tabgroup">Profile settings</div>
-      <div class="tabs">
-        <!-- APPEARANCE rather than LOOK, so the tab and the "Appearance
-             profiles" read as the same subject. data-tab stays "look": it is
-             the storage key, and renaming it would rewrite every stored
-             document for a label. -->
-        <button data-tab="look" class="on">APPEARANCE</button>
-        <!-- GEOMETRY rather than MOTION, and data-tab stays "motion" for the
-             same reason. -->
-        <button data-tab="motion">GEOMETRY</button>
-        <button data-tab="speech">SPEECH</button>
-        <button data-tab="savers">SCREENSAVER</button>
-        <button data-tab="devprof">DEVICE</button>
-        <button id="tab_account" data-tab="account">GROUPS</button>
-      </div>
-    </div>
-    <div class="tabsplit"></div>
-    <div class="tabside connside">
-      <div class="tabgroup">Connections</div>
-      <div class="tabs">
-        <button id="tab_ai" data-tab="ai">AI</button>
-        <!-- The register: every device this server knows about. Not in
-             UI_TABS or SETTINGS_TABS — like AI, nothing here writes the shared
-             settings document. -->
-        <button id="tab_devices" data-tab="devices">DEVICES</button>
-      </div>
-    </div>
+  <!-- One group, the full width of the panel. What a display looks and
+       sounds like: nothing else shares this row. -->
+  <div class="tabgroup">Profile settings</div>
+  <div class="tabs">
+    <!-- APPEARANCE rather than LOOK, so the tab and the "Appearance
+     profiles" read as the same subject. data-tab stays "look": it is
+     the storage key, and renaming it would rewrite every stored
+     document for a label. -->
+    <button data-tab="look" class="on">APPEARANCE</button>
+    <!-- GEOMETRY rather than MOTION, and data-tab stays "motion" for the
+     same reason. -->
+    <button data-tab="motion">GEOMETRY</button>
+    <button data-tab="speech">SPEECH</button>
+    <button data-tab="savers">SCREENSAVER</button>
+    <button data-tab="devprof">DEVICE</button>
+    <button id="tab_account" data-tab="account">GROUPS</button>
   </div>
+
   <div class="rule"></div>
   </div><!-- /panelhead -->
 
@@ -2390,6 +2380,8 @@ button to download it as a PDF.</div>
          stacked entries because a 425px column had no room to put four
          side by side; it does now, and four buttons that behave like tabs
          should look like the tabs. -->
+    <div class="tabrow">
+    <div class="tabside">
     <div class="tabgroup">Admin settings</div>
     <div class="tabs" id="foottabs">
       <button id="tab_app" data-tab="app">APP SETTINGS</button>
@@ -2406,6 +2398,22 @@ button to download it as a PDF.</div>
       <!-- DOCUMENTATION is not here any more. It is reached from the ? beside
            the panel title, because it is not something you configure and it
            was taking a slot in a row of things that are. -->
+    </div>
+    </div>
+    <div class="tabsplit"></div>
+    <!-- What this server is wired to, and which machines are here. Beside the
+         admin tabs rather than above them: both rows are things you administer,
+         and the rule says they are different subjects. -->
+    <div class="tabside connside">
+      <div class="tabgroup">Connections</div>
+      <div class="tabs">
+        <button id="tab_ai" data-tab="ai">AI</button>
+        <!-- The register: every device this server knows about. Not in
+             UI_TABS or SETTINGS_TABS — like AI, nothing here writes the shared
+             settings document. -->
+        <button id="tab_devices" data-tab="devices">DEVICES</button>
+      </div>
+    </div>
     </div>
   </div>
 </div>
