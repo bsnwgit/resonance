@@ -2258,7 +2258,6 @@ button to download it as a PDF.</div>
   <div id="uirow_look" class="uirow" data-uitab="look"></div>
   <div id="uirow_motion" class="uirow" data-uitab="motion"></div>
   <div id="uirow_speech" class="uirow" data-uitab="speech"></div>
-  <div id="uirow_app" class="uirow" data-uitab="app"></div>
 
   <div id="airow">
     <div class="note" id="rtlistnote"></div>
@@ -2282,7 +2281,7 @@ button to download it as a PDF.</div>
     <div class="note" id="appnote"></div>
     <div class="pending" id="apppending" hidden></div>
     <div class="seg actrow">
-      <button id="b_appsave" class="act-save">SAVE APP SETTINGS</button>
+      <button id="b_appsave" class="act-save">SAVE</button>
       <button id="b_apprevert" class="act-undo">REVERT</button>
     </div>
   </div>
@@ -2938,7 +2937,7 @@ function status(m, bad, tab){
    live on it now: the tab also has SAVE APP SETTINGS, and the two are not
    interchangeable — one publishes what every viewer sees, the other rewires
    the server. Two documents, two buttons, each saying which it writes. */
-const UI_TABS = ['look', 'motion', 'speech', 'app'];
+const UI_TABS = ['look', 'motion', 'speech'];
 function paintUiRows(){
   UI_TABS.forEach(t=>{
     const row = $('uirow_' + t);
@@ -3139,6 +3138,10 @@ $('b_apprevert').addEventListener('click', async ()=>{
   note.className = 'note';
   note.textContent = 'reloading from the server…';
   await loadApp();
+  // …and the shared half of this tab, for the same reason SAVE writes it.
+  // revertTab puts back only the keys belonging to this tab, so an edit in
+  // flight on APPEARANCE or SPEECH is left alone.
+  await revertTab('app');
   if (!note.classList.contains('bad')) note.textContent = 'back to what is saved';
 });
 
@@ -3166,6 +3169,17 @@ $('b_appsave').addEventListener('click', async ()=>{
   body.auth = segValue('ap_auth');
   try{
     const j = await api('/app', {method:'POST', body: JSON.stringify(body)});
+    /* This tab holds one topic — the speaker labels — that belongs to the
+       SHARED document rather than to app.json. It used to get a SAVE FOR
+       EVERYONE of its own, which left two commit rows on one tab and no way
+       to tell from the buttons which half you were writing. One SAVE writes
+       both, because "save what is on this tab" is what somebody pressing it
+       means. Merged, not replaced: another tab's unsaved edits are not this
+       button's business. */
+    const shared = tabKeys('app');
+    if (Object.keys(shared).length)
+      await api('/settings', {method:'POST',
+                              body: JSON.stringify({settings: shared, merge: true})});
     note.textContent = (j.pending && j.pending.length)
       ? 'saved — a restart is needed, see below'
       : 'saved — nothing here differs from what is running';
@@ -6238,7 +6252,7 @@ function panelNav(){
      about. Nothing on the AI tab writes the shared document now, so
      SAVE FOR EVERYONE there would be a button that saves nothing on the tab
      it is sitting on. Each endpoint saves itself, from inside its block. */
-  const SETTINGS_TABS = new Set(['look', 'motion', 'speech', 'app']);
+  const SETTINGS_TABS = new Set(['look', 'motion', 'speech']);
   function syncSaveRow(){
     const show = SETTINGS_TABS.has(tab) ? '' : 'none';
     UI_TABS.forEach(t=>{
