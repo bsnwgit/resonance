@@ -2653,9 +2653,23 @@ const Play = {
     }
   },
 
+  /* Every utterance builds its own analyser and source and wires them to the
+     context destination, and that context is shared for the life of the page.
+     A node left connected is held alive by the audio graph rather than by the
+     reference the next utterance overwrites — so without this, a screen that
+     is never reloaded accumulates one live analyser per reply for as long as
+     it is up. Both exits release: finishUp is the natural end, stop is the
+     interrupted one, and stop clears onended so the two never both run. */
+  _release(){
+    if (this.src){ try { this.src.disconnect(); } catch(e){} }
+    if (this.an){ try { this.an.disconnect(); } catch(e){} }
+    this.src = null; this.an = null;
+  },
+
   finishUp(){
     this.playing = false;
     Drive.extLevel = null;
+    this._release();
     if (this.body) this.body.textContent = this.full;
     if (this.caret) this.caret.remove();
     const d = this.onDone; this.onDone = null;
@@ -2664,7 +2678,8 @@ const Play = {
 
   stop(){
     if (this.src){ try { this.src.onended = null; this.src.stop(); } catch(e){} }
-    this.src = null; this.an = null; this.playing = false;
+    this._release();
+    this.playing = false;
     Drive.extLevel = null;
   }
 };
@@ -2868,6 +2883,12 @@ function ev(s){
   note(evLog.join('  →  '));
 }
 
+/* convo is capped for the model; this caps what the browser holds on to. A tab
+   on a wall is never reloaded, so an uncapped transcript is a DOM that only
+   grows — generous enough that scrolling back still feels unbounded to
+   somebody sitting at a desk. */
+const LOG_MAX = 200;
+
 function addMsg(who, text){
   const el = document.createElement('div');
   el.className = 'msg ' + who;
@@ -2879,6 +2900,7 @@ function addMsg(who, text){
   el.querySelector('.who').textContent = speakerName(who, el.dataset.route);
   el.querySelector('.body').textContent = text;
   logEl.appendChild(el);
+  while (logEl.childElementCount > LOG_MAX) logEl.removeChild(logEl.firstElementChild);
   followLive = true;
   logEl.scrollTop = logEl.scrollHeight;
   return el.querySelector('.body');
@@ -3124,9 +3146,14 @@ async function selfTest(){
                (reply.trim().length > 60 ? '…' : '') + '"'
              : 'nothing'));
 
-  const before = document.querySelectorAll('.msg').length;
+  /* Identity rather than count: the transcript is capped, so once it is full a
+     new line replaces an old one and the total never moves. Counting here
+     would report a working reply as a failure on any display that had been up
+     long enough to reach the cap. */
+  const lastMsg = ()=>{ const m = document.querySelectorAll('.msg'); return m[m.length-1] || null; };
+  const before = lastMsg();
   respond(reply);
-  say(document.querySelectorAll('.msg').length > before, 'reply rendered and spoken');
+  say(lastMsg() !== before, 'reply rendered and spoken');
 
   lines.push(lines.some(l=>l.startsWith('  FAIL')) ? '\nsomething above needs fixing.'
                                                    : '\nall green.');
