@@ -35,7 +35,7 @@ At the top:
 - **filter settings** — type to search across every topic in every tab at
   once. This is the fastest way to find a control when you know roughly what
   it is called but not which tab it lives under.
-- **APPEARANCE / MOTION / SPEECH**, **AI** and **DEVICES** — the user interface row.
+- **APPEARANCE / GEOMETRY / SPEECH**, **AI** and **DEVICES** — the user interface row.
   The first three edit the shared interface. AI holds the endpoints, each of
   which saves itself. DEVICES is where a single screen's own settings live and
   carries nothing yet.
@@ -66,7 +66,7 @@ nothing for anybody else. The state is yours until you commit it.
 
 ### Every part of the panel commits itself
 
-There is no single save button. **APPEARANCE, MOTION and SPEECH each have their own
+There is no single save button. **APPEARANCE, GEOMETRY and SPEECH each have their own
 SAVE FOR EVERYONE and REVERT**, at the foot of that tab, writing only the
 settings on that tab.
 
@@ -78,12 +78,12 @@ seven and keeps its own arrangement: SAVE at the left, and the destructive
 actions held apart at the right.
 
 That is not decoration. There used to be one button for all three, which meant
-pressing it while looking at MOTION also published whatever had been left
+pressing it while looking at GEOMETRY also published whatever had been left
 half-adjusted on APPEARANCE — a save whose scope was wider than the thing in front
 of you, and no way to tell from the screen. Each row now says what it covers:
 *19 settings on this tab, shared with every viewer*.
 
-The consequence worth knowing: you can leave MOTION unsaved while saving APPEARANCE,
+The consequence worth knowing: you can leave GEOMETRY unsaved while saving APPEARANCE,
 and the preview will keep showing both. Each row carries its own unsaved
 warning, in red, so the tab with work waiting behind it says so.
 
@@ -360,7 +360,7 @@ a working appearance.
 
 **PREVIEW** lays a profile over the live preview without saving it, and follows
 the controls as you change them. STOP puts the shared document back, and so
-does touching anything on APPEARANCE, MOTION or SPEECH.
+does touching anything on APPEARANCE, GEOMETRY or SPEECH.
 
 One limit worth knowing before a screen goes up: **type size tops out at
 LARGEST**, because that is the range the APPEARANCE tab offers. If that is not enough

@@ -119,7 +119,7 @@ that declared no name still reads *operator* rather than leaving the line
 attributed to nobody. A variable that is not recognised is left standing
 rather than blanked, so a typo is visible instead of silently disappearing.
 
-## MOTION
+## GEOMETRY
 
 ### Rotation
 

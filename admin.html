@@ -1194,7 +1194,10 @@
          the storage key for these settings, and renaming it would rewrite
          every stored document for a label change. -->
     <button data-tab="look"   class="on">APPEARANCE</button>
-    <button data-tab="motion">MOTION</button>
+<!-- GEOMETRY rather than MOTION. data-tab stays "motion": it is the
+         storage key these settings are saved under, and renaming it would
+         rewrite every stored document for a label. -->
+    <button data-tab="motion">GEOMETRY</button>
     <button data-tab="speech">SPEECH</button>
     <button id="tab_ai" data-tab="ai">AI</button>
     <!-- What a screen IS, as against who may use it — which is what ACCESS
@@ -1771,7 +1774,7 @@ that named it back to that, rather than to nothing.
 
 <b>PREVIEW</b> lays a profile over the preview on the right without saving it,
 and follows the controls as you change them. Pressing STOP — or touching
-anything on APPEARANCE, MOTION or SPEECH — puts the shared document back.
+anything on APPEARANCE, GEOMETRY or SPEECH — puts the shared document back.
 
 <b>Type size tops out at LARGEST</b>, which is the range the APPEARANCE tab offers.
 If that turns out not to be enough on a real wall, the range is the thing to
@@ -2070,7 +2073,7 @@ button to download it as a PDF.</div>
        to find out how to save. -->
   <!-- One commit row per tab, each writing only the settings on that tab.
        There was a single SAVE FOR EVERYONE across all of them, which meant
-       pressing it while looking at MOTION also published whatever had been
+       pressing it while looking at GEOMETRY also published whatever had been
        left half-adjusted on APPEARANCE — a save whose scope was wider than the
        thing you were looking at. -->
   <div id="uirow_look" class="uirow" data-uitab="look"></div>
@@ -2269,7 +2272,7 @@ leaveFieldsAlone();
    Two ways in, deliberately, because one of them is not enough on its own.
    The 401 catches it the moment anything is asked of the server — but a 401
    can only arrive if a request is made, and most of this panel is client
-   side. Dragging a slider, switching between APPEARANCE and MOTION, reading a
+   side. Dragging a slider, switching between APPEARANCE and GEOMETRY, reading a
    value: none of that touches the server, so a dead session stays invisible
    for as long as somebody sticks to those. That was the actual hole: the
    page had already been told nothing, so it reported nothing.
@@ -2714,7 +2717,7 @@ function dirty(key){
 /* Each tab's last word, held per tab. Kept in a map rather than read back off
    the element, because painting one row must not depend on what another row
    happens to be saying — repainting after a save on APPEARANCE was wiping the
-   message MOTION had just put up. */
+   message GEOMETRY had just put up. */
 const SAID = {};
 function status(m, bad, tab){
   const t = tab || CURRENT_TAB;
@@ -3807,7 +3810,7 @@ function paintBlocks(keepOpen){
   have.forEach(g=>{ if (!kept.has(g)) g.remove(); });
   /* Put them in the server's order, and measure that against the OTHER AI
      blocks rather than against every section in the panel — the blocks share
-     a parent with APPEARANCE, MOTION and SPEECH, so positioning by absolute sibling
+     a parent with APPEARANCE, GEOMETRY and SPEECH, so positioning by absolute sibling
      lifted the first endpoint above sections belonging to other tabs.
 
      Skipped entirely while something inside one is focused: re-inserting an
