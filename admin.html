@@ -3391,8 +3391,6 @@ never spoken and never matched against.</div>
   </div>
   <label class="bklab" data-r="grouplab">Groups</label>
   <div class="cks" data-r="groups"></div>
-  <label class="bklab" data-r="onelab">One at a time</label>
-  <div class="cks" data-r="displays"></div>
   <div class="note" data-r="whonote"></div>
   <div class="note help">Two reasons to restrict one. <b>A room with several
 microphones in it</b> — one person addresses the wall screen and every other
@@ -3776,7 +3774,10 @@ function blockPaint(blk, r){
    arrived a minute ago is there to tick. */
 function blockFillWho(blk, r){
   const box = R(blk, 'displays'), gbox = R(blk, 'groups');
-  if (!box) return;
+  // Groups are filled here as well, so this must not give up when the
+  // per-display box is absent — it is, now that restricting one device at a
+  // time has gone and a grant is made to a group.
+  if (!box && !gbox) return;
   const want = r.displays || [], wantG = r.groups || [];
   // Never rebuilt under somebody's cursor — replacing the nodes would drop
   // the tick they were in the middle of making.
@@ -3804,6 +3805,7 @@ function blockFillWho(blk, r){
         gbox.appendChild(em);
       }
     }
+    if (box){
     box.innerHTML = '';
     DISPLAYS.forEach(d=>{
       const lab = document.createElement('label');
@@ -3820,6 +3822,7 @@ function blockFillWho(blk, r){
       em.textContent = 'no displays have loaded the page yet';
       box.appendChild(em);
     }
+    }
   }
   blockSyncWho(blk);
 }
@@ -3830,7 +3833,7 @@ function blockFillWho(blk, r){
 function blockSyncWho(blk){
   const on = blk.querySelector('[data-f="restricted"] button.on');
   const restricted = !!on && on.dataset.v === '1';
-  ['groups', 'grouplab', 'onelab', 'displays'].forEach(n=>{
+  ['groups', 'grouplab'].forEach(n=>{
     const el = R(blk, n);
     if (el) el.style.display = restricted ? '' : 'none';
   });
@@ -3898,8 +3901,12 @@ function blockCollect(blk){
   /* Sent whether or not the switch is on, so turning it off and on again
      brings back the displays that were ticked rather than an empty list
      somebody has to fill in twice. */
-  body.displays = [...blk.querySelectorAll('[data-r="displays"] input:checked')]
-                    .map(cb=> cb.dataset.d);
+  /* Only where the control exists. Sending an empty list from a panel that no
+     longer has the box would wipe every per-device grant a route was already
+     carrying; omitting the field leaves the server's copy alone. */
+  const dbox = blk.querySelector('[data-r="displays"]');
+  if (dbox)
+    body.displays = [...dbox.querySelectorAll('input:checked')].map(cb=> cb.dataset.d);
   body.groups = [...blk.querySelectorAll('[data-r="groups"] input:checked')]
                   .map(cb=> cb.dataset.g);
   const ft = F(blk, 'fallthrough');
