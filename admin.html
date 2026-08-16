@@ -990,6 +990,9 @@
   .grp.shut h4::before{transform:rotate(0deg)}
   .grp.shut .grpbody{display:none}
   .grpbody{padding-bottom:4px}
+  /* No title, so the ? has nothing to sit beside — give it a line. */
+  .barehead{display:flex;justify-content:flex-end;margin:2px 0 4px}
+  .grp.bare{border-top:0;padding-top:2px}
   .seg{display:flex;flex-wrap:wrap;gap:4px}
   /* Committing a block — CREATE, SAVE, REVERT — in the corner every dialog
      puts its commit in. Last and hard right, so it reads as the end of the
@@ -1981,8 +1984,11 @@ nothing but that id.</div>
        a register, read when somebody asks what is out there. Three rows that
        need attention buried among fifty that do not is how a request sits
        unanswered for a week. -->
-  <section class="grp" data-tab="devices">
-    <h4>Devices</h4>
+  <!-- BARE: the tab is already called DEVICES, and a section titled Devices
+       inside it says the same word twice. A bare section has no heading, never
+       collapses — there is nothing to collapse it behind — and gets its ? on a
+       thin row of its own. -->
+  <section class="grp bare" data-tab="devices">
     <div class="grpbody">
   <div id="connlist"></div>
   <div class="note" id="connnote"></div>
@@ -2230,7 +2236,15 @@ let ready = false;             // has the preview announced itself?
    `display:none` body and the button looks broken. */
 function buildHelp(){
   document.querySelectorAll('#panel .grp').forEach(g=>{
-    const h4 = g.querySelector('h4');
+    /* A bare section has no heading to hang the ? on, so it gets a thin row of
+       its own rather than losing its help — the prose is only reachable behind
+       that button, so no button would mean no help at all. */
+    let h4 = g.querySelector('h4');
+    if (!h4 && g.classList.contains('bare') && g.querySelector('.note.help')){
+      h4 = document.createElement('div');
+      h4.className = 'barehead';
+      g.insertBefore(h4, g.firstChild);
+    }
     if (!h4 || h4.querySelector('.helpbtn')) return;
     if (!g.querySelector('.note.help')) return;
     const b = document.createElement('button');
@@ -2242,7 +2256,7 @@ function buildHelp(){
     b.addEventListener('click', e=>{
       e.stopPropagation();
       const showing = !g.classList.contains('helpon');
-      if (showing && g.classList.contains('shut')) h4.click();
+      if (showing && g.classList.contains('shut') && h4.tagName === 'H4') h4.click();
       g.classList.toggle('helpon', showing);
       // kept off the class, which the filter overwrites while it is running
       g.dataset.help = showing ? '1' : '';
@@ -5844,7 +5858,8 @@ function panelNav(){
     groups.forEach(g=>{
       const show = q ? g.textContent.toLowerCase().includes(q) : g.dataset.tab === tab;
       g.hidden = !show;
-      g.classList.toggle('shut', q ? false : !!shut.get(g));
+      g.classList.toggle('shut',
+        q ? false : (!g.classList.contains('bare') && !!shut.get(g)));
       /* The filter searches a section's whole text, and since help moved
          behind the ? that text includes words nobody can see. A section
          matching only on hidden prose would open looking like it had nothing
@@ -5909,7 +5924,8 @@ function panelNav(){
     CURRENT_TAB = tab;
     tabButtons.forEach(x=> x.classList.toggle('on', x === btn));
     // arriving at a tab shows its topics closed, not whatever was left open
-    groups.forEach(g=>{ if (g.dataset.tab === tab) shut.set(g, true); });
+    groups.forEach(g=>{ if (g.dataset.tab === tab && !g.classList.contains('bare'))
+                          shut.set(g, true); });
     render();
     syncSaveRow();
     $('panelscroll').scrollTop = 0;
