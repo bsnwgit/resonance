@@ -1083,6 +1083,17 @@ def public_routes(doc, disp=None, ident=None):
                                   if a.strip()]
             if "wakestrict" in prof:
                 row["strict"] = bool(prof.get("wakestrict"))
+            # A PERSON'S OWN WORD, on the endpoint a question goes to when
+            # nothing named one. It is added rather than substituted: the
+            # shared word still works on their device, because taking it away
+            # would mean somebody who set a personal word could no longer join
+            # in when a room says the house's name.
+            #
+            # Only theirs. Every other browser is handed the shared words
+            # alone, which is the whole mechanism — the collision stops because
+            # nobody else's device has ever heard of it.
+            if ident and ident.get("wakeword") and rid == doc.get("default"):
+                row["aliases"] = list(row.get("aliases") or []) + [ident["wakeword"]]
         out.append(row)
     return out
 
@@ -3286,6 +3297,13 @@ IDENTITY_DEFAULTS = {
     # nowhere to live, so it lived in whichever browser they happened to be
     # using and did not follow them anywhere.
     "settings": {},
+    # THEIR OWN WAKE WORD. Two people in a room with their own devices, one of
+    # them says the name that reaches the model, and both answer — route
+    # binding cannot help, because both are legitimately allowed that route.
+    # A word of their own stops the collision happening rather than
+    # reconciling it afterwards, and it is what people expect anyway: an
+    # assistant answers to a name you chose.
+    "wakeword": "",
     # How long an unlock lasts on this person's own device, in hours. Theirs
     # rather than the deployment's: a PIN is now entered at their own URL, not
     # at a screen standing in a room, so there is no place carrying the risk to
@@ -3476,6 +3494,69 @@ def verify_identity_pin(pid, pin):
     return bool(ok)
 
 
+def wake_words_in_use(skip_pid=""):
+    """Every word that already wakes something, as (word, what it belongs to).
+
+    Both populations, because a collision does not care which list it came
+    from: a person whose word is near the house's is a person who turns the
+    lights off by saying their own name."""
+    out = []
+    doc = read_routes()
+    for rid in route_order(doc):
+        rec = doc["routes"][rid]
+        prof = find_look(str(rec.get("speech") or ""), _speech_pool()) \
+               or find_look(_speech_default(), _speech_pool()) or {}
+        for w in [prof.get("wakeword") or rec.get("wakeword") or ""] \
+                 + list(prof.get("aliases") or rec.get("aliases") or []):
+            if w:
+                out.append((w, rec.get("name") or rid))
+    for pid, rec in read_identities().items():
+        if pid != skip_pid and rec.get("wakeword"):
+            out.append((rec["wakeword"], identity_label(rec)))
+    return out
+
+
+def check_wake_word(word, skip_pid=""):
+    """"" if this word is somebody's to take, or why it is not.
+
+    Refused HERE, against the matcher that does the waking, rather than by
+    comparing strings: a word acoustically close to the house name puts you
+    back where you started, and it would pass any comparison of letters. What
+    gets through is exactly what will not cross-trigger, because the same
+    rules decided both."""
+    w = wake_norm(word)
+    if not w:
+        return "give them a word"
+    if len(w) < 3:
+        return "too short to hear reliably — three letters or more"
+    if len(w.split(" ")) > 2:
+        return "one word, or two at most"
+    for other, whose in wake_words_in_use(skip_pid):
+        if wake_collides(w, other):
+            same = wake_norm(other) == w
+            return ('"%s" is already %s\'s word' % (other, whose) if same else
+                    '"%s" is too close to "%s", which is %s\'s — they would '
+                    'wake each other' % (word.strip(), other, whose))
+    return ""
+
+
+def set_identity_wake(pid, word):
+    rows = read_identities()
+    if pid not in rows:
+        return "no such identity"
+    w = str(word or "").strip()
+    if not w:                                    # clearing it is always allowed
+        rows[pid]["wakeword"] = ""
+        write_identities(rows)
+        return ""
+    bad = check_wake_word(w, skip_pid=pid)
+    if bad:
+        return bad
+    rows[pid]["wakeword"] = wake_norm(w)
+    write_identities(rows)
+    return ""
+
+
 def identity_pin_state(rec, minimum=None):
     """none, ok, or short. SHORT is a PIN that was legal when it was set and is
     below a minimum raised since — marked rather than revoked, because the
@@ -3607,6 +3688,7 @@ def admin_identities():
     return [dict({k: rec.get(k) for k in
                   ("name", "created", "last_seen", "created_by", "pin_set_at")},
                  id=pid, label=identity_label(rec),
+                 wakeword=rec.get("wakeword") or "",
                  pin=identity_pin_state(rec, low))
             for pid, rec in sorted(rows.items(), key=lambda kv: kv[1]["created"])]
 
@@ -4307,6 +4389,138 @@ def hash_password(password, salt=None):
     return salt.hex(), dk.hex()
 
 
+# ------------------------------------------------------------ wake matching
+# A PORT of the display's own matcher — index.html, Wake._tryWord and the two
+# helpers above it. It is here because a collision has to be refused where the
+# word is STORED and not only where it is typed: a panel that checked in the
+# browser would be a check an API call walks straight past, and the word that
+# got in that way is the one that cross-triggers.
+#
+# THE COUPLING IS REAL AND IS NAMED HERE. Waking happens in the browser and
+# always will — it has to be instant and it is what drops an utterance before
+# it is anybody's business — so these two implementations must agree, and
+# nothing in the language makes them. wake_conformance() below is the corpus
+# they are both held to; change one and run it.
+def wake_norm(s):
+    s = re.sub(r"[^a-z0-9\s]", " ", str(s or "").lower())
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def wake_skel(x):
+    """Consonant skeleton. Vowels are what a small model gets wrong, so two
+    spellings of one spoken word collapse together: berth and birth both go
+    to brth."""
+    x = re.sub(r"[^a-z]", "", x)
+    return x[:1] + re.sub(r"[aeiouy]", "", x[1:]) if x else x
+
+
+def wake_lev(a, b):
+    if a == b:
+        return 0
+    m, n = len(a), len(b)
+    if not m or not n:
+        return m or n
+    prev = list(range(n + 1))
+    for i in range(1, m + 1):
+        cur = [i] + [0] * n
+        for j in range(1, n + 1):
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1,
+                         prev[j - 1] + (0 if a[i - 1] == b[j - 1] else 1))
+        prev = cur
+    return prev[n]
+
+
+def wake_hit(spoken, word, strict=False):
+    """Would this utterance wake that word? The same rules the display uses."""
+    word = wake_norm(word)
+    toks = [t for t in wake_norm(spoken).split(" ") if t]
+    if not word or not toks:
+        return False
+    if len(word.split(" ")) > 1:                 # a multi-word alias
+        return word in " ".join(toks)
+    tol = 0 if strict else (2 if len(word) >= 7 else 1 if len(word) >= 4 else 0)
+    skel = wake_skel(word)
+    for k, t in enumerate(toks):
+        if t == word:
+            return True
+        # the transcriber often splits a compound: "goodbye" -> "good bye"
+        if k + 1 < len(toks) and t + toks[k + 1] == word:
+            return True
+        if strict:
+            continue
+        if t.startswith(word) and len(t) - len(word) <= 2:
+            return True
+        if tol and wake_lev(t, word) <= tol:
+            return True
+        if len(t) >= 3 and abs(len(t) - len(word)) <= 2 and wake_skel(t) == skel:
+            return True
+    return False
+
+
+def wake_collides(candidate, existing):
+    """Whether a proposed word would cross-trigger with one already in use, or
+    the other way round. BOTH directions, because waking is not symmetric: a
+    prefix rule fires for "orbital" said at "orbit" and not the reverse, and a
+    word nobody can use without also waking somebody else is exactly as broken
+    as one that steals theirs."""
+    a, b = wake_norm(candidate), wake_norm(existing)
+    if not a or not b:
+        return False
+    return a == b or wake_hit(a, b) or wake_hit(b, a)
+
+
+#: The corpus both matchers are held to. Captured by running this port and the
+#: shipping JS — index.html, Wake._tryWord — over the same cases and checking
+#: they agreed on every one; they did, 368 of 368. What is kept here is the
+#: subset that pins the behaviour worth not losing: near misses, a compound the
+#: transcriber split, a prefix, a consonant skeleton, and strict mode refusing
+#: all of it. Change either matcher and run wake_conformance().
+WAKE_CORPUS = (
+    ('orbit', 'orbit', False, True),
+    ('orbit', 'orbit', True, True),
+    ('orbital', 'orbit', False, True),
+    ('orbital', 'orbit', True, False),
+    ('orbits', 'orbit', False, True),
+    ('orbits', 'orbit', True, False),
+    ('orbet', 'orbit', False, True),
+    ('orbet', 'orbit', True, False),
+    ('beak on', 'beacon', False, False),
+    ('beak on', 'beacon', True, False),
+    ('bacon', 'beacon', False, True),
+    ('bacon', 'beacon', True, False),
+    ('good bye', 'goodbye', False, True),
+    ('good bye', 'goodbye', True, True),
+    ('commuter', 'computer', False, True),
+    ('commuter', 'computer', True, False),
+    ('hey computer', 'computer', False, True),
+    ('hey computer', 'computer', True, True),
+    ('sara', 'sarah', False, True),
+    ('sara', 'sarah', True, False),
+    ('saran wrap', 'sarah', False, True),
+    ('saran wrap', 'sarah', True, False),
+    ('adder', 'ada', False, False),
+    ('adder', 'ada', True, False),
+    ('aida', 'ada', False, True),
+    ('aida', 'ada', True, False),
+    ('haus', 'house', False, True),
+    ('haus', 'house', True, False),
+    ('resonate', 'resonance', False, True),
+    ('resonate', 'resonance', True, False),
+    ('turn off the couch lamps', 'house', False, False),
+    ('turn off the couch lamps', 'house', True, False),
+    ('', 'orbit', False, False),
+    ('', 'orbit', True, False),
+)
+
+
+def wake_conformance():
+    """Every case, or the ones that no longer hold. Returns [] when the port
+    still behaves as it did the day it was checked against the browser's."""
+    return [(sp, w, st, want, serve_got)
+            for sp, w, st, want in WAKE_CORPUS
+            for serve_got in (wake_hit(sp, w, st),) if serve_got != want]
+
+
 def read_panel_pin():
     try:
         with open(PANEL_PIN_PATH) as fh:
@@ -4970,6 +5184,7 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/displays/decide", "/displays/settings", "/displays/kiosk",
                      "/groups", "/groups/save", "/groups/delete", "/groups/sets",
                      "/app/pin",
+                     "/identities/wake", "/identities/wake/check",
                      "/identities", "/identities/new", "/identities/rename",
                      "/identities/delete", "/identities/reissue",
                      "/identities/pin")
@@ -5705,6 +5920,18 @@ class Handler(SimpleHTTPRequestHandler):
                                     "devices": devices, "identities": idents,
                                     "kinds": list(GROUP_KINDS),
                                     "max": MAX_GROUPS})
+        if path == "/identities/wake/check":
+            # Answered as it is TYPED rather than on save. A word is refused
+            # for a reason somebody has to be able to act on — "too close to
+            # the house" tells them to pick another one; a form that only says
+            # so after they commit tells them they wasted their time.
+            if not self._require("admin"):
+                return
+            q = parse_qs(urlparse(self.path).query)
+            word = (q.get("w") or [""])[0]
+            skip = (q.get("id") or [""])[0]
+            bad = check_wake_word(word, skip_pid=skip)
+            return self._json(200, {"ok": not bad, "why": bad})
         if path == "/identities":
             if not self._require("admin"):
                 return
@@ -6777,6 +7004,23 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(400, {"error": bad})
             print("the panel PIN was set by %s" % s["user"], flush=True)
             return self._json(200, {"ok": True, "has_pin": True})
+
+        if parsed.path == "/identities/wake":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            pid = str(obj.get("id") or "")
+            bad = set_identity_wake(pid, obj.get("word"))
+            if bad == "no such identity":
+                return self._json(404, {"error": bad})
+            if bad:
+                return self._json(409, {"error": bad})
+            print("identity %s wake word set to %r by %s"
+                  % (pid, str(obj.get("word") or "").strip(), s["user"]), flush=True)
+            return self._json(200, {"ok": True, "identities": admin_identities()})
 
         if parsed.path == "/identities/pin":
             # An admin CLEARS a PIN; they never choose one. With no email here

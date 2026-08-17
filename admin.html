@@ -5566,6 +5566,55 @@ async function refreshIdentities(){
     namerow.appendChild(del);
     row.appendChild(namerow);
 
+    /* THEIR OWN WAKE WORD. Checked as it is typed rather than on save: a
+       word is refused for a reason somebody has to act on, and a form that
+       only says so after they commit tells them they wasted their time. */
+    const wrow = document.createElement('div');
+    wrow.className = 'namerow';
+    const wlab = document.createElement('b');
+    wlab.textContent = 'Wakes to';
+    wrow.appendChild(wlab);
+    const wf = document.createElement('input');
+    wf.type = 'text'; wf.className = 'nmedit'; wf.spellcheck = false;
+    wf.value = p.wakeword || '';
+    wf.placeholder = 'shared words only';
+    wrow.appendChild(wf);
+    row.appendChild(wrow);
+    const wnote = document.createElement('div');
+    wnote.className = 'note';
+    row.appendChild(wnote);
+
+    let wtimer = 0;
+    const wcheck = ()=>{
+      clearTimeout(wtimer);
+      const w = (wf.value || '').trim();
+      if (!w){ wnote.className = 'note'; wnote.textContent = ''; return; }
+      wtimer = setTimeout(async ()=>{
+        try{
+          const j = await api('/identities/wake/check?w=' + encodeURIComponent(w)
+                              + '&id=' + encodeURIComponent(p.id));
+          wnote.className = 'note' + (j.ok ? '' : ' bad');
+          wnote.textContent = j.ok ? 'nothing else answers to that' : j.why;
+        }catch(e){ wnote.className = 'note bad'; wnote.textContent = e.message; }
+      }, 250);
+    };
+    wf.addEventListener('input', wcheck);
+    wf.onchange = async ()=>{
+      const j = await idAction('/identities/wake',
+                               {id: p.id, word: (wf.value || '').trim()});
+      if (j){
+        wnote.className = 'note';
+        wnote.textContent = (wf.value || '').trim()
+          ? 'saved — only their own devices hear it'
+          : 'cleared — the shared words again';
+        refreshIdentities();
+      }else{
+        /* idAction has put the reason in the row's own note; leave the field
+           holding what they typed so it can be edited rather than retyped. */
+        wcheck();
+      }
+    };
+
     const acts = document.createElement('div');
     acts.className = 'seg actrow';
     /* Clearing, never setting. An admin who chose somebody's PIN would know
