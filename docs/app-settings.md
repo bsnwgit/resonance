@@ -11,13 +11,13 @@ both starts lying the moment somebody changes half of it — "personal" would
 still read personal after the binding moved to every interface on the machine.
 
 They are two topics for the same reason, and they now sit on two tabs:
-**EXT Access**, under ADMIN SETTINGS, holds where the server can be reached
+**IP Address**, under ADMIN SETTINGS, holds where the server can be reached
 from; **Sign in**, under SECURITY, holds what it takes to get past the door —
 with the rest of who-gets-in, which is what that tab is about. **Sessions**
 went with it, since how long a session lasts is the same subject.
 
 The posture line — what it is reachable at and what the door is, in the words
-it actually means — stays under EXT Access, because what it warns about is
+it actually means — stays under IP Address, because what it warns about is
 exposure, and it still reports the pair whichever tab you set half of it on.
 
 Both moved topics still write `app.json`, so they still need a restart — and

@@ -304,6 +304,62 @@ def local_addresses():
     return sorted(found)
 
 
+def local_interfaces():
+    """Every IPv4 address this machine has, with the interface carrying it, as
+    [(address, interface)] — so the panel can offer *10.0.0.4 · eth0* rather
+    than a bare number nobody can place.
+
+    Read straight from the kernel with an ioctl rather than by shelling out to
+    `ip` or taking a dependency: this server has none, and one for a list of
+    addresses would be a poor first. Anything it cannot answer for falls back
+    to the addresses alone, which is what was offered before this existed."""
+    import socket
+    out, seen = [], set()
+    try:
+        import fcntl, struct
+        SIOCGIFADDR = 0x8915
+        for _, name in socket.if_nameindex():
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                packed = fcntl.ioctl(
+                    s.fileno(), SIOCGIFADDR,
+                    struct.pack("256s", name.encode()[:15]))
+                addr = socket.inet_ntoa(packed[20:24])
+            except OSError:
+                continue                 # no IPv4 on this interface
+            finally:
+                s.close()
+            if addr not in seen:
+                seen.add(addr)
+                out.append((addr, name))
+    except Exception:
+        pass
+    for addr in local_addresses():       # anything the ioctl route missed
+        if addr not in seen:
+            seen.add(addr)
+            out.append((addr, ""))
+    return out
+
+
+def net_host(vals, fallback):
+    """The address a network profile binds. Empty means ANY, which is this
+    server's own binding — a profile does not get to reach further than the
+    app it belongs to."""
+    addr = str((vals or {}).get("address") or "").strip()
+    return addr or fallback
+
+
+def port_free_anywhere(port, addrs):
+    """Free on at least one of these addresses.
+
+    Deliberately not `port_free(port, "0.0.0.0")`: the kernel refuses a
+    wildcard bind when the port is held on even one address, and the rule
+    asked for here is that ANY may be saved as long as SOMETHING can carry it.
+    Returns (ok, taken) so the caller can say which ones are spoken for."""
+    taken = [a for a in addrs if not port_free(port, a)]
+    return (len(taken) < len(addrs), taken)
+
+
 def address_bindable(addr):
     """Is this address one this machine actually has? An address that is not
     is the same failure as a taken port — it passes validation, and then the
@@ -2053,10 +2109,47 @@ def validate_display_settings(obj, current):
                                   "one stays under ADMIN SETTINGS, and it is "
                                   "the way back in when something here is "
                                   "wrong" % (r["name"], v))
-                if v in seen:
-                    return None, ("%s and %s are both on port %d"
-                                  % (seen[v], r["name"], v))
-                seen[v] = r["name"]
+                # Keyed by address AND port: two profiles on one port do not
+                # collide when they answer on different addresses, and
+                # refusing that would reject a configuration the machine can
+                # carry. ANY collides with everything on that port, because
+                # that is what ANY means.
+                akey = str(r["values"].get("address") or "").strip()
+                for k in ({(akey, v), ("", v)} if akey else
+                          {(a, v) for a in [x for x, _ in local_interfaces()]} | {("", v)}):
+                    if k in seen:
+                        return None, ("%s and %s are both on port %d%s"
+                                      % (seen[k], r["name"], v,
+                                         " on " + k[0] if k[0] else ""))
+                seen[(akey, v)] = r["name"]
+            # WHICH ADDRESS it answers on. Empty is ANY. Checked against what
+            # this machine actually has, for the same reason the binding under
+            # ADMIN SETTINGS is chosen rather than typed: an address this
+            # machine does not have is a listener that will not start.
+            addr = str(r["values"].get("address") or "").strip()
+            here = local_interfaces()
+            have = [a for a, _ in here]
+            if addr and addr not in have:
+                return None, ("%s: this machine has no address %s — pick one "
+                              "of its own, or ANY" % (r["name"], addr))
+            # …and whether the port can actually be had there, BEFORE anything
+            # is allowed to use it. A port that passes validation and fails at
+            # the next restart is a profile that looks saved and is not, found
+            # out at the worst moment.
+            for label, v in (("port", pv), ("plain HTTP port", rv)):
+                if not v:
+                    continue
+                if addr:
+                    if not port_free(v, addr):
+                        return None, ("%s: %d is already in use on %s"
+                                      % (r["name"], v, addr))
+                else:
+                    ok, taken = port_free_anywhere(v, have or [LOOPBACK])
+                    if not ok:
+                        return None, ("%s: %d is already in use on every "
+                                      "address this machine has (%s)"
+                                      % (r["name"], v, ", ".join(taken)))
+            r["values"]["address"] = addr
             r["values"]["port"] = pv
             r["values"]["redirect"] = rv
             r["values"]["shared"] = bool(r["values"].get("shared"))
@@ -4411,6 +4504,11 @@ class Handler(SimpleHTTPRequestHandler):
                                                    "is_default": r == doc["default"]}
                                                   for r in route_order(doc)],
                                     "open_default": open_default(doc),
+                                    # Offered rather than typed, and with the
+                                    # interface beside each so an address can
+                                    # be placed without going to the box.
+                                    "addresses": [{"addr": a, "iface": i}
+                                                  for a, i in local_interfaces()],
                                     "enrol_base": "%s://%s:%d/e/"
                                                   % ("https" if secure else "http", host,
                                                      secure or RUNNING.get("http_port") or 0)})
@@ -6072,14 +6170,18 @@ def main():
             _p = int(_vals.get("port"))
         except (TypeError, ValueError):
             continue
+        # The address this profile answers on, or the server's own where it
+        # says ANY. A profile does not get to reach further than the app it
+        # belongs to: bound to loopback, ANY is loopback.
+        _host = net_host(_vals, host)
         for _bind, _to in ((_p, None), (int(_vals.get("redirect") or 0), _p)):
             if not _bind:
                 continue
             try:
                 if have_tls and _to is None:
-                    start_tls(_bind, cert, key, host=host, pinned_net=_n["id"])
+                    start_tls(_bind, cert, key, host=_host, pinned_net=_n["id"])
                 else:
-                    _srv = make_server(_bind, host=host, pinned_net=_n["id"],
+                    _srv = make_server(_bind, host=_host, pinned_net=_n["id"],
                                        redirect_to=_to if have_tls else None)
                     threading.Thread(target=_srv.serve_forever,
                                      daemon=True).start()
@@ -6091,11 +6193,11 @@ def main():
                       % (_n["name"], _bind, exc), flush=True)
                 continue
             if _to is not None:
-                print("HTTP  on %s:%d  → redirects to %d" % (host, _bind, _p),
+                print("HTTP  on %s:%d  → redirects to %d" % (_host, _bind, _p),
                       flush=True)
             else:
                 print("%-5s on %s:%d  → %s%s"
-                      % ("HTTPS" if have_tls else "HTTP", host, _bind,
+                      % ("HTTPS" if have_tls else "HTTP", _host, _bind,
                          ", ".join(_doc["routes"][r]["name"] for r in _mine),
                          "  (no approval — the port is the grant)"
                          if _vals.get("open") else ""), flush=True)

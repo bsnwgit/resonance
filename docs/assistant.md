@@ -178,6 +178,24 @@ A port of this server's own, under a name: **PROFILES ▸ NETWORK**. This is
 where the app's networking lives — the only port configured under ADMIN
 SETTINGS is the admin portal's.
 
+**A profile is an address and a port**, not just a port. The picker offers the
+addresses this machine actually has, each with the interface carrying it, and
+**ANY** — every interface — which is where every profile was before this
+existed. Offered rather than typed, for the same reason the server's own
+binding is: an address this machine does not have is a listener that will not
+start, and nothing about a box you can type into would tell you so.
+
+Two profiles may share a port when they answer on different addresses, because
+the machine can carry that. ANY collides with everything on its port, which is
+what ANY means.
+
+**The port is checked before anything is allowed to use it.** Saving tries the
+port on the address chosen; on ANY it tries every address the machine has, and
+allows the save if even one can carry it — a port in use on all of them is
+refused, with the addresses named. This happens at the point of saving rather
+than at the next restart, when the fix would be editing JSON on the box by
+hand.
+
 **An endpoint belongs to exactly one network profile**, and answers there and
 nowhere else. One that names none answers on whichever profile is nominated
 **DEFAULT**, which is where they all were before this existed: an upgrade turns

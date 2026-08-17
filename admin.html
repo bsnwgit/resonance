@@ -1949,7 +1949,7 @@ it, which is why it lives beside the microphone and the voices.</div>
   </section>
 
   <section class="grp wide" data-tab="app">
-    <h4>EXT Access</h4>
+    <h4>IP Address</h4>
     <div class="grpbody">
   <div class="pending" id="posturewarn" hidden></div>
 
@@ -4797,6 +4797,7 @@ let ENROL_BASE = '';
 //: something does not shut the row you were working in.
 let OPENROW = '';
 let DPCFG = null;                // the displays document's own settings
+let DPADDRS = [];                // the addresses this machine answers on
 let DPEND = [];                  // endpoints, for the grant ticks
 let DPOPEN = '';                 // the default, if it is open to any display
 
@@ -4815,6 +4816,10 @@ async function loadDisplays(){
     DISPLAYS = j.displays || [];
     ENROL_BASE = j.enrol_base || '';
     DPCFG = j.settings || null;
+    /* What this machine actually has, for the network profiles' address
+       picker. It is not a setting — it is a fact about the box — so it rides
+       with the document rather than being stored in it. */
+    DPADDRS = j.addresses || [];
     DPEND = j.endpoints || [];
     DPOPEN = j.open_default || '';
   }catch(e){ DISPLAYS = []; }
@@ -5316,7 +5321,8 @@ function paintNetworks(list, def){
     top.appendChild(dflag);
     const retitle = ()=>{
       nmt.textContent = (n.name || '').trim() || 'unnamed profile';
-      sum.textContent = (v.port ? 'port ' + v.port : 'no port')
+      sum.textContent = (v.address || 'any') + ' · '
+                      + (v.port ? 'port ' + v.port : 'no port')
                       + (v.redirect ? ' · ' + v.redirect + ' redirects' : '')
                       + (v.shared ? ' · shared' : '')
                       + (v.open ? ' · no approval' : '');
@@ -5351,6 +5357,41 @@ function paintNetworks(list, def){
     nm.spellcheck = false; nm.placeholder = 'Reception';
     nm.oninput = ()=>{ n.name = nm.value; retitle(); };
     field('Name', nm);
+
+    /* WHICH address this port answers on. Offered rather than typed, for the
+       same reason the server's own binding is: an address this machine does
+       not have is a listener that will not start, and there is no way to know
+       that from a box you can type anything into. The interface is beside each
+       one because an address on its own is a number nobody can place —
+       10.0.0.4 means something once it says eth0 next to it.
+
+       ANY is last and is the default: it is where every profile was before
+       this existed, and a list that opened on one particular interface would
+       be this deciding something nobody asked it to. */
+    const ip = document.createElement('select');
+    ip.className = 'ppick';
+    (DPADDRS || []).forEach(a=>{
+      const o = document.createElement('option');
+      o.value = a.addr;
+      o.textContent = a.addr + (a.iface ? '  ·  ' + a.iface : '');
+      ip.appendChild(o);
+    });
+    const anyo = document.createElement('option');
+    anyo.value = ''; anyo.textContent = 'ANY  ·  every interface';
+    ip.appendChild(anyo);
+    /* An address that was chosen and has since gone — a lease that moved, an
+       interface that is down — is kept and flagged rather than silently
+       swapped for another. Being bound to nothing is worth seeing. */
+    const want = v.address || '';
+    if (want && !(DPADDRS || []).some(a=> a.addr === want)){
+      const o = document.createElement('option');
+      o.value = want;
+      o.textContent = want + '  ·  not on this machine now';
+      ip.appendChild(o);
+    }
+    ip.value = want;
+    ip.onchange = ()=>{ v.address = ip.value; retitle(); };
+    field('IP address', ip);
 
     const pt = document.createElement('input');
     pt.type = 'number'; pt.className = 'nmedit portedit';
