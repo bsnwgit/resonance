@@ -98,9 +98,6 @@ you. Whether it found anything is said directly under the field.
 Below the bar, two more rows built the same way — a boxed label, then links
 marked by colour and a rule underneath rather than by a box of their own:
 
-- **filter settings** — type to search across every topic in every tab at
-  once. This is the fastest way to find a control when you know roughly what
-  it is called but not which tab it lives under.
 - **PROFILES** — and after it **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER /
   MODELS / NETWORK / DISPLAY**. Each is a list of profiles, and the controls
   for one appear inside it when you open it. MODELS and NETWORK are the two
@@ -115,6 +112,12 @@ you administer about it:
 - **NODES** — everything currently connected, in two areas: the people you
   approved, and the devices that took a code.
 - **EMBEDS** — keys that let another application frame this interface.
+
+**SEARCH** shares that bottom row, on the right third of it. Type to search
+across every topic in every tab at once — the fastest way to find a control
+when you know roughly what it is called but not which tab it lives under. The
+red **✕** at the end empties it; a field left filtered is how somebody
+concludes the panel has lost half its settings.
 
 **Your own account is behind your name.** Click it for the box that changes
 your password. It is the one thing on this page you do to yourself, so it sits

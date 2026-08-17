@@ -319,11 +319,11 @@
      a control — it is the edge of a region, and it has to reach as far as
      the region does or it reads as an underline on the column above it
      instead of a division of the panel. */
-  #panelhead > .findrow{max-width:560px}
-  /* The tabs are not held to that measure any more. They were a column of
-     boxed controls, where a readable width is the right constraint; they are a
-     row of links behind a label now, and a menu bar that wraps onto three
-     lines at 560px is one nobody can scan. */
+  /* The tabs are not held to a readable measure. They were a column of boxed
+     controls, where a readable width is the right constraint; they are a row
+     of links behind a label now, and a menu bar that wraps onto three lines at
+     560px is one nobody can scan. The search that used to sit above them, and
+     was held to that measure, is in the foot with the other row. */
   #panelhead > .tabs{max-width:none}
   /* …but the tab row itself runs the whole width, out to the edge of the
      preview, because it now carries two groups that have to sit apart. */
@@ -338,7 +338,24 @@
      second subject: a boundary with nothing on the far side of it is a line,
      not a division. */
   .tabside{flex:2 1 0}
-  .connside{flex:0 1 auto;align-items:flex-start}
+  /* Two thirds to what the server is wired to, one third to the search. The
+     row carried one group and half a rule for a while, after the admin tabs
+     moved up into the bar; it carries two again, and the wider share goes to
+     the one you press. */
+  .connside{flex:2 1 0;align-items:flex-start}
+  .findside{flex:1 1 0;min-width:0}
+  .findside .tabs{flex-wrap:nowrap;align-items:stretch}
+  .findside #rigfind{flex:1 1 auto;min-width:0;margin-left:8px}
+  /* The only red on the row, because it is the only thing here that takes
+     something away. Not styled as a link: a ✕ that looked like the three
+     beside it would read as a fourth place to go. */
+  #b_findclear{
+    flex:0 0 auto;padding:2px 9px;cursor:pointer;
+    background:none;border:0;border-bottom:1px solid transparent;
+    font:inherit;font-size:calc(11px * var(--fs));line-height:1;
+    color:#e0716b;
+  }
+  #b_findclear:hover{color:#ff8a8a}
 
   /* The app tab's own commit row, at the foot of the box. Hidden outright
      on every other tab: a save button that belongs to settings you cannot
@@ -437,9 +454,10 @@
   #panelbar,
   #panelscroll{position:relative;z-index:1}
   /* Nothing to filter and nothing to save while no tab is open, and a field
-     offering to filter an empty page is a control wired to nothing. */
+     offering to filter an empty page is a control wired to nothing. The links
+     beside it stay: they are how you leave. */
   #panel.home #grpbox,
-  #panel.home #panelhead .findrow{display:none}
+  #panel.home .findside{display:none}
   /* A register is a table, not a settings column. Where the box tiles its
      topics into 300px columns, this one takes the full width of them — rows
      that read across need the room, and a device row has four things on it
@@ -1771,9 +1789,6 @@
   <!-- Wrapped so the header keeps a readable measure while the topics below
        take the full width of a wide panel. -->
   <div id="panelhead">
-  <div class="findrow">
-    <input id="rigfind" type="search" placeholder="filter settings…" spellcheck="false">
-  </div>
 
   <!-- The two rows configure different things at different scopes: what
        every viewer sees, and how the server itself is run. Saying so is
@@ -3258,6 +3273,23 @@ key inside an example sends you to a line that cannot answer you.</div>
              wired to — rather than something you administer about the server
              itself. -->
         <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
+      </div>
+    </div>
+    <!-- The search, down here rather than over the topics. It looks for a
+         control across every tab at once, which makes it the same kind of
+         thing as the links beside it — a way of getting somewhere — rather
+         than a setting at the head of the page you are already on. Two thirds
+         to the links and one third to this. -->
+    <div class="tabside findside">
+      <div class="tabs">
+        <span class="tablabel">SEARCH</span>
+        <input id="rigfind" type="search" placeholder="filter settings…"
+               spellcheck="false" autocomplete="off">
+        <!-- Red, and the only red in the row: it takes something away. A field
+             with text in it and no way out but selecting and deleting is one
+             people leave filtered and then report as the panel having lost
+             half its settings. -->
+        <button id="b_findclear" type="button" title="clear the search">✕</button>
       </div>
     </div>
     </div>
@@ -8818,6 +8850,16 @@ function panelNav(){
   // the commit row depends on the filter as well as the tab, so both paths
   // have to re-run it
   findEl.addEventListener('input', ()=>{ render(); syncSaveRow(); });
+  /* Empties the field and repaints through the same two calls the typing does,
+     rather than dispatching a synthetic input event — one path, and it cannot
+     drift from the one beside it. */
+  const fclear = $('b_findclear');
+  if (fclear) fclear.addEventListener('click', ()=>{
+    findEl.value = '';
+    render();
+    syncSaveRow();
+    findEl.focus();
+  });
   render();
   syncSaveRow();
   enterHome();
