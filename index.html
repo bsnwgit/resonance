@@ -367,6 +367,14 @@
   }
   #pingo:hover,
   #enrolgo:hover{border-color:rgba(var(--glass),.75)}
+  /* Quieter than the thing it sits beside: leaving is the lesser of the two
+     answers, not the one being recommended. */
+  #pinskip{
+    font:inherit;font-size:calc(10px * var(--fs));letter-spacing:.18em;
+    padding:8px 12px;cursor:pointer;background:none;
+    color:rgba(var(--paper),.55);border:1px solid transparent;
+  }
+  #pinskip:hover{color:rgba(var(--paper),.85)}
   #enrolgo[disabled]{opacity:.5;cursor:default}
   #enrolnote{
     font-size:calc(9.5px * var(--fs));line-height:1.6;
@@ -634,6 +642,8 @@
                autocomplete="one-time-code" maxlength="32"
                placeholder="······" aria-label="your PIN">
         <button id="pingo" type="button">UNLOCK</button>
+        <!-- Only where a PIN is being OFFERED, never where one is owed. -->
+        <button id="pinskip" type="button">NOT NOW</button>
       </div>
       <div id="pinnote">Your PIN keeps what this screen remembers about you, so
 it follows you to any machine you open your URL on.</div>
@@ -815,20 +825,30 @@ if (ENROL && window.history && history.replaceState)
    `?person=` is the one word the server sends back after spending a minted
    URL, read once and taken straight out of the address bar — the outcome of a
    thing that happened once has no business surviving a reload. */
+/* Waved away for this page only. Not stored: somebody who says NOT NOW on a
+   borrowed machine has not decided anything about the next one, and a server
+   that remembered it would be keeping a preference for a person who declined
+   to have preferences kept. */
+let PIN_DISMISSED = false;
 const PERSON_ARRIVED = (new URLSearchParams(location.search).get('person') || '')
   .replace(/[^a-z]/g, '').slice(0, 12);
 if (PERSON_ARRIVED && window.history && history.replaceState)
   history.replaceState(null, '', location.pathname);
 
 const Person = {
-  id: '', name: '', pin: '', blocked: false,
+  id: '', name: '', pin: '', blocked: false, conform: false, min: 6,
   is(){ return !!this.id; },
   open(){ return this.pin === 'open'; },
+  /* Setting one is offered where there is none, and REQUIRED where the one
+     they have is below a minimum raised since they chose it. */
+  setting(){ return this.is() && (this.pin === 'none' || this.conform); },
   take(p){
     this.id = p.id || '';
     this.name = p.name || '';
     this.pin = p.pin || 'none';
     this.blocked = !!p.blocked;
+    this.conform = !!p.conform;
+    this.min = p.pin_min || 6;
     /* Their own settings win over whatever this browser had. That is the
        whole point of the tier: the machine's copy is a local habit, theirs is
        the thing that follows them. */
@@ -836,6 +856,36 @@ const Person = {
     paintPin();
   },
 };
+
+async function setPin(){
+  const el = $('pincode'), note = $('pinnote');
+  const pin = (el.value || '').trim();
+  if (!pin) return;
+  note.className = '';
+  note.textContent = 'saving…';
+  try{
+    const r = await fetch('person/pin', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({pin}),
+    });
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok){
+      el.value = '';
+      note.className = 'bad';
+      note.textContent = j.error || 'that did not work';
+      return;
+    }
+    el.value = '';
+    Person.pin = 'open';
+    Person.conform = false;
+    if (j.settings) Prefs.adopt(j.settings);
+    paintPin();
+    applyPrefs();
+  }catch(e){
+    note.className = 'bad';
+    note.textContent = 'could not reach the server';
+  }
+}
 
 function paintPin(){
   const locked = Person.is() && Person.pin === 'locked';
@@ -845,9 +895,31 @@ function paintPin(){
      as though they had never clicked it. */
   const failed = !Person.is()
                  && (PERSON_ARRIVED === 'bad' || PERSON_ARRIVED === 'isdevice');
-  document.body.toggleAttribute('data-pin', locked || failed);
+  const setting = Person.setting() && !PIN_DISMISSED;
+  document.body.toggleAttribute('data-pin', locked || failed || setting);
   const head = $('pinhead'), row = $('pinrow'), note = $('pinnote');
-  if (row) row.style.display = locked ? '' : 'none';
+  const go = $('pingo'), skip = $('pinskip');
+  if (row) row.style.display = (locked || setting) ? '' : 'none';
+  if (go) go.textContent = setting ? 'SET IT' : 'UNLOCK';
+  /* Offered where there is no PIN, and not where one is owed: a minimum that
+     can be waved away is a minimum that only ever applied to people who set a
+     PIN after it changed. */
+  if (skip) skip.style.display = (setting && !Person.conform) ? '' : 'none';
+  if (setting){
+    if (head) head.textContent = Person.conform
+      ? 'Your PIN is shorter than this server now asks for'
+      : 'Keep your settings across machines?';
+    if (note){
+      note.className = '';
+      note.textContent = Person.conform
+        ? 'Choose a new one of at least ' + Person.min + ' digits to carry on.'
+        : 'Choose a PIN of at least ' + Person.min + ' digits and what this '
+          + 'screen remembers about you follows you to any machine you open '
+          + 'your URL on. You can leave it — without one, your settings stay '
+          + 'in this browser.';
+    }
+    return;
+  }
   if (!(locked || failed)) return;
   if (failed){
     if (head) head.textContent = PERSON_ARRIVED === 'isdevice'
@@ -5040,8 +5112,12 @@ function announcePreview(){
 }
 
 on('reqsend', 'click', sendRequest);
-on('pingo', 'click', unlockPin);
-on('pincode', 'keydown', e=>{ if (e.key === 'Enter') unlockPin(); });
+/* One control, two jobs, and the state decides which — the box is the same
+   box and the difference is whether there is a PIN behind it yet. */
+const pinGo = ()=> (Person.setting() ? setPin() : unlockPin());
+on('pingo', 'click', pinGo);
+on('pincode', 'keydown', e=>{ if (e.key === 'Enter') pinGo(); });
+on('pinskip', 'click', ()=>{ PIN_DISMISSED = true; paintPin(); });
 on('enrolgo', 'click', useCode);
 on('enrolcode', 'keydown', e=>{ if (e.key === 'Enter') useCode(); });
 /* Typed off another screen, so it arrives with whatever spacing and case the

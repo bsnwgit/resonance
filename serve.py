@@ -6298,9 +6298,16 @@ class Handler(SimpleHTTPRequestHandler):
                     # from the server rather than from localStorage.
                     pin = ("open" if open_for == who["id"]
                            else "locked" if who.get("pin_hash") else "none")
-                    out = {"id": who["id"], "name": who["name"], "pin": pin}
+                    low = display_settings()["pin_min"]
+                    out = {"id": who["id"], "name": who["name"], "pin": pin,
+                           "pin_min": low}
                     if pin == "open":
                         out["settings"] = identity_settings(who["id"])
+                        # A PIN that was legal when it was set and is below a
+                        # minimum raised since. Marked rather than revoked:
+                        # they still have to be able to unlock in order to
+                        # change it, and this is what says the change is owed.
+                        out["conform"] = identity_pin_state(who, low) == "short"
                     elif pin == "locked":
                         # Said plainly rather than left for a failed unlock to
                         # reveal: somebody who is locked out should stop, not
@@ -6584,6 +6591,57 @@ class Handler(SimpleHTTPRequestHandler):
             hours = identity_hours(rec)
             token = open_pin_session(pid, hours)
             print("identity %s unlocked for %dh" % (pid, hours), flush=True)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self._set_pin_cookie(token, hours)
+            body = json.dumps({"ok": True, "hours": hours,
+                               "settings": identity_settings(pid)}).encode()
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if parsed.path == "/person/pin":
+            # A person choosing their OWN PIN. An admin never sets one — they
+            # clear it, and this is the other half of that: the only way a PIN
+            # comes to exist.
+            #
+            # Two doors, and which one applies is whether there is a PIN
+            # already. With none, the URL is the credential and holding it is
+            # the whole claim. With one, the OLD PIN authenticates the change —
+            # which means an unlocked session, because that is what having
+            # entered it looks like a moment later. Anything else would let
+            # somebody who found an open browser change the lock on it.
+            if self.admin_port:
+                return self._json(404, {"error": "not found"})
+            if not self._same_origin():
+                return self._json(403, {"error": "cross-origin request refused"})
+            if not isinstance(self.connection, ssl.SSLSocket) \
+               and exposed(read_app()):
+                return self._json(400, {"error": "a PIN needs a secure "
+                                                 "connection"})
+            who = self._identity()
+            if not who:
+                return self._json(401, {"error": "open your own URL first"})
+            obj = self._json_body()
+            if obj is None:
+                return
+            pid = who["id"]
+            has = bool(read_identities()[pid].get("pin_hash"))
+            if has and self._pin_pid() != pid:
+                return self._json(401, {"error": "enter your current PIN first"})
+            low = display_settings()["pin_min"]
+            bad = set_identity_pin(pid, obj.get("pin"), low)
+            if bad:
+                return self._json(400, {"error": bad})
+            # set_identity_pin ended every session this person had, including
+            # this browser's — a PIN changing hands closes the doors the old
+            # one opened. So a fresh one is issued here, or somebody would set
+            # a PIN and be asked for it in the same breath.
+            hours = identity_hours(read_identities()[pid])
+            token = open_pin_session(pid, hours)
+            print("identity %s %s its PIN" % (pid, "changed" if has else "set"),
+                  flush=True)
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self._set_pin_cookie(token, hours)
