@@ -65,7 +65,7 @@ Below it:
 - **filter settings** — type to search across every topic in every tab at
   once. This is the fastest way to find a control when you know roughly what
   it is called but not which tab it lives under.
-- **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER / GROUPS / MODELS / NETWORK /
+- **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER / MODELS / NETWORK /
   DISPLAY** — the profile settings group. Each is a list of profiles, and the
   controls for one appear inside it when you open it. MODELS and NETWORK are
   the two halves of an endpoint that are not the endpoint: what it speaks to,
@@ -224,20 +224,25 @@ the building rather than like nothing. It is stored by name rather than being
 "the first in the list", so reordering the panel cannot quietly change what
 every unconfigured screen is doing.
 
-**Devices is one register, and it used to be two.** The split — a queue of
-things wanting a decision, and a list of things simply working — was there so
-that three rows needing attention were not buried among fifty that did not.
-What actually carried that is the ordering, and the ordering survived the
-merge: anything waiting sorts to the top by how much it wants attention, and
-everything working follows by what was heard from most recently.
+**One register became four lists, and every row is in exactly one.** Which one
+is two questions: is this thing working, and is it a person or a machine.
 
-What the split cost was somewhere to look. A device you had just plugged in was
-in one list or the other depending on whether it had been approved yet, which
-is precisely the moment you are hunting for it. Now it appears under Devices
-either way.
+A row that has not finished arriving is a job somebody has to do; a row that is
+working is a thing they look up. Those are not the same page, and neither is a
+person who filled in a form the same as a screen an admin minted a code for.
+The two populations arrive by different routes with different buttons, and
+neither wants to read the other's queue while doing it.
 
-**There are two ways one gets into the list**, and which you use depends on
-whether you knew it was coming.
+So an arrival is under **ENROLLMENTS** — ▸ USER while a person waits on a
+decision, ▸ DEVICE while a screen has not taken its code — and everything
+working is under **CONNECTIONS ▸ CONNECTED DEVICES**, in its own area. A row
+moves itself the moment it starts working.
+
+Ordering survives inside each list: anything waiting sorts by how much it wants
+attention, and anything working by what was heard from most recently.
+
+**There are two ways one gets in**, and which you use depends on whether you
+knew it was coming.
 
 **You are installing it — name it here first.** Type a name into the box, press
 GET A CODE, and you are given an address to type into that screen:
@@ -246,17 +251,28 @@ GET A CODE, and you are given an address to type into that screen:
 https://<host>:9701/e/K7QP-4M
 ```
 
-Type it once, on the device itself, and it *is* that display — named, and
-already holding whatever endpoints you ticked for it, because the row existed
-before the screen was switched on. The code lasts ten minutes, works once, and
-is forgiving about how it is typed: case does not matter, dashes and spaces are
-ignored, and the characters people misread on a remote — `O` and `0`, `I` and
-`1`, `l` — are not in it at all. `k7qp4m` is the same code as `K7QP-4M`.
+**Or open the display page on that screen and type the six characters into the
+box it offers** — *Setting this screen up?*, above the request form and on any
+screen that is not approved, whether or not anybody may ask for access. The URL
+is the better one for a television with a remote and no browser open yet; the
+box is the better one for a screen already showing this page, where being sent
+back to the address bar to finish is the long way round.
 
-This is the one to use for anything without a keyboard. You are typing with a
-remote or an on-screen keyboard, so the whole address is six characters longer
-than the one you would have typed anyway, and there is no second trip back to
-the panel afterwards.
+Either way it *is* that display — named, and already holding whatever endpoints
+you ticked for it, because the row existed before the screen was switched on.
+
+The code **works once** and is forgiving about how it is typed: case does not
+matter, dashes and spaces are ignored, and the characters people misread on a
+remote — `O` and `0`, `I` and `1`, `l` — are not in it at all. `k7qp4m` is the
+same code as `K7QP-4M`.
+
+**A clock runs on the row**, above everything else it says and in the one
+colour on it that is not grey: green while there is time, amber in the last
+minute, red once it is spent and telling you to REISSUE. How long it starts at
+is yours, under SECURITY ▸ Enrolment codes, and **zero switches it off** — a
+code is one use, and the row it enrols was approved the moment you created it,
+so a deployment that mints codes on Friday and hangs the screens on Monday is
+not less safe for it.
 
 **It turned up by itself — approve it.** Somebody opens the display page on a
 laptop or a phone, and it appears in the list as WAITING within seconds. Give it
@@ -484,8 +500,8 @@ pointing at something nobody can see is a setting nobody can change.
 set under APP SETTINGS ▸ MAINTENANCE, and reloads itself when anything it draws
 from has moved — so a profile edited here reaches the wall without anybody
 walking to it. Never while somebody is talking to the screen or typing into it;
-it waits until they have finished. RELOAD on a row under DEVICES asks one
-directly.
+it waits until they have finished. RELOAD on a row under CONNECTED DEVICES
+asks one directly.
 
 
 ### The settings above the list
@@ -648,7 +664,8 @@ is held and carried out as part of coming back.
 
 ### Asking a screen to reload
 
-**RELOAD**, on a device's row under DEVICES, asks that screen to reload itself
+**RELOAD**, on a device's row under CONNECTED DEVICES, asks that screen to
+reload itself
 at its next check-in. What it actually repairs is a display that is alive but
 stuck: it is still checking in, so it is still listening, and a reload is the
 whole fix. It defers while somebody is talking to the screen.
@@ -738,16 +755,26 @@ cover it.
 
 A name for a set of them, so a grant is made once instead of ticked twelve
 times and re-ticked every time somebody gets a new phone. Groups are made on
-the **GROUPS** tab and named wherever access is granted — today that is an
-endpoint's *who may use it*, and anything added later that grants something can
-name them the same way.
+**SECURITY**, under the settings that decide who has to be approved at all, and
+named wherever access is granted — today that is an endpoint's *who may use
+it*, and anything added later that grants something can name them the same way.
+
+**Everything that starts working is filed with its own population** without
+anybody doing it: a code redeemed puts a screen with the devices, an approved
+request puts a person with the people. The group is made the first time one is
+needed rather than shipped, and an existing group of the right kind is adopted
+before a second is created — so an install that never uses groups never grows
+two it did not ask for.
 
 **Two kinds, and they do not mix.** They answer separate questions — *the
 physics department* and *the screens in the east wing* — so a group holds one
 population or the other, and its kind cannot be changed once it exists.
 
-**Which population a row is in is set on the row**, under DEVICES: *It is a*
-— DEVICE, PERSON, or WORK IT OUT. Left at WORK IT OUT it is inferred from how
+**Which population a row is in is set on the row**, wherever that row is
+currently listed: *It is a* — DEVICE, PERSON, or WORK IT OUT. Changing it moves
+the row into that population's group, and where you have more than one group of
+that kind a picker appears beside the control to say which. It is hidden where
+there is one, because one is not a choice. Left at WORK IT OUT it is inferred from how
 the row arrived: asked for access reads as a person, issued a code reads as a
 device. That inference answers the wrong question and is only there so every
 existing row has an answer — asking for access happens in a browser on one

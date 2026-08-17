@@ -2135,6 +2135,45 @@ on a desk. A tablet bolted to a wall, answering a household, moves them:
 
 Newest first.
 
+### 2026-08-17 — the panel stopped being a filing cabinet
+
+Not a phase. A day of using the thing and finding that the administration side
+had been arranged by what was built when, rather than by what somebody does.
+
+- **The enrolment flow had a half missing.** An admin could mint a code; the
+  screen it was for offered no way to use one. The only path was typing
+  `/e/CODE` into an address bar — fine for a television with a remote, and the
+  long way round for a screen already showing this page. Worse where guest
+  requests are off: an unapproved screen drew nothing at all, so a device
+  somebody had just made a code for had no path forward of any kind.
+- **The code was minted on one tab and displayed on another.** Pressing GET A
+  CODE showed nothing where you were standing, and the complaint about a
+  missing name was written on the way out and never taken back — so a press
+  that worked looked exactly like a press that failed. Rows accumulated in the
+  register that nobody knew they had made, holding live codes, on a page
+  nobody had been sent to.
+- **"9 min left" was a lie for nine minutes.** A code is the one thing on a row
+  that spends itself while you read it, so it is a clock now rather than a
+  sentence — and how long it runs for is a setting, which can be switched off.
+- **One register became four lists on three tabs.** Two questions decide which:
+  is it working, and is it a person or a machine. An arrival is a job somebody
+  has to do; a working row is a thing they look up; and a person who filled in
+  a form has nothing in common with a screen an admin minted a code for except
+  where they both end up.
+- **Everything that starts working is filed with its own population.** A row in
+  no group is a row an allow-list cannot name, so every grant had to be made
+  one device at a time — which is the data entry a group exists to remove.
+- **The bar says which of two subjects you are in.** Configuring the server,
+  and how something comes to be here. Two titles, boxed, each with its own way
+  into the manual, and a gap between them doing the work a fifth link would
+  have done badly.
+- **Two bugs of my own worth recording**, because both are the same shape: a
+  commit row added as a bare div appeared on every page in the panel, since the
+  machinery hides sections by an attribute a bare div does not carry; and the
+  panel is a GRID, so a section without `wide` or `bare` tiles into a narrow
+  column beside its neighbours. Matching a list's markup is not matching a
+  tab — the classes already on that tab are the thing to copy.
+
 ### 2026-08-16 — a screen that looks perfect and does nothing
 
 Phase 4: staying up unattended. The whole of it is invisible while it works,
