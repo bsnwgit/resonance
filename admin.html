@@ -4373,6 +4373,12 @@ never spoken and never matched against.</div>
   </div>
   <label class="bklab" data-r="grouplab">Groups</label>
   <div class="cks" data-r="groups"></div>
+  <!-- People, in a box of their own. A person's grant is theirs and travels
+       with them to whatever machine they open their URL on, where a group or a
+       display is a grant to a machine — different populations, so a list that
+       could hold either would be one nobody could audit. -->
+  <label class="bklab" data-r="peoplelab">People</label>
+  <div class="cks" data-r="identities"></div>
   <div class="note" data-r="whonote"></div>
   <div class="note help">Two reasons to restrict one. <b>A room with several
 microphones in it</b> — one person addresses the wall screen and every other
@@ -4719,12 +4725,17 @@ function blockPaint(blk, r){
         + (words ? ' +' + words + ' more' : '')
         + (r.strict ? ' · exact' : ''),
     who: !r.restricted ? 'any display'
-       : ((r.groups || []).length + (r.displays || []).length)
+       : ((r.groups || []).length + (r.displays || []).length
+          + (r.identities || []).length)
          ? [(r.groups || []).length
               ? (r.groups || []).length + ' group' + ((r.groups || []).length === 1 ? '' : 's')
               : '',
             (r.displays || []).length
-              ? (r.displays || []).length + ' named' : ''].filter(Boolean).join(' + ')
+              ? (r.displays || []).length + ' named' : '',
+            (r.identities || []).length
+              ? (r.identities || []).length
+                + ((r.identities || []).length === 1 ? ' person' : ' people')
+              : ''].filter(Boolean).join(' + ')
          : 'nobody',
     voice: (r.greeting ? '“' + r.greeting.slice(0, 28)
                        + (r.greeting.length > 28 ? '…' : '') + '” · ' : 'shared greeting · ')
@@ -4786,12 +4797,14 @@ function blockPaint(blk, r){
    list, so a device that has been deleted stops being offered and one that
    arrived a minute ago is there to tick. */
 function blockFillWho(blk, r){
-  const box = R(blk, 'displays'), gbox = R(blk, 'groups');
+  const box = R(blk, 'displays'), gbox = R(blk, 'groups'),
+        pbox = R(blk, 'identities');
   // Groups are filled here as well, so this must not give up when the
   // per-display box is absent — it is, now that restricting one device at a
   // time has gone and a grant is made to a group.
-  if (!box && !gbox) return;
-  const want = r.displays || [], wantG = r.groups || [];
+  if (!box && !gbox && !pbox) return;
+  const want = r.displays || [], wantG = r.groups || [],
+        wantP = r.identities || [];
   // Never rebuilt under somebody's cursor — replacing the nodes would drop
   // the tick they were in the middle of making.
   // Both guarded. `box` is gone now that a grant is made to groups rather than
@@ -4799,7 +4812,26 @@ function blockFillWho(blk, r){
   // endpoint paint — which aborted the loop, so only the first endpoint drew
   // and the block was never hidden when you left the tab.
   if (!(box && box.contains(document.activeElement))
-      && !(gbox && gbox.contains(document.activeElement))){
+      && !(gbox && gbox.contains(document.activeElement))
+      && !(pbox && pbox.contains(document.activeElement))){
+    if (pbox){
+      pbox.innerHTML = '';
+      IDENTITIES.forEach(p=>{
+        const lab = document.createElement('label');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.dataset.p = p.id;
+        cb.checked = wantP.indexOf(p.id) >= 0;
+        lab.appendChild(cb);
+        lab.appendChild(document.createTextNode(' ' + (p.label || p.id)));
+        pbox.appendChild(lab);
+      });
+      if (!IDENTITIES.length){
+        const em = document.createElement('span');
+        em.textContent = 'nobody yet — people are created under '
+                       + 'ENROLLMENTS ▸ PERSON';
+        pbox.appendChild(em);
+      }
+    }
     /* Groups first, and in their own box. Naming a group is the grant you
        want to make most of the time — twelve people who all get the same
        thing — and a list that mixed them in among the individuals would bury
@@ -4850,11 +4882,13 @@ function blockFillWho(blk, r){
 function blockSyncWho(blk){
   const on = blk.querySelector('[data-f="restricted"] button.on');
   const restricted = !!on && on.dataset.v === '1';
-  ['groups', 'grouplab'].forEach(n=>{
+  ['groups', 'grouplab', 'identities', 'peoplelab'].forEach(n=>{
     const el = R(blk, n);
     if (el) el.style.display = restricted ? '' : 'none';
   });
-  const box = R(blk, 'displays'), gbox = R(blk, 'groups');
+  const box = R(blk, 'displays'), gbox = R(blk, 'groups'),
+        pbox = R(blk, 'identities');
+  const tickedP = pbox ? [...pbox.querySelectorAll('input:checked')] : [];
   const tickedG = gbox ? [...gbox.querySelectorAll('input:checked')] : [];
   const ticked = box ? [...box.querySelectorAll('input:checked')] : [];
   const live = ticked.filter(cb=>{
@@ -4867,11 +4901,11 @@ function blockSyncWho(blk){
     if (!restricted){
       msg = 'Any display, approved or not — the same as every endpoint before '
           + 'displays existed.';
-    }else if (!ticked.length && !tickedG.length){
+    }else if (!ticked.length && !tickedG.length && !tickedP.length){
       // Allowed rather than refused: restricting one before the tablet that
       // will use it has been hung is a legitimate order to do things in.
-      msg = 'No display may use this endpoint — nothing reaches it until one '
-          + 'is ticked.';
+      msg = 'Nobody and nothing may use this endpoint — it is reached only '
+          + 'once something is ticked.';
       bad = true;
     }else{
       const bits = [];
@@ -4880,6 +4914,12 @@ function blockSyncWho(blk){
       if (ticked.length)
         bits.push(ticked.length + (ticked.length === 1 ? ' display named on its own'
                                                        : ' displays named on their own'));
+      /* Counted apart from the displays rather than added to them. A person
+         reaches this from whatever machine they open their URL on, where a
+         display is one machine — "5 named" covering both would be a number
+         that answers neither question. */
+      if (tickedP.length)
+        bits.push(tickedP.length + (tickedP.length === 1 ? ' person' : ' people'));
       msg = bits.join(' · ');
       if (live.length !== ticked.length)
         msg += ' — ' + (ticked.length - live.length) + ' of those not approved '
@@ -4927,6 +4967,12 @@ function blockCollect(blk){
     body.displays = [...dbox.querySelectorAll('input:checked')].map(cb=> cb.dataset.d);
   body.groups = [...blk.querySelectorAll('[data-r="groups"] input:checked')]
                   .map(cb=> cb.dataset.g);
+  /* Guarded the same way the displays box is: sending an empty list from a
+     panel that does not have the box would wipe every grant a route already
+     carries, where omitting the field leaves the server's copy alone. */
+  const pbox = blk.querySelector('[data-r="identities"]');
+  if (pbox)
+    body.identities = [...pbox.querySelectorAll('input:checked')].map(cb=> cb.dataset.p);
   const ft = F(blk, 'fallthrough');
   if (ft) body.fallthrough = ft.value;
   const key = F(blk, 'api_key');
@@ -4955,7 +5001,12 @@ function wireBlock(blk){
   /* Ticking a display changes what the note under the list says, and a tick
      is a change rather than an input. */
   blk.addEventListener('change', e=>{
-    if (e.target.closest('[data-r="displays"]')) blockSyncWho(blk);
+    /* Every box the summary counts, not just the first one it counted. The
+       line under them says how many groups, displays and people are ticked,
+       and it went stale on two of the three. */
+    if (e.target.closest('[data-r="displays"]')
+        || e.target.closest('[data-r="groups"]')
+        || e.target.closest('[data-r="identities"]')) blockSyncWho(blk);
     /* Which limits and which notes apply is the PROFILE's provider, so
        choosing a different profile rearranges the block the same way choosing
        a different provider used to. */
@@ -8846,8 +8897,13 @@ function panelNav(){
       /* The endpoint blocks list SPEECH PROFILES, and those live in the
          displays document — which this tab never fetched. Painted before it
          arrives, every picker on every endpoint is empty but for DEFAULT.
-         Load first, then paint. */
-      Promise.resolve(refreshProfiles()).then(loadBackend);
+         Load first, then paint.
+
+         The people an endpoint can be granted to are the same problem in the
+         same place: their list is fetched by the tab they are managed on, and
+         an endpoint painted before it arrives offers nobody. */
+      Promise.resolve(Promise.all([refreshProfiles(), loadIdentities()]))
+        .then(loadBackend);
     }
     if (tab === 'docs') loadDocs();
   }

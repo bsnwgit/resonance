@@ -830,6 +830,12 @@ ROUTE_DEFAULTS.update({
     # read that way next year, and flattening it at the point of saving would
     # turn it into twelve ids nobody can maintain.
     "groups": [],
+    # The people it names. A THIRD list rather than more ids in the first,
+    # because a display and a person are different populations reached by
+    # different sessions — the same reason groups refuse to mix the two kinds
+    # — and one list holding either would be a list nobody could audit. Empty
+    # on every existing route, so an upgrade grants nobody anything.
+    "identities": [],
 })
 MAX_ROUTES = 24                  # a household, not a directory service
 
@@ -900,6 +906,8 @@ def read_routes():
                                    (rec.get("displays") or [])][:MAX_ALLOW]
                 out["groups"] = [str(g)[:32] for g in
                                  (rec.get("groups") or [])][:MAX_GROUPS]
+                out["identities"] = [str(p)[:32] for p in
+                                     (rec.get("identities") or [])][:MAX_ALLOW]
                 out["created"] = rec.get("created")
                 out["created_by"] = rec.get("created_by")
                 doc["routes"][str(rid)] = out
@@ -1003,7 +1011,7 @@ def _speech_default():
         return ""
 
 
-def public_routes(doc, disp=None):
+def public_routes(doc, disp=None, ident=None):
     """The two halves a browser may see. The connection half is not omitted
     from the serialisation by accident — it is enumerated the other way
     round, so a field added to a route later is private until somebody
@@ -1042,8 +1050,13 @@ def public_routes(doc, disp=None):
             row["greeting"] = prof["greetings"]
         if not row.get("voice") and prof.get("ttsvoice"):
             row["voice"] = prof["ttsvoice"]
-        row.update(id=rid, allowed=display_may(disp, rec))
-        if disp:
+        row.update(id=rid, allowed=subject_may(rec, disp, ident))
+        # A PERSON gets the routing half on the same terms a display does. The
+        # wake gate runs in the browser, so a session that is handed no wake
+        # words cannot drop an utterance it should drop — it simply never
+        # recognises one, which is the fault this half exists to prevent,
+        # arriving through the door marked "we only thought about devices".
+        if disp or ident:
             row.update({k: rec[k] for k in ROUTE_ROUTING})
             # …and the words come from the speech profile now, not from the
             # route's own record. An endpoint names a profile; the profile says
@@ -1242,6 +1255,18 @@ def validate_route(obj, current, doc, rid=None):
                 seen.add(g)
                 out.append(g)
         rec["groups"] = out[:MAX_GROUPS]
+    if "identities" in obj:
+        # Same treatment as the displays above, and for the same reason: an id
+        # for somebody who has been deleted must not sit in an allow-list
+        # looking like a grant to a person.
+        known = read_identities()
+        seen, out = set(), []
+        for p in (obj["identities"] or []):
+            p = str(p)[:32]
+            if p in known and p not in seen:
+                seen.add(p)
+                out.append(p)
+        rec["identities"] = out[:MAX_ALLOW]
     if "wakeword" in obj:
         rec["wakeword"] = _keep_word(obj["wakeword"])[:40]
     # No longer required on the route. The word lives in the speech profile the
@@ -3052,18 +3077,32 @@ def guest_path_broken(doc):
     return not display_settings()["guest_requests"] and not open_default(doc)
 
 
-def display_may(disp, route):
-    """May this display use this endpoint?
+def subject_may(route, disp=None, ident=None):
+    """May this caller use this endpoint?
+
+    The caller is a DEVICE or a PERSON, never both — see `_subject`, which is
+    where that is decided — so this takes one of the two and answers about it.
+    A person's grant is their own and does not depend on what the machine they
+    are sitting at was approved for; a device's is the machine's and owes
+    nothing to whoever happens to be standing in front of it.
 
     An endpoint with no allow-list is reachable by anything that can reach the
     port, which is what every endpoint was before displays existed — so an
     upgrade changes nothing until somebody restricts one, and the restriction
     is a thing you can see rather than a default nobody was told about.
 
-    Where there IS one: approval is the floor. An unapproved device holding a
-    freshly minted token is exactly the phone somebody typed the URL into."""
+    Where there IS one: approval is the floor for a device. An unapproved one
+    holding a freshly minted token is exactly the phone somebody typed the URL
+    into. A person has no equivalent test, because an identity only exists at
+    all if an admin made it — creation IS the approval, and there is no way to
+    turn up asking to be one."""
     if not route.get("restricted"):
         return True
+    if ident:
+        # Named directly. Groups of people are the next phase's work; until
+        # then this is the whole of a person's reach, and an empty list is a
+        # person who reaches only what is open to everybody.
+        return ident["id"] in (route.get("identities") or [])
     if not disp:
         return False
     # The preview is the panel. It is already signed in as an admin, who can
@@ -4523,6 +4562,27 @@ class Handler(SimpleHTTPRequestHandler):
         morsel = jar.get(IDENTITY_COOKIE)
         return find_identity(morsel.value) if morsel else None
 
+    def _subject(self):
+        """Which caller this request IS: `(display, identity)`, never both.
+
+        The precedence `/display/hello` applies, in the other two places it
+        matters. An approved display is a device whatever else is in the cookie
+        jar — a kiosk stays a kiosk, which is the whole of why signing a person
+        into one is refused at the door. Below that line a person's cookie wins
+        over a token nobody approved, because such a token is somebody who once
+        opened this page rather than a screen anybody hung.
+
+        Returning a pair rather than a tagged object because both callers want
+        to pass them straight through to `subject_may`, and a wrapper would be
+        unpacked at every one of them."""
+        disp = self._display()
+        if disp and disp.get("approved"):
+            return disp, None
+        ident = self._identity()
+        if ident:
+            return None, ident
+        return disp, None
+
     def _set_identity_cookie(self, token):
         # Same reasoning as the display cookie: Secure only where the
         # connection actually is, because bound to loopback this server is the
@@ -4855,7 +4915,7 @@ class Handler(SimpleHTTPRequestHandler):
             # page that draws correctly and answers to nothing. The connection
             # half is not here at all, at any tier.
             doc = read_routes()
-            rows = public_routes(doc, self._display())
+            rows = public_routes(doc, *self._subject())
             if self.pinned_net:
                 # This port carries its own endpoints and no others. They are
                 # not filtered out of a list the browser then ignores — they
@@ -5886,8 +5946,21 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(404, {"error": "no such identity"})
             name = identity_label(rows.pop(pid))
             write_identities(rows)
-            print("identity %s (%s) deleted by %s" % (pid, name, s["user"]),
-                  flush=True)
+            # An allow-list holding somebody who no longer exists is a
+            # permission nobody can see and nobody can withdraw. Cleared here,
+            # exactly as a deleted display's is.
+            doc = read_routes()
+            touched = [r for r, o in doc["routes"].items()
+                       if pid in (o.get("identities") or [])]
+            for r in touched:
+                doc["routes"][r]["identities"] = [
+                    p for p in doc["routes"][r]["identities"] if p != pid]
+            if touched:
+                write_routes(doc)
+            print("identity %s (%s) deleted by %s%s"
+                  % (pid, name, s["user"],
+                     " — removed from %d endpoint(s)" % len(touched)
+                     if touched else ""), flush=True)
             return self._json(200, {"ok": True, "identities": admin_identities()})
 
         if parsed.path == "/groups/delete":
@@ -6354,11 +6427,13 @@ class Handler(SimpleHTTPRequestHandler):
             # one we shipped. An embed is not a display and does not inherit
             # one: its rights come from its key, so it reaches the endpoints
             # anything can reach and no others.
-            disp = None if emb else self._display()
-            if not (self.pinned_open or display_may(disp, cfg)):
+            disp, ident = (None, None) if emb else self._subject()
+            if not (self.pinned_open or subject_may(cfg, disp, ident)):
                 note_display_refused(disp, cfg["name"])
                 print("refused: %s may not use %s (%s)"
-                      % (disp["id"] if disp else "a display with no token",
+                      % (disp["id"] if disp else
+                         ("identity " + ident["id"] if ident else
+                          "a caller with no token"),
                          cfg["name"], rid), flush=True)
                 # The DISPLAY says nothing about this: that utterance was
                 # addressed to a different device, and one nobody was talking
