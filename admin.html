@@ -726,11 +726,13 @@
            overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #whorole{font-size:calc(8px * var(--fs));letter-spacing:.14em;padding:2px 5px;white-space:nowrap;
            border:1px solid rgba(var(--glass),.25);color:rgba(var(--paper),.8)}
+  #b_home,
   #b_signout{
     font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.12em;white-space:nowrap;
     padding:3px 7px;cursor:pointer;background:none;
     color:rgba(var(--paper),.8);border:1px solid rgba(var(--glass),.22);
   }
+  #b_home:hover,
   #b_signout:hover{border-color:var(--hue);color:var(--hue)}
   #stage{position:relative;display:flex;flex-direction:column;min-width:0}
   #stagebar{display:flex;align-items:center;gap:12px;padding:8px 14px;
@@ -1705,6 +1707,12 @@
       <button id="tab_enrol" data-tab="enrol">DEVICE</button>
     </span>
     <span class="right" id="whobox">
+      <!-- Back to the start, and it reloads rather than just putting the mark
+           back up: "like it was when I opened it" means the lists refetched and
+           every half-finished edit gone as well as the page cleared, and a
+           button that restored the look while leaving yesterday's state behind
+           it would be the more confusing of the two. -->
+      <button id="b_home" title="back to the start — reloads the panel">HOME</button>
       <button id="whoname" title="your account">—</button>
       <span id="whorole"></span>
       <button id="b_signout" title="end this session">SIGN OUT</button>
@@ -8740,6 +8748,12 @@ function panelNav(){
      own when there has only ever been the one. */
   const phelp = $('panelhelp');
   if (phelp) phelp.addEventListener('click', ()=> selectTab('docs'));
+  /* A reload rather than enterHome(). Both put the mark back, but only one of
+     them makes the panel what it is on a fresh open — every list refetched,
+     nothing half-edited still sitting in a field on a tab you cannot see. The
+     sign-in survives it: the session is a cookie, not page state. */
+  const bhome = $('b_home');
+  if (bhome) bhome.addEventListener('click', ()=> location.reload());
   /* Opening a section from somewhere other than its own heading: ADD has to
      take you to the block it just created. Assigned out to module scope
      because this closure is where the collapse state lives. */
