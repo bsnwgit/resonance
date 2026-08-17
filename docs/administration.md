@@ -78,7 +78,7 @@ a URL and talks to the display.
   admin session lasts, how long an **enrolment code** is worth anything for,
   **AI Requires Permission** — whether a general user needs approval at all,
   how long a grant lasts, how many devices and waiting requests there may be —
-  and the **groups** access is granted to. ENROLLMENTS ▸ PERSON answers who is
+  and the **groups** access is granted to. ENROLLMENTS ▸ USER answers who is
   waiting; this is whether anybody is asked in the first place.
 
 **ENROLLMENTS** — how something comes to be here, as opposed to everything left
@@ -294,7 +294,7 @@ leaves the tab it arrived through.
 
 Whether anybody is asked at all is on **SECURITY**, under **AI Requires
 Permission** — that is the door rather than the key, and it decides what a
-grant is worth once given. ENROLLMENTS ▸ PERSON answers who is waiting; SECURITY
+grant is worth once given. ENROLLMENTS ▸ USER answers who is waiting; SECURITY
 answers whether anybody has to.
 
 Each profile list has a tab of its own in the profile settings group — what a
@@ -330,7 +330,7 @@ person who filled in a form the same as a screen an admin minted a code for.
 The two populations arrive by different routes with different buttons, and
 neither wants to read the other's queue while doing it.
 
-So an arrival is under **ENROLLMENTS** — ▸ PERSON while a person waits on a
+So an arrival is under **ENROLLMENTS** — ▸ USER while a person waits on a
 decision, ▸ DEVICE while a screen has not taken its code — and everything
 working is under **CONNECTIONS**, in its own area. A row
 moves itself the moment it starts working.
@@ -901,7 +901,7 @@ two it did not ask for.
 
 **Two kinds, and they do not mix.**
 
-- **USERS** holds the people created under ENROLLMENTS ▸ PERSON. A person
+- **USERS** holds the people created under ENROLLMENTS ▸ USER. A person
   reaches an endpoint from whatever machine they open their URL on, so a grant
   made here follows the human rather than the hardware.
 - **DEVICES** holds displays — every screen and every laptop, however it got

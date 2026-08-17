@@ -1816,7 +1816,7 @@
            for the two populations: they arrive by different routes with
            different buttons, and neither wants to read the other's queue
            while doing it. -->
-      <button id="tab_displays" data-tab="displays">PERSON</button>
+      <button id="tab_displays" data-tab="displays">USER</button>
       <button id="tab_enrol" data-tab="enrol">DEVICE</button>
     </span>
     <span class="right" id="whobox">
@@ -2574,7 +2574,7 @@ Short by default — this session configures what everyone else is looking at.
   <div class="note help" style="margin-top:10px">Two populations, and a group
 holds one of them.
 
-<b>USERS</b> holds the people you created under ENROLLMENTS ▸ PERSON. A person
+<b>USERS</b> holds the people you created under ENROLLMENTS ▸ USER. A person
 reaches an endpoint from whatever machine they open their URL on, so a grant
 here follows the human rather than the hardware.
 
@@ -3077,7 +3077,7 @@ is the last time one asked this server anything, so a screen unplugged for a
 week says so here before anybody notices the wall.
 
 Anything that has NOT finished arriving is on the tab it is arriving through —
-ENROLLMENTS ▸ PERSON for a person waiting on a decision, ▸ DEVICE for a screen
+ENROLLMENTS ▸ USER for a person waiting on a decision, ▸ DEVICE for a screen
 that has not taken its code yet. A row moves here on its own the moment it is
 working.
 
@@ -4851,7 +4851,7 @@ function blockFillWho(blk, r){
       if (!IDENTITIES.length){
         const em = document.createElement('span');
         em.textContent = 'nobody yet — people are created under '
-                       + 'ENROLLMENTS ▸ PERSON';
+                       + 'ENROLLMENTS ▸ USER';
         pbox.appendChild(em);
       }
     }
@@ -5612,7 +5612,7 @@ async function refreshGroups(){
       const em = document.createElement('span');
       em.textContent = g.kind === 'identity'
         ? 'nobody has been created yet — people are made under '
-          + 'ENROLLMENTS ▸ PERSON'
+          + 'ENROLLMENTS ▸ USER'
         : 'no displays here yet';
       cks.appendChild(em);
     }

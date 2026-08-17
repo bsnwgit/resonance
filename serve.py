@@ -3459,6 +3459,11 @@ def enrolled_as(rec):
 #: would be editing a list an admin wrote. The kind's LABEL in the panel is
 #: what changes for them.
 DEFAULT_GROUP_NAME = {"device": "Devices", "identity": "Users"}
+#: Names these groups used to be created with. A system group still carrying
+#: one is corrected to the current name — it was the server's word, not an
+#: admin's, and leaving it means an install renamed by a day's timing. Only
+#: these exact strings; anything else is a name somebody chose and is theirs.
+SUPERSEDED_GROUP_NAMES = {"identity": ("People",)}
 
 
 def system_group(kind):
@@ -3490,7 +3495,18 @@ def ensure_system_groups(by="the server"):
     cfg = display_settings()
     changed = cfg_changed = False
     for kind in GROUP_KINDS:
-        if any(r["kind"] == kind and r["system"] for r in groups.values()):
+        mine = [g for g, r in groups.items() if r["kind"] == kind and r["system"]]
+        if mine:
+            # There is one. Correct its name only where it still carries a
+            # default this server has since stopped using.
+            for g in mine:
+                if groups[g]["name"] in SUPERSEDED_GROUP_NAMES.get(kind, ()):
+                    was = groups[g]["name"]
+                    groups[g]["name"] = DEFAULT_GROUP_NAME[kind]
+                    changed = True
+                    print("group %s renamed %s -> %s (it was still on the old "
+                          "default)" % (g, was, DEFAULT_GROUP_NAME[kind]),
+                          flush=True)
             continue
         gid = str(cfg.get(kind + "_group") or "")
         if gid in groups and groups[gid]["kind"] == kind:
@@ -5101,11 +5117,18 @@ class Handler(SimpleHTTPRequestHandler):
             # for a group of devices whatever way it enrolled; that fact is on
             # the row and says nothing about which list it may be put in.
             #
-            # APPROVED ONLY. A row waiting on a decision is not a candidate for
-            # a grant: a group is a set of things that work, and offering one
-            # that cannot do anything invites an admin to grant an endpoint to
-            # a device they have not let in yet. Rows join a group when they
-            # start working, so this is the same rule at the other end.
+            # WORKING ONLY, which is approval AND a token. Approval alone is
+            # not enough: an admin who names a screen and mints a code for it
+            # has approved a row that does not exist yet as a device, and it
+            # sits there `approved` with nothing behind it until somebody
+            # carries the code to the television. Offering it invites a grant
+            # to a screen that has never been switched on.
+            #
+            # The same pair the gate itself requires, and the same pair the
+            # register draws its three states from: INVITED is a code waiting,
+            # WAITING is a browser waiting on a decision, and neither is a
+            # thing a group should be able to name. Rows join a group when they
+            # start working; this is that rule at the other end of the list.
             #
             # …plus anything already IN a group, approved or not. Refusing a
             # display deliberately leaves it in whatever groups it was in — a
@@ -5122,7 +5145,8 @@ class Handler(SimpleHTTPRequestHandler):
                         "arrived": enrolled_as(rec)}
                        for did, rec in sorted(read_displays().items(),
                                               key=lambda kv: display_label(kv[1]).lower())
-                       if rec.get("approved") or did in in_a_group]
+                       if (rec.get("approved") and rec.get("hash"))
+                       or did in in_a_group]
             idents = [{"id": p["id"], "label": p["label"], "approved": True}
                       for p in admin_identities()]
             return self._json(200, {"groups": admin_groups(),
