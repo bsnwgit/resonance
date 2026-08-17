@@ -20,9 +20,9 @@ The posture line — what it is reachable at and what the door is, in the words
 it actually means — stays under EXT Access, because what it warns about is
 exposure, and it still reports the pair whichever tab you set half of it on.
 
-Both moved topics still write `app.json`, so they still need a restart, and
-they carry their own **SAVE SIGN-IN & SESSIONS** rather than being committed by
-a button on a tab they are no longer on.
+Both moved topics still write `app.json`, so they still need a restart — and
+each carries its own SAVE inside it, the way every other topic in the panel
+does, rather than being committed by a button on a tab they are no longer on.
 
 They are still read as a pair:
 

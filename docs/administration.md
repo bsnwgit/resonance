@@ -122,7 +122,8 @@ Each of these writes a different document, so each has its own button:
 | SAVE, inside a profile row | that profile alone; every display naming it, and every display at all if it is the default | immediately |
 | SAVE, inside an AI endpoint's box | that endpoint alone | immediately, next question |
 | SAVE, on SECURITY | who has to be approved, what a grant is worth, how long a code lasts | immediately |
-| SAVE SIGN-IN & SESSIONS, on SECURITY | how you get in, and how long a session lasts | only after a restart |
+| SAVE, inside Sign in | how you get in | only after a restart |
+| SAVE, inside Sessions | how long an admin session lasts | only after a restart |
 | SAVE, on ADMIN SETTINGS | the admin port, binding, session lifetime | only after a restart |
 
 Offering one button that meant all of them is how somebody presses the wrong

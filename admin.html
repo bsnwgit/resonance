@@ -292,14 +292,7 @@
   #approw,.uirow{display:none;margin-top:14px;padding-top:10px;
           border-top:1px solid rgba(var(--glass),.30)}
   #approw.on,.uirow.on{display:block}
-  /* Sign in and Sessions moved to SECURITY and brought their commit with
-     them. Always shown, unlike #approw: that one is hidden on tabs it does
-     not belong to, and this one only exists on the tab it belongs to. */
-  #secapprow{display:none;margin-top:14px;padding-top:10px;
-             border-top:1px solid rgba(var(--glass),.30)}
-  #secapprow.on{display:block}
-  #secapprow .seg{justify-content:flex-end;margin-top:8px}
-  #secapprow .seg button{border-width:2px;border-style:solid;padding:6px 10px}
+
   #approw .seg,.uirow .seg{justify-content:flex-end;margin-top:8px}
   #approw .seg button,
   .uirow .seg button{border-width:2px;border-style:solid;padding:6px 10px}
@@ -2191,6 +2184,11 @@ that assumes it can be reached.
 <b>A single PIN</b> — one number for the whole display, no account management —
 is the middle rung and is not built yet. It is the PIN machinery from identity
 pointed at a display rather than a person, so it lands with that.</div>
+  <div class="note" id="authnote"></div>
+  <div class="pending" id="authpending" hidden></div>
+  <div class="seg actrow">
+    <button id="b_authsave" class="act-save">SAVE</button>
+  </div>
     </div>
   </section>
 
@@ -2205,16 +2203,13 @@ returns you to the sign-in as soon as it lapses.
 
 Short by default — this session configures what everyone else is looking at.
 5 to 480. Full reasoning in DOCUMENTATION → App settings &amp; accounts.</div>
+  <div class="note" id="sessnote"></div>
+  <div class="pending" id="sesspending" hidden></div>
+  <div class="seg actrow">
+    <button id="b_sesssave" class="act-save">SAVE</button>
+  </div>
     </div>
   </section>
-
-  <div id="secapprow">
-    <div class="note" id="secappnote"></div>
-    <div class="pending" id="secapppending" hidden></div>
-    <div class="seg actrow">
-      <button id="b_secappsave" class="act-save">SAVE SIGN-IN &amp; SESSIONS</button>
-    </div>
-  </div>
 
   <!-- Bare, like the profile lists — and BELOW the security topics, because
        what the door is set to comes before who is standing behind it. -->
@@ -3744,7 +3739,8 @@ async function loadApp(){
     segSet('ap_auth', j.app.auth);
     postureSync();
     showPending(j);
-    showPending(j, 'secapppending');
+    showPending(j, 'authpending');
+    showPending(j, 'sesspending');
   }catch(e){ $('appnote').className = 'note bad'; $('appnote').textContent = e.message; }
 }
 
@@ -3775,27 +3771,33 @@ $('b_apprevert').addEventListener('click', async ()=>{
 });
 $('ap_bindaddr').addEventListener('change', postureSync);
 
-/* The two topics that moved to SECURITY still write app.json, and app.json
-   still needs a restart — so they commit themselves there rather than from a
-   button on a tab they are no longer on. Their own keys only: pressing this
-   must not publish a port somebody was halfway through changing next door. */
-$('b_secappsave').addEventListener('click', async ()=>{
-  const note = $('secappnote');
+/* The two topics that moved to SECURITY still write app.json and still need a
+   restart, so each commits itself from inside its own section — the way every
+   other topic on that tab does, rather than from one button belonging to
+   neither. Its own key only: pressing SAVE under Sign in must not publish a
+   session length somebody was halfway through changing under it. */
+async function saveAppBit(body, noteId, pendId){
+  const note = $(noteId);
   note.className = 'note';
   note.textContent = 'saving…';
   try{
-    const body = {auth: segValue('ap_auth')};
-    const el = $('ap_session');
-    if (el && el.value !== '') body.session_idle_minutes = parseInt(el.value, 10);
     const j = await api('/app', {method:'POST', body: JSON.stringify(body)});
     note.textContent = (j.pending && j.pending.length)
       ? 'saved — a restart is needed, see below'
       : 'saved — nothing here is waiting on a restart';
-    showPending(j, 'secapppending');
+    showPending(j, pendId);
     /* The other tab's copy of the same document, so a warning about a pending
        restart is not stale on whichever of the two you look at next. */
     loadApp();
   }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+}
+$('b_authsave').addEventListener('click', ()=>
+  saveAppBit({auth: segValue('ap_auth')}, 'authnote', 'authpending'));
+$('b_sesssave').addEventListener('click', ()=>{
+  const el = $('ap_session');
+  if (!el || el.value === '') return;
+  saveAppBit({session_idle_minutes: parseInt(el.value, 10)},
+             'sessnote', 'sesspending');
 });
 
 $('b_appsave').addEventListener('click', async ()=>{
@@ -7910,14 +7912,6 @@ function panelNav(){
     const ar = $('approw');
     if (ar) ar.classList.toggle('on',
       tab === 'app' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
-    /* …and the one Sign in and Sessions brought with them to SECURITY. It is
-       a bare div rather than a .grp, which is what a commit row has to be —
-       and a bare div carries no data-tab, so nothing in the machinery above
-       was ever going to hide it. It showed on every tab in the panel. */
-    const sr = $('secapprow');
-    if (sr) sr.classList.toggle('on',
-      tab === 'security' && !(findEl.value || '').trim()
-      && !!ME && ME.role === 'admin');
     /* ADD INSTANCE is not inside any block, because it makes one — it has to
        stay reachable whichever block happens to be open, or the only way to
        add a second endpoint is to first collapse the first. */
