@@ -35,6 +35,12 @@ in a field on a tab you can no longer see. Anything you typed and did not save
 goes with it. Your sign-in does not — the session is a cookie, not something
 the page is holding.
 
+HOME and **SIGN OUT** are the only two filled controls on that bar, because
+they are the only two that move the whole panel, and they are filled in
+opposite colours: ice takes you back to the start, rust ends the session.
+Beside them your name reads as one phrase — name, dash, level — rather than a
+name with a badge after it.
+
 The left column is the whole interface. It is organised as a set of topics,
 and **one topic is open at a time**: opening another closes the one before it,
 so the column stays short enough to take in at a glance rather than becoming a
@@ -47,6 +53,13 @@ one. It says what the links after it have in common, and the large space before
 the next label is what separates one subject from the next. The links are links
 rather than tabs, because they do not switch which controls you are editing;
 they change the subject entirely.
+
+**Every label is shaded from the display's own palette**, a colour per subject
+— the three in the bar in **blue**, PROFILES and CONNECTIONS in **ice**, SEARCH
+in **milk**. They are the same five colours a display can be set to, taken from
+the same values rather than matched by eye, so the panel and the thing it
+configures are not two people's idea of one palette. The colour is there to
+tell the rows apart at a glance; it is not saying anything you have to decode.
 
 **IDENTITY** — who this server knows about. Two populations that are not one
 list: one signs in with a password to configure the server, the other picks up
@@ -115,9 +128,20 @@ you administer about it:
 
 **SEARCH** shares that bottom row, on the right third of it. Type to search
 across every topic in every tab at once — the fastest way to find a control
-when you know roughly what it is called but not which tab it lives under. The
-red **✕** at the end empties it; a field left filtered is how somebody
-concludes the panel has lost half its settings.
+when you know roughly what it is called but not which tab it lives under. It
+searches a topic's whole text, including the prose behind its **?**, and a
+topic that matched only on hidden help opens with that help showing rather than
+looking like it has nothing to do with what you typed.
+
+**It is there at all times, the opening screen included**, and it is the one
+thing that works from there: it looks across every tab, so it is how you get
+somewhere without knowing which tab to press. Typing takes the panel off that
+screen, because the matches have to land somewhere. Emptying it puts the mark
+back if you never chose a tab, and returns you to the tab you were on if you
+did.
+
+The red **✕** at the end empties it in one press. A field left filtered with no
+obvious way out is how somebody concludes the panel has lost half its settings.
 
 **Your own account is behind your name.** Click it for the box that changes
 your password. It is the one thing on this page you do to yourself, so it sits
