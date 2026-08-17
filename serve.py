@@ -3262,7 +3262,103 @@ IDENTITY_DEFAULTS = {
     # nobody can use without the hash, and without it raising the minimum
     # would either do nothing to existing PINs or force everybody to reset.
     "pin_salt": "", "pin_hash": "", "pin_len": 0, "pin_set_at": 0,
+    # PER-IDENTITY SETTINGS: the storage tier a PIN unlocks, and the one this
+    # server did not have. There was shared configuration, a per-browser
+    # preference and a per-embed grant; a setting belonging to a PERSON had
+    # nowhere to live, so it lived in whichever browser they happened to be
+    # using and did not follow them anywhere.
+    "settings": {},
+    # How long an unlock lasts on this person's own device, in hours. Theirs
+    # rather than the deployment's: a PIN is now entered at their own URL, not
+    # at a screen standing in a room, so there is no place carrying the risk to
+    # set it from. Zero takes the deployment default.
+    "session_hours": 0,
 }
+
+#: What a person is allowed to keep. An ALLOW-list, not a filter: this store is
+#: written from a browser, and a document shaped by whatever a page decided to
+#: send is one nobody can reason about a year from now. These three are exactly
+#: what the display has always kept per browser — push-to-talk, muted, and
+#: whether the transcript is showing.
+IDENTITY_PREF_KEYS = ("ptt", "muted", "text")
+#: Hours, where an identity names none. Long enough that somebody is not asked
+#: again in a working day, short enough to matter on a machine they borrowed.
+SESSION_HOURS_DEFAULT = 12
+SESSION_HOURS_LIMITS = (1, 720)
+#: A browser that has unlocked. Its own cookie, because the identity cookie is
+#: the URL secret and every device that person owns holds the same one —
+#: unlocking on the laptop would unlock the phone, which is not what entering a
+#: PIN on one machine means. In memory, like the admin sessions: a restart asks
+#: again, and that is the same bargain the rest of this server makes.
+_pin_sessions = {}               # token -> {"pid": str, "expires": float}
+_pin_lock = threading.Lock()
+PIN_COOKIE = "rsn_pinq"
+
+
+def clean_identity_settings(obj):
+    """Only the keys that exist, only as booleans. Everything a person may keep
+    today is a switch; the day one is not, this is where that is decided rather
+    than wherever the page happened to send it."""
+    out = {}
+    if isinstance(obj, dict):
+        for k in IDENTITY_PREF_KEYS:
+            if k in obj:
+                out[k] = bool(obj[k])
+    return out
+
+
+def identity_settings(pid):
+    rec = read_identities().get(pid)
+    return clean_identity_settings((rec or {}).get("settings"))
+
+
+def write_identity_settings(pid, obj):
+    rows = read_identities()
+    if pid not in rows:
+        return None
+    rows[pid]["settings"] = clean_identity_settings(obj)
+    write_identities(rows)
+    return rows[pid]["settings"]
+
+
+def identity_hours(rec):
+    h = int(rec.get("session_hours") or 0)
+    return h if h > 0 else SESSION_HOURS_DEFAULT
+
+
+def open_pin_session(pid, hours):
+    token = secrets.token_urlsafe(32)
+    with _pin_lock:
+        # Swept here rather than on a timer: this runs when somebody unlocks,
+        # which is the only moment the map grows.
+        now_ = time.time()
+        for t in [t for t, v in _pin_sessions.items() if v["expires"] <= now_]:
+            _pin_sessions.pop(t, None)
+        _pin_sessions[token] = {"pid": pid, "expires": now_ + hours * 3600}
+    return token
+
+
+def pin_session_pid(token):
+    """Which person this browser has unlocked, or "". Expiry is read HERE
+    rather than swept on a clock, so a session that has run out is over the
+    moment it is asked about rather than whenever a timer next fired."""
+    rec = _pin_sessions.get(str(token or ""))
+    if not rec:
+        return ""
+    if rec["expires"] <= time.time():
+        _pin_sessions.pop(str(token), None)
+        return ""
+    return rec["pid"]
+
+
+def close_pin_sessions(pid):
+    """Every unlocked browser for one person, ended. Called where their PIN
+    changes hands — an admin clearing it, or the person setting a new one —
+    because a session opened by a secret that no longer exists is a door left
+    open behind a lock somebody just changed."""
+    with _pin_lock:
+        for t in [t for t, v in _pin_sessions.items() if v["pid"] == pid]:
+            _pin_sessions.pop(t, None)
 
 #: Guessing is per IDENTITY rather than per address. A six-digit PIN is small
 #: enough that the thing to slow down is attempts against one person, and an
@@ -3328,6 +3424,7 @@ def set_identity_pin(pid, pin, minimum=None):
                      pin_set_at=int(time.time()))
     write_identities(rows)
     _pin_fails.pop(pid, None)
+    close_pin_sessions(pid)
     return ""
 
 
@@ -3342,6 +3439,7 @@ def clear_identity_pin(pid):
     rows[pid].update(pin_salt="", pin_hash="", pin_len=0, pin_set_at=0)
     write_identities(rows)
     _pin_fails.pop(pid, None)
+    close_pin_sessions(pid)
     return True
 
 
@@ -4944,6 +5042,27 @@ class Handler(SimpleHTTPRequestHandler):
             return None, ident
         return disp, None
 
+    def _pin_pid(self):
+        """Which person this browser has UNLOCKED, or "". Distinct from
+        `_identity`, which says who it claims to be: the cookie is the claim,
+        this is the claim having been proved."""
+        raw = self.headers.get("Cookie")
+        if not raw or self.admin_port:
+            return ""
+        try:
+            jar = http.cookies.SimpleCookie(raw)
+        except http.cookies.CookieError:
+            return ""
+        m = jar.get(PIN_COOKIE)
+        return pin_session_pid(m.value) if m else ""
+
+    def _set_pin_cookie(self, token, hours):
+        bits = ["%s=%s" % (PIN_COOKIE, token), "Path=/", "HttpOnly",
+                "SameSite=Strict", "Max-Age=%d" % int(hours * 3600)]
+        if isinstance(self.connection, ssl.SSLSocket):
+            bits.insert(3, "Secure")
+        self.send_header("Set-Cookie", "; ".join(bits))
+
     def _set_identity_cookie(self, token):
         # Same reasoning as the display cookie: Secure only where the
         # connection actually is, because bound to loopback this server is the
@@ -6282,6 +6401,75 @@ class Handler(SimpleHTTPRequestHandler):
             # every browser that ever had that page open.
             return self._json(200, {"ok": True, "token": token,
                                     "identities": admin_identities()})
+
+        if parsed.path == "/person/unlock":
+            # A PIN, entered by the person it belongs to, at their own URL.
+            #
+            # HTTPS ONLY, and refused rather than degraded: a PIN typed over
+            # plain HTTP is a PIN somebody else has. The loopback case is the
+            # exception the whole server already makes — bound there it is the
+            # only listener and there is nothing between the two ends.
+            if self.admin_port:
+                return self._json(404, {"error": "not found"})
+            if not self._same_origin():
+                return self._json(403, {"error": "cross-origin request refused"})
+            if not isinstance(self.connection, ssl.SSLSocket) \
+               and exposed(read_app()):
+                return self._json(400, {"error": "a PIN needs a secure "
+                                                 "connection"})
+            who = self._identity()
+            if not who:
+                return self._json(401, {"error": "open your own URL first"})
+            obj = self._json_body()
+            if obj is None:
+                return
+            pid = who["id"]
+            if pin_blocked(pid):
+                # The number is not given: "wait 47 seconds" is a clock an
+                # attacker can read, and the person who typed it wrong twice
+                # needs to know to stop rather than to know when.
+                return self._json(429, {"error": "too many attempts — wait a "
+                                                 "little and try again"})
+            rec = read_identities()[pid]
+            if not rec.get("pin_hash"):
+                return self._json(400, {"error": "there is no PIN on this "
+                                                 "identity"})
+            if not verify_identity_pin(pid, obj.get("pin")):
+                print("PIN refused for %s from %s" % (pid, self.address_string()),
+                      flush=True)
+                return self._json(401, {"error": "that is not the PIN"})
+            hours = identity_hours(rec)
+            token = open_pin_session(pid, hours)
+            print("identity %s unlocked for %dh" % (pid, hours), flush=True)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self._set_pin_cookie(token, hours)
+            body = json.dumps({"ok": True, "hours": hours,
+                               "settings": identity_settings(pid)}).encode()
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if parsed.path == "/person/settings":
+            # What a person keeps. Only for a browser that has UNLOCKED: the
+            # identity cookie says who this claims to be, and a claim is not
+            # what durable storage hangs off. Without a PIN the display keeps
+            # its own preferences in the browser, exactly as it always has.
+            if self.admin_port:
+                return self._json(404, {"error": "not found"})
+            if not self._same_origin():
+                return self._json(403, {"error": "cross-origin request refused"})
+            pid = self._pin_pid()
+            if not pid:
+                return self._json(401, {"error": "not unlocked"})
+            obj = self._json_body()
+            if obj is None:
+                return
+            saved = write_identity_settings(pid, obj.get("settings"))
+            if saved is None:
+                return self._json(404, {"error": "no such identity"})
+            return self._json(200, {"ok": True, "settings": saved})
 
         if parsed.path == "/identities/pin":
             # An admin CLEARS a PIN; they never choose one. With no email here
