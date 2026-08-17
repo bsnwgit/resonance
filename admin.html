@@ -2087,45 +2087,6 @@ above.</div>
        admin put somewhere. Named wherever access is granted — today an
        endpoint's allow-list, and anything later that grants something can name
        them the same way. -->
-  <!-- The tab is called GROUPS; a section called Groups inside it says the
-       word twice. Bare, like the profile lists. -->
-  <!-- On SECURITY rather than in the profile settings row. A group is not a
-       profile: nothing about it describes what a screen looks like or how it
-       behaves. It is a name for a SET of the things that may be here, made so
-       a grant is given once instead of ticked twelve times — which is the
-       subject of the tab it now sits on. -->
-  <section class="grp bare proflist" data-tab="security">
-    <div class="barehead"><span class="listtitle">Groups</span></div>
-    <div class="grpbody">
-  <div id="grouplist"></div>
-  <div class="labrow" id="gr_addrow" style="margin-top:10px">
-    <input id="gr_name" type="text" spellcheck="false" autocomplete="off"
-           placeholder="Physics department">
-    <div class="seg" id="gr_kind">
-      <button data-v="user" class="on">PEOPLE</button>
-      <button data-v="device">DEVICES</button>
-    </div>
-  </div>
-  <div class="note" id="groupnote"></div>
-  <div class="seg actrow"><button id="b_addgroup" class="act-add">CREATE</button></div>
-  <div class="note help" style="margin-top:10px">A group of <b>people</b> holds
-those who asked for access and were approved. A group of <b>devices</b> holds
-the screens you created and sent a code to. They are separate populations
-answering separate questions — <i>the physics department</i> and <i>the screens
-in the east wing</i> — so a group holds one or the other, and its kind cannot
-be changed once it exists.
-
-Name a group under an endpoint's <b>who may use it</b> and everyone in it may
-reach that endpoint. <b>Grants add up:</b> a group never takes away a grant
-made to one device on its own, and somebody whose access has run out is still
-refused whatever group they are in.
-
-Deleting a group removes it from every endpoint that named it. The devices and
-people in it are untouched — a group is a way of referring to them, not a
-thing they belong to.</div>
-    </div>
-  </section>
-
   <!-- Whether the app takes a sign-in at all, and what a grant is worth once
        given. On SECURITY rather than ACCESS: ACCESS answers WHICH device may
        reach which endpoint, and whether anybody has to be approved in the
@@ -2183,6 +2144,46 @@ by noise.</div>
   </div>
     </div>
   </section>
+
+  <!-- Bare, like the profile lists — and BELOW the security topics, because
+       what the door is set to comes before who is standing behind it. -->
+  <!-- On SECURITY rather than in the profile settings row. A group is not a
+       profile: nothing about it describes what a screen looks like or how it
+       behaves. It is a name for a SET of the things that may be here, made so
+       a grant is given once instead of ticked twelve times — which is the
+       subject of the tab it now sits on. -->
+  <section class="grp bare proflist" data-tab="security">
+    <div class="barehead"><span class="listtitle">Groups</span></div>
+    <div class="grpbody">
+  <div id="grouplist"></div>
+  <div class="labrow" id="gr_addrow" style="margin-top:10px">
+    <input id="gr_name" type="text" spellcheck="false" autocomplete="off"
+           placeholder="Physics department">
+    <div class="seg" id="gr_kind">
+      <button data-v="user" class="on">PEOPLE</button>
+      <button data-v="device">DEVICES</button>
+    </div>
+  </div>
+  <div class="note" id="groupnote"></div>
+  <div class="seg actrow"><button id="b_addgroup" class="act-add">CREATE</button></div>
+  <div class="note help" style="margin-top:10px">A group of <b>people</b> holds
+those who asked for access and were approved. A group of <b>devices</b> holds
+the screens you created and sent a code to. They are separate populations
+answering separate questions — <i>the physics department</i> and <i>the screens
+in the east wing</i> — so a group holds one or the other, and its kind cannot
+be changed once it exists.
+
+Name a group under an endpoint's <b>who may use it</b> and everyone in it may
+reach that endpoint. <b>Grants add up:</b> a group never takes away a grant
+made to one device on its own, and somebody whose access has run out is still
+refused whatever group they are in.
+
+Deleting a group removes it from every endpoint that named it. The devices and
+people in it are untouched — a group is a way of referring to them, not a
+thing they belong to.</div>
+    </div>
+  </section>
+
 
   <!-- The device half of arriving, start to finish: name it, take the code to
        the screen, and watch it leave this tab the moment it is used. It sat on
