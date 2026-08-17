@@ -923,7 +923,10 @@
     background:rgba(0,0,0,.6);color:var(--text);
     border:1px solid rgba(var(--glass),.16);outline:0;
   }
-  #dispadd{display:flex;gap:4px;margin:4px 0 10px}
+  /* It is an addrow now, like ADD A PROFILE — so it keeps that row's rule
+     above it and only sets what is particular to it: a field beside the
+     button, because naming the thing IS the act of adding it here. */
+  #dispadd{gap:4px}
   #dispadd input{
     flex:1;min-width:0;padding:5px 6px;font:inherit;
     font-size:calc(9.5px * var(--fs));
@@ -2185,65 +2188,6 @@ thing they belong to.</div>
   </section>
 
 
-  <!-- The device half of arriving, start to finish: name it, take the code to
-       the screen, and watch it leave this tab the moment it is used. It sat on
-       ACCESS beside the request form, which put two different populations
-       arriving two different ways on one page — and put the code somewhere
-       other than the register it appeared in. -->
-  <section class="grp" data-tab="enrol">
-    <h4>Get a code</h4>
-    <div class="grpbody">
-  <label class="bklab" style="margin-top:2px">Add a display — name it, then type the code into the screen</label>
-  <div class="seg" id="dispadd">
-    <input id="dp_name" type="text" spellcheck="false" autocomplete="off"
-           placeholder="kitchen wall">
-    <button id="b_adddisp" class="act-add">GET A CODE</button>
-  </div>
-  <!-- The answer, where the question was asked. The row this creates lands in
-       the register under CONNECTIONS ▸ DEVICES and carries its code there too,
-       but that is a different tab: pressing a button and being shown nothing
-       reads as a button that did not work, which is exactly what happened. -->
-  <div id="dispcode"></div>
-  <div class="note" id="dispnote"></div>
-  <div class="note help" style="margin-top:10px">How a device comes to exist.
-This is the half where you invite one; the register itself is under
-<b>CONNECTIONS ▸ DEVICES</b>, and the row appears there the moment you press
-GET A CODE.
-
-<b>Two ways one gets there.</b> Name it above and you are given a six-character
-code: type <b>&lt;this server&gt;/e/CODE</b> into that screen once and it is
-that display, already named, already holding whatever endpoints you ticked for
-it. The code lasts ten minutes, works once, and case and dashes do not matter —
-<b>k7qp4m</b> is the same as <b>K7QP-4M</b>. Or a device simply opens the
-display page, in which case it turns up under Devices as WAITING and you
-approve it by hand.
-
-<b>REISSUE</b> is for a screen that lost its cookie, or was replaced by a
-different one in the same place. The row keeps its name and every endpoint that
-names it; you get a new code to type into the new screen. <b>The old device
-stops working the moment you press it</b> — a place is one device, so deciding
-to move it ends the old one there and then.
-
-<b>The name is not the credential.</b> Anybody can type
-<b>?display=kitchen</b> into a URL. The token is what says this really is that
-device, and it lives in a cookie the page itself cannot read. Somebody who
-types a wall screen's URL into their own phone is issued a <i>new</i> token,
-which nobody approved — and turns up under Devices as a row you were not
-expecting.
-
-<b>Approve it and it works; leave it and it still renders.</b> The appearance
-settings are public, so a device that has just arrived looks right immediately
-and simply answers to nothing until you say otherwise.
-
-An endpoint consults this list only where it has been restricted to named
-displays — <b>who may use it</b>, on each endpoint under AI. Until you restrict
-one, every display reaches everything, which is what they all did before this
-existed.
-
-DELETE is the revocation: that token stops matching anything, and the device
-is back to being a browser that has never been here.</div>
-    </div>
-  </section>
   <!-- The other half of a place: what it looks like when somebody IS there.
        Its own list, because appearance and the screensaver are different axes. -->
   <section class="grp bare proflist" data-tab="look">
@@ -2550,49 +2494,61 @@ nothing but that id.</div>
        inside it says the same word twice. A bare section has no heading, never
        collapses — there is nothing to collapse it behind — and gets its ? on a
        thin row of its own. -->
-  <!-- Only people, and only those who have not been decided about. This is a
-       QUEUE: it is read when something needs doing, and it is empty when
-       nothing does. -->
-  <section class="grp" data-tab="displays">
-    <h4>Waiting for approval</h4>
+  <!-- Only people, and only those who have not been decided about — a bare
+       list like every other, under the topic that decides what it asks them.
+       A QUEUE: read when something needs doing, empty when nothing does. -->
+  <section class="grp bare proflist" data-tab="displays">
+    <div class="barehead"><span class="listtitle">Waiting for approval</span></div>
     <div class="grpbody">
   <div id="asklist"></div>
   <div class="note" id="asknote"></div>
-  <div class="note help" style="margin-top:10px">Somebody opened the display
-page on their own device and filled in the form above. Nothing they said is
-proof of anything — it is what they told you — but a request that arrives
-saying <b>Sarah, building 4 laptop</b> is one you can act on, where an
-anonymous row is one you can only guess at.
+  <div class="note help">Somebody opened the display page on their own device
+and filled in the form above. Nothing they said is proof of anything — it is
+what they told you — but a request that arrives saying <b>Sarah, building 4
+laptop</b> is one you can act on, where an anonymous row is one you can only
+guess at.
 
 <b>APPROVE</b> grants access and, in the same gesture, whichever endpoints you
 tick. <b>REFUSE</b> gives them a message and you a note for whoever comes back
 to this row in six months, and says whether they may ask again.
 
-They leave this list the moment you decide, and appear under CONNECTIONS ▸
-CONNECTED DEVICES.</div>
+They leave this list the moment you decide and appear under CONNECTIONS ▸
+CONNECTED DEVICES, filed with the other people.</div>
     </div>
   </section>
 
-  <!-- Devices that have been minted a code and have not used it yet. Same
-       shape as the queue above, for the other population. -->
-  <section class="grp" data-tab="enrol">
-    <h4>Waiting for their code</h4>
+  <!-- The same shape as APPEARANCE and every other list in this panel: a bare
+       section with the list's name across the top, the rows, and the thing
+       that makes a new one along the foot. It was two headed topics you had to
+       open before you could do the one thing this page is for. -->
+  <section class="grp bare proflist" data-tab="enrol">
+    <div class="barehead"><span class="listtitle">Device enrolment</span></div>
     <div class="grpbody">
   <div id="enrollist"></div>
-  <div class="note help" style="margin-top:10px">A row exists from the moment
-you press GET A CODE, so its endpoints can be ticked and its profile chosen
-before the screen it is for has ever been switched on.
+  <div class="note" id="dispnote"></div>
+  <div id="dispcode"></div>
+  <div class="seg addrow" id="dispadd">
+    <input id="dp_name" type="text" spellcheck="false" autocomplete="off"
+           placeholder="kitchen wall">
+    <button id="b_adddisp" class="act-add">GET A CODE</button>
+  </div>
+  <div class="note help">A screen, from naming it to the moment it works. Name
+one and you are given a six-character code; the row exists from that moment, so
+its endpoints can be ticked and its profile chosen before the screen it is for
+has ever been switched on.
 
-<b>A code lasts ten minutes and works once.</b> If it runs out, REISSUE gives
-another — the row is the PLACE, so its name and every endpoint that names it
-are kept.
+<b>A code lasts ten minutes and works once</b>, and the clock beside it is
+running. If it runs out, <b>REISSUE</b> gives another — the row is the PLACE,
+so its name and every endpoint that names it are kept.
 
-The screen it is for takes the code either way: type
-<b>&lt;this server&gt;/e/CODE</b> into its address bar, or open the display
-page and type the six characters into the box it offers.
+The screen takes the code either way: type <b>&lt;this server&gt;/e/CODE</b>
+into its address bar, or open the display page on it and type the six
+characters into the box it offers. Case and dashes do not matter —
+<b>k7qp4m</b> is the same as <b>K7QP-4M</b>.
 
-It leaves this list the moment the code is used, and appears under
-CONNECTIONS ▸ CONNECTED DEVICES.</div>
+A row leaves this list the moment its code is used and appears under
+CONNECTIONS ▸ CONNECTED DEVICES, filed with the other devices so a grant to all
+of them is one tick.</div>
     </div>
   </section>
 
