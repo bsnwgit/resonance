@@ -3614,6 +3614,43 @@ def join_group(did, gid):
     write_groups(groups)
 
 
+def drop_from_groups(row_id):
+    """Take a deleted row out of every group. Returns the names it was in.
+
+    The opposite of join_group, and it was missing: deleting a display or a
+    person cleared it from every endpoint's allow-list and left it sitting in
+    its groups. That reads as harmless — admin_groups filters to rows that
+    still exist, so nothing phantom is ever shown — and it is not, for one
+    reason. A group's member list is capped at MAX_ALLOW and join_group appends
+    before it truncates, so a group filled with dead ids silently stops
+    accepting live ones: the new member is the element that gets cut. The
+    screen enrols, appears to work, and is simply not in the group."""
+    groups = read_groups()
+    was = []
+    for rec in groups.values():
+        if row_id in rec["members"]:
+            rec["members"] = [m for m in rec["members"] if m != row_id]
+            was.append(rec["name"])
+    if was:
+        write_groups(groups)
+    return was
+
+
+def prune_group_members():
+    """Ids in groups that belong to no row at all — left by every delete that
+    happened before drop_from_groups existed. Swept once, at startup."""
+    live = set(read_displays()) | set(read_identities())
+    groups = read_groups()
+    gone = 0
+    for rec in groups.values():
+        keep = [m for m in rec["members"] if m in live]
+        gone += len(rec["members"]) - len(keep)
+        rec["members"] = keep
+    if gone:
+        write_groups(groups)
+        print("pruned %d member(s) of no row from groups" % gone, flush=True)
+
+
 def file_display(rec_or_id, kind=None, by="the server"):
     """A row that has just started working, filed with its own population.
 
@@ -6162,6 +6199,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(404, {"error": "no such identity"})
             name = identity_label(rows.pop(pid))
             write_identities(rows)
+            left = drop_from_groups(pid)
             # An allow-list holding somebody who no longer exists is a
             # permission nobody can see and nobody can withdraw. Cleared here,
             # exactly as a deleted display's is.
@@ -6173,10 +6211,11 @@ class Handler(SimpleHTTPRequestHandler):
                     p for p in doc["routes"][r]["identities"] if p != pid]
             if touched:
                 write_routes(doc)
-            print("identity %s (%s) deleted by %s%s"
+            print("identity %s (%s) deleted by %s%s%s"
                   % (pid, name, s["user"],
                      " — removed from %d endpoint(s)" % len(touched)
-                     if touched else ""), flush=True)
+                     if touched else "",
+                     "; out of " + ", ".join(left) if left else ""), flush=True)
             return self._json(200, {"ok": True, "identities": admin_identities()})
 
         if parsed.path == "/groups/sets":
@@ -6556,6 +6595,7 @@ class Handler(SimpleHTTPRequestHandler):
             name = display_label(displays.pop(did))
             write_displays(displays)
             _display_refusals.pop(did, None)
+            left = drop_from_groups(did)
             # An allow-list holding the id of a display that no longer exists
             # is a permission nobody can see and nobody can withdraw. Cleared
             # here, for the same reason a deleted endpoint's fallthrough is.
@@ -6567,10 +6607,11 @@ class Handler(SimpleHTTPRequestHandler):
                                                 if d != did]
             if touched:
                 write_routes(doc)
-            print("display %s (%s) deleted by %s%s"
+            print("display %s (%s) deleted by %s%s%s"
                   % (did, name, s["user"],
                      " — removed from %d endpoint(s)" % len(touched)
-                     if touched else ""), flush=True)
+                     if touched else "",
+                     "; out of " + ", ".join(left) if left else ""), flush=True)
             # Its token still exists in a cookie jar somewhere and now matches
             # nothing, so the device it belonged to is back to being a browser
             # that has never been here. That is the revocation.
@@ -6876,6 +6917,7 @@ def main():
     # no moment where a population has nowhere to land.
     ensure_system_groups()
     migrate_unenrolled_invites()
+    prune_group_members()
     ensure_default_membership()
     app = read_app()
     # Environment still wins, so a one-off run on a different port needs no
