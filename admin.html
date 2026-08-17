@@ -4926,13 +4926,18 @@ function blockFillWho(blk, r){
            them — so a tick reading "Physics" alone says nothing about whether
            it grants three people or three screens.
 
-           Custom groups only. The two the server keeps are named after their
-           own kind, and "Devices - Devices" is the panel saying it twice. */
+           Suppressed only where the NAME already says it — "Devices -
+           Devices" is the panel saying it twice. It used to be suppressed for
+           every system group, on the assumption that those are named after
+           their own kind; nothing enforces that, and a default group's name is
+           the admin's to change. So the two entries most likely to be ticked
+           were the two that hid the fact. */
         lab.appendChild(document.createTextNode(' ' + g.name));
+        const kindName = g.kind === 'identity' ? 'Users' : 'Devices';
         const q = document.createElement('span');
         q.className = 'gkind';
-        q.textContent = (g.system ? '' : ' - ' + (g.kind === 'identity' ? 'Users'
-                                                                       : 'Devices'))
+        q.textContent = ((g.name || '').trim().toLowerCase() === kindName.toLowerCase()
+                         ? '' : ' - ' + kindName)
                       + ' (' + g.members.length + ')';
         lab.appendChild(q);
         gbox.appendChild(lab);
@@ -7223,7 +7228,13 @@ function kioskBlock(d){
        a grant somebody made from the group list a moment earlier. */
     gbox2.dataset.painted = mine.filter(g=> (g.members || []).indexOf(d.id) >= 0)
                                 .map(g=> g.id).sort().join(',');
-    if (!mine.length && !home) grow.style.display = 'none';
+    /* Set both ways round. It only ever hid, so a row built while the group
+       list had failed to load stayed hidden for its lifetime — and the save
+       path reads its checkboxes regardless, so a control the admin cannot see
+       was still voting, and always for "no custom groups". */
+    const usable = !!(mine.length || home);
+    grow.style.display = usable ? '' : 'none';
+    gbox2.dataset.usable = usable ? '1' : '';
   }
   syncGroups();
 
@@ -7305,7 +7316,9 @@ function kioskBlock(d){
          default group is not in this list and the server would ignore it. */
       const wantSet = [...gbox2.querySelectorAll('input:checked')].map(x=> x.dataset.g);
       let extra = '';
-      if (wantSet.slice().sort().join(',') !== (gbox2.dataset.painted || '')){
+      /* Nothing drawn is not the same as nothing ticked. */
+      if (gbox2.dataset.usable
+          && wantSet.slice().sort().join(',') !== (gbox2.dataset.painted || '')){
         const k = await api('/groups/sets', {method:'POST', body: JSON.stringify(
           {id: d.id, groups: wantSet})});
         if (k.groups) GROUPS = k.groups;

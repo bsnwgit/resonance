@@ -52,7 +52,8 @@ Plain `python3 -m http.server` also honours conditional GETs, so a browser can
 sit on a cached copy of index.html and you end up debugging code that is no
 longer running. This sends no-store on everything instead.
 """
-import base64, functools, hashlib, hmac, http.cookies, inspect, json, os, re, \
+import base64, contextlib, functools, hashlib, hmac, http.cookies, inspect, \
+       json, os, re, \
        secrets, ssl, subprocess, sys, tempfile, threading, time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
@@ -1739,6 +1740,10 @@ DISPLAY_SETTINGS = {
     # never grows two it did not ask for — see default_group.
     "device_group": "",
     "identity_group": "",
+    # Set once ensure_system_groups has had its one chance to correct a name it
+    # had shipped and since changed. After that a default group's name is the
+    # admin's, including if they choose the old one back.
+    "group_names_done": 0,
     # The fewest digits a PIN may have. Raising it does not revoke anything —
     # it marks every PIN below it, and those are made to conform at the next
     # unlock. See identity_pin_state.
@@ -3608,7 +3613,9 @@ def admin_identities():
 # which is the point of them living in a file of their own rather than inside
 # the thing that currently uses them.
 GROUPS_PATH = os.path.join(ROOT, "groups.json")
-_groups_lock = threading.Lock()
+#: Re-entrant, because a mutation holds it across read-modify-WRITE and
+#: write_groups takes it again on the way out.
+_groups_lock = threading.RLock()
 #: THREE populations now, and the third is the only one that is not a display.
 #: `user` and `device` both hold DISPLAY rows — one arrived by asking, the
 #: other by taking a code — which is what "people" meant here while a refusal
@@ -3797,7 +3804,13 @@ def ensure_system_groups(by="the server"):
         if mine:
             # There is one. Correct its name only where it still carries a
             # default this server has since stopped using.
-            for g in mine:
+            # ONCE, not at every startup. An admin may rename a default group
+            # — the name is theirs, only its membership is the server's — and
+            # "People" is a name somebody might legitimately choose. Running
+            # this on every start would take it back off them a restart later,
+            # which is the thing DEFAULT_GROUP_NAME's own comment says must not
+            # happen.
+            for g in (mine if not cfg.get("group_names_done") else []):
                 if groups[g]["name"] in SUPERSEDED_GROUP_NAMES.get(kind, ()):
                     was = groups[g]["name"]
                     groups[g]["name"] = DEFAULT_GROUP_NAME[kind]
@@ -3832,6 +3845,9 @@ def ensure_system_groups(by="the server"):
         if cfg.get(kind + "_group") != gid:
             cfg[kind + "_group"] = gid
             cfg_changed = True
+    if not cfg.get("group_names_done"):
+        cfg["group_names_done"] = 1
+        cfg_changed = True
     if changed:
         write_groups(groups)
     if cfg_changed:
@@ -3851,15 +3867,15 @@ def join_group(did, gid):
     screen, and a failure to file it is not a reason to refuse the screen."""
     if not gid:
         return
-    groups = read_groups()
-    rec = groups.get(gid)
-    if not rec or did in rec["members"]:
+    with group_edit() as groups:
+      rec = groups.get(gid)
+      if not rec or did in rec["members"]:
         return
-    if not add_member(rec, did):
+      if not add_member(rec, did):
         print("group %s is full (%d) — %s was NOT filed into it"
               % (gid, MAX_ALLOW, did), flush=True)
         return
-    write_groups(groups)
+      write_groups(groups)
 
 
 def drop_from_groups(row_id):
@@ -3873,15 +3889,15 @@ def drop_from_groups(row_id):
     before it truncates, so a group filled with dead ids silently stops
     accepting live ones: the new member is the element that gets cut. The
     screen enrols, appears to work, and is simply not in the group."""
-    groups = read_groups()
-    was = []
-    for rec in groups.values():
-        if row_id in rec["members"]:
-            rec["members"] = [m for m in rec["members"] if m != row_id]
-            was.append(rec["name"])
-    if was:
-        write_groups(groups)
-    return was
+    with group_edit() as groups:
+        was = []
+        for rec in groups.values():
+            if row_id in rec["members"]:
+                rec["members"] = [m for m in rec["members"] if m != row_id]
+                was.append(rec["name"])
+        if was:
+            write_groups(groups)
+        return was
 
 
 def _rows_readable(path, key):
@@ -3987,6 +4003,22 @@ def clean_members(ids, kind):
     return out[:MAX_ALLOW]
 
 
+@contextlib.contextmanager
+def group_edit():
+    """Read, change, write — with nothing else writing in between.
+
+    Every mutator used to read the whole document, change one row and write the
+    whole document back, with the lock held only around the write itself. This
+    is a threading server and displays enrol on their own schedule, so those
+    interleave for real: the last writer wins wholesale and the loser's change
+    is gone with no error and no log line. The dangerous one is join_group,
+    which is fire-and-forget by design — a screen enrols, is told nothing went
+    wrong, and is not in its group."""
+    with _groups_lock:
+        groups = read_groups()
+        yield groups
+
+
 def group_cap(rec):
     """How many members this group may hold, or None for no bound.
 
@@ -4047,9 +4079,16 @@ def validate_group(obj, current):
     if "kind" in obj:
         k = str(obj["kind"] or "").strip()
         if k not in GROUP_KINDS:
-            return None, ("a group is people, devices, or the personal devices "
-                          "that asked to be here")
-        rec["kind"] = k
+            return None, "a group is either people or devices"
+        # ONLY on a group being created. On an existing one the kind is fixed,
+        # and taking the requested one here made it decide which FILE the
+        # members below were resolved against — so a save that switched the
+        # kind had its members validated as the other population, and the
+        # handler then put the kind back and kept them. The group ended up
+        # holding ids it could never show, never grant and never be rid of,
+        # still counting against its cap.
+        if not current.get("kind"):
+            rec["kind"] = k
     if "members" in obj:
         rec["members"] = clean_members(obj["members"], rec["kind"])
     # Never off the wire. Which group is permanent is this server's to decide,
@@ -6954,6 +6993,14 @@ class Handler(SimpleHTTPRequestHandler):
                 # be called "kitchen" when the tablet moves to the hall.
                 displays[did]["name"] = name
             write_displays(displays)
+            # Approving a row that already holds a token is the moment it
+            # starts working, and everything that starts working is filed. The
+            # panel goes through /displays/decide, which does this — so without
+            # it here the invariant held only for the route the shipped UI
+            # happens to use, and a row approved through the API stayed outside
+            # its group until the next restart backfilled it.
+            if on and displays[did].get("hash"):
+                file_display(did, by=s["user"])
             print("display %s (%s) %s by %s"
                   % (did, display_label(displays[did]),
                      "approved" if on else "approval withdrawn", s["user"]),
