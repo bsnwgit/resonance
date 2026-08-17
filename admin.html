@@ -28,6 +28,21 @@
        button that was technically present and practically invisible. */
     --help:#8fb6e8;
     --help-line:122,166,224;
+    /* THE DISPLAY'S OWN PALETTE, used as the panel's accents. These are the
+       same five triples the swatches on APPEARANCE are drawn from, so a label
+       shaded ICE here and a display set to ICE are the same colour rather than
+       two people's idea of one. Named after the palette rather than after what
+       they are used for, because what they are used for will move. */
+    --pal-blue:120,186,255;
+    --pal-milk:236,244,252;
+    --pal-ice:169,220,242;
+    --pal-amber:242,196,137;
+    --pal-rust:242,168,150;
+    /* SIGN OUT's own, and deeper than the palette's rust swatch. That one is a
+       light salmon meant to be read as a tint at eight per cent; this is a
+       FILLED control that has to hold white letters and read as warm against a
+       cold panel, which a pale wash cannot do. */
+    --rust:176,84,44;
 
     /* Typography — the same three faces and three sizes the display has,
        kept identical to the block in index.html on purpose: the panel is
@@ -160,6 +175,50 @@
   .docitem .a{font-size:calc(8px * var(--fs));letter-spacing:.16em;color:var(--hue-dim);
               border:1px solid rgba(var(--glass),.22);padding:1px 4px;
               margin-left:6px;vertical-align:1px}
+  /* The shelf a group of documents sits on, and the document a run of search
+     hits came out of — one rule for both, because they are the same thing in
+     the same place: a word telling you what the rows under it have in common.
+     Quiet, and not a control: nothing happens when you press it. */
+  .doccat{
+    font-size:calc(8.5px * var(--fs));letter-spacing:.2em;
+    color:rgba(var(--paper),.58);margin:15px 0 1px;padding-bottom:3px;
+    border-bottom:1px solid rgba(var(--glass),.18);
+  }
+  .doccat:first-child{margin-top:2px}
+  /* A hit. Bordered on one edge rather than boxed like a document: a result is
+     a way into a document, not another document. */
+  .dochit{
+    display:block;width:100%;text-align:left;font:inherit;cursor:pointer;
+    background:none;color:inherit;border:0;
+    border-left:1px solid rgba(var(--glass),.28);
+    padding:4px 0 5px 10px;margin:5px 0 0;
+  }
+  .dochit:hover{border-left-color:var(--hue)}
+  .dochit .h{font-size:calc(8.5px * var(--fs));letter-spacing:.14em;
+             color:var(--hue-dim)}
+  .dochit .x{font-size:calc(9px * var(--fs));letter-spacing:.03em;line-height:1.55;
+             color:rgba(var(--paper),.78);margin-top:2px}
+  /* What was searched for, wherever it is shown: in a result, and again in the
+     document once it is open. */
+  .dochit mark,
+  #docbody mark{
+    background:rgba(var(--glass),.34);color:var(--text);padding:0 1px;
+  }
+  /* Said after a capped run, never left to be inferred: a list that stops
+     without saying so reads as everything there was. */
+  .docmore{
+    font-size:calc(8.5px * var(--fs));letter-spacing:.1em;
+    color:rgba(var(--paper),.5);margin:5px 0 0;padding-left:11px;
+  }
+  /* Larger than a note usually is, and it earns it: this one answers a
+     question somebody has just asked out loud into the field above it. Set in
+     the smallest type on the page, an answer is something they read only after
+     deciding nothing happened. */
+  #docnote{
+    font-size:calc(11px * var(--fs));letter-spacing:.05em;
+    margin:7px 0 2px;color:rgba(var(--paper),.92);
+  }
+  #docnote.bad{color:#ff8a8a}
 
   #docmodal{
     position:fixed;inset:0;z-index:60;display:none;
@@ -268,9 +327,12 @@
      a control — it is the edge of a region, and it has to reach as far as
      the region does or it reads as an underline on the column above it
      instead of a division of the panel. */
-  #panelhead > .findrow,
-  #panelhead > .tabgroup,
-  #panelhead > .tabs{max-width:560px}
+  /* The tabs are not held to a readable measure. They were a column of boxed
+     controls, where a readable width is the right constraint; they are a row
+     of links behind a label now, and a menu bar that wraps onto three lines at
+     560px is one nobody can scan. The search that used to sit above them, and
+     was held to that measure, is in the foot with the other row. */
+  #panelhead > .tabs{max-width:none}
   /* …but the tab row itself runs the whole width, out to the edge of the
      preview, because it now carries two groups that have to sit apart. */
   #panelhead > .tabrow{max-width:none}
@@ -284,7 +346,24 @@
      second subject: a boundary with nothing on the far side of it is a line,
      not a division. */
   .tabside{flex:2 1 0}
-  .connside{flex:0 1 auto;align-items:flex-start}
+  /* Two thirds to what the server is wired to, one third to the search. The
+     row carried one group and half a rule for a while, after the admin tabs
+     moved up into the bar; it carries two again, and the wider share goes to
+     the one you press. */
+  .connside{flex:2 1 0;align-items:flex-start}
+  .findside{flex:1 1 0;min-width:0}
+  .findside .tabs{flex-wrap:nowrap;align-items:stretch}
+  .findside #rigfind{flex:1 1 auto;min-width:0;margin-left:8px}
+  /* The only red on the row, because it is the only thing here that takes
+     something away. Not styled as a link: a ✕ that looked like the three
+     beside it would read as a fourth place to go. */
+  #b_findclear{
+    flex:0 0 auto;padding:2px 9px;cursor:pointer;
+    background:none;border:0;border-bottom:1px solid transparent;
+    font:inherit;font-size:calc(11px * var(--fs));line-height:1;
+    color:#e0716b;
+  }
+  #b_findclear:hover{color:#ff8a8a}
 
   /* The app tab's own commit row, at the foot of the box. Hidden outright
      on every other tab: a save button that belongs to settings you cannot
@@ -311,15 +390,10 @@
      whole box rather than the tail of whichever column it landed in. */
   @container (min-width:700px){ #approw,.uirow{grid-column:1/-1} }
 
-  /* The caption over a row of tabs. Quieter than anything it labels — it is
-     there to be read once and then ignored, not to compete with the tabs
-     underneath it. */
-  .tabgroup{
-    font-size:calc(8px * var(--fs));letter-spacing:.22em;
-    text-transform:uppercase;color:rgba(var(--paper),.55);
-    margin:0 0 5px;
-  }
-  #panelfoot .tabgroup{margin-top:2px}
+  /* The caption OVER a row of tabs is gone. It was a quiet line above the row
+     saying what the row was; it is now a boxed label sitting in the row, the
+     same as the three in the bar — one idiom for "this word names the links
+     next to it" rather than two that had to be kept looking related. */
   #panelfoot .tabrow{align-items:flex-end}
   #panelfoot .tabside .tabs{margin-bottom:0}
   #panelfoot{
@@ -354,6 +428,45 @@
     padding:2px 10px 12px;
     margin-top:10px;
   }
+  /* The ground the panel sits on, present the whole time. Out of the flow and
+     pinned to the panel rather than to the scroll, so it stays put while the
+     topics move over it. */
+  #panelhome{
+    position:absolute;inset:0;z-index:0;
+    display:flex;align-items:center;justify-content:center;
+    /* Never in the way of anything: it is behind the page in every sense, and
+       a click that lands on the wallpaper instead of the control under the
+       cursor is the one way a watermark can be a bug. */
+    pointer-events:none;
+    /* The artwork carries an opaque near-black backing rectangle, drawn for a
+       sign-in card that needed one. Behind a working panel that would be a
+       dark BLOCK rather than a watermark — so it is screened, where near-black
+       contributes nothing and only the strokes and the wordmark come through.
+       Without support for the blend the rectangle is still all but invisible
+       at this opacity, so it degrades to slightly-too-dark rather than to
+       wrong. */
+    mix-blend-mode:screen;
+    opacity:.12;filter:grayscale(.9);
+    /* Slow enough to read as the page settling rather than as something
+       flashing on the way past. */
+    transition:opacity .55s ease, filter .55s ease;
+  }
+  /* Full strength on the opening state, where it is the only thing there. */
+  #panel.home #panelhome{opacity:1;filter:none}
+  /* Three quarters of the panel, which IS the space between the window's left
+     edge and the preview — so a percentage of this column is the measurement
+     without having to know what the preview is set to. */
+  #panelhome img{width:75%;height:auto;max-width:none}
+  /* Above the mark, both of them. Without a stacking order of their own they
+     share one with it and the answer is whatever the DOM happens to say. */
+  #panelbar,
+  #panelscroll{position:relative;z-index:1}
+  /* The box goes; the search does not. Searching is the one thing that makes
+     sense from a page showing nothing — it looks across every tab at once, so
+     it is how you get somewhere when you do not know which tab to press. It
+     takes the panel out of this state as soon as anything is typed, which is
+     what keeps it from being a field with nowhere to put its answers. */
+  #panel.home #grpbox{display:none}
   /* A register is a table, not a settings column. Where the box tiles its
      topics into 300px columns, this one takes the full width of them — rows
      that read across need the room, and a device row has four things on it
@@ -469,13 +582,15 @@
      row and the segmented controls had no hover at all. Disabled controls
      are excluded, so a read-only account still gets no false affordance.
      :not() carries the specificity needed to beat the .on selected state. */
-  .tabs button:hover:not(:disabled),
   .seg button:hover:not(:disabled),
   .urow button:hover:not(:disabled),
   #stagebar button:hover:not(:disabled),
   /* the five that used to be listed here individually are all `.tabs`
-     buttons now, covered by the first selector */
-  #b_signout:hover:not(:disabled),
+     buttons now, covered by the first selector.
+
+     SIGN OUT is no longer here either: it carries its own colour, and the
+     shared rule would have handed it the panel's near-white on hover — a
+     control that goes grey the moment you reach for it. */
   #gatebtn:hover:not(:disabled){
     border-color:var(--hue);color:var(--hue);
   }
@@ -556,11 +671,11 @@
   }
   #navlinks button:hover{color:rgba(var(--paper),.95)}
   #navlinks button.on{color:var(--hue);border-bottom-color:var(--hue-dim)}
-  /* One between each pair, and one before the first — which separates the
-     places you can go from the title of the page you are on. The same
-     hairline in both cases: they are doing the same job. */
-  #navlinks::before{content:""}
-  #navlinks::before,
+  /* One between each pair, and only between a pair. There used to be one
+     before the first link as well, separating the places you can go from the
+     title of the page you are on — and it came off when that title moved into
+     this row: the bar now opens on a boxed label, and a hairline drawn against
+     the left edge of a box is a line beside a line. */
   #navlinks button + button{border-left:1px solid rgba(var(--glass),.28)}
   /* A large space, and nothing in it. It is what separates the two subjects;
      the boxed title after it is what stops the space reading as the bar
@@ -576,35 +691,86 @@
      cheapest way to say "this is a label", and it doubles as the division
      between the two groups, which is why the group divider came off the
      second one. */
-  #panelbar .bartitle{
+  /* One rule for every boxed label on the page, wherever the row is. The bar
+     at the top and the two rows of tabs are the same kind of thing — a word
+     saying what the links beside it have in common — and two rules that had to
+     be kept looking alike would eventually stop being. */
+  #panelbar .bartitle,
+  .tablabel{
     display:flex;align-items:center;align-self:center;
     padding:3px 9px 3px 11px;letter-spacing:.2em;
     color:rgba(var(--paper),.92);
     border:1px solid rgba(var(--glass),.40);
     background:rgba(var(--glass),.07);
+    white-space:nowrap;
   }
+  /* The tab rows are set smaller than the bar, so their labels come down with
+     them rather than sitting a size above the links they name. */
+  .tablabel{font-size:calc(9px * var(--fs))}
+  /* Shaded from the display's palette, a colour per subject, and shaded hard
+     enough to see. The first pass used the swatch alphas — an edge at .45 over
+     a wash at .12 — which is right for a swatch sitting on its own and wrong
+     here: it REPLACED a seven per cent white, so the box gained a coloured
+     outline and a fill nobody could tell from the one before it. These are the
+     weights SIGN OUT is filled at, which is the reference for "shaded" on this
+     bar. The text stays at the panel's near-white: a label is not pressable
+     and does not need the two filled controls' full white as well. */
+  #panelbar .bartitle{
+    border-color:rgba(var(--pal-blue),.70);
+    background:rgba(var(--pal-blue),.26);
+  }
+  .tablabel{
+    border-color:rgba(var(--pal-ice),.70);
+    background:rgba(var(--pal-ice),.26);
+  }
+  /* Milk is the palest of the five, so it carries a little more of itself to
+     land at the same visual weight as the other two. */
+  .findside .tablabel{
+    border-color:rgba(var(--pal-milk),.70);
+    background:rgba(var(--pal-milk),.30);
+  }
+  /* The foot has a darker ground of its own — rgba(0,0,0,.5) laid over the
+     panel's own .35 — so an identical tint reads weaker down there than the
+     same label does in the bar. CONNECTIONS looked untouched for exactly that
+     reason while the ones above it were already shaded. A few points more so
+     all five land at one weight rather than at one number. */
+  #panelfoot .tablabel{background:rgba(var(--pal-ice),.34)}
+  #panelfoot .findside .tablabel{background:rgba(var(--pal-milk),.38)}
   #navlinks .bartitle{margin-left:10px}
+  /* …except the one that opens the bar. That margin is what holds a label off
+     the link before it, and there is no link before the first — left in, it
+     reads as the row starting indented from everything under it. */
+  #navlinks .bartitle:first-child{margin-left:0}
   /* Filled rather than outlined, unlike the ? beside a section heading: those
      are one per section and have their heading right there for context, where
      these two have to be findable on their own from across the panel.
 
-     Inside the box, after the word it belongs to. Said at this weight because
-     the mark in the right-hand title sits inside #navlinks, where the rule for
-     the links is an id plus an element and would otherwise hand it the links'
-     grey, their padding and their divider. */
-  #panelbar .bartitle .helpmark{
-    width:17px;height:17px;padding:0;margin-left:9px;flex:0 0 auto;
+     ONE of them, at the far end of the bar, past the way out. There were two
+     — one inside each boxed label — and both opened the same page: a mark per
+     label says the labels have separate manuals, which was never true and got
+     less true as a third label arrived. The manual is the panel's, so it sits
+     with the things that belong to you rather than to a section of it.
+
+     Said at this weight because it sits in a bar whose other rules are an id
+     plus an element, which would otherwise hand it their grey, their padding
+     and their divider. */
+  #panelbar .helpmark{
+    width:17px;height:17px;padding:0;flex:0 0 auto;
     font:inherit;font-size:calc(9px * var(--fs));letter-spacing:0;line-height:1;
     display:inline-flex;align-items:center;justify-content:center;
     border:1px solid rgba(var(--help-line),.75);border-radius:50%;
     background:rgba(var(--help-line),.16);color:var(--help);cursor:pointer;
   }
-  #panelbar .bartitle .helpmark:hover{
+  #panelbar .helpmark:hover{
     border-color:rgba(var(--help-line),1);color:#cfe2f8;
     background:rgba(var(--help-line),.30);
   }
   #panelbar .right{margin-left:auto}
   #whobox{display:flex;align-items:center;gap:8px;min-width:0}
+  /* Double the row's own gap, and it is doing a job: the manual is not a third
+     thing you do to your session, so it should not sit in the run of them as
+     though SIGN OUT and it were a pair. */
+  #whobox .helpmark{margin-left:8px}
   #mine{
     display:none;position:fixed;inset:0;z-index:60;
     align-items:center;justify-content:center;padding:24px;
@@ -630,14 +796,42 @@
     text-underline-offset:3px;
     font-size:calc(10px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.92);
            overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  #whorole{font-size:calc(8px * var(--fs));letter-spacing:.14em;padding:2px 5px;white-space:nowrap;
-           border:1px solid rgba(var(--glass),.25);color:rgba(var(--paper),.8)}
+  /* No box. It was outlined like a badge, which put a bordered thing between
+     your name and the way out and made three edges in a row where there is one
+     piece of information: who you are, and at what level. It reads as one
+     phrase now — name, dash, level — so the rule that separates them is a
+     dash rather than a border. */
+  #whorole{font-size:calc(8.5px * var(--fs));letter-spacing:.12em;white-space:nowrap;
+           color:rgba(var(--paper),.72)}
+  /* The pair at the ends of the bar are the two things that move the WHOLE
+     panel, so both are filled rather than outlined — and they are filled in
+     different colours because they are opposites. Ice takes you back to the
+     start; rust ends the session. */
+  #b_home{
+    font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.12em;white-space:nowrap;
+    padding:3px 7px;cursor:pointer;
+    color:#fff;
+    border:1px solid rgba(var(--pal-ice),.85);
+    background:rgba(var(--pal-ice),.22);
+  }
+  #b_home:hover{
+    border-color:rgb(var(--pal-ice));background:rgba(var(--pal-ice),.38);color:#fff;
+  }
+  /* The one control on this bar that ENDS something. Everything else here goes
+     somewhere; this one takes the session away, and it should not be telling
+     you that in the same grey as the way back to the start. Rust, outlined and
+     shaded, with the letters at full brightness — the only warm thing on a
+     cold panel, which is what makes it findable without being an alarm. */
   #b_signout{
     font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.12em;white-space:nowrap;
-    padding:3px 7px;cursor:pointer;background:none;
-    color:rgba(var(--paper),.8);border:1px solid rgba(var(--glass),.22);
+    padding:3px 7px;cursor:pointer;
+    color:#fff;
+    border:1px solid rgba(var(--rust),.85);
+    background:rgba(var(--rust),.30);
   }
-  #b_signout:hover{border-color:var(--hue);color:var(--hue)}
+  #b_signout:hover{
+    border-color:rgb(var(--rust));background:rgba(var(--rust),.48);color:#fff;
+  }
   #stage{position:relative;display:flex;flex-direction:column;min-width:0}
   #stagebar{display:flex;align-items:center;gap:12px;padding:8px 14px;
             border-bottom:1px solid rgba(var(--glass),.1);
@@ -1023,6 +1217,7 @@
      nothing, because the answer landed somewhere you were not looking, is not
      a flow anybody can follow. */
   .erow .dcode,
+  #idurl,
   #dispcode{
     margin:6px 0 2px;padding:6px 8px;user-select:all;
     background:rgba(122,201,160,.07);
@@ -1031,13 +1226,18 @@
     color:#d2f2e2;word-break:break-all;
   }
   .erow .dcode span,
+  #idurl span,
   #dispcode span{
     display:block;margin-top:3px;user-select:none;
     font-size:calc(8.5px * var(--fs));letter-spacing:.06em;
     color:rgba(var(--paper),.62);
   }
-  #dispcode{display:none}
-  #dispcode.on{display:block}
+  /* A URL rather than six characters, so it wraps instead of tracking wide. */
+  #idurl{letter-spacing:.02em}
+  #dispcode,
+  #idurl{display:none}
+  #dispcode.on,
+  #idurl.on{display:block}
   /* Spent. Kept on screen rather than removed, because a box that vanishes
      while you are walking back to the keyboard is indistinguishable from one
      that was never there — and this one has to say what to do next. */
@@ -1227,24 +1427,35 @@
   #em_key.on{display:block}
 
   /* ---- rig: tabs > collapsible sections ---- */
-  .tabs{display:flex;gap:4px;margin-bottom:10px}
+  /* Built like the bar at the top, because they are doing the bar's job: a
+     boxed label and the places it leads to. They were boxed buttons in a row
+     of boxes, which read as a row of CONTROLS — things that do something when
+     pressed — rather than as somewhere you can go. Marked by colour and a rule
+     under the current one, and separated by the same hairline. */
+  .tabs{display:flex;align-items:stretch;gap:0;margin-bottom:10px;flex-wrap:wrap}
   .tabs button{
-    flex:1;font:inherit;font-size:calc(9px * var(--fs));letter-spacing:.18em;padding:6px 4px;cursor:pointer;
-    background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.85);
+    display:flex;align-items:center;
+    font:inherit;font-size:calc(9px * var(--fs));letter-spacing:.18em;
+    padding:2px 14px;cursor:pointer;
+    background:none;border:0;border-bottom:1px solid transparent;
+    color:rgba(var(--paper),.62);
   }
-  /* The three left in the foot keep a tab's width rather than shrinking to
-     their labels. AI is two characters, and a two-character tab beside a
-     seven-character one reads as a mistake rather than as a short word. */
-  .connside .tabs{flex-wrap:wrap}
-  .connside .tabs button{flex:0 0 auto;min-width:96px}
-  .tabs button.on{border-color:var(--hue-dim);color:var(--hue);background:rgba(var(--glass),.08)}
+  /* Between each pair and never after the label: the label already has an edge
+     of its own, and a rule against it is a line beside a line. */
+  .tabs button + button{border-left:1px solid rgba(var(--glass),.28)}
+  .tabs button.on{color:var(--hue);border-bottom-color:var(--hue-dim)}
+  /* Brightening, the way a link in the bar does — not a border appearing on
+     something that has none. */
+  .tabs button:hover:not(:disabled){color:rgba(var(--paper),.95)}
   .findrow{display:flex;margin:0 0 4px}
-  #rigfind{
+  #rigfind,
+  #docfind{
     flex:1;min-width:0;margin:0;font:inherit;font-size:calc(9.5px * var(--fs));padding:5px 7px;
     background:rgba(0,0,0,.5);color:var(--text);
     border:1px solid rgba(var(--glass),.18);outline:0;-webkit-appearance:none;appearance:none;
   }
-  #rigfind::placeholder{color:rgba(var(--paper),.62)}
+  #rigfind::placeholder,
+  #docfind::placeholder{color:rgba(var(--paper),.62)}
 
   /* a real divider between topics, not just spacing */
   .grp{
@@ -1539,20 +1750,22 @@
 
 <div id="wrap">
 <div id="panel">
+  <!-- The mark, behind everything, all of the time. Full strength on the
+       opening state where it is the only thing on the page, and a watermark
+       once somebody is working — still there, greyed back far enough to read
+       a setting over.
+
+       Out of the scroll and pinned to the panel: a watermark that slides up
+       under the topics as you scroll is a picture somebody is scrolling, not a
+       ground the page sits on. -->
+  <div id="panelhome" aria-hidden="true">
+    <img src="lockup.svg" alt="">
+  </div>
   <!-- The identity sits at the top right of the panel, opposite the stage's
        own bar across the window. It is outside #panelscroll on purpose: who
        you are signed in as, and the way out, should not scroll away under a
        tab's worth of settings. -->
   <div id="panelbar">
-    <!-- The way into the manual, INSIDE the title rather than beside it:
-         documentation is not a topic you configure, it is the thing you reach
-         for when a topic will not explain itself — so it belongs to the title
-         it explains rather than sitting in the row of places you can go. Blue,
-         and the same blue as every ? beside a section heading; one colour
-         meaning one thing is what lets somebody find help without reading
-         labels. -->
-    <span class="bartitle">SETTINGS<button id="panelhelp" class="helpmark"
-            type="button" title="open the documentation">?</button></span>
     <!-- Administering the server, as links in the bar rather than as a row of
          tabs at the foot. They were never the same kind of thing as the tabs
          above the settings: those switch which set of controls you are
@@ -1562,42 +1775,66 @@
 
          Left, beside the title, because that is where you look for the way
          around a page. Your name and the way out stay right, where they were:
-         one side is where you are going, the other is who you are. -->
+         one side is where you are going, the other is who you are.
+
+         THREE subjects now, each behind its own boxed label with a large space
+         between them: who the server knows about, how it is wired, and how
+         something comes to be here. SETTINGS moved into this row to become the
+         middle one — it used to sit outside as the title of the page, which
+         worked while it was the only label and read as a fourth kind of thing
+         the moment there were three. -->
     <span id="navlinks">
-      <button id="tab_app" data-tab="app">ADMIN SETTINGS</button>
-      <button id="tab_accounts" data-tab="accounts">ADMIN USERS</button>
+      <!-- Who the server knows about, split by which side of the product they
+           exist on: ADMIN is an account that reaches THIS panel, USER is a
+           person the display side knows about. They are not the same
+           population and never have been — one signs in with a password to
+           configure the server, the other picks up a minted URL and talks to
+           it — so they are two places rather than one list with a column
+           saying which. -->
+      <span class="navtitle bartitle">IDENTITY</span>
+      <button id="tab_accounts" data-tab="accounts">ADMIN</button>
+      <button id="tab_users" data-tab="users">USER</button>
+      <span class="navgap"></span>
+      <span class="navtitle bartitle">SETTINGS</span>
+      <button id="tab_app" data-tab="app">ADMIN</button>
       <!-- How the server itself is defended, which is administration rather
            than a connection: who gets in, on what terms, and into which
            group. -->
       <button id="tab_security" data-tab="security">SECURITY</button>
-      <!-- Two subjects in one bar, and the gap is what says so. Everything
-           left of it configures the server; everything right of it is how
-           something comes to be here. A second title rather than a fourth and
-           fifth link, because they are not more of the same thing — and it
-           carries its own ? for the same reason SETTINGS does. -->
+      <!-- The gap is what says these are a different subject. Everything left
+           of it is the server; everything right of it is how something comes
+           to be here. -->
       <span class="navgap"></span>
-      <span class="navtitle bartitle">ENROLLMENTS<button id="enrolhelp"
-              class="helpmark" type="button"
-              title="open the documentation">?</button></span>
-      <!-- People, and only people: the two populations arrive by different
-           routes with different buttons, and neither wants to read the
-           other's queue while doing it. -->
-      <button id="tab_displays" data-tab="displays">USER</button>
+      <span class="navtitle bartitle">ENROLLMENTS</span>
+      <!-- PERSON and DEVICE, in the same words the rest of the product uses
+           for the two populations: they arrive by different routes with
+           different buttons, and neither wants to read the other's queue
+           while doing it. -->
+      <button id="tab_displays" data-tab="displays">PERSON</button>
       <button id="tab_enrol" data-tab="enrol">DEVICE</button>
     </span>
     <span class="right" id="whobox">
+      <!-- Back to the start, and it reloads rather than just putting the mark
+           back up: "like it was when I opened it" means the lists refetched and
+           every half-finished edit gone as well as the page cleared, and a
+           button that restored the look while leaving yesterday's state behind
+           it would be the more confusing of the two. -->
+      <button id="b_home" title="back to the start — reloads the panel">HOME</button>
       <button id="whoname" title="your account">—</button>
       <span id="whorole"></span>
       <button id="b_signout" title="end this session">SIGN OUT</button>
+      <!-- The way into the manual: one mark, at the end of the bar, past the
+           way out. Blue, and the same blue as every ? beside a section
+           heading — one colour meaning one thing is what lets somebody find
+           help without reading labels. -->
+      <button id="panelhelp" class="helpmark" type="button"
+              title="open the documentation">?</button>
     </span>
   </div>
   <div id="panelscroll">
   <!-- Wrapped so the header keeps a readable measure while the topics below
        take the full width of a wide panel. -->
   <div id="panelhead">
-  <div class="findrow">
-    <input id="rigfind" type="search" placeholder="filter settings…" spellcheck="false">
-  </div>
 
   <!-- The two rows configure different things at different scopes: what
        every viewer sees, and how the server itself is run. Saying so is
@@ -1609,8 +1846,8 @@
        are different subjects that happen to share a row. -->
   <!-- One group, the full width of the panel. What a display looks and
        sounds like: nothing else shares this row. -->
-  <div class="tabgroup">Profile settings</div>
   <div class="tabs">
+    <span class="tablabel">PROFILES</span>
     <!-- APPEARANCE rather than LOOK, so the tab and the "Appearance
      profiles" read as the same subject. data-tab stays "look": it is
      the storage key, and renaming it would rewrite every stored
@@ -1734,7 +1971,7 @@ size it is setting, so you read the choice while making it.</div>
        else on this tab: what the transcript calls each speaker is part of how
        a place reads, and a hallway screen and a laptop can want different
        answers. It writes the shared settings document, which is what the rest
-       of this tab writes — it was on ADMIN SETTINGS, which meant the one tab
+       of this tab writes — it was on ADMIN, which meant the one tab
        carried two different commits. -->
   <section class="grp" data-prof="look" data-tab="look">
     <h4>Speaker label</h4>
@@ -2111,6 +2348,18 @@ above.</div>
   </section>
 
 
+  <!-- Empty on purpose, and saying so. The button exists because IDENTITY has
+       two populations under it and the shape should be visible before the
+       second one is filled in; what belongs here is not built yet. A tab that
+       renders nothing at all is indistinguishable from a page that failed to
+       load, which is the one thing an empty tab must not look like. -->
+  <section class="grp bare proflist" data-tab="users">
+    <div class="barehead"><span class="listtitle">Users</span></div>
+    <div class="grpbody">
+  <div class="note">Nothing here yet.</div>
+    </div>
+  </section>
+
   <!-- Hidden with the rest of it where there is no sign-in: a title over three
        sections that are not there is a heading for nothing. -->
   <section class="grp bare titleonly" data-tab="accounts" data-signin>
@@ -2236,7 +2485,7 @@ setting.</div>
     </div>
   </section>
 
-  <!-- Signing in, and how long a session lasts. Moved off ADMIN SETTINGS,
+  <!-- Signing in, and how long a session lasts. Moved off ADMIN,
        which is about how the server is WIRED — ports, addresses, maintenance —
        where these two are about who gets in and for how long, which is this
        tab's subject. They still write app.json and still need a restart, so
@@ -2426,7 +2675,7 @@ which is how you tell a fault in the interface from a fault in whatever it is
 pointed at.</div>
     </div>
   </section>
-  <!-- A port, under a name. The ports on ADMIN SETTINGS are the admin
+  <!-- A port, under a name. The ports on ADMIN are the admin
        portal's own; what the app answers on is here, with the rest of what an
        endpoint is made of. -->
   <section class="grp bare proflist" data-tab="network">
@@ -2457,7 +2706,7 @@ one more thing to renew.
 
 <b>Ports are bound when the server starts.</b> Adding a profile, changing a
 port or pointing a different endpoint at one takes a restart, exactly as the
-ports on ADMIN SETTINGS do — a listening socket is not something to open and
+ports on ADMIN do — a listening socket is not something to open and
 close under a mouse.</div>
     </div>
   </section>
@@ -2602,6 +2851,54 @@ behaves like the rest of the building rather than like nothing.</div>
   </section>
   <!-- The form itself, which is a different job again: this one is written
        once, in somebody's own words, and read by strangers. -->
+  <!-- A PERSON, as against the browser somebody happened to open. An admin
+       mints one here and hands over the URL; it travels to whatever machine
+       they pick it up on, and the machine contributes nothing to what that
+       session is. First on the tab because it is now the primary thing this
+       page is for — the queue below is read when something needs deciding.
+
+       Add row at the TOP for the same reason DEVICE ENROLMENT's is: this list
+       exists to be added to and then watched, so the URL you have just minted
+       is the first thing on the page rather than the last. -->
+  <section class="grp bare proflist" data-tab="displays">
+    <div class="barehead"><span class="listtitle">People</span></div>
+    <div class="grpbody">
+  <div class="addtop" id="idadd">
+    <div class="seg">
+      <input id="id_name" type="text" spellcheck="false" autocomplete="off"
+             placeholder="Sarah">
+      <button id="b_idnew" class="act-add">CREATE A PERSON</button>
+    </div>
+  </div>
+  <!-- Where the URL appears, once. Same place the enrolment code appears, and
+       for the same reason: what you have just made is what you came here to
+       collect. -->
+  <div id="idurl"></div>
+  <div class="note" id="idnote"></div>
+  <div id="idlist"></div>
+  <div class="note help">A person, as against a device. A device is one screen
+standing in one room; a person moves between a phone, a laptop and a borrowed
+browser and is the same person in all three.
+
+<b>The URL is the credential</b>, so it is minted rather than spelled out of
+their name — a name would be guessable, and a guessable address that grants
+anything is a password written on a wall. It is shown <b>once</b>, here, at the
+moment you create it: what is stored is a hash, so this page cannot show it to
+you a second time. Hand it over before you leave the row.
+
+Opening it sets a cookie and drops the secret out of the address bar, so what
+stays in their history no longer carries anything.
+
+<b>REISSUE</b> mints a new one and kills the old the moment you press it —
+for a URL that got somewhere it should not have, where deleting the person
+would take everything they own with them.
+
+<b>It will not work on a screen you approved.</b> A device is a device, and
+signing a person into a shared one is deliberately not built yet — a kiosk is
+the case it is least for. The URL is not spent by being refused there.</div>
+    </div>
+  </section>
+
   <section class="grp wide" data-tab="displays">
     <h4>The request form</h4>
     <div class="grpbody">
@@ -2654,7 +2951,7 @@ tick. <b>REFUSE</b> gives them a message and you a note for whoever comes back
 to this row in six months, and says whether they may ask again.
 
 They leave this list the moment you decide and appear under CONNECTIONS ▸
-CONNECTIONS, filed with the other people.</div>
+NODES, filed with the other people.</div>
     </div>
   </section>
 
@@ -2711,7 +3008,7 @@ characters into the box it offers. Case and dashes do not matter —
 <b>k7qp4m</b> is the same as <b>K7QP-4M</b>.
 
 A row leaves this list the moment its code is used and appears under
-CONNECTIONS ▸ CONNECTIONS, filed with the other devices so a grant to all
+CONNECTIONS ▸ NODES, filed with the other devices so a grant to all
 of them is one tick.</div>
     </div>
   </section>
@@ -2757,7 +3054,7 @@ is the last time one asked this server anything, so a screen unplugged for a
 week says so here before anybody notices the wall.
 
 Anything that has NOT finished arriving is on the tab it is arriving through —
-ENROLLMENTS ▸ USER for a person waiting on a decision, ▸ DEVICE for a screen
+ENROLLMENTS ▸ PERSON for a person waiting on a decision, ▸ DEVICE for a screen
 that has not taken its code yet. A row moves here on its own the moment it is
 working.
 
@@ -2921,13 +3218,37 @@ Worked examples in DOCUMENTATION → Embedding it elsewhere.</div>
        microphone gotcha are now the help behind Embed keys, and the worked
        examples belong in the manual, which has room for them. -->
 
-  <section class="grp" data-tab="docs">
-    <h4>Manual</h4>
+  <!-- Every document on one page, on its shelf, with the search across all of
+       them at the top. It was a headed topic called Manual that you opened to
+       find a flat list of seven — a container to expand before you could reach
+       the only thing the page is for, on the one tab where there is nothing
+       else to be looking at. -->
+  <section class="grp bare proflist" data-tab="docs">
+    <div class="barehead"><span class="listtitle">Manual</span></div>
     <div class="grpbody">
-  <div class="note help">Select one to read it. Each opens in a window with a
-button to download it as a PDF.</div>
-  <div id="doclist"></div>
+  <!-- Above the list rather than below it, and the same shape as the filter
+       over the settings: a field at the top of a page of things is read as
+       searching them, wherever else it has been met. -->
+  <div class="findrow">
+    <input id="docfind" type="search" spellcheck="false" autocomplete="off"
+           placeholder="search every document…">
+  </div>
+  <!-- Directly under the field, above the results. Whether a search found
+       anything, and anything that went wrong reaching for it, is the answer to
+       what somebody has just typed — at the foot of a list it is somewhere
+       they arrive after they have already concluded it did nothing. -->
   <div class="note" id="docnote"></div>
+  <div id="doclist"></div>
+  <div class="note help">Each document opens in a window, with a button to save
+it as a PDF.
+
+<b>The search reads the documents themselves</b>, not their titles. What comes
+back is the line that matched and the heading it sits under, so you can tell
+which of six mentions is the one you want before opening anything — and opening
+one from a result lands on that line rather than at the top of the document.
+
+Two characters or more. Code blocks are not searched: matching a word against a
+key inside an example sends you to a line that cannot answer you.</div>
     </div>
   </section>
   <!-- App settings save their own thing, so they get their own commit row
@@ -2975,26 +3296,46 @@ button to download it as a PDF.</div>
          divided the two subjects has gone with the second subject — a boundary
          with nothing on the far side of it is a line, not a division.
 
-         DOCUMENTATION is not here either. It is reached from the ? beside the
-         panel title, because it is not something you configure and it was
-         taking a slot in a row of things that are. -->
+         DOCUMENTATION is not here either. It is reached from the ? at the far
+         end of the bar, past the way out, because it is not something you
+         configure and it was taking a slot in a row of things that are. -->
     <div class="tabrow">
     <!-- What this server is wired to, and which machines are here. -->
     <div class="tabside connside">
-      <!-- No caption. One of the three below is now called CONNECTIONS, and a
-           caption saying the same word over it is the panel saying it twice —
-           the rule that keeps a bare list from repeating the tab it sits on. -->
       <div class="tabs">
+        <span class="tablabel">CONNECTIONS</span>
         <button id="tab_ai" data-tab="ai">AI</button>
-        <!-- The register: every device this server knows about. Not in
-             UI_TABS or SETTINGS_TABS — like AI, nothing here writes the shared
-             settings document. -->
-        <button id="tab_devices" data-tab="devices">CONNECTIONS</button>
+        <!-- The register: every device this server knows about. NODES rather
+             than CONNECTIONS, which is now the label over the row — a link
+             repeating the word above it says nothing about which of the three
+             it is. data-tab stays "devices": it is the key everything else
+             addresses this tab by, and renaming it for a label is how a stored
+             document gets rewritten to no purpose. Not in UI_TABS or
+             SETTINGS_TABS — like AI, nothing here writes the shared settings
+             document. -->
+        <button id="tab_devices" data-tab="devices">NODES</button>
         <!-- An embed is another application connecting to this one, which is
              the same question the two beside it answer — what this server is
              wired to — rather than something you administer about the server
              itself. -->
         <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
+      </div>
+    </div>
+    <!-- The search, down here rather than over the topics. It looks for a
+         control across every tab at once, which makes it the same kind of
+         thing as the links beside it — a way of getting somewhere — rather
+         than a setting at the head of the page you are already on. Two thirds
+         to the links and one third to this. -->
+    <div class="tabside findside">
+      <div class="tabs">
+        <span class="tablabel">SEARCH</span>
+        <input id="rigfind" type="search" placeholder="filter settings…"
+               spellcheck="false" autocomplete="off">
+        <!-- Red, and the only red in the row: it takes something away. A field
+             with text in it and no way out but selecting and deleting is one
+             people leave filtered and then report as the panel having lost
+             half its settings. -->
+        <button id="b_findclear" type="button" title="clear the search">✕</button>
       </div>
     </div>
     </div>
@@ -4110,7 +4451,7 @@ name. One port reaches one endpoint, so a profile another endpoint already
 answers on is not offered here.
 
 <b>The port is bound when the server starts</b>, so choosing one here takes a
-restart to come into effect — the same as the ports on ADMIN SETTINGS.</div>
+restart to come into effect — the same as the ports on ADMIN.</div>
     </div>
   </div>
 <div class="subgrp" data-g="limits">
@@ -4881,6 +5222,187 @@ async function loadDisplays(){
   }catch(e){ DISPLAYS = []; }
   return DISPLAYS;
 }
+
+/* ------------------------------------------------------- identities
+   A PERSON, as against the browser somebody happened to open. Minted here and
+   nowhere else: there is no email and nothing to vouch for a name, so anybody
+   who could mint their own could mint somebody else's. */
+let IDENTITIES = [], IDBASE = '', OPENPID = '';
+
+async function loadIdentities(){
+  try{
+    const j = await api('/identities');
+    IDENTITIES = j.identities || [];
+    IDBASE = j.base || '';
+  }catch(e){ IDENTITIES = []; }
+  return IDENTITIES;
+}
+
+function idNote(m, bad){
+  const el = $('idnote');
+  if (!el) return;
+  el.className = 'note' + (bad ? ' bad' : '');
+  el.textContent = m || '';
+}
+
+/* The URL, in the one moment it exists in the clear. Shown whole, the way an
+   enrolment code is: nobody is retyping half an address, and this page cannot
+   show it a second time. */
+function showPersonUrl(name, token){
+  const out = $('idurl');
+  if (!out) return;
+  const line = document.createElement('div');
+  line.textContent = IDBASE + token;
+  const sub = document.createElement('span');
+  sub.textContent = '“' + name + '” · hand this over now — it is not shown '
+                  + 'again · opening it drops the secret out of their address bar';
+  out.innerHTML = '';
+  out.appendChild(line);
+  out.appendChild(sub);
+  out.classList.add('on');
+}
+
+async function idAction(path, body){
+  try{
+    const j = await api(path, {method:'POST', body: JSON.stringify(body)});
+    IDENTITIES = j.identities || IDENTITIES;
+    return j;
+  }catch(e){
+    idNote(e.message || 'that did not work', true);
+    return null;
+  }
+}
+
+async function refreshIdentities(){
+  const box = $('idlist');
+  if (!box || ME.role !== 'admin'){ if (box) box.textContent = ''; return; }
+  await loadIdentities();
+  box.innerHTML = '';
+  if (!IDENTITIES.length){
+    box.className = 'note';
+    box.textContent = 'Nobody yet. Name one above and you are handed the URL '
+                    + 'to give them.';
+    return;
+  }
+  box.className = '';
+  IDENTITIES.forEach(p=>{
+    const row = document.createElement('div');
+    row.className = 'erow';
+    if (OPENPID !== p.id) row.classList.add('shut');
+
+    /* Shut, the name is the row's title and the badge says whether anybody
+       ever picked the URL up — which is the one thing this list is read for,
+       so it is not something you open a row to find. */
+    const top = document.createElement('div'); top.className = 'top';
+    const nmt = document.createElement('span');
+    nmt.className = 'nm';
+    nmt.textContent = p.label || 'unnamed person';
+    top.appendChild(nmt);
+    const seen = document.createElement('span');
+    seen.className = 'badge';
+    seen.textContent = p.last_seen ? 'IN USE' : 'URL NOT PICKED UP';
+    top.appendChild(seen);
+    top.onclick = (e)=>{
+      if (e.target.closest('input, button, select, textarea')) return;
+      const opening = row.classList.contains('shut');
+      OPENPID = opening ? p.id : '';
+      box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+      row.classList.toggle('shut', !opening);
+    };
+    row.appendChild(top);
+
+    const namerow = document.createElement('div');
+    namerow.className = 'namerow';
+    const nlab = document.createElement('b');
+    nlab.textContent = 'Name';
+    namerow.appendChild(nlab);
+    const nm = document.createElement('input');
+    nm.type = 'text'; nm.className = 'nmedit'; nm.value = p.name || '';
+    nm.spellcheck = false;
+    nm.onkeydown = (e)=>{ if (e.key === 'Enter') nm.blur(); };
+    nm.onchange = async ()=>{
+      const j = await idAction('/identities/rename',
+                               {id: p.id, name: (nm.value || '').trim()});
+      if (j){ idNote(''); refreshIdentities(); }
+    };
+    namerow.appendChild(nm);
+    /* On the name's own line, hard right, the same as a group's — deleting is
+       the one thing here that cannot be undone and belongs beside the thing it
+       names rather than among the ticks. */
+    const del = document.createElement('button');
+    del.textContent = 'DELETE';
+    del.className = 'act-danger';
+    del.onclick = async ()=>{
+      if (!confirm('Delete "' + (p.label || p.id) + '"? Their URL stops working '
+                   + 'immediately, and anything granted to them goes with them.'))
+        return;
+      const j = await idAction('/identities/delete', {id: p.id});
+      if (j){ OPENPID = ''; idNote(''); refreshIdentities(); }
+    };
+    namerow.appendChild(del);
+    row.appendChild(namerow);
+
+    const acts = document.createElement('div');
+    acts.className = 'seg actrow';
+    const re = document.createElement('button');
+    re.className = 'act-undo';
+    re.textContent = 'REISSUE THE URL';
+    re.onclick = async ()=>{
+      if (!confirm('Mint a new URL for "' + (p.label || p.id) + '"? The one they '
+                   + 'are using stops working the moment you press this.')) return;
+      const j = await idAction('/identities/reissue', {id: p.id});
+      if (!j || !j.token) return;
+      /* On screen before anything repaints: the old one is already dead, so a
+         new one nobody caught is somebody locked out. */
+      showPersonUrl(p.label || p.id, j.token);
+      idNote('the previous URL stopped working just now');
+      refreshIdentities();
+    };
+    acts.appendChild(re);
+    row.appendChild(acts);
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    [['Created', dispWhen(p.created)
+                 + (p.created_by ? ' by ' + p.created_by : '')],
+     ['Last seen', p.last_seen ? dispWhen(p.last_seen)
+                               : 'never — the URL has not been opened']]
+      .forEach(([k, v])=>{
+        const el = document.createElement('div');
+        const bb = document.createElement('b');
+        bb.textContent = k + ' ';
+        el.appendChild(bb);
+        el.appendChild(document.createTextNode(v));
+        meta.appendChild(el);
+      });
+    row.appendChild(meta);
+    box.appendChild(row);
+  });
+}
+
+$('b_idnew').addEventListener('click', async ()=>{
+  const el = $('id_name'), out = $('idurl');
+  const name = (el.value || '').trim();
+  /* Cleared on the way in, the same as the enrolment code's: a complaint left
+     on screen after the thing succeeded reads as the press having failed. */
+  idNote('');
+  out.classList.remove('on');
+  out.textContent = '';
+  if (!name){
+    idNote('give them a name first — it is what the row is called and what you '
+           + 'will look for when you grant something', true);
+    el.focus();
+    return;
+  }
+  el.value = '';
+  const j = await idAction('/identities/new', {name});
+  if (!j || !j.token) return;           // idAction has said why
+  showPersonUrl(name, j.token);
+  refreshIdentities();
+});
+$('id_name').addEventListener('keydown', e=>{
+  if (e.key === 'Enter') $('b_idnew').click();
+});
 
 /* ----------------------------------------------------------- groups
    A name for a set of displays, so a grant is made once instead of ticked
@@ -7267,7 +7789,7 @@ function showCode(name, code, left){
       clearInterval(codeTick);
       out.classList.add('dead');
       sub.textContent = '“' + name + '” · this code has expired — REISSUE the '
-                      + 'row under CONNECTIONS ▸ DEVICES for another';
+                      + 'row under CONNECTIONS ▸ NODES for another';
       return;
     }
     out.classList.remove('dead');
@@ -7915,36 +8437,187 @@ function mdRender(md){
 
 let DOC_OPEN = null;                          // the id currently on screen
 
+let DOC_INDEX = [];
+
 async function loadDocs(){
   const box = $('doclist'), note = $('docnote');
   if (!box) return;
   note.className = 'note'; note.textContent = '';
   try{
     const j = await api('/docs');
-    box.innerHTML = '';
-    (j.docs || []).forEach(d=>{
-      const b = document.createElement('button');
-      b.className = 'docitem';
-      b.type = 'button';
-      const t = document.createElement('div');
-      t.className = 't';
-      t.textContent = d.title;
-      const tag = document.createElement('span');
-      tag.className = 'a';
-      tag.textContent = d.audience.toUpperCase();
-      t.appendChild(tag);
-      const s = document.createElement('div');
-      s.className = 's';
-      s.textContent = d.summary;
-      b.appendChild(t); b.appendChild(s);
-      b.addEventListener('click', ()=> openDoc(d.id));
-      box.appendChild(b);
-    });
-    if (!(j.docs || []).length) note.textContent = 'no documents installed';
+    DOC_INDEX = j.docs || [];
+    paintDocs();
+    if (!DOC_INDEX.length) note.textContent = 'no documents installed';
   }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
 }
 
-async function openDoc(id){
+function docItem(d){
+  const b = document.createElement('button');
+  b.className = 'docitem';
+  b.type = 'button';
+  const t = document.createElement('div');
+  t.className = 't';
+  t.textContent = d.title;
+  const tag = document.createElement('span');
+  tag.className = 'a';
+  tag.textContent = (d.audience || '').toUpperCase();
+  t.appendChild(tag);
+  const s = document.createElement('div');
+  s.className = 's';
+  s.textContent = d.summary;
+  b.appendChild(t); b.appendChild(s);
+  b.addEventListener('click', ()=> openDoc(d.id));
+  return b;
+}
+
+/* The whole shelf, grouped. Categories come out of the documents in the order
+   they first appear rather than from a list of their own, and the order INSIDE
+   a category is the registry's — which is a reading order, not an alphabet. */
+function paintDocs(){
+  const box = $('doclist');
+  box.innerHTML = '';
+  const cats = [];
+  DOC_INDEX.forEach(d=>{
+    const c = d.category || 'Other';
+    if (cats.indexOf(c) < 0) cats.push(c);
+  });
+  cats.forEach(c=>{
+    const h = document.createElement('div');
+    h.className = 'doccat';
+    h.textContent = c;
+    box.appendChild(h);
+    DOC_INDEX.filter(d=> (d.category || 'Other') === c)
+             .forEach(d=> box.appendChild(docItem(d)));
+  });
+}
+
+/* The line, with the match picked out — built as nodes rather than by pasting
+   a string of HTML together. What is being shown came out of a document, and a
+   document is text: it must never get a chance to be parsed as markup. */
+function markInto(el, text, q){
+  const low = String(text).toLowerCase(), needle = q.toLowerCase();
+  let i = 0, at;
+  while (needle && (at = low.indexOf(needle, i)) >= 0){
+    if (at > i) el.appendChild(document.createTextNode(text.slice(i, at)));
+    const m = document.createElement('mark');
+    m.textContent = text.slice(at, at + needle.length);
+    el.appendChild(m);
+    i = at + needle.length;
+  }
+  el.appendChild(document.createTextNode(text.slice(i)));
+}
+
+let docFindTimer = 0;
+
+async function runDocSearch(q){
+  const box = $('doclist'), note = $('docnote');
+  if (!box) return;
+  if (!q){ note.className = 'note'; note.textContent = ''; paintDocs(); return; }
+  if (q.length < 2){
+    /* The shelf stays on screen rather than being cleared for one character:
+       emptying the page while somebody is still typing the first letter reads
+       as the search having found nothing. */
+    note.className = 'note';
+    note.textContent = 'two characters or more';
+    return;
+  }
+  try{
+    const j = await api('/docs/search?q=' + encodeURIComponent(q));
+    const res = j.results || [];
+    box.innerHTML = '';
+    if (!res.length){
+      note.className = 'note';
+      note.textContent = 'nothing in any document matches “' + q + '”';
+      return;
+    }
+    const n = res.reduce((a, r)=> a + r.total, 0);
+    note.className = 'note';
+    note.textContent = n + (n === 1 ? ' match in ' : ' matches in ') + res.length
+                     + (res.length === 1 ? ' document' : ' documents');
+    res.forEach(r=>{
+      const h = document.createElement('div');
+      h.className = 'doccat';
+      h.textContent = r.title;
+      box.appendChild(h);
+      r.hits.forEach(hit=>{
+        const b = document.createElement('button');
+        b.className = 'dochit';
+        b.type = 'button';
+        if (hit.heading){
+          const hd = document.createElement('div');
+          hd.className = 'h';
+          hd.textContent = hit.heading;
+          b.appendChild(hd);
+        }
+        const x = document.createElement('div');
+        x.className = 'x';
+        markInto(x, hit.text, q);
+        b.appendChild(x);
+        /* Carries the query, so opening it lands on the line rather than at
+           the top of a document somebody then searches again by eye. */
+        b.addEventListener('click', ()=> openDoc(r.id, q));
+        box.appendChild(b);
+      });
+      if (r.total > r.hits.length){
+        const more = document.createElement('div');
+        more.className = 'docmore';
+        more.textContent = (r.total - r.hits.length)
+                         + ' more in this document — open it to read them';
+        box.appendChild(more);
+      }
+    });
+  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+}
+
+const docfind = $('docfind');
+if (docfind){
+  docfind.addEventListener('input', ()=>{
+    clearTimeout(docFindTimer);
+    const q = docfind.value.trim();
+    /* Debounced. Otherwise it is a pass over seven documents on every
+       keystroke, and the answer for "us" is not worth a round trip on the way
+       to "user". */
+    docFindTimer = setTimeout(()=> runDocSearch(q), 180);
+  });
+  docfind.addEventListener('keydown', e=>{
+    if (e.key === 'Escape'){
+      docfind.value = '';
+      clearTimeout(docFindTimer);
+      runDocSearch('');
+    }
+  });
+}
+
+/* Every occurrence of what was searched for, picked out where it sits, and the
+   first one scrolled to. Walking text nodes rather than touching innerHTML:
+   the document has already been rendered and re-parsing it around a match
+   would take the markup apart to put a highlight in. */
+function markDoc(q){
+  const body = $('docbody'), needle = String(q || '').toLowerCase();
+  if (!needle) return;
+  const walk = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+  const found = [];
+  let n;
+  while ((n = walk.nextNode())){
+    if (n.nodeValue.toLowerCase().indexOf(needle) >= 0) found.push(n);
+  }
+  let first = null;
+  found.forEach(node=>{
+    const at = node.nodeValue.toLowerCase().indexOf(needle);
+    if (at < 0) return;                 // split by an earlier pass
+    const r = document.createRange();
+    r.setStart(node, at);
+    r.setEnd(node, at + needle.length);
+    const m = document.createElement('mark');
+    /* Refuses where the match straddles two elements — half a word in bold.
+       One highlight not drawn is better than a document taken apart. */
+    try{ r.surroundContents(m); }catch(e){ return; }
+    if (!first) first = m;
+  });
+  if (first) first.scrollIntoView({block:'center'});
+}
+
+async function openDoc(id, q){
   const modal = $('docmodal');
   $('doctitle').textContent = 'loading…';
   $('docsub').textContent = '';
@@ -7957,6 +8630,7 @@ async function openDoc(id){
     $('docsub').textContent = j.doc.summary;
     $('docbody').innerHTML = mdRender(j.doc.body);
     $('docbody').scrollTop = 0;
+    if (q) markDoc(q);
     $('b_docclose').focus();
   }catch(e){
     $('doctitle').textContent = 'could not open it';
@@ -8125,13 +8799,17 @@ function panelNav(){
        add a second endpoint is to first collapse the first. */
   }
   /* Takes a tab button, or a tab's NAME for a tab that no longer has one.
-     Documentation is reached from the ? beside the panel title now, so there
-     is no button in the row to light up — and nothing lighting up is the
-     honest answer there, because none of the tabs in the row is where you
+     Documentation is reached from the ? at the far end of the bar now, so
+     there is no button in the row to light up — and nothing lighting up is
+     the honest answer there, because none of the tabs in the row is where you
      are. */
   function selectTab(b){
     const btn = (typeof b === 'string')
       ? tabButtons.find(x=> x.dataset.tab === b) : b;
+    /* Anything selected is a departure from the opening state, including the ?
+       — which reaches a tab with no button in the row and would otherwise open
+       the manual behind the mark. */
+    $('panel').classList.remove('home');
     tab = btn ? btn.dataset.tab : b;
     CURRENT_TAB = tab;
     tabButtons.forEach(x=> x.classList.toggle('on', x === btn));
@@ -8147,6 +8825,9 @@ function panelNav(){
     if (tab === 'security'){ refreshGroups(); loadApp(); }
     if (tab === 'displays' || tab === 'devices' || tab === 'security'
         || tab === 'enrol') refreshDisplays();
+    // Its own list and its own fetch: it shares the tab with the request
+    // queue but nothing else, and a person is not a row in the display file.
+    if (tab === 'displays') refreshIdentities();
     /* The three settings tabs ARE profile lists now, and those lists live in
        the displays document — so arriving at one has to fetch it, exactly as
        PROFILES does. Without this the lists were painted only if you happened
@@ -8170,11 +8851,33 @@ function panelNav(){
     }
     if (tab === 'docs') loadDocs();
   }
+  /* The opening state, and the only way out of it is pressing something. Not a
+     tab of its own: it has no content, nothing to save and nothing to filter,
+     and giving it a data-tab would put it in the row of places you can go —
+     where it is the absence of one of those, not another. */
+  function enterHome(){
+    $('panel').classList.add('home');
+    /* No tab, rather than 'look' with its button unlit: syncSaveRow reads
+       this, and a commit row offering to SAVE FOR EVERYONE over a page
+       showing nothing but the mark is a button with no subject. */
+    tab = '';
+    CURRENT_TAB = '';
+    tabButtons.forEach(x=> x.classList.remove('on'));
+    render();
+    syncSaveRow();
+  }
   tabButtons.forEach(b=> b.addEventListener('click', ()=> selectTab(b)));
+  /* One mark now, in the bar's right-hand end. There were two, one per boxed
+     label, and both called this — which said the labels had manuals of their
+     own when there has only ever been the one. */
   const phelp = $('panelhelp');
   if (phelp) phelp.addEventListener('click', ()=> selectTab('docs'));
-  const ehelp = $('enrolhelp');
-  if (ehelp) ehelp.addEventListener('click', ()=> selectTab('docs'));
+  /* A reload rather than enterHome(). Both put the mark back, but only one of
+     them makes the panel what it is on a fresh open — every list refetched,
+     nothing half-edited still sitting in a field on a tab you cannot see. The
+     sign-in survives it: the session is a cookie, not page state. */
+  const bhome = $('b_home');
+  if (bhome) bhome.addEventListener('click', ()=> location.reload());
   /* Opening a section from somewhere other than its own heading: ADD has to
      take you to the block it just created. Assigned out to module scope
      because this closure is where the collapse state lives. */
@@ -8192,9 +8895,27 @@ function panelNav(){
   rescan();
   // the commit row depends on the filter as well as the tab, so both paths
   // have to re-run it
-  findEl.addEventListener('input', ()=>{ render(); syncSaveRow(); });
+  /* One path for both the typing and the X, so the two cannot drift.
+     Searching from the opening state has to LEAVE it, or the field is a
+     control wired to nothing: the matches land in the box that state hides.
+     Emptying it goes back there, but only if no tab was ever chosen — after
+     that, clearing a filter should return you to the tab you were on. */
+  function afterFind(){
+    if ((findEl.value || '').trim()) $('panel').classList.remove('home');
+    else if (!tab) return enterHome();
+    render();
+    syncSaveRow();
+  }
+  findEl.addEventListener('input', afterFind);
+  const fclear = $('b_findclear');
+  if (fclear) fclear.addEventListener('click', ()=>{
+    findEl.value = '';
+    afterFind();
+    findEl.focus();
+  });
   render();
   syncSaveRow();
+  enterHome();
 }
 
 /* ----------------------------------------------------------------- boot */
@@ -8215,7 +8936,10 @@ function start(){
   // Nothing to expire when there is no sign-in, so nothing to poll for.
   if (!ME.no_auth) startBeat();
   $('whoname').textContent = ME.user;
-  $('whorole').textContent = ME.role;
+  /* One phrase — name, dash, level — rather than a name and a badge. The dash
+     is carried here rather than in the markup so an empty role leaves no
+     orphan punctuation sitting beside somebody's name. */
+  $('whorole').textContent = ME.role ? '- ' + ME.role : '';
   /* With no sign-in there is nobody to name, and "Signed in as (no sign-in)"
      is worse than saying plainly what is going on. */
   $('whoami').textContent = ME.no_auth
@@ -8237,6 +8961,10 @@ function start(){
   $('tab_displays').style.display = admin ? '' : 'none';
   $('tab_enrol').style.display = admin ? '' : 'none';
   $('tab_embeds').style.display = admin ? '' : 'none';
+  // Empty today, and admin-only from the start rather than from whenever it
+  // stops being empty: everything a person is made of here is minted, granted
+  // or revoked, and none of those is a thing a read-only account does.
+  $('tab_users').style.display = admin ? '' : 'none';
   /* The accounts tab stays, because Groups live on it and a group has nothing
      to do with signing in. What goes, where there is no sign-in, is the three
      sections about accounts themselves: they would manage a set of people who
@@ -8259,8 +8987,13 @@ function start(){
      click for was the one that arrived empty — and the only thing that
      covered it was the preview's handshake, which is a race (see askPreview
      below). Two different reasons for the same blank list; this is one of
-     them. */
-  loadTab(CURRENT_TAB);
+     them.
+
+     GUARDED, because the panel now opens on no tab at all. Called with an
+     empty one this selects nothing, and selecting anything is what leaves the
+     opening state — so the mark was drawn and then immediately taken down
+     again, leaving the empty box that used to hold the topics. */
+  if (CURRENT_TAB) loadTab(CURRENT_TAB);
   /* The controls themselves are built from the settings the preview hands
      over. If that already happened while this page was still working out who
      was signed in, the message is gone — so ask for it rather than wait for

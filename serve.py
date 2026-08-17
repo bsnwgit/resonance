@@ -3127,6 +3127,171 @@ def admin_displays():
     return out
 
 
+# ---------------------------------------------------------------- identities
+# A PERSON, as distinct from a place. A display is one physical object standing
+# in one room; an identity is somebody who moves between a phone, a laptop and
+# a borrowed browser and is the same person in all three.
+#
+# A SESSION IS A USER OR A DEVICE, NEVER BOTH, and the URL decides which. A
+# device added as a device operates as a device — a kiosk, a wall tablet — and
+# no person exists inside that session. An identity's URL travels, and the
+# machine it was opened on contributes nothing to what that session may reach.
+# They are separate namespaces for that reason: a place is named by ?display=
+# and a person by a minted path, and neither can be spelled in the other's
+# notation. One parameter holding either kind would hang everything a place
+# owns — appearance, kiosk mode, route bindings, session length — off a person,
+# who has no place to hang any of it on.
+#
+# CREATED IN THE PANEL AND NOWHERE ELSE. No email, no verification and nothing
+# here to vouch for a name, so anybody who could mint their own identity could
+# mint somebody else's.
+#
+# THE URL CARRIES A MINTED SECRET rather than a readable name. A name is
+# guessable, and a guessable URL that grants reach is a password written on a
+# wall — the same fault that made display tokens necessary, arriving through
+# the front door. The first visit exchanges it for a cookie, so the secret
+# leaves the address bar after one use and a shoulder-read of somebody's
+# browser history is spent rather than live.
+IDENTITIES_PATH = os.path.join(ROOT, "identities.json")
+_identities_lock = threading.Lock()
+IDENTITY_COOKIE = "rsn_pid"
+#: The same ten years a display gets, for the same reason: an identity is
+#: issued once and then somebody just uses it, and an expiring one would lock
+#: somebody out for a reason they could not see. Revocation is deleting the
+#: record or reissuing the URL, and both are immediate.
+IDENTITY_MAX_AGE = DISPLAY_MAX_AGE
+#: A ceiling rather than a setting. It bounds a list an admin fills in by hand
+#: and nobody creates five thousand people one at a time; if a deployment ever
+#: needs this to scale it belongs beside max_displays, where the numbers that
+#: DO scale with the deployment already live.
+MAX_IDENTITIES = 500
+
+IDENTITY_DEFAULTS = {
+    "name": "",                  # what an admin called them
+    # The URL secret, hashed the way a display token is: the id addresses the
+    # record and the secret proves it, so a wrong URL costs one hash rather
+    # than a scan of everybody in the building. SHA-256 rather than the PBKDF2
+    # the passwords get, because this secret is 32 bytes from the system
+    # generator and there is no dictionary to run against it.
+    "salt": "", "hash": "",
+    "created": 0, "last_seen": 0,
+    "created_by": "",
+}
+
+
+def read_identities():
+    try:
+        with open(IDENTITIES_PATH) as fh:
+            doc = json.load(fh)
+        stored = doc.get("identities", {}) if isinstance(doc, dict) else {}
+    except (OSError, ValueError):
+        return {}
+    out = {}
+    for pid, rec in stored.items():
+        if not isinstance(rec, dict):
+            continue
+        row = dict(IDENTITY_DEFAULTS)
+        row.update({k: v for k, v in rec.items() if k in IDENTITY_DEFAULTS})
+        out[str(pid)] = row
+    return out
+
+
+def write_identities(rows):
+    with _identities_lock:
+        tmp = IDENTITIES_PATH + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump({"version": 1, "identities": rows}, fh,
+                      indent=2, sort_keys=True)
+        os.chmod(tmp, 0o600)                     # URL secret hashes
+        os.replace(tmp, IDENTITIES_PATH)
+
+
+def identity_label(rec):
+    return rec.get("name") or "unnamed person"
+
+
+def new_identity(name, by):
+    """Mint one, and hand back (url token, record) — or (None, error).
+
+    The token is shown once, in the URL an admin hands over. What is stored is
+    its hash, so a panel that has been closed cannot show it again and a copy
+    of this file cannot be read back into a working URL."""
+    name = str(name or "").strip()[:60]
+    if not name:
+        return None, "a name is required"
+    rows = read_identities()
+    if len(rows) >= MAX_IDENTITIES:
+        return None, ("that is %d identities already — remove one first"
+                      % MAX_IDENTITIES)
+    if any(r["name"].lower() == name.lower() for r in rows.values()):
+        # Not a security property: the URL is the credential, and two people
+        # called Sam would still be told apart by it. It is that a list with
+        # two identical rows is one an admin cannot act on.
+        return None, "there is already an identity with that name"
+    pid = "p" + secrets.token_hex(6)
+    secret = secrets.token_urlsafe(32)
+    salt, dk = hash_key(secret)
+    rows[pid] = dict(IDENTITY_DEFAULTS, name=name, salt=salt, hash=dk,
+                     created=int(time.time()), created_by=str(by or "")[:60])
+    write_identities(rows)
+    return pid + "." + secret, dict(rows[pid], id=pid)
+
+
+def reissue_identity(pid):
+    """A new secret, and the old URL stops working the moment this returns.
+    What it is for is a URL that got somewhere it should not have — pasted
+    into a chat, left in a browser somebody else uses — where deleting the
+    person would take everything they own with it."""
+    rows = read_identities()
+    rec = rows.get(pid)
+    if not rec:
+        return None
+    secret = secrets.token_urlsafe(32)
+    rec["salt"], rec["hash"] = hash_key(secret)
+    write_identities(rows)
+    return pid + "." + secret
+
+
+def find_identity(token):
+    """The person this token belongs to, or None. Same shape as a display
+    token and an embed key: id, a dot, and the secret."""
+    pid, _, secret = str(token or "").partition(".")
+    if not pid or not secret:
+        return None
+    rec = read_identities().get(pid)
+    if not rec or not rec.get("hash"):
+        return None
+    try:
+        ok = hmac.compare_digest(
+            hash_key(secret, bytes.fromhex(rec["salt"]))[1], rec["hash"])
+    except (KeyError, TypeError, ValueError):
+        return None                              # a record edited by hand
+    return dict(rec, id=pid) if ok else None
+
+
+def note_identity_seen(pid):
+    """Last seen, at most once every SEEN_INTERVAL. A person's browser talks to
+    this server as often as a display's does, and writing on every request
+    would make a list nobody is reading the busiest file on the box."""
+    rows = read_identities()
+    rec = rows.get(pid)
+    now_ = int(time.time())
+    if not rec or now_ - int(rec.get("last_seen") or 0) < SEEN_INTERVAL:
+        return
+    rec["last_seen"] = now_
+    write_identities(rows)
+
+
+def admin_identities():
+    """The list, less the credential. What a URL secret IS never leaves this
+    server after the one moment it was minted."""
+    rows = read_identities()
+    return [dict({k: rec.get(k) for k in
+                  ("name", "created", "last_seen", "created_by")},
+                 id=pid, label=identity_label(rec))
+            for pid, rec in sorted(rows.items(), key=lambda kv: kv[1]["created"])]
+
+
 # -------------------------------------------------------------------- groups
 # A name for a set of them, so a grant can be made once instead of ticked
 # twelve times and re-ticked every time somebody gets a new phone.
@@ -4121,10 +4286,17 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/displays", "/displays/approve", "/displays/rename",
                      "/displays/delete", "/displays/new", "/displays/reissue",
                      "/displays/decide", "/displays/settings", "/displays/kiosk",
-                     "/groups", "/groups/save", "/groups/delete")
+                     "/groups", "/groups/save", "/groups/delete",
+                     "/identities", "/identities/new", "/identities/rename",
+                     "/identities/delete", "/identities/reissue")
 #: where an enrolment code is typed. On the display listeners only — it hands
 #: out a display's token, and the admin listener is not a display.
 ENROL_PREFIX = "/e/"
+#: where a person's minted URL is spent. On the display listeners only, and for
+#: the same reason /display/hello is: it hands out an identity's cookie, and
+#: the admin listener is not somewhere anybody stands and uses this. Everything
+#: an ADMIN does to an identity sits under /identities, well away from it.
+PERSON_PREFIX = "/p/"
 #: the other half of the embed API: reachable from the display listeners,
 #: because that is where a host server and a host browser can actually get to
 EMBED_ROUTES = ("/embed", "/embed/session")
@@ -4331,6 +4503,37 @@ class Handler(SimpleHTTPRequestHandler):
         morsel = jar.get(DISPLAY_COOKIE)
         return find_display(morsel.value) if morsel else None
 
+    def _identity(self):
+        """Which person is calling, or None. Same mechanism as `_display`, in a
+        cookie of its own — and a browser may hold both, because somebody can
+        have opened a display URL on the machine they later spend their own URL
+        on. Which of the two a request IS is decided by the URL, not by what is
+        in the jar: see the precedence at /display/hello."""
+        if self.admin_port:
+            # The panel's live preview is an admin looking at a display. It is
+            # not somebody's personal session and must never borrow one.
+            return None
+        raw = self.headers.get("Cookie")
+        if not raw:
+            return None
+        try:
+            jar = http.cookies.SimpleCookie(raw)
+        except http.cookies.CookieError:
+            return None
+        morsel = jar.get(IDENTITY_COOKIE)
+        return find_identity(morsel.value) if morsel else None
+
+    def _set_identity_cookie(self, token):
+        # Same reasoning as the display cookie: Secure only where the
+        # connection actually is, because bound to loopback this server is the
+        # whole product over plain HTTP and a cookie the browser refused to
+        # store would leave a personal install unable to hold an identity.
+        bits = ["%s=%s" % (IDENTITY_COOKIE, token), "Path=/", "HttpOnly",
+                "SameSite=Strict", "Max-Age=%d" % IDENTITY_MAX_AGE]
+        if isinstance(self.connection, ssl.SSLSocket):
+            bits.insert(3, "Secure")
+        self.send_header("Set-Cookie", "; ".join(bits))
+
     def _display_state(self, rec):
         """Everything the display page needs to know about itself, in one
         object: whether it may use anything, whether it may ask, what the form
@@ -4445,6 +4648,12 @@ class Handler(SimpleHTTPRequestHandler):
                                     # not. `/display/hello` is one letter and a
                                     # whole boundary away, and unaffected.
                                     or path.startswith("/displays/")
+                                    # Same belt-and-braces as /displays/ above,
+                                    # applied when the section was new rather
+                                    # than after one of its routes announced
+                                    # itself with a 401. `/p/` is one letter
+                                    # and a whole boundary away, and unaffected.
+                                    or path.startswith("/identities/")
                                     or path.startswith("/auth/")
                                     or path == "/docs"
                                     or path.startswith("/docs/")):
@@ -4457,6 +4666,16 @@ class Handler(SimpleHTTPRequestHandler):
             if not self._require():
                 return
             return self._json(200, {"docs": manual.doc_index()})
+        if path == "/docs/search":
+            # Ahead of the /docs/<id> lookup below, which would take "search"
+            # for a document id and answer 404. It costs one reserved id in a
+            # registry we own, and keeps the search under the path it searches
+            # rather than off in a name of its own.
+            if not self._require():
+                return
+            q = (parse_qs(urlparse(self.path).query).get("q") or [""])[0]
+            return self._json(200, {"q": q, "results": manual.search(q),
+                                    "min": manual.SEARCH_MIN})
         if path.startswith("/docs/"):
             if not self._require():
                 return
@@ -4539,6 +4758,47 @@ class Handler(SimpleHTTPRequestHandler):
                   flush=True)
             _back("ok")
             self._set_display_cookie(token)
+            self.end_headers()
+            return
+
+        if path.startswith(PERSON_PREFIX):
+            # A person's minted URL, being spent. A GET, because it is a link
+            # somebody was handed and clicked, and the redirect is the point
+            # rather than a courtesy: it takes the secret out of the address
+            # bar, so what is left in the history is a URL that no longer
+            # carries anything.
+            #
+            # No back-off here, unlike an enrolment code. That one is six typed
+            # characters and needs four rules around it to be safe; this is 32
+            # bytes from the system generator, and a rate limit on guessing it
+            # would be a control against nothing.
+            if self.admin_port:
+                return self._json(404, {"error": "not found"})
+            token = path[len(PERSON_PREFIX):]
+            here = self._display()
+            if here and here.get("approved"):
+                # A DEVICE IS A DEVICE. Signing a person into a screen several
+                # people share is the middle ground this phase deliberately
+                # leaves for later, and a kiosk is the case it is explicitly
+                # NOT for — so it is refused where it was attempted, visibly,
+                # rather than accepted here and quietly ignored on some later
+                # request. The URL is not spent by this: it still works
+                # everywhere it should.
+                self.send_response(303)
+                self.send_header("Location", "/?person=isdevice")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            rec = find_identity(token)
+            self.send_response(303)
+            self.send_header("Location", "/?person=" + ("ok" if rec else "bad"))
+            self.send_header("Content-Length", "0")
+            if rec:
+                note_identity_seen(rec["id"])
+                print("identity %s (%s) spent its URL from %s"
+                      % (rec["id"], identity_label(rec), self.address_string()),
+                      flush=True)
+                self._set_identity_cookie(token)
             self.end_headers()
             return
 
@@ -4687,6 +4947,22 @@ class Handler(SimpleHTTPRequestHandler):
                                     "people": people, "devices": devices,
                                     "kinds": list(GROUP_KINDS),
                                     "max": MAX_GROUPS})
+        if path == "/identities":
+            if not self._require("admin"):
+                return
+            # The host the panel is being read on, for the same reason the
+            # enrolment base uses it: an admin is about to hand this address to
+            # somebody, so it has to be whole rather than a path they finish by
+            # guessing. A stored hostname would be this server's opinion of
+            # where it lives; the Host header is where somebody actually is.
+            host = re.sub(r":\d+$", "", self.headers.get("Host") or "") or LOOPBACK
+            secure = RUNNING.get("https_port")
+            return self._json(200, {"identities": admin_identities(),
+                                    "max": MAX_IDENTITIES,
+                                    "base": "%s://%s:%d%s"
+                                            % ("https" if secure else "http", host,
+                                               secure or RUNNING.get("http_port") or 0,
+                                               PERSON_PREFIX)})
         if path == "/app":
             if not self._require("admin"):
                 return
@@ -5303,6 +5579,22 @@ class Handler(SimpleHTTPRequestHandler):
                     return self._json(401, {"error": "not signed in"})
                 return self._json(200, {"display": dict(PREVIEW_DISPLAY)})
             disp = self._display()
+            # A SESSION IS A USER OR A DEVICE, AND THE URL DECIDES WHICH.
+            # A declared name means this browser is standing somewhere, and an
+            # approved token means somebody hung it there — either way it is a
+            # device, whatever else is in the cookie jar. Below that line a
+            # person wins: a browser holding an unapproved token is somebody
+            # who once looked at this page, not a screen on a wall.
+            #
+            # It must not fall through to minting a display, or everybody who
+            # ever opened their own URL would leave a stray row in the panel
+            # for an admin to wonder about.
+            if not asked and not (disp and disp.get("approved")):
+                who = self._identity()
+                if who:
+                    note_identity_seen(who["id"])
+                    return self._json(200, {"person": {"id": who["id"],
+                                                       "name": who["name"]}})
             if disp:
                 note_display_seen(disp["id"], asked=asked or None,
                                   hint=hint or None)
@@ -5520,6 +5812,83 @@ class Handler(SimpleHTTPRequestHandler):
                      len(rec["members"])), flush=True)
             return self._json(200, {"ok": True, "id": gid,
                                     "groups": admin_groups()})
+
+        if parsed.path == "/identities/new":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            token, rec = new_identity(obj.get("name"), s["user"])
+            if not token:                        # `rec` is the reason
+                return self._json(409, {"error": rec})
+            print("identity %s (%s) created by %s"
+                  % (rec["id"], identity_label(rec), s["user"]), flush=True)
+            # The URL is handed back ONCE and never again: what is stored is
+            # its hash, so a panel that has been closed cannot show it a second
+            # time. Same contract an embed key already has, and for the same
+            # reason — a secret a panel can re-display is a secret sitting in
+            # every browser that ever had that page open.
+            return self._json(200, {"ok": True, "token": token,
+                                    "identities": admin_identities()})
+
+        if parsed.path == "/identities/reissue":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            token = reissue_identity(str(obj.get("id") or ""))
+            if not token:
+                return self._json(404, {"error": "no such identity"})
+            print("identity %s reissued by %s" % (obj.get("id"), s["user"]),
+                  flush=True)
+            # The old URL stopped working the moment that returned. Anything
+            # holding a cookie from it keeps that cookie and it no longer
+            # resolves, which is the same revocation an embed key gets.
+            return self._json(200, {"ok": True, "token": token,
+                                    "identities": admin_identities()})
+
+        if parsed.path == "/identities/rename":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            rows = read_identities()
+            pid = str(obj.get("id") or "")
+            if pid not in rows:
+                return self._json(404, {"error": "no such identity"})
+            name = str(obj.get("name") or "").strip()[:60]
+            if not name:
+                return self._json(400, {"error": "a name is required"})
+            if any(p != pid and r["name"].lower() == name.lower()
+                   for p, r in rows.items()):
+                return self._json(409, {"error": "there is already an identity "
+                                                 "with that name"})
+            rows[pid]["name"] = name
+            write_identities(rows)
+            return self._json(200, {"ok": True, "identities": admin_identities()})
+
+        if parsed.path == "/identities/delete":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            rows = read_identities()
+            pid = str(obj.get("id") or "")
+            if pid not in rows:
+                return self._json(404, {"error": "no such identity"})
+            name = identity_label(rows.pop(pid))
+            write_identities(rows)
+            print("identity %s (%s) deleted by %s" % (pid, name, s["user"]),
+                  flush=True)
+            return self._json(200, {"ok": True, "identities": admin_identities()})
 
         if parsed.path == "/groups/delete":
             s = self._require("admin")

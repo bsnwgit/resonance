@@ -24,61 +24,124 @@ it out; the delay is per address and clears on its own.
 
 ## How the panel is laid out
 
+**It opens on nothing.** The first thing you see is the mark, at three quarters
+of the panel's width, and the menus — no topics, no box, and no tab lit,
+because none of them is where you are yet. Press anything and it steps back to
+a watermark behind the work, where it stays for the rest of the session.
+
+**HOME**, immediately left of your name, brings the whole panel back to that
+state. It reloads: every list refetched, and nothing half-edited still sitting
+in a field on a tab you can no longer see. Anything you typed and did not save
+goes with it. Your sign-in does not — the session is a cookie, not something
+the page is holding.
+
+HOME and **SIGN OUT** are the only two filled controls on that bar, because
+they are the only two that move the whole panel, and they are filled in
+opposite colours: ice takes you back to the start, rust ends the session.
+Beside them your name reads as one phrase — name, dash, level — rather than a
+name with a badge after it.
+
 The left column is the whole interface. It is organised as a set of topics,
 and **one topic is open at a time**: opening another closes the one before it,
 so the column stays short enough to take in at a glance rather than becoming a
 wall to scroll through. Clicking the open one closes it, which is a legitimate
 state to leave it in.
 
-**In the bar across the top**, beside the SETTINGS title, are the places this
-panel can take you — links rather than tabs, because they do not switch which
-controls you are editing, they change the subject entirely:
+**In the bar across the top** are three boxed labels, each naming the links
+beside it. A label is not somewhere you can go — nothing happens when you press
+one. It says what the links after it have in common, and the large space before
+the next label is what separates one subject from the next. The links are links
+rather than tabs, because they do not switch which controls you are editing;
+they change the subject entirely.
 
-- **ADMIN SETTINGS** — how the server itself is wired: where it can be reached
-  from, maintenance, and the admin portal's own port. What the app answers on
-  is a network profile, not here; signing in and session lifetime are on
-  SECURITY, with the rest of who-gets-in.
-- **ADMIN USERS** — the accounts that can sign in to this panel.
+**Every label is shaded from the display's own palette**, a colour per subject
+— the three in the bar in **blue**, PROFILES and CONNECTIONS in **ice**, SEARCH
+in **milk**. They are the same five colours a display can be set to, taken from
+the same values rather than matched by eye, so the panel and the thing it
+configures are not two people's idea of one palette. The colour is there to
+tell the rows apart at a glance; it is not saying anything you have to decode.
+
+**IDENTITY** — who this server knows about. Two populations that are not one
+list: one signs in with a password to configure the server, the other picks up
+a URL and talks to the display.
+
+- **ADMIN** — the accounts that can sign in to this panel.
+- **USER** — a person the display side knows about. Empty for now.
+
+**SETTINGS** — how the server itself is run.
+
+- **ADMIN** — how the server is wired: where it can be reached from,
+  maintenance, and the admin portal's own port. What the app answers on is a
+  network profile, not here; signing in and session lifetime are on SECURITY,
+  with the rest of who-gets-in.
 - **SECURITY** — who gets in and on what terms: **signing in** and how long an
   admin session lasts, how long an **enrolment code** is worth anything for,
   **AI Requires Permission** — whether a general user needs approval at all,
   how long a grant lasts, how many devices and waiting requests there may be —
-  and the **groups** access is granted to. ENROLLMENTS ▸ USER answers who is waiting;
-  this is whether anybody is asked in the first place.
-- **?** — these documents. It is blue, and it is the same blue as every ?
-  beside a topic heading, so help is one colour wherever you meet it.
-- At the right: your own name, your role, and **SIGN OUT**. One side of that
-  bar is where you are going, the other is who you are.
+  and the **groups** access is granted to. ENROLLMENTS ▸ PERSON answers who is
+  waiting; this is whether anybody is asked in the first place.
 
-**ENROLLMENTS**, after a gap and a rule in the same bar, is how something comes
-to be here — as opposed to everything left of it, which configures the server:
+**ENROLLMENTS** — how something comes to be here, as opposed to everything left
+of it, which configures the server.
 
-- **USER** — the request form, and everybody who has asked to be here and not
-  yet been decided about.
+- **PERSON** — the people you have minted a URL for, the request form, and
+  everybody who has asked to be here and not yet been decided about.
 - **DEVICE** — where a screen is set up: named, given a code, and watched until
   it takes it.
-- **?** — these documents again. It belongs to that title the way the first one
-  belongs to SETTINGS.
 
-Below it:
+At the right of the same bar: your own name, your role, **SIGN OUT**, and the
+**?**. One side of the bar is where you are going, the other is who you are.
 
-- **filter settings** — type to search across every topic in every tab at
-  once. This is the fastest way to find a control when you know roughly what
-  it is called but not which tab it lives under.
-- **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER / MODELS / NETWORK /
-  DISPLAY** — the profile settings group. Each is a list of profiles, and the
-  controls for one appear inside it when you open it. MODELS and NETWORK are
-  the two halves of an endpoint that are not the endpoint: what it speaks to,
-  and what it answers on.
+**There is one ?**, at the far end past SIGN OUT, and it opens these documents.
+It used to be a mark inside each boxed label, which said the labels had manuals
+of their own when there has only ever been the one. It is blue, and it is the
+same blue as every ? beside a topic heading, so help is one colour wherever you
+meet it.
 
-**At the foot**, what this server is wired to, as opposed to what you
-administer about it:
+It opens a page rather than a container: every document on its shelf — using
+it, administration, the display, assistants and integration — and a search
+across all of them at the top. **The search reads the documents themselves, not
+their titles.** What comes back is the line that matched and the heading it
+sits under, so you can tell which of six mentions is the one you want before
+opening anything, and opening a result lands you on that line rather than at
+the top. Two characters or more; code blocks are not searched, because matching
+a word against a key inside an example sends you to a line that cannot answer
+you. Whether it found anything is said directly under the field.
+
+Below the bar, two more rows built the same way — a boxed label, then links
+marked by colour and a rule underneath rather than by a box of their own:
+
+- **PROFILES** — and after it **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER /
+  MODELS / NETWORK / DISPLAY**. Each is a list of profiles, and the controls
+  for one appear inside it when you open it. MODELS and NETWORK are the two
+  halves of an endpoint that are not the endpoint: what it speaks to, and what
+  it answers on.
+
+**CONNECTIONS**, at the foot — what this server is wired to, as opposed to what
+you administer about it:
 
 - **AI** — the endpoints, each naming a speech profile, a model profile and a
   network profile.
-- **CONNECTIONS** — everything currently connected, in two areas: the
-  people you approved, and the devices that took a code.
+- **NODES** — everything currently connected, in two areas: the people you
+  approved, and the devices that took a code.
 - **EMBEDS** — keys that let another application frame this interface.
+
+**SEARCH** shares that bottom row, on the right third of it. Type to search
+across every topic in every tab at once — the fastest way to find a control
+when you know roughly what it is called but not which tab it lives under. It
+searches a topic's whole text, including the prose behind its **?**, and a
+topic that matched only on hidden help opens with that help showing rather than
+looking like it has nothing to do with what you typed.
+
+**It is there at all times, the opening screen included**, and it is the one
+thing that works from there: it looks across every tab, so it is how you get
+somewhere without knowing which tab to press. Typing takes the panel off that
+screen, because the matches have to land somewhere. Emptying it puts the mark
+back if you never chose a tab, and returns you to the tab you were on if you
+did.
+
+The red **✕** at the end empties it in one press. A field left filtered with no
+obvious way out is how somebody concludes the panel has lost half its settings.
 
 **Your own account is behind your name.** Click it for the box that changes
 your password. It is the one thing on this page you do to yourself, so it sits
@@ -130,7 +193,7 @@ Each of these writes a different document, so each has its own button:
 | SAVE, on SECURITY | who has to be approved, what a grant is worth, how long a code lasts | immediately |
 | SAVE, inside Sign in | how you get in | only after a restart |
 | SAVE, inside Sessions | how long an admin session lasts | only after a restart |
-| SAVE, on ADMIN SETTINGS | the admin port, binding, maintenance | only after a restart, except maintenance |
+| SAVE, on ADMIN | the admin port, binding, maintenance | only after a restart, except maintenance |
 
 Offering one button that meant all of them is how somebody presses the wrong
 one. The AI tab has no tab-wide save because each endpoint saves itself from
@@ -177,12 +240,46 @@ through.** A person opens the display page and asks; a device is named here
 and takes a code to the screen. They have almost nothing in common except
 that both end up connected, so neither has to read the other's queue.
 
-**USER** (under ENROLLMENTS) — people, and only people:
+**PERSON** (under ENROLLMENTS) — people, and only people:
 
 | | |
 |---|---|
+| **People** | the people you have minted a URL for |
 | **The request form** | what a request asks for |
 | **Waiting for approval** | everybody who has asked and not been decided about |
+
+### A person, as against a device
+
+A device is one screen standing in one room. A person moves between a phone, a
+laptop and a borrowed browser and is the same person in all three, so they are
+not the same kind of row and they are not created the same way.
+
+**You mint a person; they do not sign themselves up.** Name one under **People**
+and you are handed a URL to give them. There is no self-registration here — no
+email, no verification and nothing to vouch for a name — so anybody who could
+create their own identity could create somebody else's.
+
+**The URL is the credential, and it is shown once.** It carries an unguessable
+component rather than being spelled out of their name: a name is guessable, and
+a guessable address that grants anything is a password written on a wall. What
+is stored is a hash of it, so the panel cannot show it to you a second time —
+hand it over before you leave the row. Opening it sets a cookie and drops the
+secret out of the address bar, so what stays in their browser history no longer
+carries anything.
+
+**REISSUE** mints a new one and kills the old the moment you press it. It is
+for a URL that has got somewhere it should not have — pasted into a chat, left
+in a browser somebody else uses — where deleting the person would take
+everything they own with them.
+
+**A session is a person or a device, never both, and the URL decides which.** A
+device you approved operates as a device; opening a person's URL on one is
+refused where it is attempted, and the URL is not spent by the refusal. Signing
+a person in at a screen several people share is deliberately not built yet, and
+a kiosk is the case it is least for.
+
+The badge on a row says whether the URL was ever picked up, which is the
+question this list is read to answer.
 
 **DEVICE** (under ENROLLMENTS) — a screen, from naming it to the moment it works:
 
@@ -197,7 +294,7 @@ leaves the tab it arrived through.
 
 Whether anybody is asked at all is on **SECURITY**, under **AI Requires
 Permission** — that is the door rather than the key, and it decides what a
-grant is worth once given. ENROLLMENTS ▸ USER answers who is waiting; SECURITY
+grant is worth once given. ENROLLMENTS ▸ PERSON answers who is waiting; SECURITY
 answers whether anybody has to.
 
 Each profile list has a tab of its own in the profile settings group — what a
@@ -233,7 +330,7 @@ person who filled in a form the same as a screen an admin minted a code for.
 The two populations arrive by different routes with different buttons, and
 neither wants to read the other's queue while doing it.
 
-So an arrival is under **ENROLLMENTS** — ▸ USER while a person waits on a
+So an arrival is under **ENROLLMENTS** — ▸ PERSON while a person waits on a
 decision, ▸ DEVICE while a screen has not taken its code — and everything
 working is under **CONNECTIONS**, in its own area. A row
 moves itself the moment it starts working.
@@ -858,7 +955,7 @@ effect:
 
 1. **Put the wall displays on their own VLAN** and let nothing else onto it.
    A device that cannot open a connection needs no other control.
-2. **Bind to one address** rather than every interface, in ADMIN SETTINGS →
+2. **Bind to one address** rather than every interface, in ADMIN →
    Reach & sign-in. A machine that later joins another network then does not
    follow you onto it.
 3. **Firewall the display ports** to the addresses that should have them.
