@@ -192,6 +192,20 @@ Changing a role or a password drops that account's existing sessions, so the
 new rights or the new password take effect at the next sign-in rather than
 whenever the old session happens to expire.
 
+## Maintenance
+
+Four settings that keep a screen nobody touches working: how often every
+display checks in, how many attempts a failing check-in makes and how long it
+waits between them, and whether a kiosk reloads itself once a night.
+
+**None of them needs a restart** — unlike everything else on this tab. Each
+display takes them at its next check-in, which is what makes the check-in
+interval the one setting that changes how quickly the others arrive.
+
+The reasoning, what a screen actually does when it loses this server, and the
+two things no setting here can reach — a tablet that reboots, and a scheduled
+restart of this server — are in **Administration → Staying up unattended**.
+
 ## Accounts
 
 ### Roles
@@ -265,3 +279,11 @@ running.
 verifying in both cases that what it found is actually this directory's
 server. It never matches on a name pattern, because pattern-killing on a box
 running other things is how you take down something unrelated.
+
+**This is also why there is no scheduled restart.** Nothing supervises the
+process — `serve.sh` launches it with `setsid nohup` — so a setting that
+stopped the server at three in the morning would have nothing to start it
+again, and a Maintenance page carrying a button that ends the service is worse
+than one without. It waits for a supervisor somebody opts into. Scheduling a
+`stop && start` from the account's own crontab is the way to have one today,
+and it is the same decision made where a person can see it.

@@ -309,6 +309,19 @@ wanting the address bar back — and asking again on their next tap would make i
 unusable exactly while they are working on it. After that minute a wall goes
 back to being a wall.
 
+**And it keeps the screen awake**, unless the profile says otherwise. A tablet
+that has let its backlight go out cannot be walked up to and spoken to: the
+microphone is behind a page nobody can see, and the person standing in front of
+it has no way of knowing the screen is anything but off. The page asks the
+browser to hold the display on for as long as it is showing.
+
+The browser drops that request whenever the tab is hidden, so it is taken again
+every time the tab comes back — and some browsers will not grant it at all
+until somebody has touched the page, which the same first touch that asks for
+full screen takes care of. Untick it on a television, or on a device whose
+operating system is already set never to sleep, where holding it gains nothing
+and costs the battery.
+
 Neither changes what this server will answer. This is entirely what the screen
 looks like.
 
@@ -435,12 +448,14 @@ live preview on the right; SAVE is what gives it to the devices that name it.
 deleting a display clears it from every endpoint that named that. A setting
 pointing at something nobody can see is a setting nobody can change.
 
-**When a device picks a change up.** One still waiting on a decision is asking
-this server every twenty seconds and takes it within seconds. One that is
-already working has nothing left to ask about, so it takes it the next time its
-page loads — reload it on the screen, or use OPEN DISPLAY here. Making a working
-screen poll continuously for a setting that changes twice a year would be the
-wrong trade.
+**When a device picks a change up.** Every display checks in on the interval
+set under APP SETTINGS ▸ MAINTENANCE. A kiosk reloads itself when anything it
+draws from has moved, so a profile edited here reaches the wall without
+anybody walking to it — though not while somebody is mid-conversation with the
+screen. A display that is *not* a kiosk has a person in front of it who can
+reload the page, and taking one out from under them to apply a colour somebody
+changed upstairs would be a worse interruption than the stale colour; use
+RELOAD on its row under DEVICES to ask it directly, or OPEN DISPLAY here.
 
 
 ### The settings above the list
@@ -530,6 +545,123 @@ still on the wall it will enrol again, as a new row, unapproved.
 A display's token has no expiry. A wall display is commissioned once, and one
 that stopped working a year later for a reason nobody standing in front of it
 could see would be worse than anything the expiry bought.
+
+## Staying up unattended
+
+Everything above assumes a page somebody opened and will close. A tablet on a
+wall is a browser tab running for a year: through server restarts, network
+drops, endpoint reboots, certificate renewals and its own operating system's
+ideas about backgrounding, with nobody standing in front of it to notice or
+reload.
+
+The failure this is written against is specific, and it is not a blank screen.
+It is **a screen that looks perfect and does nothing.** The figure is drawn on
+the device, so it keeps drifting and breathing with no server involvement at
+all — somebody walks past, sees it moving, and assumes it is fine while nothing
+has reached this server in a week. A blank screen at least gets reported within
+the hour.
+
+The settings are under **APP SETTINGS ▸ MAINTENANCE**, and none of them needs a
+restart: each display takes them at its next check-in.
+
+### Every display checks in
+
+A screen at rest issues no requests at all. Without a check-in an outage would
+end and the screen would stay broken until somebody walked up and spoke to it —
+the server would be back, and the wall would not know.
+
+That one check-in pays for four things: it keeps **Last seen** honest in the
+device list, it gives RELOAD somewhere to be answered, it carries the settings
+on this page out to every screen, and it is how a screen notices on its own
+that the server has returned.
+
+**Check in every (seconds)** — 20 by default, 2 to 300. Faster than a couple of
+seconds is a denial of service somebody configured by accident; slower than five
+minutes is a screen that stays dead through a lunch break.
+
+### When a check-in fails
+
+**Attempts before it says so** and **seconds between attempts** — three and
+four by default. Three attempts is right for a server being restarted and wrong
+for a cable somebody pulled out, which is why both are fields rather than
+constants.
+
+**How it says so depends on what the screen is.**
+
+A **kiosk** speaks the failure aloud, once, after the last attempt, and shows a
+line high on the screen. It has no transcript and no composer, so speaking is
+the only way it can tell anybody — and saying it twice would make an outage
+worse than the silence it replaced. **That line clears itself** when the server
+answers again: nobody is standing in a hallway to dismiss anything, and an
+alert that has to be acknowledged at the screen is an alert that stays up for a
+month.
+
+Anything **not** a kiosk stays quiet. Somebody is sitting in front of it, and
+it fails at the moment they actually try to use it rather than making them wait
+out three attempts first. Somebody who has just spoken is owed an answer now; a
+hallway nobody is standing in is not.
+
+**On reconnect, a kiosk reloads the page** rather than picking up where it left
+off. Resuming would preserve a conversation nobody is having any more — the
+outage was minutes and the person left — while a reload picks up a deploy and
+anything changed while the screen was down, including a route or an appearance
+an admin corrected during the outage.
+
+**It never reloads while the server is unreachable.** A reload into an outage
+replaces a working screen with the browser's own error page, and that page has
+no check-in, no timer and no way back. A reload that falls due during an outage
+is held and carried out as part of coming back.
+
+### Asking a screen to reload
+
+**RELOAD**, on a device's row under DEVICES, asks that screen to reload itself
+at its next check-in. What it actually repairs is a display that is alive but
+stuck: it is still checking in, so it is still listening, and a reload is the
+whole fix. It defers while somebody is talking to the screen.
+
+A display that does not come back from that is one this server has no channel
+to at all — nothing here reaches it, and no amount of server-side work will.
+
+### The nightly refresh
+
+**At (HH:MM)** and **spread over (minutes)** — off by default. A kiosk reloads
+itself once a night, because a tab that never reloads accumulates.
+
+It is read off **each device's own clock**, not this server's, for the same
+reason a screensaver's dark hours are: a screen's night is the night outside
+it. And it is deferred while somebody is mid-conversation — a reload that lands
+between a question and its answer looks like a crash to whoever asked.
+
+Spread it if the building has more than a handful of screens: twelve tablets
+reconnecting in the same second is a load this server did not previously have.
+Each screen takes its own fixed slot inside the window, worked out from its
+device id, so the spread stays put instead of re-shuffling every night.
+
+### What this cannot reach
+
+**A device that reboots.** A tablet that restarts at four in the morning after
+an operating system update comes back to a lock screen with no browser running.
+There is nothing left for this server to talk to, and no setting on this page
+reaches it. Relaunching a browser at a URL on boot is the device's job:
+
+- **Android** — a kiosk launcher, or *screen pinning* plus a home-screen
+  shortcut to the display URL.
+- **iPad** — *Guided Access*, with the page added to the home screen so it
+  opens without Safari's chrome.
+- **A desktop or a mini PC** — the browser's own kiosk mode
+  (`--kiosk <url>`), started by whatever the machine uses to start things at
+  login.
+
+Saying that plainly is better than a Maintenance page that quietly fails to
+cover it.
+
+**A scheduled restart of this server.** There is no supervisor. `serve.sh`
+launches the process with `setsid nohup` and there is deliberately no systemd
+unit, because that is what lets the whole thing install and run without
+elevated rights — so a setting that stopped the server at three in the morning
+would have nothing to start it again. A Maintenance page with a restart button
+that ends the service is worse than one without, so there is not one. It waits
+for a supervisor somebody opts into.
 
 ## Groups
 

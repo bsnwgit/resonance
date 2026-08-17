@@ -500,24 +500,26 @@
     font-size:calc(9px * var(--fs));letter-spacing:.06em;line-height:1.6;color:#f0cf94;
     white-space:pre-line;
   }
-  #portgrid{display:grid;grid-template-columns:1fr auto;gap:6px 10px;
+  #portgrid,.numgrid{display:grid;grid-template-columns:1fr auto;gap:6px 10px;
             align-items:center;margin-top:8px}
-  #portgrid label{font-size:calc(9.5px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.9)}
+  #portgrid label,.numgrid label{font-size:calc(9.5px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.9)}
   /* the session field is the same kind of thing as a port — a small number
      you type, not prose — so it takes the same treatment */
-  #portgrid input,#ap_session,#em_ttl{
+  #portgrid input,#ap_session,#em_ttl,.num{
     width:88px;font:inherit;font-size:calc(10px * var(--fs));padding:4px 6px;
     background:rgba(0,0,0,.6);color:var(--text);
     border:1px solid rgba(var(--glass),.16);outline:0;text-align:right;
   }
-  #portgrid input:focus,#ap_session:focus,#em_ttl:focus{border-color:var(--hue-dim)}
+  #portgrid input:focus,#ap_session:focus,#em_ttl:focus,.num:focus{border-color:var(--hue-dim)}
   #ap_session,#em_ttl{display:block;margin:4px 0}
   /* the spinner arrows are the operating system's, and look it */
   #portgrid input::-webkit-outer-spin-button,
   #portgrid input::-webkit-inner-spin-button,
   #ap_session::-webkit-outer-spin-button,
-  #ap_session::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
-  #portgrid input,#ap_session,#em_ttl{-moz-appearance:textfield;appearance:textfield}
+  #ap_session::-webkit-inner-spin-button,
+  .num::-webkit-outer-spin-button,
+  .num::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  #portgrid input,#ap_session,#em_ttl,.num{-moz-appearance:textfield;appearance:textfield}
   #em_ttl::-webkit-outer-spin-button,
   #em_ttl::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   #pw_cur:focus,#pw_new:focus,#nu_name:focus,#nu_pw:focus,
@@ -1891,6 +1893,59 @@ Short by default — this session configures what everyone else is looking at.
     </div>
   </section>
 
+  <section class="grp" data-tab="app">
+    <h4>Maintenance</h4>
+    <div class="grpbody">
+  <div class="note help">What keeps a screen nobody touches working.
+
+Every display checks in on the interval below. That check-in is what keeps
+LAST SEEN honest in DEVICES, what lets RELOAD there reach a screen, and what
+lets a screen notice on its own that the server has come back — without it, an
+outage would end and the screen would stay broken until somebody walked up and
+spoke to it.
+
+A kiosk that has run out of attempts <b>says so aloud, once</b>, and shows a
+line high on the screen that clears itself when the server answers again. A
+screen that is not a kiosk stays quiet and fails at the moment somebody
+actually uses it, rather than making them wait out the retries.
+
+These take effect at each display's next check-in. No restart.</div>
+  <div class="numgrid">
+    <label for="ap_poll">check in every (seconds)</label>
+    <input id="ap_poll" class="num" type="number" inputmode="numeric" min="2" max="300">
+    <label for="ap_retries">attempts before it says so</label>
+    <input id="ap_retries" class="num" type="number" inputmode="numeric" min="1" max="10">
+    <label for="ap_retrywait">seconds between attempts</label>
+    <input id="ap_retrywait" class="num" type="number" inputmode="numeric" min="1" max="60">
+  </div>
+  <div class="note help">2–300, 1–10 and 1–60. Three attempts is right for a
+server being restarted and wrong for a cable somebody pulled out, which is why
+it is a field rather than a constant. Anything outside a range is nudged back
+into it rather than refused.</div>
+
+  <label class="bklab">Nightly refresh</label>
+  <div class="numgrid">
+    <label for="ap_refresh">at (HH:MM, empty for none)</label>
+    <input id="ap_refresh" class="num" type="text" inputmode="numeric"
+           placeholder="04:00" spellcheck="false" autocomplete="off">
+    <label for="ap_stagger">spread over (minutes)</label>
+    <input id="ap_stagger" class="num" type="number" inputmode="numeric" min="0" max="240">
+  </div>
+  <div class="note help">A kiosk reloads itself once a night, because a tab
+that never reloads accumulates. Off by default.
+
+Read off <b>each device's own clock</b>, not this server's, for the same
+reason a screensaver's dark hours are: a screen's night is the night outside
+it. And deferred while somebody is mid-conversation with it — a reload that
+lands between a question and its answer looks like a crash to whoever asked.
+
+Spread it if the building has more than a handful of screens: twelve tablets
+reconnecting in the same second is a load this server did not previously have.
+Each screen takes its own fixed slot inside the window, so the spread stays
+put instead of re-shuffling every night.</div>
+    </div>
+  </section>
+
 
   <section class="grp" data-tab="accounts" data-signin>
     <h4>Add an account</h4>
@@ -2259,10 +2314,9 @@ Deleting a profile clears it from every device that named it, the same way
 deleting a display clears it from every endpoint. Nothing keeps drifting to
 numbers that are no longer here.
 
-<b>On a device</b>, under Created Access, tick <b>On a wall</b> and three
-controls appear: an appearance profile, a screensaver profile, and whether it
-is <b>voice only</b>. Untick it and the screen goes back to being an ordinary
-page; what you chose is kept, so putting it back up restores it.
+<b>On a device</b>, in DEVICES, tick <b>Kiosk mode</b> and pick which of these
+profiles it is. Untick it and the screen goes back to being an ordinary page;
+what you chose is kept, so putting it back up restores it.
 
 <b>A wall is voice only and speak only the moment you tick it.</b> No text box
 — voice only arrives already ticked, and you untick it for the case that wants
@@ -2289,11 +2343,18 @@ while somebody is talking to it. While the screensaver drifts it is drawn into
 the picture and travels with it, because taking it away would lose it for
 exactly the person it is for.
 
-<b>When a device takes a change.</b> One still waiting on a decision asks this
-server every twenty seconds and takes it within seconds. One that is already
-working has nothing left to ask about, so it takes it the next time its page
-loads — reload it there, or use OPEN DISPLAY. Making a working screen poll for
-a setting that changes twice a year would be the wrong trade.</div>
+<b>It keeps the screen awake.</b> A tablet that has let its backlight go out
+cannot be walked up to and spoken to: the microphone is behind a page nobody
+can see. Untick it on a television, or on a device whose operating system is
+already set never to sleep, where holding the lock gains nothing.
+
+<b>When a device takes a change.</b> Every display checks in on the interval
+under APP SETTINGS ▸ MAINTENANCE. A kiosk reloads itself when something it
+draws from changes, so an appearance or a profile edited here reaches the wall
+without anybody walking to it — but not while somebody is mid-conversation
+with it. A screen that is not a kiosk has a person in front of it who can
+reload the page, so it is left alone; use RELOAD on its row in DEVICES to ask
+it directly.</div>
 
     </div>
   </section>
@@ -3307,7 +3368,16 @@ window.addEventListener('beforeunload', e=>{
    can take effect while the process is running, so the page's real job is to
    be honest about what is configured versus what is actually bound. */
 const APP_FIELDS = {ap_admin:'admin_port',
-                    ap_session:'session_idle_minutes'};
+                    ap_session:'session_idle_minutes',
+                    ap_poll:'poll_seconds',
+                    ap_retries:'retry_attempts',
+                    ap_retrywait:'retry_seconds',
+                    ap_stagger:'refresh_stagger'};
+/* …and the one field on this tab that is not a number. Kept out of APP_FIELDS
+   rather than special-cased inside it, because everything that loop does —
+   parseInt on save, a blank meaning "leave it alone" — is wrong for a time
+   somebody is allowed to clear. */
+const APP_TEXT = {ap_refresh:'refresh_at'};
 
 /* The two axes are a segmented control each, so they read as one choice from
    a closed set rather than a value you could mistype. */
@@ -3377,6 +3447,9 @@ async function loadApp(){
     Object.keys(APP_FIELDS).forEach(id=>{
       const el = $(id); if (el) el.value = j.app[APP_FIELDS[id]];
     });
+    Object.keys(APP_TEXT).forEach(id=>{
+      const el = $(id); if (el) el.value = j.app[APP_TEXT[id]] || '';
+    });
     /* Offer the addresses this machine actually has. Typing one by hand is a
        way to configure a server that will not start — and the one place you
        cannot recover from is the one that takes the admin page with it. */
@@ -3439,6 +3512,13 @@ $('b_appsave').addEventListener('click', async ()=>{
     const el = $(id);
     if (el && el.value !== '') body[APP_FIELDS[id]] = parseInt(el.value, 10);
   });
+  // Sent even when empty, unlike the numbers above: empty is how the nightly
+  // refresh is switched OFF, and a field that could only ever be set would be
+  // one nobody could take back.
+  Object.keys(APP_TEXT).forEach(id=>{
+    const el = $(id);
+    if (el) body[APP_TEXT[id]] = el.value.trim();
+  });
   body.bind = segValue('ap_bind');
   body.bind_address = body.bind === 'address' ? ($('ap_bindaddr').value || '') : '';
   body.auth = segValue('ap_auth');
@@ -3455,9 +3535,13 @@ $('b_appsave').addEventListener('click', async ()=>{
     if (Object.keys(shared).length)
       await api('/settings', {method:'POST',
                               body: JSON.stringify({settings: shared, merge: true})});
+    /* "nothing differs from what is running" was true when everything on this
+       tab needed a restart. The maintenance settings do not — they reach each
+       screen at its next check-in — so a save that changed one of them would
+       have been told nothing had changed. */
     note.textContent = (j.pending && j.pending.length)
       ? 'saved — a restart is needed, see below'
-      : 'saved — nothing here differs from what is running';
+      : 'saved — nothing here is waiting on a restart';
     showPending(j);
   }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
 });
@@ -5620,6 +5704,7 @@ function paintKiosks(list, def){
                                     speech: k.speech || '',
                                     saver: k.saver || '',
                                     fullscreen: k.fullscreen !== false,
+                                    keep_awake: k.keep_awake !== false,
                                     prompt: k.prompt !== false,
                                     prompt_text: k.prompt_text || ''}));
   if (def !== undefined) DPKDEF = def || '';
@@ -5665,6 +5750,7 @@ function paintKiosks(list, def){
       const sv = ((DPCFG && DPCFG.savers) || []).filter(x=> x.id === k.saver)[0];
       if (sv) bits.push(sv.name); else bits.push('never drifts');
       if (!k.fullscreen) bits.push('no full screen');
+      if (!k.keep_awake) bits.push('may sleep');
       if (!k.prompt) bits.push('no prompt');
       sum.textContent = bits.join(' · ');
       dflag.style.display = (k.id && k.id === DPKDEF) ? '' : 'none';
@@ -5716,6 +5802,7 @@ function paintKiosks(list, def){
     };
     tick('Voice only', 'voice_only');
     tick('Full screen on first touch', 'fullscreen');
+    tick('Keep the screen awake', 'keep_awake');
 
     /* The text belongs to the tick above it and is meaningless without it, so
        it goes away with it rather than sitting there inert. */
@@ -5797,6 +5884,7 @@ function paintKiosks(list, def){
       saveDp({kiosks: keep.map(x=> ({id:x.id, name:x.name, voice_only:x.voice_only,
                                      look:x.look, motion:x.motion, speech:x.speech,
                                      saver:x.saver, fullscreen:x.fullscreen,
+                                     keep_awake:x.keep_awake,
                                      prompt:x.prompt, prompt_text:x.prompt_text})),
               kiosk_default: DPKDEF}, 'kiosknote');
     };
@@ -5848,7 +5936,7 @@ $('b_addkiosk').addEventListener('click', ()=>{
   if (DPKIOSKS.length >= 8) return;
   DPKIOSKS.push({id:newProfileId(), _new:true, name:'', voice_only:true,
                  look:'', motion:'', speech:'', saver:'',
-                 fullscreen:true, prompt:true, prompt_text:''});
+                 fullscreen:true, keep_awake:true, prompt:true, prompt_text:''});
   OPENKI = DPKIOSKS.length - 1;
   paintKiosks(DPKIOSKS);
 });
@@ -5957,6 +6045,7 @@ function kioskBlock(d){
     if (lk) bits.push(lk.name);
     if (sv) bits.push(sv.name);
     if (!k.fullscreen) bits.push('no full screen');
+    if (!k.keep_awake) bits.push('may sleep');
     if (!k.prompt) bits.push('no prompt line');
     o.title = bits.join(', ');
     sel.appendChild(o);
@@ -6255,6 +6344,20 @@ async function refreshDisplays(){
       };
       r.appendChild(again);
     }
+    /* Reaching a screen without walking to it, and what it actually fixes is
+       a display that is alive but stuck: it is still checking in, so it is
+       still listening, and a reload is the whole repair. Only offered where
+       there is a device checking in to hear it — a row waiting for its code
+       has nothing on the other end, and a button that could not possibly work
+       is worse than no button. */
+    if (st === 'live'){
+      const rl = document.createElement('button');
+      rl.textContent = 'RELOAD';
+      rl.onclick = ()=> displayAction('/displays/reload', {id: d.id},
+        '"' + d.label + '" reloads at its next check-in — or when whoever is '
+        + 'talking to it stops, if somebody is.');
+      r.appendChild(rl);
+    }
     /* Everything above is about whether this device may be here — granting,
        refusing, withdrawing, reissuing — and it stays left. What follows is
        committing what the row says and ending it, and those go right. The
@@ -6532,7 +6635,7 @@ function decide(d, approve, name, row){
   if (!approve) reason.focus();
 }
 
-async function displayAction(path, body){
+async function displayAction(path, body, said){
   const note = $('dispnote');
   try{
     const j = await api(path, {method:'POST', body: JSON.stringify(body)});
@@ -6545,6 +6648,12 @@ async function displayAction(path, body){
        permission nobody can see. The endpoint blocks are rebuilt from the
        fresh list — harmless when the AI tab is not the one on screen. */
     paintBlocks();
+    /* Most of these actions say what they did by changing the row in front of
+       you — a badge appears, a code turns up, a device leaves the list. The
+       ones that do not are the ones that ask a screen somewhere else to do
+       something, and those have to say so in words or they read as a button
+       that did nothing. */
+    if (said && note){ note.className = 'note'; note.textContent = said; }
   }catch(e){
     if (note){ note.className = 'note bad'; note.textContent = e.message; }
   }

@@ -211,6 +211,24 @@ If you are on `https://` and it still does not work:
 - Check no other application has the microphone open.
 - On a shared machine, check the operating system's own microphone permission.
 
+## If it says it has lost its server
+
+A screen mounted on a wall says so aloud once, and shows **NO CONNECTION TO
+THE SERVER** high in the frame. The figure carries on drifting, because it is
+drawn on the device itself and never stopped — which is exactly why the line
+is there. A screen that looks perfectly alive and is reaching nothing would
+otherwise be walked past for a week.
+
+There is nothing to press. It keeps trying on its own, the line disappears the
+moment the server answers, and the screen reloads itself so it comes back with
+anything that changed while it was down. If it is still saying it after a few
+minutes, the server or the network between you and it needs somebody — tell
+your administrator.
+
+A screen you opened yourself in a browser does not say any of this. It stays
+quiet and tells you at the moment you actually ask it something, rather than
+interrupting you about a server you were not using.
+
 ## If it mishears you
 
 - Speak at a normal pace. Slowing down unnaturally makes transcription worse,

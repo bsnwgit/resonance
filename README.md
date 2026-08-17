@@ -74,13 +74,13 @@ display, displays the server knows about, so a name can be restricted to the
 tablets you approved, the embed API that lets another application put this
 interface inside its own page, and what a wall display looks like — voice only
 and speak only, an appearance a place can have of its own, and a screensaver
-that is still the product.
+that is still the product, and staying up unattended — a tablet on a wall is a
+browser tab running for a year, and it now checks in, says so when it cannot,
+reloads itself when it can again, and can be reached from the panel.
 
-**Not done, in the order it matters:** staying up unattended, because a tablet
-on a wall is a browser tab running for a year. Then identity and memory, so a
-conversation can mean something an hour later — the embed is deliberately
-memoryless until that lands. Then packaging it as a library other projects can
-install.
+**Not done, in the order it matters:** identity and memory, so a conversation
+can mean something an hour later — the embed is deliberately memoryless until
+that lands. Then packaging it as a library other projects can install.
 
 The [Roadmap](#roadmap) carries the reasoning for each, including the
 decisions already taken about how identity and memory should work.
@@ -1081,7 +1081,7 @@ two people in one room with three listening microphones between them.
 | 1b | ~~**The Home Assistant adapter**~~ **— done** | saying the house name switches a light on | 1a | none |
 | 2 | ~~**Displays, and binding a route to one**~~ **— done** | only the tablets you approved can actuate the house, whatever anyone's browser is set to | 1b | none |
 | 3 | ~~**What a wall display looks like**~~ **— done** | voice only and speak only, an appearance per place, and a screensaver that is still the product | 2 | none |
-| 4 | **Staying up unattended** | a tablet nobody touches for a year is still working | 3, and 8 for the alert | none · designed, not built |
+| 4 | ~~**Staying up unattended**~~ **— done** | a tablet nobody touches for a year is still working | 3 | none · the alert waits for 8 |
 | 5 | **Identity and the PIN** | a person, as distinct from a place | 2 | **1** · whether an identity carries its own Home Assistant token |
 | 6 | **Personal wake words** | one person addressing a tablet stops triggering another person's device | 5 | none |
 | 7 | **Memory** | conversations that mean something across sessions | 5 | **1** · what the retained unit is — deliberately left to experience |
@@ -1091,22 +1091,17 @@ The last column counts decisions that need **you**, not implementation choices
 made while building and shown afterwards. A phase reading *none* is ready to
 start.
 
-**Nothing outstanding blocks starting.** Four is designed and not started. It
-was a design problem rather than a question to answer, and working through it
-turned five open questions into a build: the display polls, reconnects by
-reloading, retries three times and then says so — spoken aloud on a wall,
-where there is nothing to read — refreshes itself nightly on its own clock, and
-gains a Maintenance section to configure all of that.
+**Nothing outstanding blocks starting.**
 
 **Alerting merged into eight rather than becoming a ninth phase**, because
 eight already collects the events an alert would fire on, and building the
 watcher separately would be a second pass over the same code. The consequence
-lands on four: the server can tell a stuck display to reload itself, and when
+landed on four: the server can tell a stuck display to reload itself, and when
 that fails there is nothing left for it to do but tell somebody, which is
-eight's job. So **either eight moves up beside four, or four ships with the
-reload and gains its alert when eight lands** — an ordering call rather than a
-design one, and both answers work. Four is buildable either way; only its last
-paragraph waits.
+eight's job. **Four shipped without that alert** rather than eight moving up
+beside it — decided 2026-08-16. Everything four is for works today; a display
+the server cannot reach at all is visible in the panel as one that stopped
+checking in, and what it does not yet do is come and find you.
 
 The three remaining decisions are each answerable when their own phase comes
 up, and one of them is deliberately waiting on experience rather than on a
@@ -1164,10 +1159,22 @@ three faults that had nothing to do with Home Assistant, plus two secret
 disclosures, all of which would otherwise have been debugged through a new
 adapter.
 
-**Four stopped being a placeholder** — see its entry. What it turned out to be
-is a set of small mechanisms that only make sense together, and one of them,
-the poll, pays for four of the others. Its position held: designing it moved
-nothing, and turned up two real leaks in code that already shipped.
+**4 is done**, and it is the first phase whose value is entirely invisible when
+it works. What it turned out to be is a set of small mechanisms that only make
+sense together, and one of them — the check-in — pays for four of the others:
+last seen, the reload channel, the settings reaching a building of screens, and
+a screen noticing on its own that the server came back. Its position held:
+designing it moved nothing, and turned up two real leaks in code that had
+already shipped, both since fixed.
+
+The one thing worth having here rather than in its entry is the split it forced
+between a kiosk and a browser tab. Everything automatic — reloading because a
+setting moved, because the server returned, or because it is four in the
+morning — happens only on a kiosk. A desk tab has somebody in front of it who
+can reload the page, and taking one out from under them to apply a colour
+somebody changed upstairs is a worse interruption than the stale colour. Only
+an admin's explicit RELOAD reaches every display, because that one was asked
+for, about that row, by somebody looking at it.
 
 Two and three were one phase until the wall-mounted side outgrew it. They
 share a substrate — a display the server knows about — but nothing else:
@@ -1688,8 +1695,9 @@ it. Each entry below carries its own panel scope.
 
   **The refresh runs alongside fixing the leaks rather than instead of them.**
   It is a net under work not yet done, and treating it as the fix would mean
-  shipping a leak and a nightly workaround for it in the same release. Two are
-  known:
+  shipping a leak and a nightly workaround for it in the same release. Two were
+  known, and **both were fixed on their own branch before this was built**,
+  which is the order that made the refresh a net rather than a patch:
 
   - **Every spoken reply leaves an analyser behind.** Speech builds a fresh
     `AnalyserNode` and `BufferSourceNode` per utterance and wires them to the
@@ -1740,6 +1748,13 @@ it. Each entry below carries its own panel scope.
   behaviour, as a named profile picked per device the way appearance and
   screensaver already are. The server half sits with the other server settings,
   since a restart applies to one server rather than to twelve screens.
+
+  *As built:* the profile that behaviour belongs on already existed by the time
+  this was written — the kiosk profile, which is exactly "a named profile
+  picked per device" and is already where full screen and the prompt line live.
+  So keeping the screen awake is a tick on it rather than a fifth list, and the
+  Maintenance section holds the four numbers, all of which are one server's
+  business rather than one screen's.
 
 - **Identity, in three strengths.** How a device or person identifies itself
   decides what may be kept, because the strength of the claim and the
@@ -2098,6 +2113,70 @@ on a desk. A tablet bolted to a wall, answering a household, moves them:
 ## Progress log
 
 Newest first.
+
+### 2026-08-16 — a screen that looks perfect and does nothing
+
+Phase 4: staying up unattended. The whole of it is invisible while it works,
+which is why it needed its own phase — nobody ever gets to it as part of
+something else.
+
+- **The display checks in, and that one decision pays for four others.** A
+  screen at rest issues no requests, so without it an outage would end and the
+  wall would stay broken until somebody walked up and spoke to it. The same
+  check-in keeps `last_seen` honest, gives the server somewhere to answer
+  *reload yourself*, carries the maintenance settings out to every screen, and
+  is how a screen notices on its own that the server came back.
+- **The stamp is a digest, not a modification time.** `last_seen` is written by
+  the very check-in that reads it, so a stamp based on the file's mtime would
+  change on its own and order every screen in the building to reload itself for
+  ever. Only the fields an admin can change are in the digest, and it is
+  recomputed only when the file has actually been written — a building full of
+  screens costs one `stat` each rather than one hash each.
+- **The boot moment is the server's clock, not the device's.** A reload request
+  is a moment in server time, and a tablet whose own clock is a year out would
+  either obey it for ever or never. The display is told the time at its first
+  check-in and hands that value back; a request older than it has already been
+  satisfied by the load that is running. Nothing to acknowledge, nothing left
+  set to fire again at the next restart.
+- **Automatic reloads are for kiosks; the admin's RELOAD is for anybody.** A
+  desk tab has a person in front of it who can reload the page, and taking one
+  out from under them to apply an appearance somebody changed upstairs is a
+  worse interruption than the stale colour. An explicit request is different in
+  kind: it was asked for, about that row, by somebody looking at it.
+- **It never reloads into an outage.** A reload while the server is unreachable
+  swaps a working screen for the browser's error page, which has no check-in,
+  no timer and no way back — the display would be gone until somebody walked
+  over, which is the exact outcome the phase exists to prevent. A reload that
+  falls due while it is down is held, and coming back carries it out.
+- **A kiosk says it once, aloud, and the line clears itself.** It has no
+  transcript and no composer, so speech is the only channel it has; saying it
+  twice would make the outage worse than the silence it replaced. Nobody is
+  standing in a hallway to dismiss anything, so an alert that needed
+  acknowledging at the screen would be an alert that stayed up for a month.
+  Anything not a kiosk stays quiet and fails at the moment somebody actually
+  uses it.
+- **Two bugs found while writing it, both in the new code.** Re-planning the
+  nightly refresh on every check-in erased it instead of carrying it out — the
+  check-in at the appointed minute moved the appointment to tomorrow a line
+  before anything asked whether it was due, every night, for ever. And a tab
+  coming back into view asked straight away while the timer's request was still
+  in flight, leaving two chains armed, then four, each one doubling the load on
+  a server already slow enough for that to happen.
+- **A poll with no deadline is not a poll.** A dropped route does not refuse or
+  error, it goes silent, and `fetch` will wait minutes — during which a screen
+  that has lost its network sits looking perfect. Fifteen seconds and it counts
+  as a failure.
+- **What no setting here can reach, said plainly.** A tablet that reboots at
+  four in the morning comes back to a lock screen with no browser running, and
+  there is nothing left for this server to talk to — so kiosk mode, a launcher
+  or screen pinning is a deployment instruction in the manual rather than a
+  field in the panel. And there is no scheduled server restart, because nothing
+  supervises the process: a Maintenance page with a button that ends the
+  service is worse than one without.
+- **Four ships without its alert.** Raising one when a forced reload fails is
+  phase 8's job, and eight did not move up to meet it. A screen the server
+  cannot reach at all is visible in the panel as one that stopped checking in;
+  what it does not yet do is come and find you.
 
 ### 2026-08-15 — the screensaver is still the product
 
