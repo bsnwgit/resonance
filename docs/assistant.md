@@ -189,12 +189,25 @@ Two profiles may share a port when they answer on different addresses, because
 the machine can carry that. ANY collides with everything on its port, which is
 what ANY means.
 
+**A profile never reaches further than the server itself.** With ADMIN SETTINGS
+▸ IP Address set to one address — or to this machine only — that address wins
+for every profile, whatever they name. A setting that says *this machine only*
+has to mean it, and a profile able to bind a LAN address anyway would be that
+setting quietly not applying.
+
 **The port is checked before anything is allowed to use it.** Saving tries the
-port on the address chosen; on ANY it tries every address the machine has, and
-allows the save if even one can carry it — a port in use on all of them is
-refused, with the addresses named. This happens at the point of saving rather
-than at the next restart, when the fix would be editing JSON on the box by
-hand.
+port on the address chosen; on **ANY** it must be free on *every* address the
+machine has, and a refusal names the one holding it, with its interface. This
+happens at the point of saving rather than at the next restart, when the fix
+would be editing JSON on the box by hand.
+
+ANY is strict for a reason that is the kernel's, not a policy: ANY binds the
+wildcard, and a wildcard bind is refused when the port is held on even one
+address. A rule of "allowed if something can carry it" would have saved a
+profile that could not then come up — the panel saying yes and the server
+saying no at the next restart, in the log, where nobody is looking. If one
+address is holding the port and you want the others, name one of the others
+here.
 
 **A socket this server is already holding does not count as taken**, and only
 the same socket. The question a save has to answer is not *is this port free*

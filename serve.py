@@ -370,22 +370,38 @@ def local_interfaces():
 
 
 def net_host(vals, fallback):
-    """The address a network profile binds. Empty means ANY, which is this
-    server's own binding — a profile does not get to reach further than the
-    app it belongs to."""
+    """The address a network profile binds.
+
+    Empty means ANY, which is this server's own binding. And a named address
+    is only honoured while the server is not pinned tighter than it: the
+    comment here used to claim a profile never reaches further than the app it
+    belongs to, and the code did not enforce it — set the server to THIS
+    MACHINE ONLY and a profile naming a LAN address would have bound the LAN
+    address anyway, which is that setting quietly not meaning what it says.
+
+    Bound to one address, that address wins for everything. Bound to
+    everything, a profile may choose. There is no arrangement where a profile
+    is offered a reach the app was told not to have."""
     addr = str((vals or {}).get("address") or "").strip()
+    if fallback not in ("0.0.0.0", ""):
+        return fallback              # the app is pinned; nothing outruns it
     return addr or fallback
 
 
 def port_free_anywhere(port, addrs):
-    """Free on at least one of these addresses.
+    """Free on EVERY one of these addresses, which is what ANY has to mean.
 
-    Deliberately not `port_free(port, "0.0.0.0")`: the kernel refuses a
-    wildcard bind when the port is held on even one address, and the rule
-    asked for here is that ANY may be saved as long as SOMETHING can carry it.
-    Returns (ok, taken) so the caller can say which ones are spoken for."""
+    ANY binds the wildcard, and the kernel refuses a wildcard bind when the
+    port is held on even one address. So a rule of "allowed if something can
+    carry it" would have saved a profile that then could not come up — the
+    panel saying yes and the server saying no at the next restart, in the log,
+    where nobody was looking.
+
+    Tested per address rather than by binding 0.0.0.0 once, because the answer
+    has to say WHICH address is holding it. A refusal naming the port and not
+    the address leaves somebody to go and find it."""
     taken = [a for a in addrs if not port_free(port, a)]
-    return (len(taken) < len(addrs), taken)
+    return (not taken, taken)
 
 
 def address_bindable(addr):
@@ -2125,7 +2141,12 @@ def validate_display_settings(obj, current):
         # https_port is the migration doing its job, not a collision.
         adm = read_app()["admin_port"]
         seen = {}
+        # Read once for the whole save: the interface list is an ioctl sweep,
+        # and it was being taken again for every port of every profile.
+        here = local_interfaces()
+        have = [a for a, _ in here]
         for r in rows:
+            addr = str(r["values"].get("address") or "").strip()
             try:
                 pv = int(r["values"].get("port"))
             except (TypeError, ValueError):
@@ -2160,9 +2181,12 @@ def validate_display_settings(obj, current):
                 # refusing that would reject a configuration the machine can
                 # carry. ANY collides with everything on that port, because
                 # that is what ANY means.
-                akey = str(r["values"].get("address") or "").strip()
+                # `here` is read once for the whole save, above — this used to
+                # ask the kernel for the interface list again for every port of
+                # every profile.
+                akey = addr
                 for k in ({(akey, v), ("", v)} if akey else
-                          {(a, v) for a in [x for x, _ in local_interfaces()]} | {("", v)}):
+                          {(a, v) for a in have} | {("", v)}):
                     if k in seen:
                         return None, ("%s and %s are both on port %d%s"
                                       % (seen[k], r["name"], v,
@@ -2172,9 +2196,6 @@ def validate_display_settings(obj, current):
             # this machine actually has, for the same reason the binding under
             # ADMIN SETTINGS is chosen rather than typed: an address this
             # machine does not have is a listener that will not start.
-            addr = str(r["values"].get("address") or "").strip()
-            here = local_interfaces()
-            have = [a for a, _ in here]
             if addr and addr not in have:
                 return None, ("%s: this machine has no address %s — pick one "
                               "of its own, or ANY" % (r["name"], addr))
@@ -2204,9 +2225,15 @@ def validate_display_settings(obj, current):
                 else:
                     ok, taken = port_free_anywhere(v, have or [LOOPBACK])
                     if not ok:
-                        return None, ("%s: %d is already in use on every "
-                                      "address this machine has (%s)"
-                                      % (r["name"], v, ", ".join(taken)))
+                        # Named, with its interface, because ANY is refused by
+                        # ONE address holding the port and the whole question
+                        # is which. The fix is either to stop whatever has it,
+                        # or to name an address here that is free.
+                        by = ", ".join("%s (%s)" % (a, dict(here).get(a) or "?")
+                                       for a in taken)
+                        return None, ("%s: ANY needs %d free on every address, "
+                                      "and it is already in use on %s"
+                                      % (r["name"], v, by))
             r["values"]["address"] = addr
             r["values"]["port"] = pv
             r["values"]["redirect"] = rv
@@ -2634,7 +2661,10 @@ def validate_kiosk(obj, rec, kiosks):
 #: Last computed displays stamp, keyed by the file's modification time in
 #: nanoseconds. Seconds are too coarse — two writes inside one second would
 #: read as no change at all.
-_DISPLAYS_STAMP = {"key": None, "value": "0"}
+#: Keyed by display, because the stamp is. One slot held the last row asked
+#: about and missed on every poll from every other screen — which turned "one
+#: stat each rather than one hash each" into a hash each, for a building.
+_DISPLAYS_STAMP = {}
 
 
 def _displays_stamp(did=None):
@@ -2663,13 +2693,14 @@ def _displays_stamp(did=None):
         st = os.stat(DISPLAYS_PATH)
     except OSError:
         return "0"                       # absent is a stamp of its own
-    key = (st.st_mtime_ns, st.st_size, did or "")
-    if _DISPLAYS_STAMP["key"] == key:
-        return _DISPLAYS_STAMP["value"]
+    slot = _DISPLAYS_STAMP.get(did or "")
+    key = (st.st_mtime_ns, st.st_size)
+    if slot and slot[0] == key:
+        return slot[1]
     try:
         raw = read_displays_doc()
     except Exception:
-        return _DISPLAYS_STAMP["value"]
+        return slot[1] if slot else "0"
     rows = raw.get("displays") or {}
     if isinstance(rows, dict):
         rows = [dict(r, id=k) for k, r in rows.items()]
@@ -2681,8 +2712,11 @@ def _displays_stamp(did=None):
         if isinstance(r, dict) and (did is None or r.get("id") == did))
     facts.append(json.dumps(raw.get("settings") or {}, sort_keys=True))
     val = hashlib.sha256("\n".join(facts).encode()).hexdigest()[:16]
-    _DISPLAYS_STAMP["key"] = key
-    _DISPLAYS_STAMP["value"] = val
+    # Bounded, because the key is a display id and a register can be long.
+    # Oldest out; the cost of a miss is one hash, not a fault.
+    if len(_DISPLAYS_STAMP) > 200:
+        _DISPLAYS_STAMP.clear()
+    _DISPLAYS_STAMP[did or ""] = (key, val)
     return val
 
 
