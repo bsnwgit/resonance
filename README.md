@@ -1085,7 +1085,7 @@ two people in one room with three listening microphones between them.
 | 5 | **Identity and the PIN** | a person, as distinct from a place | 2 | **1** · whether an identity carries its own Home Assistant token |
 | 6 | **Personal wake words** | one person addressing a tablet stops triggering another person's device | 5 | none |
 | 7 | **Memory** | conversations that mean something across sessions | 5 | **1** · what the retained unit is — deliberately left to experience |
-| 8 | **Diagnostics and alerting** | a failing screen comes and finds you, rather than the other way round | 2 | **1** · the retention default |
+| 8 | **Diagnostics and alerting** | a failing screen comes and finds you, rather than the other way round | 2 | **1** · the retention default · also carries 4's network-drop test |
 
 The last column counts decisions that need **you**, not implementation choices
 made while building and shown afterwards. A phase reading *none* is ready to
@@ -1160,7 +1160,9 @@ disclosures, all of which would otherwise have been debugged through a new
 adapter.
 
 **4 is done**, and it is the first phase whose value is entirely invisible when
-it works. What it turned out to be is a set of small mechanisms that only make
+it works — with one thing owed and booked into eight: nothing it built has yet
+faced a real network drop on real hardware, and that test is written up in
+eight's entry rather than left as a good intention. What it turned out to be is a set of small mechanisms that only make
 sense together, and one of them — the check-in — pays for four of the others:
 last seen, the reload channel, the settings reaching a building of screens, and
 a screen noticing on its own that the server came back. Its position held:
@@ -2009,6 +2011,32 @@ it. Each entry below carries its own panel scope.
   immediately rather than in a digest, because it is the one alert here with a
   person attached to it — somebody is standing at a screen waiting to be let
   in.
+
+  **Phase 4's outage behaviour is verified here, against a real network drop.**
+  Everything four built for an unreachable server was exercised from the server
+  side — the poll, the stamp, the reload channel, the handover restart, both
+  states of the code clock — but the half that only a pulled cable can prove
+  has never been run: a tablet losing its network, showing the line, speaking
+  it once, holding a reload it must not perform while down, and reloading when
+  the server answers again.
+
+  It belongs to this phase rather than to four for the reason four shipped
+  without its alert: this is where a screen that has gone quiet becomes
+  something the server notices and reports, so the rig that proves the
+  detection works is the same rig that proves the reporting does. Testing it
+  twice, once with nothing watching, is the pass that gets skipped.
+
+  What to run, on real hardware rather than a throttled devtools tab:
+
+  - unplug the network at the screen — the line appears, a kiosk says it once,
+    nothing else speaks
+  - leave it down past a scheduled nightly refresh — no reload happens while
+    it is unreachable
+  - plug it back in — the line clears itself and the page reloads
+  - change an appearance profile while it is down — the reload comes back
+    carrying it
+  - press RELOAD in the panel while it is down — it is obeyed on reconnect,
+    once, and not again on the next restart
 
   **What already exists makes this cheaper than the entry looks.** There is no
   diagnostics, health or event endpoint in `serve.py` at all, so that part
