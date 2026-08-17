@@ -292,11 +292,11 @@
   /* The app tab's own commit row, at the foot of the box. Hidden outright
      on every other tab: a save button that belongs to settings you cannot
      currently see is a save button somebody will eventually press. */
-  #approw,#secrow,.uirow{display:none;margin-top:14px;padding-top:10px;
+  #approw,.uirow{display:none;margin-top:14px;padding-top:10px;
           border-top:1px solid rgba(var(--glass),.30)}
-  #approw.on,#secrow.on,.uirow.on{display:block}
-  #approw .seg,#secrow .seg,.uirow .seg{justify-content:flex-end;margin-top:8px}
-  #approw .seg button,#secrow .seg button,
+  #approw.on,.uirow.on{display:block}
+  #approw .seg,.uirow .seg{justify-content:flex-end;margin-top:8px}
+  #approw .seg button,
   .uirow .seg button{border-width:2px;border-style:solid;padding:6px 10px}
   /* What this row's scope actually is. Worth a line, because "shared" is the
      property that separates these from the three controls a viewer keeps. */
@@ -311,7 +311,7 @@
   .uirow .state.alert{color:#eaa8a8}
   /* Spans every column once the topics tile, so it reads as the foot of the
      whole box rather than the tail of whichever column it landed in. */
-  @container (min-width:700px){ #approw,#secrow,.uirow{grid-column:1/-1} }
+  @container (min-width:700px){ #approw,.uirow{grid-column:1/-1} }
 
   /* The caption over a row of tabs. Quieter than anything it labels — it is
      there to be read once and then ignored, not to compete with the tabs
@@ -1997,16 +1997,12 @@ When more than the waiting limit are queued, the oldest one waiting is dropped
 to make room — so set it high enough that a real request cannot be pushed out
 by noise.</div>
 
+  <div class="note" id="dpnote"></div>
+  <div class="seg actrow">
+    <button id="b_dpsave" class="act-save">SAVE GUEST ACCESS</button>
+  </div>
     </div>
   </section>
-
-  <div id="secrow">
-    <div class="note" id="dpnote"></div>
-    <div class="seg actrow">
-      <button id="b_dpsave" class="act-save">SAVE GUEST ACCESS</button>
-      <button id="b_dprevert" class="act-undo">REVERT</button>
-    </div>
-  </div>
 
   <section class="grp" data-tab="displays">
     <h4>Created Access</h4>
@@ -4620,10 +4616,6 @@ $('dp_guest').addEventListener('click', e=>{
   const b = e.target.closest('button');
   if (b) segSet('dp_guest', b.dataset.v);
 });
-$('b_dprevert').addEventListener('click', ()=>{
-  paintDpSettings();
-  dpNote('back to what is saved');
-});
 $('b_dpsave').addEventListener('click', ()=>{
   const on = document.querySelector('#dp_guest button.on');
   saveDp({
@@ -7054,11 +7046,6 @@ function panelNav(){
     const ar = $('approw');
     if (ar) ar.classList.toggle('on',
       tab === 'app' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
-    /* Same rule for SECURITY's: a commit belonging to settings you cannot
-       currently see is one somebody eventually presses. */
-    const sr = $('secrow');
-    if (sr) sr.classList.toggle('on',
-      tab === 'security' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
     /* ADD INSTANCE is not inside any block, because it makes one — it has to
        stay reachable whichever block happens to be open, or the only way to
        add a second endpoint is to first collapse the first. */
