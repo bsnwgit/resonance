@@ -1581,12 +1581,16 @@
          worked while it was the only label and read as a fourth kind of thing
          the moment there were three. -->
     <span id="navlinks">
-      <!-- Who the server knows about, as against how it is wired or how
-           anything got here. ADMIN USERS is the only one under it today; it is
-           the accounts that reach THIS panel, which is why it is not filed
-           with the people the display side knows about. -->
+      <!-- Who the server knows about, split by which side of the product they
+           exist on: ADMIN is an account that reaches THIS panel, USER is a
+           person the display side knows about. They are not the same
+           population and never have been — one signs in with a password to
+           configure the server, the other picks up a minted URL and talks to
+           it — so they are two places rather than one list with a column
+           saying which. -->
       <span class="navtitle bartitle">IDENTITY</span>
-      <button id="tab_accounts" data-tab="accounts">ADMIN USERS</button>
+      <button id="tab_accounts" data-tab="accounts">ADMIN</button>
+      <button id="tab_users" data-tab="users">USER</button>
       <span class="navgap"></span>
       <span class="navtitle bartitle">SETTINGS</span>
       <button id="tab_app" data-tab="app">ADMIN</button>
@@ -2137,6 +2141,18 @@ above.</div>
     </div>
   </section>
 
+
+  <!-- Empty on purpose, and saying so. The button exists because IDENTITY has
+       two populations under it and the shape should be visible before the
+       second one is filled in; what belongs here is not built yet. A tab that
+       renders nothing at all is indistinguishable from a page that failed to
+       load, which is the one thing an empty tab must not look like. -->
+  <section class="grp bare proflist" data-tab="users">
+    <div class="barehead"><span class="listtitle">Users</span></div>
+    <div class="grpbody">
+  <div class="note">Nothing here yet.</div>
+    </div>
+  </section>
 
   <!-- Hidden with the rest of it where there is no sign-in: a title over three
        sections that are not there is a heading for nothing. -->
@@ -8497,6 +8513,10 @@ function start(){
   $('tab_displays').style.display = admin ? '' : 'none';
   $('tab_enrol').style.display = admin ? '' : 'none';
   $('tab_embeds').style.display = admin ? '' : 'none';
+  // Empty today, and admin-only from the start rather than from whenever it
+  // stops being empty: everything a person is made of here is minted, granted
+  // or revoked, and none of those is a thing a read-only account does.
+  $('tab_users').style.display = admin ? '' : 'none';
   /* The accounts tab stays, because Groups live on it and a group has nothing
      to do with signing in. What goes, where there is no sign-in, is the three
      sections about accounts themselves: they would manage a set of people who
