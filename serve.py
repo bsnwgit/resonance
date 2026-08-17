@@ -1636,6 +1636,14 @@ MAX_LOOKS = 8
 
 #: The displays document's own settings, as opposed to the rows in it. Set in
 #: the panel, and none of them needs a restart.
+#: Six digits is a low bar that rate limiting carries, and it is the number a
+#: person keys into a screen. An admin can raise it where the room deserves
+#: more; below four is not a secret, above twelve is a password with the wrong
+#: keyboard.
+PIN_MIN_DEFAULT = 6
+PIN_LIMITS = (4, 12)
+PIN_MAX = 32
+
 DISPLAY_SETTINGS = {
     # May a device nobody invited ask for access at all?
     #
@@ -1731,6 +1739,10 @@ DISPLAY_SETTINGS = {
     # never grows two it did not ask for — see default_group.
     "device_group": "",
     "identity_group": "",
+    # The fewest digits a PIN may have. Raising it does not revoke anything —
+    # it marks every PIN below it, and those are made to conform at the next
+    # unlock. See identity_pin_state.
+    "pin_min": PIN_MIN_DEFAULT,
     # Kept so an existing document round-trips rather than losing a key on the
     # first save. `user` was the second DISPLAY kind and folded into `device`;
     # nothing reads this now, and nothing writes it either.
@@ -1738,7 +1750,8 @@ DISPLAY_SETTINGS = {
 }
 MAX_FORM_FIELDS = 5
 #: (low, high) for each number the panel can set
-DISPLAY_LIMITS = {"max_displays": (2, 5000), "max_pending": (1, 1000),
+DISPLAY_LIMITS = {"pin_min": PIN_LIMITS,
+                  "max_displays": (2, 5000), "max_pending": (1, 1000),
                   "guest_days": (1, 3650),
                   # 0 is off — see code_minutes. A week is the top because a
                   # code good for longer than anybody remembers issuing it is
@@ -3238,7 +3251,123 @@ IDENTITY_DEFAULTS = {
     "salt": "", "hash": "",
     "created": 0, "last_seen": 0,
     "created_by": "",
+    # THE PIN. PBKDF2 like an admin password and not the SHA-256 the URL gets:
+    # a URL secret is 32 bytes from the system generator with no dictionary to
+    # run, where a PIN is six digits a human chose. Stretching is the only
+    # thing standing between that and a list of a million guesses.
+    #
+    # `pin_len` is kept because the policy is a MINIMUM that can be raised
+    # later, and a hash cannot be asked how long the thing behind it was. It
+    # is the length and nothing else — it narrows the search space by a factor
+    # nobody can use without the hash, and without it raising the minimum
+    # would either do nothing to existing PINs or force everybody to reset.
+    "pin_salt": "", "pin_hash": "", "pin_len": 0, "pin_set_at": 0,
 }
+
+#: Guessing is per IDENTITY rather than per address. A six-digit PIN is small
+#: enough that the thing to slow down is attempts against one person, and an
+#: attacker who changes address between guesses must not get a fresh budget.
+#: Its own ledger, so somebody fumbling their PIN cannot lock an admin out of
+#: the panel — the same reason the embed keys keep theirs.
+_pin_fails = {}                  # identity id -> [count, blocked_until]
+
+
+def pin_blocked(pid):
+    rec = _pin_fails.get(pid)
+    return bool(rec and rec[1] > time.time())
+
+
+def note_pin_failure(pid):
+    rec = _pin_fails.setdefault(pid, [0, 0])
+    rec[0] += 1
+    if rec[0] >= 5:
+        rec[1] = time.time() + min(300, 15 * (2 ** (rec[0] - 5)))
+
+
+def weak_pin(pin):
+    """The guesses anybody would try first, refused where they are chosen
+    rather than left for the back-off to absorb. A run, a repeat, or the year
+    somebody was born is most of what a keypad ever sees, and rate limiting is
+    what makes six digits survivable — it should not be spending its budget on
+    111111."""
+    if len(set(pin)) == 1:
+        return "that is one digit repeated"
+    runs = "0123456789" * 2
+    if pin in runs or pin in runs[::-1]:
+        return "that is a run of digits"
+    if len(pin) == 4 and pin.startswith(("19", "20")):
+        return "that reads as a year"
+    return ""
+
+
+def check_pin(pin, minimum=None):
+    """What is wrong with this PIN, or "" if nothing is. Digits only: it is
+    keyed into a screen, often with a remote, and a PIN that needed letters
+    would be a password with the wrong name."""
+    pin = str(pin or "")
+    low = PIN_MIN_DEFAULT if minimum is None else minimum
+    if not pin.isdigit():
+        return "a PIN is digits only"
+    if len(pin) > PIN_MAX:
+        return "that is longer than a PIN needs to be"
+    if len(pin) < low:
+        return "a PIN needs at least %d digits here" % low
+    return weak_pin(pin)
+
+
+def set_identity_pin(pid, pin, minimum=None):
+    """Set or replace somebody's PIN. Returns "" or the reason it was refused."""
+    rows = read_identities()
+    if pid not in rows:
+        return "no such identity"
+    bad = check_pin(pin, minimum)
+    if bad:
+        return bad
+    salt, dk = hash_password(str(pin))
+    rows[pid].update(pin_salt=salt, pin_hash=dk, pin_len=len(str(pin)),
+                     pin_set_at=int(time.time()))
+    write_identities(rows)
+    _pin_fails.pop(pid, None)
+    return ""
+
+
+def clear_identity_pin(pid):
+    """An admin resetting a forgotten one. With no email here this is the only
+    recovery path, which is why it exists in the first version — and it does
+    not set a new PIN, it removes the old one: an admin who chose somebody's
+    PIN would know it."""
+    rows = read_identities()
+    if pid not in rows:
+        return False
+    rows[pid].update(pin_salt="", pin_hash="", pin_len=0, pin_set_at=0)
+    write_identities(rows)
+    _pin_fails.pop(pid, None)
+    return True
+
+
+def verify_identity_pin(pid, pin):
+    """True where it matches. Compared HERE and never in the browser, and the
+    back-off is charged on the way out rather than the way in, so a correct PIN
+    entered after four wrong ones still works."""
+    rec = read_identities().get(pid)
+    if not rec or not rec.get("pin_hash"):
+        return False
+    ok = verify_password(str(pin or ""), rec["pin_salt"], rec["pin_hash"])
+    if ok:
+        _pin_fails.pop(pid, None)
+    else:
+        note_pin_failure(pid)
+    return bool(ok)
+
+
+def identity_pin_state(rec, minimum=None):
+    """none, ok, or short. SHORT is a PIN that was legal when it was set and is
+    below a minimum raised since — marked rather than revoked, because the
+    person still has to be able to unlock in order to change it."""
+    low = PIN_MIN_DEFAULT if minimum is None else minimum
+    if not rec.get("pin_hash"):
+        return "none"
+    return "ok" if (rec.get("pin_len") or 0) >= low else "short"
 
 
 def read_identities():
@@ -3354,9 +3483,15 @@ def admin_identities():
     """The list, less the credential. What a URL secret IS never leaves this
     server after the one moment it was minted."""
     rows = read_identities()
+    low = display_settings()["pin_min"]
+    # The STATE of a PIN, never the PIN. Whether somebody has one, and whether
+    # theirs is below a minimum raised since they set it, is what an admin has
+    # to be able to see — the rollout of a tightened policy is otherwise a
+    # thing you assume rather than watch.
     return [dict({k: rec.get(k) for k in
-                  ("name", "created", "last_seen", "created_by")},
-                 id=pid, label=identity_label(rec))
+                  ("name", "created", "last_seen", "created_by", "pin_set_at")},
+                 id=pid, label=identity_label(rec),
+                 pin=identity_pin_state(rec, low))
             for pid, rec in sorted(rows.items(), key=lambda kv: kv[1]["created"])]
 
 
@@ -4552,7 +4687,8 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/displays/decide", "/displays/settings", "/displays/kiosk",
                      "/groups", "/groups/save", "/groups/delete", "/groups/sets",
                      "/identities", "/identities/new", "/identities/rename",
-                     "/identities/delete", "/identities/reissue")
+                     "/identities/delete", "/identities/reissue",
+                     "/identities/pin")
 #: where an enrolment code is typed. On the display listeners only — it hands
 #: out a display's token, and the admin listener is not a display.
 ENROL_PREFIX = "/e/"
@@ -5272,6 +5408,7 @@ class Handler(SimpleHTTPRequestHandler):
             secure = RUNNING.get("https_port")
             return self._json(200, {"identities": admin_identities(),
                                     "max": MAX_IDENTITIES,
+                                    "pin_min": display_settings()["pin_min"],
                                     "base": "%s://%s:%d%s"
                                             % ("https" if secure else "http", host,
                                                secure or RUNNING.get("http_port") or 0,
@@ -6145,6 +6282,24 @@ class Handler(SimpleHTTPRequestHandler):
             # every browser that ever had that page open.
             return self._json(200, {"ok": True, "token": token,
                                     "identities": admin_identities()})
+
+        if parsed.path == "/identities/pin":
+            # An admin CLEARS a PIN; they never choose one. With no email here
+            # this is the only recovery path, which is why it is in the first
+            # version — and clearing rather than setting is the difference
+            # between giving somebody their account back and knowing their PIN.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            pid = str(obj.get("id") or "")
+            if not clear_identity_pin(pid):
+                return self._json(404, {"error": "no such identity"})
+            print("identity %s had its PIN cleared by %s" % (pid, s["user"]),
+                  flush=True)
+            return self._json(200, {"ok": True, "identities": admin_identities()})
 
         if parsed.path == "/identities/reissue":
             s = self._require("admin")

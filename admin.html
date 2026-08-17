@@ -1431,6 +1431,10 @@
   }
   .erow .badge{font-size:calc(7.5px * var(--fs));letter-spacing:.14em;padding:1px 5px;
                border:1px solid rgba(var(--glass),.25);color:rgba(var(--paper),.8)}
+  /* A badge that is a thing to do rather than a thing to know. Used where a
+     PIN sits below a minimum raised since it was set: nothing is broken, and
+     somebody still has to go and fix it. */
+  .erow .badge.warn{border-color:rgba(224,113,107,.55);color:#eaa8a8}
   .cks{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;margin:6px 0 2px}
   .cks label{display:flex;align-items:center;gap:6px;font-size:calc(9px * var(--fs));
              letter-spacing:.08em;color:rgba(var(--paper),.9);cursor:pointer}
@@ -2476,6 +2480,38 @@ by noise.</div>
   <div class="seg actrow">
     <button id="b_dpsave" class="act-save">SAVE</button>
   </div>
+    </div>
+  </section>
+
+  <!-- A person's own secret, as against a screen's. It sits on SECURITY with
+       the rest of who-gets-in rather than beside the people themselves: it is
+       one number for the whole deployment, and a policy set on the row it
+       applies to is a policy somebody sets differently twelve times. -->
+  <section class="grp wide" data-tab="security">
+    <h4>PIN policy</h4>
+    <div class="grpbody">
+  <label class="bklab" style="margin-top:2px">Fewest digits a PIN may have</label>
+  <input id="dp_pinmin" class="num" type="number" inputmode="numeric"
+         min="4" max="12">
+  <div class="note help">A PIN is what turns somebody's URL into a person who
+can be remembered — it buys durable memory, not reach, so a user without one
+still reaches everything they were granted.
+
+<b>Six digits is the default</b>, and it is a low bar that rate limiting
+carries: guessing backs off geometrically per person, so an attacker who
+changes address gets no fresh budget. Runs, repeats and anything that reads as
+a year are refused where they are chosen rather than left for the back-off to
+absorb.
+
+<b>Raising this does not revoke anything.</b> Every PIN below the new minimum
+is marked in the list, and the person is made to set a conforming one the next
+time they unlock — their old PIN still authenticates that change, or an admin
+resetting every account by hand would be the price of tightening a number.
+Lowering it invalidates nothing.
+
+<b>A PIN is not a password.</b> Six digits keyed into a screen suits an
+internal tool; it should not be the only thing standing in front of anything
+genuinely sensitive.</div>
     </div>
   </section>
 
@@ -5331,13 +5367,14 @@ async function loadDisplays(){
    A PERSON, as against the browser somebody happened to open. Minted here and
    nowhere else: there is no email and nothing to vouch for a name, so anybody
    who could mint their own could mint somebody else's. */
-let IDENTITIES = [], IDBASE = '', OPENPID = '';
+let IDENTITIES = [], IDBASE = '', OPENPID = '', IDPINMIN = 6;
 
 async function loadIdentities(){
   try{
     const j = await api('/identities');
     IDENTITIES = j.identities || [];
     IDBASE = j.base || '';
+    IDPINMIN = j.pin_min || 6;
   }catch(e){ IDENTITIES = []; }
   return IDENTITIES;
 }
@@ -5406,6 +5443,16 @@ async function refreshIdentities(){
     seen.className = 'badge';
     seen.textContent = p.last_seen ? 'IN USE' : 'URL NOT PICKED UP';
     top.appendChild(seen);
+    /* Whether there is a PIN, and whether it still meets the minimum. SHORT is
+       the one worth seeing from the list: raising the policy marks every PIN
+       below it, and who is still outstanding is how a rollout is watched
+       rather than assumed. */
+    const pin = document.createElement('span');
+    pin.className = 'badge' + (p.pin === 'short' ? ' warn' : '');
+    pin.textContent = p.pin === 'ok' ? 'PIN'
+                    : p.pin === 'short' ? 'PIN BELOW ' + IDPINMIN
+                    : 'NO PIN';
+    top.appendChild(pin);
     top.onclick = (e)=>{
       if (e.target.closest('input, button, select, textarea')) return;
       const opening = row.classList.contains('shut');
@@ -5448,6 +5495,22 @@ async function refreshIdentities(){
 
     const acts = document.createElement('div');
     acts.className = 'seg actrow';
+    /* Clearing, never setting. An admin who chose somebody's PIN would know
+       it; this hands the account back and lets them pick their own. */
+    if (p.pin !== 'none'){
+      const rp = document.createElement('button');
+      rp.className = 'act-undo';
+      rp.textContent = 'CLEAR THE PIN';
+      rp.onclick = async ()=>{
+        if (!confirm('Clear the PIN for "' + (p.label || p.id) + '"? They set a '
+                     + 'new one the next time they unlock. You are not shown '
+                     + 'the old one and cannot choose the new one.')) return;
+        const j = await idAction('/identities/pin', {id: p.id});
+        if (j){ idNote('their PIN is cleared — they set a new one next time');
+                refreshIdentities(); }
+      };
+      acts.appendChild(rp);
+    }
     const re = document.createElement('button');
     re.className = 'act-undo';
     re.textContent = 'REISSUE THE URL';
@@ -5728,6 +5791,7 @@ function paintDpSettings(){
   $('dp_max').value = DPCFG.max_displays;
   $('dp_pending').value = DPCFG.max_pending;
   $('dp_codemins').value = DPCFG.code_minutes;
+  $('dp_pinmin').value = DPCFG.pin_min;
   paintDpForm(DPCFG.form || []);
   PROFILE_KINDS.forEach(k=> paintProfiles(k, DPCFG[k.key] || [],
                                           DPCFG[DEF_KEY[k.key]] || ''));
@@ -5846,6 +5910,7 @@ $('b_dpsave').addEventListener('click', ()=>{
     max_displays: parseInt($('dp_max').value, 10),
     max_pending: parseInt($('dp_pending').value, 10),
     code_minutes: parseInt($('dp_codemins').value, 10),
+    pin_min: parseInt($('dp_pinmin').value, 10),
   }, 'dpnote');
 });
 
