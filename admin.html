@@ -1023,6 +1023,7 @@
      nothing, because the answer landed somewhere you were not looking, is not
      a flow anybody can follow. */
   .erow .dcode,
+  #idurl,
   #dispcode{
     margin:6px 0 2px;padding:6px 8px;user-select:all;
     background:rgba(122,201,160,.07);
@@ -1031,13 +1032,18 @@
     color:#d2f2e2;word-break:break-all;
   }
   .erow .dcode span,
+  #idurl span,
   #dispcode span{
     display:block;margin-top:3px;user-select:none;
     font-size:calc(8.5px * var(--fs));letter-spacing:.06em;
     color:rgba(var(--paper),.62);
   }
-  #dispcode{display:none}
-  #dispcode.on{display:block}
+  /* A URL rather than six characters, so it wraps instead of tracking wide. */
+  #idurl{letter-spacing:.02em}
+  #dispcode,
+  #idurl{display:none}
+  #dispcode.on,
+  #idurl.on{display:block}
   /* Spent. Kept on screen rather than removed, because a box that vanishes
      while you are walking back to the keyboard is indistinguishable from one
      that was never there — and this one has to say what to do next. */
@@ -2602,6 +2608,54 @@ behaves like the rest of the building rather than like nothing.</div>
   </section>
   <!-- The form itself, which is a different job again: this one is written
        once, in somebody's own words, and read by strangers. -->
+  <!-- A PERSON, as against the browser somebody happened to open. An admin
+       mints one here and hands over the URL; it travels to whatever machine
+       they pick it up on, and the machine contributes nothing to what that
+       session is. First on the tab because it is now the primary thing this
+       page is for — the queue below is read when something needs deciding.
+
+       Add row at the TOP for the same reason DEVICE ENROLMENT's is: this list
+       exists to be added to and then watched, so the URL you have just minted
+       is the first thing on the page rather than the last. -->
+  <section class="grp bare proflist" data-tab="displays">
+    <div class="barehead"><span class="listtitle">People</span></div>
+    <div class="grpbody">
+  <div class="addtop" id="idadd">
+    <div class="seg">
+      <input id="id_name" type="text" spellcheck="false" autocomplete="off"
+             placeholder="Sarah">
+      <button id="b_idnew" class="act-add">CREATE A PERSON</button>
+    </div>
+  </div>
+  <!-- Where the URL appears, once. Same place the enrolment code appears, and
+       for the same reason: what you have just made is what you came here to
+       collect. -->
+  <div id="idurl"></div>
+  <div class="note" id="idnote"></div>
+  <div id="idlist"></div>
+  <div class="note help">A person, as against a device. A device is one screen
+standing in one room; a person moves between a phone, a laptop and a borrowed
+browser and is the same person in all three.
+
+<b>The URL is the credential</b>, so it is minted rather than spelled out of
+their name — a name would be guessable, and a guessable address that grants
+anything is a password written on a wall. It is shown <b>once</b>, here, at the
+moment you create it: what is stored is a hash, so this page cannot show it to
+you a second time. Hand it over before you leave the row.
+
+Opening it sets a cookie and drops the secret out of the address bar, so what
+stays in their history no longer carries anything.
+
+<b>REISSUE</b> mints a new one and kills the old the moment you press it —
+for a URL that got somewhere it should not have, where deleting the person
+would take everything they own with them.
+
+<b>It will not work on a screen you approved.</b> A device is a device, and
+signing a person into a shared one is deliberately not built yet — a kiosk is
+the case it is least for. The URL is not spent by being refused there.</div>
+    </div>
+  </section>
+
   <section class="grp wide" data-tab="displays">
     <h4>The request form</h4>
     <div class="grpbody">
@@ -4881,6 +4935,187 @@ async function loadDisplays(){
   }catch(e){ DISPLAYS = []; }
   return DISPLAYS;
 }
+
+/* ------------------------------------------------------- identities
+   A PERSON, as against the browser somebody happened to open. Minted here and
+   nowhere else: there is no email and nothing to vouch for a name, so anybody
+   who could mint their own could mint somebody else's. */
+let IDENTITIES = [], IDBASE = '', OPENPID = '';
+
+async function loadIdentities(){
+  try{
+    const j = await api('/identities');
+    IDENTITIES = j.identities || [];
+    IDBASE = j.base || '';
+  }catch(e){ IDENTITIES = []; }
+  return IDENTITIES;
+}
+
+function idNote(m, bad){
+  const el = $('idnote');
+  if (!el) return;
+  el.className = 'note' + (bad ? ' bad' : '');
+  el.textContent = m || '';
+}
+
+/* The URL, in the one moment it exists in the clear. Shown whole, the way an
+   enrolment code is: nobody is retyping half an address, and this page cannot
+   show it a second time. */
+function showPersonUrl(name, token){
+  const out = $('idurl');
+  if (!out) return;
+  const line = document.createElement('div');
+  line.textContent = IDBASE + token;
+  const sub = document.createElement('span');
+  sub.textContent = '“' + name + '” · hand this over now — it is not shown '
+                  + 'again · opening it drops the secret out of their address bar';
+  out.innerHTML = '';
+  out.appendChild(line);
+  out.appendChild(sub);
+  out.classList.add('on');
+}
+
+async function idAction(path, body){
+  try{
+    const j = await api(path, {method:'POST', body: JSON.stringify(body)});
+    IDENTITIES = j.identities || IDENTITIES;
+    return j;
+  }catch(e){
+    idNote(e.message || 'that did not work', true);
+    return null;
+  }
+}
+
+async function refreshIdentities(){
+  const box = $('idlist');
+  if (!box || ME.role !== 'admin'){ if (box) box.textContent = ''; return; }
+  await loadIdentities();
+  box.innerHTML = '';
+  if (!IDENTITIES.length){
+    box.className = 'note';
+    box.textContent = 'Nobody yet. Name one above and you are handed the URL '
+                    + 'to give them.';
+    return;
+  }
+  box.className = '';
+  IDENTITIES.forEach(p=>{
+    const row = document.createElement('div');
+    row.className = 'erow';
+    if (OPENPID !== p.id) row.classList.add('shut');
+
+    /* Shut, the name is the row's title and the badge says whether anybody
+       ever picked the URL up — which is the one thing this list is read for,
+       so it is not something you open a row to find. */
+    const top = document.createElement('div'); top.className = 'top';
+    const nmt = document.createElement('span');
+    nmt.className = 'nm';
+    nmt.textContent = p.label || 'unnamed person';
+    top.appendChild(nmt);
+    const seen = document.createElement('span');
+    seen.className = 'badge';
+    seen.textContent = p.last_seen ? 'IN USE' : 'URL NOT PICKED UP';
+    top.appendChild(seen);
+    top.onclick = (e)=>{
+      if (e.target.closest('input, button, select, textarea')) return;
+      const opening = row.classList.contains('shut');
+      OPENPID = opening ? p.id : '';
+      box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+      row.classList.toggle('shut', !opening);
+    };
+    row.appendChild(top);
+
+    const namerow = document.createElement('div');
+    namerow.className = 'namerow';
+    const nlab = document.createElement('b');
+    nlab.textContent = 'Name';
+    namerow.appendChild(nlab);
+    const nm = document.createElement('input');
+    nm.type = 'text'; nm.className = 'nmedit'; nm.value = p.name || '';
+    nm.spellcheck = false;
+    nm.onkeydown = (e)=>{ if (e.key === 'Enter') nm.blur(); };
+    nm.onchange = async ()=>{
+      const j = await idAction('/identities/rename',
+                               {id: p.id, name: (nm.value || '').trim()});
+      if (j){ idNote(''); refreshIdentities(); }
+    };
+    namerow.appendChild(nm);
+    /* On the name's own line, hard right, the same as a group's — deleting is
+       the one thing here that cannot be undone and belongs beside the thing it
+       names rather than among the ticks. */
+    const del = document.createElement('button');
+    del.textContent = 'DELETE';
+    del.className = 'act-danger';
+    del.onclick = async ()=>{
+      if (!confirm('Delete "' + (p.label || p.id) + '"? Their URL stops working '
+                   + 'immediately, and anything granted to them goes with them.'))
+        return;
+      const j = await idAction('/identities/delete', {id: p.id});
+      if (j){ OPENPID = ''; idNote(''); refreshIdentities(); }
+    };
+    namerow.appendChild(del);
+    row.appendChild(namerow);
+
+    const acts = document.createElement('div');
+    acts.className = 'seg actrow';
+    const re = document.createElement('button');
+    re.className = 'act-undo';
+    re.textContent = 'REISSUE THE URL';
+    re.onclick = async ()=>{
+      if (!confirm('Mint a new URL for "' + (p.label || p.id) + '"? The one they '
+                   + 'are using stops working the moment you press this.')) return;
+      const j = await idAction('/identities/reissue', {id: p.id});
+      if (!j || !j.token) return;
+      /* On screen before anything repaints: the old one is already dead, so a
+         new one nobody caught is somebody locked out. */
+      showPersonUrl(p.label || p.id, j.token);
+      idNote('the previous URL stopped working just now');
+      refreshIdentities();
+    };
+    acts.appendChild(re);
+    row.appendChild(acts);
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    [['Created', dispWhen(p.created)
+                 + (p.created_by ? ' by ' + p.created_by : '')],
+     ['Last seen', p.last_seen ? dispWhen(p.last_seen)
+                               : 'never — the URL has not been opened']]
+      .forEach(([k, v])=>{
+        const el = document.createElement('div');
+        const bb = document.createElement('b');
+        bb.textContent = k + ' ';
+        el.appendChild(bb);
+        el.appendChild(document.createTextNode(v));
+        meta.appendChild(el);
+      });
+    row.appendChild(meta);
+    box.appendChild(row);
+  });
+}
+
+$('b_idnew').addEventListener('click', async ()=>{
+  const el = $('id_name'), out = $('idurl');
+  const name = (el.value || '').trim();
+  /* Cleared on the way in, the same as the enrolment code's: a complaint left
+     on screen after the thing succeeded reads as the press having failed. */
+  idNote('');
+  out.classList.remove('on');
+  out.textContent = '';
+  if (!name){
+    idNote('give them a name first — it is what the row is called and what you '
+           + 'will look for when you grant something', true);
+    el.focus();
+    return;
+  }
+  el.value = '';
+  const j = await idAction('/identities/new', {name});
+  if (!j || !j.token) return;           // idAction has said why
+  showPersonUrl(name, j.token);
+  refreshIdentities();
+});
+$('id_name').addEventListener('keydown', e=>{
+  if (e.key === 'Enter') $('b_idnew').click();
+});
 
 /* ----------------------------------------------------------- groups
    A name for a set of displays, so a grant is made once instead of ticked
@@ -8147,6 +8382,9 @@ function panelNav(){
     if (tab === 'security'){ refreshGroups(); loadApp(); }
     if (tab === 'displays' || tab === 'devices' || tab === 'security'
         || tab === 'enrol') refreshDisplays();
+    // Its own list and its own fetch: it shares the tab with the request
+    // queue but nothing else, and a person is not a row in the display file.
+    if (tab === 'displays') refreshIdentities();
     /* The three settings tabs ARE profile lists now, and those lists live in
        the displays document — so arriving at one has to fetch it, exactly as
        PROFILES does. Without this the lists were painted only if you happened
