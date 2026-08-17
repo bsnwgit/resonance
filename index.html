@@ -3732,17 +3732,15 @@ const Wake = {
     }
     const h = this.heard(text);
     if (!h){
-      /* What was heard, in the same breath as the refusal. They used to be two
-         notes and the second overwrote the first, which threw away the one
-         fact that tells you whether a name was mis-heard or never said. */
-      /* It says that something was said and that it named nothing — never
-         WHAT was said. Quoting it here is publishing a conversation nobody
-         addressed to this screen, which is the one thing a wake word exists
-         to prevent. A wake word that is being misheard is diagnosed with
-         LEARN, which asks first. */
-      micNote(Routes.spoken()
-        ? 'asleep — that named none of ' + Routes.spoken()
-        : 'asleep — ' + Routes.mute(), true);
+      /* Nothing is said about it. Speech that named no assistant was not
+         addressed to this screen, and announcing that it was heard and
+         ignored puts a line on the wall about a conversation happening in
+         front of it — every time anybody in the room speaks. The state is
+         already on the button, which reads ASLEEP.
+
+         Cleared rather than left: whatever the last note said, it is not
+         about this utterance. */
+      micNote('');
       return null;
     }
     if (!Routes.usable(h.route)) return this.notMine(h);

@@ -179,7 +179,6 @@ answer to *"why did nothing happen?"* now appears:
 | `transcribing…` | the recording is with the server |
 | `heard you · woken · 340ms decode, 512ms round trip` | it acted on what you said, and how long each stage took |
 | `nothing recognised — try speaking a little louder` | the recording came back empty; nothing to match against |
-| `asleep — that named none of "house" or "ada"` | somebody said something near it and no assistant was named. **It does not say what was said** |
 | `"house" is not for this display — ignored` | somebody addressed an assistant this display is not allowed to use. Nothing was sent, nothing was answered, and the conversation it was already having was left alone |
 | `waiting to be approved — kitchen (d4a19…)` | this display has never been approved. It renders correctly and answers to nothing; the id is what an administrator looks for in DISPLAYS |
 | `enrolled as kitchen wall — say "house" or "ada"` | an enrolment code was just typed into this screen and it worked |
@@ -189,16 +188,20 @@ answer to *"why did nothing happen?"* now appears:
 | `refused: this display may not use house` | a question typed into the box went to an assistant this display is not allowed to use |
 | `backend: …` | why an endpoint failed, in full, where the spoken reply gives only the name |
 
-**It never shows what it overheard.** While it is asleep the line says that
-something was said and that no assistant was named — never the words. A display
-in an occupied room that printed everything within earshot would be putting
-other people's conversations on a wall, which is exactly what the wake word
-exists to prevent: answering an unaddressed sentence and publishing one are the
-same breach. Nothing is written to the line until the gate has decided the
-display was being spoken to.
+**It says nothing at all about what it overheard.** Speech that named no
+assistant was not addressed to this screen, and the line stays empty — it does
+not report the words, and it does not report that anything was heard. A display
+in an occupied room that announced every sentence within earshot would be
+putting other people's conversations on a wall, which is exactly what the wake
+word exists to prevent: answering an unaddressed sentence and remarking on one
+are the same breach. Nothing is written to the line until the gate has decided
+the display was being spoken to.
 
-The cost is real and worth knowing: a wake word that is being *misheard* used
-to be diagnosable from that line. It is not any more. **LEARN HOW I SAY IT** is
+The state is on the button rather than in a line of text: while the gate is
+shut it reads **ASLEEP**.
+
+The cost is real and worth knowing: a wake word that is being *misheard*
+produces no line at all, so it looks the same as nobody having spoken. **LEARN HOW I SAY IT** is
 the tool for that instead — it asks before it listens, captures three
 deliberate attempts, and adds the spellings the transcriber actually returns.
 
