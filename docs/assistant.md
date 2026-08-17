@@ -189,6 +189,12 @@ Two profiles may share a port when they answer on different addresses, because
 the machine can carry that. ANY collides with everything on its port, which is
 what ANY means.
 
+**A profile never reaches further than the server itself.** With ADMIN SETTINGS
+▸ IP Address set to one address — or to this machine only — that address wins
+for every profile, whatever they name. A setting that says *this machine only*
+has to mean it, and a profile able to bind a LAN address anyway would be that
+setting quietly not applying.
+
 **The port is checked before anything is allowed to use it.** Saving tries the
 port on the address chosen; on ANY it tries every address the machine has, and
 allows the save if even one can carry it — a port in use on all of them is
