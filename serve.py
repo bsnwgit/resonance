@@ -62,6 +62,11 @@ import manual                            # the manual, and its PDF writer
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SETTINGS_PATH = os.path.join(ROOT, "settings.json")
 USERS_PATH = os.path.join(ROOT, "users.json")
+#: The panel's own PIN, for the middle rung. Its own file rather than a key in
+#: app.json, because that document is handed to the panel whole on /app and a
+#: credential — even a hashed one — has no business riding along with the
+#: ports and the bind address.
+PANEL_PIN_PATH = os.path.join(ROOT, "panel_pin.json")
 APP_PATH = os.path.join(ROOT, "app.json")
 BACKEND_PATH = os.path.join(ROOT, "backend.json")
 _settings_lock = threading.Lock()
@@ -184,11 +189,17 @@ UNATTENDED_LIMITS = {"poll_seconds": (2, 300), "retry_attempts": (1, 10),
 PORT_MIN, PORT_MAX = 1024, 65535     # below 1024 needs root; this runs as you
 SESSION_MIN, SESSION_MAX = 5, 480    # minutes: below 5 is unusable, above 8h absurd
 BIND_MODES = ("loopback", "address", "everything")
-# "pin" — one number for the whole display, no accounts — is the middle rung
-# and is not here yet. It is the identity work's PIN machinery pointed at the
-# display rather than at a named person, so it lands with that rather than
-# being built twice. Named here so the omission is deliberate and visible.
-AUTH_MODES = ("none", "accounts")
+#: THREE RUNGS. Nothing at the door, one number for the whole panel, or
+#: accounts with roles. The middle one is the identity work's PIN machinery
+#: pointed at the panel rather than at a named person — which is why it waited
+#: for that rather than being built twice.
+#:
+#: What it is FOR is the deployment with one administrator: accounts exist to
+#: tell people apart, and telling one person apart from themselves is a login
+#: screen charging rent. What it is NOT for is a deployment where the log has
+#: to say who did a thing. A single PIN cannot, and the log says "(single PIN)"
+#: rather than implying somebody.
+AUTH_MODES = ("none", "pin", "accounts")
 LOOPBACK = "127.0.0.1"
 
 
@@ -1384,12 +1395,14 @@ def validate_app(obj, current):
     if "auth" in obj:
         v = str(obj["auth"] or "").strip()
         if v not in AUTH_MODES:
-            # The rung that is specified but not built. Saying so beats a
-            # generic "not one of" that reads like a typo in the request.
-            if v == "pin":
-                return None, ("a single PIN with no accounts is not built yet — "
-                              "it arrives with identity")
             return None, "sign-in must be one of: " + ", ".join(AUTH_MODES)
+        if v == "pin" and not has_panel_pin():
+            # Refused HERE rather than at the restart that would apply it.
+            # Saving this and restarting is how a panel ends up in a mode whose
+            # only key was never cut, and the way back is a text editor on the
+            # box.
+            return None, ("set the panel PIN first — switching to it with none "
+                          "set would leave no way in")
         cfg["auth"] = v
     if "session_idle_minutes" in obj:
         try:
@@ -4294,6 +4307,51 @@ def hash_password(password, salt=None):
     return salt.hex(), dk.hex()
 
 
+def read_panel_pin():
+    try:
+        with open(PANEL_PIN_PATH) as fh:
+            doc = json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    return doc if isinstance(doc, dict) else {}
+
+
+def has_panel_pin():
+    d = read_panel_pin()
+    return bool(d.get("hash") and d.get("salt"))
+
+
+def set_panel_pin(pin, minimum=None):
+    """The panel's PIN. Returns "" or the reason it was refused.
+
+    Stretched with the same PBKDF2 as an account password and held to the same
+    rules as a person's PIN — a run or a repeat is refused where it is chosen,
+    because rate limiting is what makes a short secret survivable and it should
+    not spend its budget on 111111.
+
+    Setting it does NOT end the sessions it protects, unlike a person's. Those
+    are one human's own browsers, and locking yourself out of the panel from
+    the panel is not a security property."""
+    bad = check_pin(pin, minimum)
+    if bad:
+        return bad
+    salt, dk = hash_password(str(pin))
+    tmp = PANEL_PIN_PATH + ".tmp"
+    with open(tmp, "w") as fh:
+        json.dump({"version": 1, "salt": salt, "hash": dk,
+                   "set": int(time.time())}, fh)
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, PANEL_PIN_PATH)
+    return ""
+
+
+def verify_panel_pin(pin):
+    d = read_panel_pin()
+    if not (d.get("salt") and d.get("hash")):
+        return False
+    return verify_password(str(pin or ""), d["salt"], d["hash"])
+
+
 def verify_password(password, salt_hex, hash_hex):
     try:
         _, dk = hash_password(password, bytes.fromhex(salt_hex))
@@ -4911,6 +4969,7 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/displays/delete", "/displays/new", "/displays/reissue",
                      "/displays/decide", "/displays/settings", "/displays/kiosk",
                      "/groups", "/groups/save", "/groups/delete", "/groups/sets",
+                     "/app/pin",
                      "/identities", "/identities/new", "/identities/rename",
                      "/identities/delete", "/identities/reissue",
                      "/identities/pin")
@@ -5497,7 +5556,11 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/auth/me":
             s = self._session()
             if not s:
-                return self._json(401, {"error": "not signed in"})
+                # WHICH DOOR. The gate cannot know whether to ask for a
+                # username and a password or for one number, and guessing wrong
+                # is a form somebody fills in twice.
+                return self._json(401, {"error": "not signed in",
+                                        "mode": AUTH_MODE})
             # The panel needs to tell "signed in as an admin" from "there is no
             # sign-in here" — they grant the same access and want different
             # words, and one of them has no account to offer or to sign out of.
@@ -5677,7 +5740,12 @@ class Handler(SimpleHTTPRequestHandler):
                                                "session_min": SESSION_MIN,
                                                "session_max": SESSION_MAX,
                                                "bind_modes": list(BIND_MODES),
-                                               "auth_modes": list(AUTH_MODES)}})
+                                               "auth_modes": list(AUTH_MODES),
+                                               # Whether the middle rung can be
+                                               # switched to at all. The panel
+                                               # says so rather than letting a
+                                               # save come back refused.
+                                               "has_panel_pin": has_panel_pin()}})
         if path == "/users":
             if not self._require("admin"):
                 return
@@ -5792,6 +5860,26 @@ class Handler(SimpleHTTPRequestHandler):
             obj = self._json_body()
             if obj is None:
                 return
+            if AUTH_MODE == "pin":
+                # One number, no account to name. The session is an admin
+                # because there is nobody else it could be: this rung exists
+                # for the deployment with one administrator, and a role system
+                # with one member is a role system pretending.
+                if not verify_panel_pin(obj.get("pin")):
+                    note_login_failure(ip)
+                    print("failed PIN sign-in from %s" % ip, flush=True)
+                    return self._json(401, {"error": "that is not the PIN"})
+                clear_login_failures(ip)
+                name, role = "(single PIN)", "admin"
+                token = new_session(name, role)
+                body = json.dumps({"ok": True, "user": name, "role": role}).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self._set_cookie(token)
+                self.end_headers()
+                print("signed in with the panel PIN", flush=True)
+                return self.wfile.write(body)
             name = str(obj.get("username") or "").strip()
             users = read_users()
             u = users.get(name)
@@ -6672,6 +6760,24 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(404, {"error": "no such identity"})
             return self._json(200, {"ok": True, "settings": saved})
 
+        if parsed.path == "/app/pin":
+            # The panel's own PIN, set from the panel. Admin only, and there is
+            # no "old PIN" gate on it: reaching this route already required a
+            # session, which in PIN mode means having just entered the current
+            # one. Asking for it again would be asking somebody to prove twice
+            # what one door already proved.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            bad = set_panel_pin(obj.get("pin"), display_settings()["pin_min"])
+            if bad:
+                return self._json(400, {"error": bad})
+            print("the panel PIN was set by %s" % s["user"], flush=True)
+            return self._json(200, {"ok": True, "has_pin": True})
+
         if parsed.path == "/identities/pin":
             # An admin CLEARS a PIN; they never choose one. With no email here
             # this is the only recovery path, which is why it is in the first
@@ -7541,7 +7647,9 @@ def main():
     print("reachable at %s · %s" % (
         "this machine only (loopback)" if personal else
         "every interface on this machine" if host == "0.0.0.0" else host,
-        "no sign-in" if AUTH_MODE == "none" else "accounts and roles"), flush=True)
+        "no sign-in" if AUTH_MODE == "none"
+        else "one PIN, no accounts" if AUTH_MODE == "pin"
+        else "accounts and roles"), flush=True)
 
     if have_tls:
         # Pinned to the default profile, so an endpoint moved onto a port of
@@ -7651,6 +7759,8 @@ def main():
     # ceremony it forces is pure obstruction — which is exactly the install
     # this setting exists to make possible.
     if have_tls or personal:
+        # Only the accounts rung mints one. In PIN mode the key was cut before
+        # the mode could be saved, and with nothing at the door there is no key.
         first_pw = ensure_first_admin() if AUTH_MODE == "accounts" else None
         if have_tls:
             start_tls(adm_port, cert, key, admin_port=True, host=host)

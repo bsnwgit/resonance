@@ -2551,7 +2551,7 @@ setting.</div>
   <label class="bklab">Sign in</label>
   <div class="seg" id="ap_auth">
     <button data-v="none">NOTHING</button>
-    <button data-v="pin" disabled title="arrives with identity">A SINGLE PIN</button>
+    <button data-v="pin" title="one number for the whole panel">A SINGLE PIN</button>
     <button data-v="accounts">ACCOUNTS &amp; ROLES</button>
   </div>
   <div class="note help">What it takes to reach this configuration page.
@@ -2562,9 +2562,29 @@ personal install possible without fishing a generated password out of a log.
 <b>Accounts &amp; roles</b> is the default, because the safe default is the one
 that assumes it can be reached.
 
-<b>A single PIN</b> — one number for the whole display, no account management —
-is the middle rung and is not built yet. It is the PIN machinery from identity
-pointed at a display rather than a person, so it lands with that.</div>
+<b>A single PIN</b> — one number for the whole panel, no account management —
+is for the deployment with one administrator. Accounts exist to tell people
+apart, and telling one person apart from themselves is a login screen charging
+rent.
+
+<b>What it costs is the log.</b> Everything an account does is recorded against
+a name; everything done behind the PIN is recorded as <b>(single PIN)</b>,
+because that is all this rung knows. If it ever has to matter who did
+something, this is not the rung for it.
+
+Set the PIN below before switching to it — the switch is refused otherwise,
+since a restart into a mode whose key was never cut leaves no way in.</div>
+  <label class="bklab" style="margin-top:12px">The panel PIN</label>
+  <div class="seg">
+    <input id="ap_pin" class="num" type="password" inputmode="numeric"
+           autocomplete="new-password" placeholder="······">
+    <button id="b_appin" class="act-save">SET THE PIN</button>
+  </div>
+  <div class="note" id="pinsetnote"></div>
+  <div class="note help">Held to the same rules as a person's: digits only, at
+least as many as the PIN policy asks for, and runs, repeats and years refused
+where they are chosen. Setting it does not sign anybody out — locking yourself
+out of the panel from inside the panel is not a security property.</div>
   <div class="note" id="authnote"></div>
   <div class="pending" id="authpending" hidden></div>
   <div class="seg actrow">
@@ -3602,7 +3622,11 @@ async function api(path, opts){
     /* /auth/login answers 401 for a wrong password, which is a message on
        the gate that is already up — not a session ending. */
     if (r.status === 401 && path !== '/auth/login' && ME) endSession();
-    throw new Error(j.error || ('HTTP ' + r.status));
+    const err = new Error(j.error || ('HTTP ' + r.status));
+    /* The whole answer, not just its sentence. /auth/me's 401 says WHICH door
+       this is, and the gate cannot ask for the right thing without it. */
+    err.payload = j;
+    throw err;
   }
   return j;
 }
@@ -3639,7 +3663,31 @@ function endSession(){
 }
 
 async function whoami(){
-  try{ return await api('/auth/me'); }catch(e){ return null; }
+  try{ return await api('/auth/me'); }
+  catch(e){
+    GATE_MODE = (e.payload && e.payload.mode) || 'accounts';
+    paintGate();
+    return null;
+  }
+}
+
+/* Which door the gate is standing at. Read off the 401 that sent us here,
+   because a gate that guesses asks somebody to fill in a form twice. */
+let GATE_MODE = 'accounts';
+function paintGate(){
+  const pin = GATE_MODE === 'pin';
+  const ulab = document.querySelector('label[for="u"]');
+  const plab = document.querySelector('label[for="p"]');
+  if (ulab) ulab.style.display = pin ? 'none' : '';
+  if ($('u')) $('u').style.display = pin ? 'none' : '';
+  if (plab) plab.textContent = pin ? 'PIN' : 'password';
+  const f = $('p');
+  if (f){
+    f.setAttribute('autocomplete', pin ? 'one-time-code' : 'current-password');
+    if (pin) f.setAttribute('inputmode', 'numeric');
+    else f.removeAttribute('inputmode');
+    f.focus();
+  }
 }
 
 let signingIn = false;
@@ -3652,9 +3700,10 @@ async function signIn(){
   const label = btn.textContent;
   btn.textContent = 'SIGNING IN…';
   try{
-    ME = await api('/auth/login', {method:'POST', body: JSON.stringify({
-      username: $('u').value.trim(), password: $('p').value
-    })});
+    ME = await api('/auth/login', {method:'POST', body: JSON.stringify(
+      GATE_MODE === 'pin' ? {pin: $('p').value}
+                          : {username: $('u').value.trim(), password: $('p').value}
+    )});
     $('p').value = '';
     start();
   }catch(ex){
@@ -3666,6 +3715,19 @@ async function signIn(){
     btn.textContent = label;
   }
 }
+
+$('b_appin').addEventListener('click', async ()=>{
+  const el = $('ap_pin'), note = $('pinsetnote');
+  const pin = (el.value || '').trim();
+  note.className = 'note';
+  if (!pin){ note.className = 'note bad'; note.textContent = 'type one first';
+             el.focus(); return; }
+  try{
+    await api('/app/pin', {method:'POST', body: JSON.stringify({pin})});
+    el.value = '';
+    note.textContent = 'the panel PIN is set';
+  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+});
 
 $('gateform').addEventListener('submit', e=>{ e.preventDefault(); signIn(); });
 
@@ -4252,6 +4314,12 @@ async function loadApp(){
     sel.value = j.app.bind_address || '';
     segSet('ap_bind', j.app.bind);
     segSet('ap_auth', j.app.auth);
+    /* Whether a key has been cut. The switch is refused server-side without
+       one; saying so here means the refusal is not the way somebody finds
+       out. */
+    const pinnote = $('pinsetnote');
+    if (pinnote && !(j.limits || {}).has_panel_pin)
+      pinnote.textContent = 'No panel PIN is set yet.';
     postureSync();
     showPending(j);
     showPending(j, 'authpending');
@@ -4279,7 +4347,7 @@ $('b_apprevert').addEventListener('click', async ()=>{
 ['ap_bind', 'ap_auth'].forEach(id=>{
   document.querySelector('#' + id).addEventListener('click', e=>{
     const b = e.target.closest('button');
-    if (!b || b.disabled) return;      // the PIN rung is not built yet
+    if (!b || b.disabled) return;
     segSet(id, b.dataset.v);
     postureSync();
   });
