@@ -389,14 +389,19 @@ def net_host(vals, fallback):
 
 
 def port_free_anywhere(port, addrs):
-    """Free on at least one of these addresses.
+    """Free on EVERY one of these addresses, which is what ANY has to mean.
 
-    Deliberately not `port_free(port, "0.0.0.0")`: the kernel refuses a
-    wildcard bind when the port is held on even one address, and the rule
-    asked for here is that ANY may be saved as long as SOMETHING can carry it.
-    Returns (ok, taken) so the caller can say which ones are spoken for."""
+    ANY binds the wildcard, and the kernel refuses a wildcard bind when the
+    port is held on even one address. So a rule of "allowed if something can
+    carry it" would have saved a profile that then could not come up — the
+    panel saying yes and the server saying no at the next restart, in the log,
+    where nobody was looking.
+
+    Tested per address rather than by binding 0.0.0.0 once, because the answer
+    has to say WHICH address is holding it. A refusal naming the port and not
+    the address leaves somebody to go and find it."""
     taken = [a for a in addrs if not port_free(port, a)]
-    return (len(taken) < len(addrs), taken)
+    return (not taken, taken)
 
 
 def address_bindable(addr):
@@ -2220,9 +2225,15 @@ def validate_display_settings(obj, current):
                 else:
                     ok, taken = port_free_anywhere(v, have or [LOOPBACK])
                     if not ok:
-                        return None, ("%s: %d is already in use on every "
-                                      "address this machine has (%s)"
-                                      % (r["name"], v, ", ".join(taken)))
+                        # Named, with its interface, because ANY is refused by
+                        # ONE address holding the port and the whole question
+                        # is which. The fix is either to stop whatever has it,
+                        # or to name an address here that is free.
+                        by = ", ".join("%s (%s)" % (a, dict(here).get(a) or "?")
+                                       for a in taken)
+                        return None, ("%s: ANY needs %d free on every address, "
+                                      "and it is already in use on %s"
+                                      % (r["name"], v, by))
             r["values"]["address"] = addr
             r["values"]["port"] = pv
             r["values"]["redirect"] = rv
