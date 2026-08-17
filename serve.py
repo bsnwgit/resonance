@@ -5022,6 +5022,46 @@ class Handler(SimpleHTTPRequestHandler):
                                     "now": now_,
                                     "reload": bool(boot and req > boot)})
 
+        if parsed.path == "/display/enrol":
+            # The same redemption as /e/CODE, from a box on the screen itself.
+            #
+            # The URL form was the only way in, and it is the wrong shape for
+            # the thing it is for: somebody standing at a screen that is
+            # already showing this interface, holding six characters, being
+            # asked to type an address instead of the code. Worse where guest
+            # requests are off — that screen offered nothing at all, so a
+            # device with a code had no way to use it and no way to find out
+            # there was one.
+            if self.admin_port:
+                return self._json(404, {"error": "not found"})
+            if not self._same_origin():
+                return self._json(403, {"error": "cross-origin request refused"})
+            obj = self._json_body()
+            if obj is None:
+                return
+            ip = self.address_string()
+            # The same back-off ledger the URL form uses, which is what makes
+            # six characters enough: a billion possibilities only matters if
+            # guessing is cheap.
+            if code_blocked(ip):
+                return self._json(429, {"error": "blocked", "state": "blocked"})
+            token, out = redeem_code(str(obj.get("code") or ""))
+            if not token:                        # `out` is the reason
+                note_code_failure(ip)
+                print("enrolment code refused (%s) from %s" % (out, ip), flush=True)
+                return self._json(400, {"error": out, "state": out})
+            _code_fails.pop(ip, None)
+            print("display %s (%s) enrolled by code, in page"
+                  % (out["id"], display_label(out)), flush=True)
+            body = json.dumps({"ok": True,
+                               "display": self._display_state(out)}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self._set_display_cookie(token)
+            self.end_headers()
+            return self.wfile.write(body)
+
         if parsed.path == "/display/request":
             # A device asking for access, in the admin's own words. Same-origin
             # for the same reason hello is: nothing here should be reachable
@@ -5260,8 +5300,15 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(400, {"error": err})
             print("display %s (%s) invited by %s — code issued"
                   % (rec["id"], display_label(rec), s["user"]), flush=True)
+            # …and how long it is worth anything for, so the panel can count
+            # it down rather than restate the rule. Read off the record rather
+            # than assumed to be CODE_TTL: the two agree today, and a panel
+            # that assumes they always will is a panel that lies the day they
+            # do not.
             return self._json(200, {"ok": True, "id": rec["id"],
                                     "code": rec["code"],
+                                    "code_left": max(0, rec["code_expires"]
+                                                     - int(time.time())),
                                     "displays": admin_displays()})
 
         if parsed.path == "/displays/reissue":
@@ -5278,8 +5325,15 @@ class Handler(SimpleHTTPRequestHandler):
             # deliberately and somebody may be standing in front of it.
             print("display %s (%s) reissued by %s — its old token is dead"
                   % (rec["id"], display_label(rec), s["user"]), flush=True)
+            # …and how long it is worth anything for, so the panel can count
+            # it down rather than restate the rule. Read off the record rather
+            # than assumed to be CODE_TTL: the two agree today, and a panel
+            # that assumes they always will is a panel that lies the day they
+            # do not.
             return self._json(200, {"ok": True, "id": rec["id"],
                                     "code": rec["code"],
+                                    "code_left": max(0, rec["code_expires"]
+                                                     - int(time.time())),
                                     "displays": admin_displays()})
 
         if parsed.path == "/displays/approve":

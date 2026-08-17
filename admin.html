@@ -956,6 +956,13 @@
   }
   #dispcode{display:none}
   #dispcode.on{display:block}
+  /* Spent. Kept on screen rather than removed, because a box that vanishes
+     while you are walking back to the keyboard is indistinguishable from one
+     that was never there — and this one has to say what to do next. */
+  #dispcode.dead{
+    background:rgba(224,113,107,.06);border-color:rgba(224,113,107,.45);
+    color:rgba(var(--paper),.6);user-select:none;
+  }
   .erow .r{margin-left:auto;display:flex;gap:4px}
   .erow button{font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.1em;padding:3px 6px;
                cursor:pointer;background:none;color:rgba(var(--paper),.87);
@@ -6442,8 +6449,14 @@ async function refreshDisplays(){
       b.className = 'badge'; b.textContent = t;
       namecell.appendChild(b);
     };
-    if (st === 'code')    badge('WAITING FOR ITS CODE');
-    if (st === 'stale')   badge('CODE EXPIRED');
+    /* What is true, and when it stops being true. It read WAITING FOR ITS
+       CODE, which says the opposite of what this state is: the code exists,
+       it is live, and it is waiting for somebody to TYPE it — with a clock on
+       it that nothing on the row admitted to. */
+    if (st === 'code')
+      badge('CODE LIVE · ' + Math.max(1, Math.round((d.code_left || 0) / 60))
+            + ' MIN LEFT');
+    if (st === 'stale')   badge('CODE EXPIRED — REISSUE FOR ANOTHER');
     if (st === 'waiting') badge('WAITING');
     if (st === 'asked')   badge(d.renewals ? 'ASKING AGAIN' : 'ASKED FOR ACCESS');
     if (st === 'expired') badge('ACCESS EXPIRED');
@@ -6515,6 +6528,10 @@ async function refreshDisplays(){
               + 'using it now stops working immediately, and the row waits for '
               + 'somebody to type the new code into a screen. Its name and every '
               + 'endpoint that names it are kept.'))
+          /* No box needed here: displayAction opens the row it just changed,
+             and a row in this state draws the whole address and code across
+             it with the minutes left beside them. The box on ACCESS exists
+             because the button there is on a different tab from this list. */
           displayAction('/displays/reissue', {id: d.id});
       };
       r.appendChild(again);
@@ -6734,13 +6751,42 @@ $('b_adddisp').addEventListener('click', async ()=>{
   /* The whole thing somebody has to type, on its own line and big enough to
      read from across a room while typing it into a television with a remote.
      The address as well as the code: nobody is typing half a URL. */
-  out.textContent = ENROL_BASE + dispCode(j.code);
+  showCode(name, j.code, j.code_left || 600);
+});
+
+/* A code is only worth anything for ten minutes, so the ten minutes are on
+   screen and moving. It was a sentence saying "the code lasts ten minutes",
+   which tells you the rule and not the answer — and the answer changes every
+   second you spend walking to the screen. */
+let codeTick = 0;
+function showCode(name, code, left){
+  const out = $('dispcode');
+  clearInterval(codeTick);
+  const until = Date.now() + left * 1000;
+  const line = document.createElement('div');
+  line.textContent = ENROL_BASE + dispCode(code);
   const sub = document.createElement('span');
-  sub.textContent = '“' + name + '” · 10 minutes · works once · case and dashes '
-                  + 'do not matter · the row is under CONNECTIONS ▸ DEVICES';
+  out.innerHTML = '';
+  out.appendChild(line);
   out.appendChild(sub);
   out.classList.add('on');
-});
+  const paint = ()=>{
+    const s = Math.max(0, Math.round((until - Date.now()) / 1000));
+    if (!s){
+      clearInterval(codeTick);
+      out.classList.add('dead');
+      sub.textContent = '“' + name + '” · this code has expired — REISSUE the '
+                      + 'row under CONNECTIONS ▸ DEVICES for another';
+      return;
+    }
+    out.classList.remove('dead');
+    sub.textContent = '“' + name + '” · ' + Math.floor(s / 60) + ':'
+                    + String(s % 60).padStart(2, '0') + ' left · works once · '
+                    + 'type it into the screen, or into the box on its page';
+  };
+  paint();
+  codeTick = setInterval(paint, 1000);
+}
 $('dp_name').addEventListener('keydown', e=>{
   if (e.key === 'Enter') $('b_adddisp').click();
 });

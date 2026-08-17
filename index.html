@@ -320,6 +320,40 @@
     padding:22px 26px 18px;
     width:100%;max-width:560px;margin-inline:auto;
   }
+  /* ---- the code box ----
+     Set apart from the request beneath it by a rule, because they are two
+     different conversations: one is finishing a setup somebody already
+     decided on, the other is asking to be let in. The code is typed at the
+     size of the thing it is — six characters read off another screen — rather
+     than at form-field size. */
+  #enrol{display:none;flex-direction:column;gap:8px;
+         padding-bottom:14px;border-bottom:1px solid rgba(var(--glass),.18)}
+  body[data-enrol] #enrol{display:flex}
+  #enrolhead{
+    font-size:calc(12px * var(--fs));line-height:1.6;color:rgba(var(--paper),.88);
+  }
+  #enrolrow{display:flex;gap:8px;flex-wrap:wrap}
+  #enrolcode{
+    flex:1 1 180px;min-width:0;font:inherit;
+    font-size:calc(17px * var(--fs));letter-spacing:.28em;text-transform:uppercase;
+    padding:8px 10px;background:rgba(0,0,0,.45);color:var(--text);
+    border:1px solid rgba(var(--glass),.3);outline:0;border-radius:0;
+  }
+  #enrolcode:focus{border-color:rgba(var(--glass),.62)}
+  #enrolcode::placeholder{color:rgba(var(--paper),.28);letter-spacing:.28em}
+  #enrolgo{
+    font:inherit;font-size:calc(10px * var(--fs));letter-spacing:.18em;
+    padding:8px 14px;cursor:pointer;
+    background:none;color:rgba(var(--paper),.9);
+    border:1px solid rgba(var(--glass),.4);
+  }
+  #enrolgo:hover{border-color:rgba(var(--glass),.75)}
+  #enrolgo[disabled]{opacity:.5;cursor:default}
+  #enrolnote{
+    font-size:calc(9.5px * var(--fs));line-height:1.6;
+    color:rgba(var(--paper),.55);
+  }
+  #enrolnote.bad{color:#e0716b}
   #reqhead{
     font-size:calc(12px * var(--fs));line-height:1.6;
     color:rgba(var(--paper),.88);
@@ -560,6 +594,26 @@
        two controls wired to a refusal. Built from the fields an admin defined —
        this server has no opinion about what a request should ask. -->
   <div id="request">
+    <!-- Somebody commissioning this screen, holding six characters an admin
+         read out. FIRST, above the request form, because a person with a code
+         has already been decided about — they are finishing a setup, not
+         asking to be let in — and because the form was the only thing on this
+         page, so a code had nowhere to go and no sign that it was wanted.
+
+         Its own path to the end: the URL form, /e/CODE, is a fine thing to
+         type into a television with a remote and a poor thing to ask for from
+         somebody already looking at this screen. -->
+    <div id="enrol">
+      <div id="enrolhead">Setting this screen up?</div>
+      <div id="enrolrow">
+        <input id="enrolcode" type="text" spellcheck="false" autocomplete="off"
+               autocapitalize="characters" maxlength="7" placeholder="K7Q-P4M"
+               aria-label="setup code">
+        <button id="enrolgo" type="button">USE CODE</button>
+      </div>
+      <div id="enrolnote">Type the six-character code from the admin panel.
+Case and dashes do not matter.</div>
+    </div>
     <div id="reqhead"></div>
     <form id="reqform" autocomplete="off"></form>
     <div class="seg"><button id="reqsend" type="button">REQUEST ACCESS</button></div>
@@ -968,9 +1022,25 @@ function paintRequest(){
   const box = $('request');
   if (!box || EMBED || PREVIEW) return;
   const D = Display;
-  const show = D.known && D.canRequest && D.state !== 'approved';
-  document.body.toggleAttribute('data-request', show);
-  if (!show) return;
+  /* A code works whatever this device's state is and whether or not anybody
+     may ask for access — so the panel appears for ANY screen that is not
+     approved, where it used to appear only for one that could request.
+     With guest requests switched off, an unapproved screen showed nothing at
+     all: no form, because none was allowed, and no way to use a code, because
+     there had never been one. A device an admin had just made a code for had
+     nowhere to type it and no sign that a code was a thing. */
+  const canEnrol = D.known && D.state !== 'approved';
+  const canAsk = canEnrol && D.canRequest;
+  document.body.toggleAttribute('data-enrol', canEnrol);
+  document.body.toggleAttribute('data-request', canEnrol);
+  if (!canEnrol) return;
+  /* The three request elements go away when nobody may ask, leaving the code
+     box as the whole of the page — which is what it is for a screen being
+     commissioned in a deployment that takes no requests. */
+  $('reqhead').style.display = canAsk ? '' : 'none';
+  $('reqsend').style.display = canAsk ? '' : 'none';
+  $('reqnote').style.display = canAsk ? '' : 'none';
+  if (!canAsk){ $('reqform').style.display = 'none'; return; }
 
   const head = $('reqhead'), form = $('reqform'), btn = $('reqsend');
   /* Three ways to arrive here, and they are not the same conversation: never
@@ -1066,6 +1136,51 @@ async function sendRequest(){
   }catch(e){
     btn.disabled = false;
     reqNote(e.message, true);
+  }
+}
+
+function enrolNote(m, bad){
+  const el = $('enrolnote');
+  if (el){ el.textContent = m; el.classList.toggle('bad', !!bad); }
+}
+
+/* Six characters, redeemed in place. The URL form still works and still has
+   its place — a television with a remote and no browser open yet — but a
+   screen already showing this page should not send somebody back to the
+   address bar to finish setting it up. */
+async function useCode(){
+  const el = $('enrolcode'), btn = $('enrolgo');
+  const code = (el.value || '').replace(/[^A-Za-z0-9]/g, '');
+  if (!code){ enrolNote('type the code first', true); el.focus(); return; }
+  btn.disabled = true;
+  enrolNote('checking…');
+  try{
+    const r = await fetch('display/enrol', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({code})
+    });
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok || !j.display){
+      /* The server's own three reasons, in words. A code typed off another
+         screen is mistyped often enough that "no" is not a useful answer. */
+      const why = (j && j.state) || '';
+      throw new Error(
+          why === 'expired' ? 'that code had expired — ask for a new one'
+        : why === 'blocked' ? 'too many wrong codes — wait a minute and try again'
+        : 'that code was not recognised — check it and try again');
+    }
+    /* Reloaded rather than continued in place. This device has just become a
+       different display: a new token, a name, its own appearance and whatever
+       endpoints were ticked for it before the screen was ever switched on. A
+       reload picks all of that up in the order the page already knows how to
+       do it, instead of a second path through the same setup that would have
+       to be kept in step with the first. */
+    enrolNote('enrolled — starting up…');
+    location.replace('?enrol=ok');
+  }catch(e){
+    btn.disabled = false;
+    enrolNote(e.message, true);
+    el.select();
   }
 }
 
@@ -4745,6 +4860,16 @@ function announcePreview(){
 }
 
 on('reqsend', 'click', sendRequest);
+on('enrolgo', 'click', useCode);
+on('enrolcode', 'keydown', e=>{ if (e.key === 'Enter') useCode(); });
+/* Typed off another screen, so it arrives with whatever spacing and case the
+   person reading it out used. The server ignores both; this makes the field
+   agree with it instead of looking like it is refusing what was typed. */
+on('enrolcode', 'input', e=>{
+  const el = e.target, at = el.selectionStart, was = el.value;
+  el.value = was.toUpperCase();
+  if (el.value !== was) el.setSelectionRange(at, at);
+});
 on('verdictok', 'click', ()=> $('verdict').classList.remove('on'));
 
 setPalette('blue');
