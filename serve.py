@@ -3653,7 +3653,10 @@ def read_groups():
         out[str(gid)] = {
             "name": str(rec.get("name") or "")[:60],
             "kind": kind if kind in GROUP_KINDS else "device",
-            "members": [str(m)[:32] for m in (rec.get("members") or [])][:MAX_ALLOW],
+            # NOT truncated on read. A system group legitimately holds the
+            # whole deployment, and cutting the stored list here would drop
+            # members on the next write of a document that was never too long.
+            "members": [str(m)[:32] for m in (rec.get("members") or [])],
             "created": rec.get("created"), "created_by": rec.get("created_by"),
             # One per kind, made by the server and not deletable. See
             # ensure_system_groups.
@@ -3740,8 +3743,7 @@ def ensure_default_membership():
         if not gid:
             continue
         for i in ids:
-            if i not in groups[gid]["members"]:
-                groups[gid]["members"] = (groups[gid]["members"] + [i])[:MAX_ALLOW]
+            if i not in groups[gid]["members"] and add_member(groups[gid], i):
                 added += 1
     if added:
         write_groups(groups)
@@ -3843,7 +3845,10 @@ def join_group(did, gid):
     rec = groups.get(gid)
     if not rec or did in rec["members"]:
         return
-    rec["members"] = (rec["members"] + [did])[:MAX_ALLOW]
+    if not add_member(rec, did):
+        print("group %s is full (%d) — %s was NOT filed into it"
+              % (gid, MAX_ALLOW, did), flush=True)
+        return
     write_groups(groups)
 
 
@@ -3930,6 +3935,39 @@ def clean_members(ids, kind):
             seen.add(did)
             out.append(did)
     return out[:MAX_ALLOW]
+
+
+def group_cap(rec):
+    """How many members this group may hold, or None for no bound.
+
+    MAX_ALLOW bounds a HAND-WRITTEN list: an admin ticking devices into a
+    group, or naming them on an endpoint, and nobody does that five thousand
+    times. The default group is not that. It holds the whole deployment by
+    construction — everything that enrols is in it — so bounding it by a number
+    meant for a curated list makes the cap a limit on the installation, and
+    MAX_IDENTITIES is 500, exactly MAX_ALLOW, so the Users group could not hold
+    the maximum number of people even with nothing ever deleted.
+
+    What bounds a system group is what bounds the population: max_displays and
+    MAX_IDENTITIES, enforced where rows are created."""
+    return None if rec.get("system") else MAX_ALLOW
+
+
+def add_member(rec, row_id):
+    """Put a row in a group, and say whether it actually went in.
+
+    Every add used to be `(members + [id])[:MAX_ALLOW]` — append, then keep the
+    FIRST cap-many — so a full group discarded the element just added and every
+    caller reported success. A screen enrolled, got a token, showed as approved,
+    and was refused by every endpoint naming its group, with nothing anywhere
+    saying why. Truncation is not a way to report a failure."""
+    if row_id in rec["members"]:
+        return True
+    cap = group_cap(rec)
+    if cap is not None and len(rec["members"]) >= cap:
+        return False
+    rec["members"] = rec["members"] + [row_id]
+    return True
 
 
 def group_members(gids, groups=None, kinds=None):
@@ -6162,8 +6200,24 @@ class Handler(SimpleHTTPRequestHandler):
                 who = self._identity()
                 if who:
                     note_identity_seen(who["id"])
-                    return self._json(200, {"person": {"id": who["id"],
-                                                       "name": who["name"]}})
+                    open_for = self._pin_pid()
+                    # THREE STATES, and the page needs all three. `none` is
+                    # somebody with no PIN, who keeps their preferences in this
+                    # browser exactly as the display always has. `locked` is a
+                    # PIN set and this browser not having entered it. `open` is
+                    # the durable tier, and the only one whose settings come
+                    # from the server rather than from localStorage.
+                    pin = ("open" if open_for == who["id"]
+                           else "locked" if who.get("pin_hash") else "none")
+                    out = {"id": who["id"], "name": who["name"], "pin": pin}
+                    if pin == "open":
+                        out["settings"] = identity_settings(who["id"])
+                    elif pin == "locked":
+                        # Said plainly rather than left for a failed unlock to
+                        # reveal: somebody who is locked out should stop, not
+                        # keep typing into a box that looks like it is working.
+                        out["blocked"] = pin_blocked(who["id"])
+                    return self._json(200, {"person": out})
             if disp:
                 note_display_seen(disp["id"], asked=asked or None,
                                   hint=hint or None)
@@ -6593,7 +6647,10 @@ class Handler(SimpleHTTPRequestHandler):
                 if here == should:
                     continue
                 if should:
-                    rec["members"] = (rec["members"] + [did])[:MAX_ALLOW]
+                    if not add_member(rec, did):
+                        return self._json(409, {"error": '"%s" is full — it '
+                                                         "holds %d already"
+                                                         % (rec["name"], MAX_ALLOW)})
                 else:
                     rec["members"] = [m for m in rec["members"] if m != did]
                 touched.append(rec["name"])
