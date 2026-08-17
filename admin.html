@@ -160,6 +160,41 @@
   .docitem .a{font-size:calc(8px * var(--fs));letter-spacing:.16em;color:var(--hue-dim);
               border:1px solid rgba(var(--glass),.22);padding:1px 4px;
               margin-left:6px;vertical-align:1px}
+  /* The shelf a group of documents sits on, and the document a run of search
+     hits came out of — one rule for both, because they are the same thing in
+     the same place: a word telling you what the rows under it have in common.
+     Quiet, and not a control: nothing happens when you press it. */
+  .doccat{
+    font-size:calc(8.5px * var(--fs));letter-spacing:.2em;
+    color:rgba(var(--paper),.58);margin:15px 0 1px;padding-bottom:3px;
+    border-bottom:1px solid rgba(var(--glass),.18);
+  }
+  .doccat:first-child{margin-top:2px}
+  /* A hit. Bordered on one edge rather than boxed like a document: a result is
+     a way into a document, not another document. */
+  .dochit{
+    display:block;width:100%;text-align:left;font:inherit;cursor:pointer;
+    background:none;color:inherit;border:0;
+    border-left:1px solid rgba(var(--glass),.28);
+    padding:4px 0 5px 10px;margin:5px 0 0;
+  }
+  .dochit:hover{border-left-color:var(--hue)}
+  .dochit .h{font-size:calc(8.5px * var(--fs));letter-spacing:.14em;
+             color:var(--hue-dim)}
+  .dochit .x{font-size:calc(9px * var(--fs));letter-spacing:.03em;line-height:1.55;
+             color:rgba(var(--paper),.78);margin-top:2px}
+  /* What was searched for, wherever it is shown: in a result, and again in the
+     document once it is open. */
+  .dochit mark,
+  #docbody mark{
+    background:rgba(var(--glass),.34);color:var(--text);padding:0 1px;
+  }
+  /* Said after a capped run, never left to be inferred: a list that stops
+     without saying so reads as everything there was. */
+  .docmore{
+    font-size:calc(8.5px * var(--fs));letter-spacing:.1em;
+    color:rgba(var(--paper),.5);margin:5px 0 0;padding-left:11px;
+  }
 
   #docmodal{
     position:fixed;inset:0;z-index:60;display:none;
@@ -1258,12 +1293,14 @@
   .connside .tabs button{flex:0 0 auto;min-width:96px}
   .tabs button.on{border-color:var(--hue-dim);color:var(--hue);background:rgba(var(--glass),.08)}
   .findrow{display:flex;margin:0 0 4px}
-  #rigfind{
+  #rigfind,
+  #docfind{
     flex:1;min-width:0;margin:0;font:inherit;font-size:calc(9.5px * var(--fs));padding:5px 7px;
     background:rgba(0,0,0,.5);color:var(--text);
     border:1px solid rgba(var(--glass),.18);outline:0;-webkit-appearance:none;appearance:none;
   }
-  #rigfind::placeholder{color:rgba(var(--paper),.62)}
+  #rigfind::placeholder,
+  #docfind::placeholder{color:rgba(var(--paper),.62)}
 
   /* a real divider between topics, not just spacing */
   .grp{
@@ -3012,13 +3049,33 @@ Worked examples in DOCUMENTATION → Embedding it elsewhere.</div>
        microphone gotcha are now the help behind Embed keys, and the worked
        examples belong in the manual, which has room for them. -->
 
-  <section class="grp" data-tab="docs">
-    <h4>Manual</h4>
+  <!-- Every document on one page, on its shelf, with the search across all of
+       them at the top. It was a headed topic called Manual that you opened to
+       find a flat list of seven — a container to expand before you could reach
+       the only thing the page is for, on the one tab where there is nothing
+       else to be looking at. -->
+  <section class="grp bare proflist" data-tab="docs">
+    <div class="barehead"><span class="listtitle">Manual</span></div>
     <div class="grpbody">
-  <div class="note help">Select one to read it. Each opens in a window with a
-button to download it as a PDF.</div>
+  <!-- Above the list rather than below it, and the same shape as the filter
+       over the settings: a field at the top of a page of things is read as
+       searching them, wherever else it has been met. -->
+  <div class="findrow">
+    <input id="docfind" type="search" spellcheck="false" autocomplete="off"
+           placeholder="search every document…">
+  </div>
   <div id="doclist"></div>
   <div class="note" id="docnote"></div>
+  <div class="note help">Each document opens in a window, with a button to save
+it as a PDF.
+
+<b>The search reads the documents themselves</b>, not their titles. What comes
+back is the line that matched and the heading it sits under, so you can tell
+which of six mentions is the one you want before opening anything — and opening
+one from a result lands on that line rather than at the top of the document.
+
+Two characters or more. Code blocks are not searched: matching a word against a
+key inside an example sends you to a line that cannot answer you.</div>
     </div>
   </section>
   <!-- App settings save their own thing, so they get their own commit row
@@ -8187,36 +8244,187 @@ function mdRender(md){
 
 let DOC_OPEN = null;                          // the id currently on screen
 
+let DOC_INDEX = [];
+
 async function loadDocs(){
   const box = $('doclist'), note = $('docnote');
   if (!box) return;
   note.className = 'note'; note.textContent = '';
   try{
     const j = await api('/docs');
-    box.innerHTML = '';
-    (j.docs || []).forEach(d=>{
-      const b = document.createElement('button');
-      b.className = 'docitem';
-      b.type = 'button';
-      const t = document.createElement('div');
-      t.className = 't';
-      t.textContent = d.title;
-      const tag = document.createElement('span');
-      tag.className = 'a';
-      tag.textContent = d.audience.toUpperCase();
-      t.appendChild(tag);
-      const s = document.createElement('div');
-      s.className = 's';
-      s.textContent = d.summary;
-      b.appendChild(t); b.appendChild(s);
-      b.addEventListener('click', ()=> openDoc(d.id));
-      box.appendChild(b);
-    });
-    if (!(j.docs || []).length) note.textContent = 'no documents installed';
+    DOC_INDEX = j.docs || [];
+    paintDocs();
+    if (!DOC_INDEX.length) note.textContent = 'no documents installed';
   }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
 }
 
-async function openDoc(id){
+function docItem(d){
+  const b = document.createElement('button');
+  b.className = 'docitem';
+  b.type = 'button';
+  const t = document.createElement('div');
+  t.className = 't';
+  t.textContent = d.title;
+  const tag = document.createElement('span');
+  tag.className = 'a';
+  tag.textContent = (d.audience || '').toUpperCase();
+  t.appendChild(tag);
+  const s = document.createElement('div');
+  s.className = 's';
+  s.textContent = d.summary;
+  b.appendChild(t); b.appendChild(s);
+  b.addEventListener('click', ()=> openDoc(d.id));
+  return b;
+}
+
+/* The whole shelf, grouped. Categories come out of the documents in the order
+   they first appear rather than from a list of their own, and the order INSIDE
+   a category is the registry's — which is a reading order, not an alphabet. */
+function paintDocs(){
+  const box = $('doclist');
+  box.innerHTML = '';
+  const cats = [];
+  DOC_INDEX.forEach(d=>{
+    const c = d.category || 'Other';
+    if (cats.indexOf(c) < 0) cats.push(c);
+  });
+  cats.forEach(c=>{
+    const h = document.createElement('div');
+    h.className = 'doccat';
+    h.textContent = c;
+    box.appendChild(h);
+    DOC_INDEX.filter(d=> (d.category || 'Other') === c)
+             .forEach(d=> box.appendChild(docItem(d)));
+  });
+}
+
+/* The line, with the match picked out — built as nodes rather than by pasting
+   a string of HTML together. What is being shown came out of a document, and a
+   document is text: it must never get a chance to be parsed as markup. */
+function markInto(el, text, q){
+  const low = String(text).toLowerCase(), needle = q.toLowerCase();
+  let i = 0, at;
+  while (needle && (at = low.indexOf(needle, i)) >= 0){
+    if (at > i) el.appendChild(document.createTextNode(text.slice(i, at)));
+    const m = document.createElement('mark');
+    m.textContent = text.slice(at, at + needle.length);
+    el.appendChild(m);
+    i = at + needle.length;
+  }
+  el.appendChild(document.createTextNode(text.slice(i)));
+}
+
+let docFindTimer = 0;
+
+async function runDocSearch(q){
+  const box = $('doclist'), note = $('docnote');
+  if (!box) return;
+  if (!q){ note.className = 'note'; note.textContent = ''; paintDocs(); return; }
+  if (q.length < 2){
+    /* The shelf stays on screen rather than being cleared for one character:
+       emptying the page while somebody is still typing the first letter reads
+       as the search having found nothing. */
+    note.className = 'note';
+    note.textContent = 'two characters or more';
+    return;
+  }
+  try{
+    const j = await api('/docs/search?q=' + encodeURIComponent(q));
+    const res = j.results || [];
+    box.innerHTML = '';
+    if (!res.length){
+      note.className = 'note';
+      note.textContent = 'nothing in any document matches “' + q + '”';
+      return;
+    }
+    const n = res.reduce((a, r)=> a + r.total, 0);
+    note.className = 'note';
+    note.textContent = n + (n === 1 ? ' match in ' : ' matches in ') + res.length
+                     + (res.length === 1 ? ' document' : ' documents');
+    res.forEach(r=>{
+      const h = document.createElement('div');
+      h.className = 'doccat';
+      h.textContent = r.title;
+      box.appendChild(h);
+      r.hits.forEach(hit=>{
+        const b = document.createElement('button');
+        b.className = 'dochit';
+        b.type = 'button';
+        if (hit.heading){
+          const hd = document.createElement('div');
+          hd.className = 'h';
+          hd.textContent = hit.heading;
+          b.appendChild(hd);
+        }
+        const x = document.createElement('div');
+        x.className = 'x';
+        markInto(x, hit.text, q);
+        b.appendChild(x);
+        /* Carries the query, so opening it lands on the line rather than at
+           the top of a document somebody then searches again by eye. */
+        b.addEventListener('click', ()=> openDoc(r.id, q));
+        box.appendChild(b);
+      });
+      if (r.total > r.hits.length){
+        const more = document.createElement('div');
+        more.className = 'docmore';
+        more.textContent = (r.total - r.hits.length)
+                         + ' more in this document — open it to read them';
+        box.appendChild(more);
+      }
+    });
+  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+}
+
+const docfind = $('docfind');
+if (docfind){
+  docfind.addEventListener('input', ()=>{
+    clearTimeout(docFindTimer);
+    const q = docfind.value.trim();
+    /* Debounced. Otherwise it is a pass over seven documents on every
+       keystroke, and the answer for "us" is not worth a round trip on the way
+       to "user". */
+    docFindTimer = setTimeout(()=> runDocSearch(q), 180);
+  });
+  docfind.addEventListener('keydown', e=>{
+    if (e.key === 'Escape'){
+      docfind.value = '';
+      clearTimeout(docFindTimer);
+      runDocSearch('');
+    }
+  });
+}
+
+/* Every occurrence of what was searched for, picked out where it sits, and the
+   first one scrolled to. Walking text nodes rather than touching innerHTML:
+   the document has already been rendered and re-parsing it around a match
+   would take the markup apart to put a highlight in. */
+function markDoc(q){
+  const body = $('docbody'), needle = String(q || '').toLowerCase();
+  if (!needle) return;
+  const walk = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+  const found = [];
+  let n;
+  while ((n = walk.nextNode())){
+    if (n.nodeValue.toLowerCase().indexOf(needle) >= 0) found.push(n);
+  }
+  let first = null;
+  found.forEach(node=>{
+    const at = node.nodeValue.toLowerCase().indexOf(needle);
+    if (at < 0) return;                 // split by an earlier pass
+    const r = document.createRange();
+    r.setStart(node, at);
+    r.setEnd(node, at + needle.length);
+    const m = document.createElement('mark');
+    /* Refuses where the match straddles two elements — half a word in bold.
+       One highlight not drawn is better than a document taken apart. */
+    try{ r.surroundContents(m); }catch(e){ return; }
+    if (!first) first = m;
+  });
+  if (first) first.scrollIntoView({block:'center'});
+}
+
+async function openDoc(id, q){
   const modal = $('docmodal');
   $('doctitle').textContent = 'loading…';
   $('docsub').textContent = '';
@@ -8229,6 +8437,7 @@ async function openDoc(id){
     $('docsub').textContent = j.doc.summary;
     $('docbody').innerHTML = mdRender(j.doc.body);
     $('docbody').scrollTop = 0;
+    if (q) markDoc(q);
     $('b_docclose').focus();
   }catch(e){
     $('doctitle').textContent = 'could not open it';

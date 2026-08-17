@@ -23,35 +23,48 @@ DOC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs")
 # `audience` drives the tag in the list — a viewer signing in should be able to
 # tell at a glance which of these are about the screen and which are about the
 # panel they are looking at.
+#
+# `category` is the shelf it sits on. A reading order is right for somebody new
+# and useless for somebody who has come looking for one thing, so the page
+# groups by this and keeps the reading order inside each group. Categories are
+# discovered from the entries below rather than declared in a list of their
+# own: two places to edit is one place to forget.
 DOCS = [
     {"id": "using",   "file": "using-resonance.md",
+     "category": "Using it",
      "title": "Using Resonance",       "audience": "everyone",
      "summary": "Talking to the display: wake words, the three input modes, "
                 "and what it remembers."},
     {"id": "admin",   "file": "administration.md",
+     "category": "Administration",
      "title": "Administration",        "audience": "admin",
      "summary": "Signing in, how the panel is laid out, saving and reverting, "
                 "the live preview, approving the displays that may use each "
                 "assistant, and keeping a screen nobody touches working."},
     {"id": "look",    "file": "appearance.md",
+     "category": "The display",
      "title": "Appearance & geometry", "audience": "admin",
      "summary": "The palette, layout and glass, the figure and how it "
                 "moves, and what each control does."},
     {"id": "speech",  "file": "speech.md",
+     "category": "The display",
      "title": "Speech in & out",       "audience": "admin",
      "summary": "Transcription models, voices, wake and sleep words, what the "
                 "display's status line is telling you, and why HTTPS is not "
                 "optional."},
     {"id": "backend", "file": "assistant.md",
+     "category": "Assistants & integration",
      "title": "Assistants", "audience": "admin",
      "summary": "One display, several assistants: the name you say to reach "
                 "each, what a browser is told about them, and the services "
                 "behind them — models, hosted providers, and Home Assistant."},
     {"id": "app",     "file": "app-settings.md",
+     "category": "Administration",
      "title": "Admin settings & accounts", "audience": "admin",
      "summary": "Ports, restarts, session lifetime, keeping unattended screens "
                 "up, and the two roles."},
     {"id": "embed",   "file": "embedding.md",
+     "category": "Assistants & integration",
      "title": "Embedding it elsewhere", "audience": "admin",
      "summary": "Embed keys, the two axes an integrator has to keep apart, "
                 "and the three steps a host application takes."},
@@ -74,8 +87,80 @@ def read_doc(doc_id):
 
 
 def doc_index():
-    return [{k: d[k] for k in ("id", "title", "audience", "summary")}
+    return [{k: d[k] for k in ("id", "title", "audience", "summary", "category")}
             for d in DOCS if read_doc(d["id"]) is not None]
+
+
+#: How many lines of one document come back before the rest are counted rather
+#: than listed. A search that returns four hundred lines from one file is a
+#: file, not an answer — and the count of what was left is reported, because a
+#: cap nobody is told about reads as "that is all there is".
+SEARCH_PER_DOC = 8
+#: Below this, a search matches most of the English language and would hand
+#: back every document in full, which reads as the thing being broken.
+SEARCH_MIN = 2
+
+
+def _snippet(line, needle, width=170):
+    """One matched line, cut to something that fits a row — with the match
+    kept inside the cut. Trimming to the first N characters of a paragraph
+    that matched on its last word shows somebody a line with nothing in it."""
+    text = re.sub(r"\s+", " ", line).strip()
+    # Markdown that means nothing once the line is out of its document.
+    text = re.sub(r"[*_`]+", "", text).strip()
+    if len(text) <= width:
+        return text
+    i = text.lower().find(needle)
+    if i < 0:
+        return text[:width].rstrip() + "…"
+    start = max(0, i - width // 3)
+    end = min(len(text), start + width)
+    return (("…" if start else "") + text[start:end].strip()
+            + ("…" if end < len(text) else ""))
+
+
+def search(q, per_doc=SEARCH_PER_DOC):
+    """Every document, line by line, for a plain substring.
+
+    No index and no ranking. Seven files is a grep, and an index would be one
+    more thing to keep in step with them for a gain nobody could measure on a
+    corpus this size.
+
+    What a hit carries is the heading it sits under, because *which document*
+    is only half of what somebody searching needs — one of six mentions is the
+    one they want, and the heading is what tells them which before they open
+    anything.
+    """
+    needle = str(q or "").strip().lower()
+    if len(needle) < SEARCH_MIN:
+        return []
+    out = []
+    for d in DOCS:
+        body = read_doc(d["id"])
+        if body is None:
+            continue
+        heading, hits, fenced = "", [], False
+        for line in body.split("\n"):
+            stripped = line.strip()
+            # Inside a fence the text is a command or a payload, and matching
+            # "user" against a JSON key sends somebody to a line that cannot
+            # answer them. The fence markers themselves are never content.
+            if stripped.startswith("```"):
+                fenced = not fenced
+                continue
+            head = re.match(r"#{1,6}\s+(.*)", stripped)
+            if head:
+                heading = head.group(1).strip().rstrip("#").strip()
+            if fenced or not stripped:
+                continue
+            if needle in stripped.lower():
+                hits.append({"heading": heading,
+                             "text": _snippet(stripped, needle)})
+        if hits:
+            out.append({"id": d["id"], "title": d["title"],
+                        "category": d["category"],
+                        "total": len(hits), "hits": hits[:per_doc]})
+    return out
 
 
 # ------------------------------------------------------------------ encoding

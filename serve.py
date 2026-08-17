@@ -4666,6 +4666,16 @@ class Handler(SimpleHTTPRequestHandler):
             if not self._require():
                 return
             return self._json(200, {"docs": manual.doc_index()})
+        if path == "/docs/search":
+            # Ahead of the /docs/<id> lookup below, which would take "search"
+            # for a document id and answer 404. It costs one reserved id in a
+            # registry we own, and keeps the search under the path it searches
+            # rather than off in a name of its own.
+            if not self._require():
+                return
+            q = (parse_qs(urlparse(self.path).query).get("q") or [""])[0]
+            return self._json(200, {"q": q, "results": manual.search(q),
+                                    "min": manual.SEARCH_MIN})
         if path.startswith("/docs/"):
             if not self._require():
                 return
