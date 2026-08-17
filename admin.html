@@ -586,6 +586,21 @@
   /* The mark belongs to the title beside it, not to the link after it. */
   #navlinks .navtitle + .helpmark{margin-right:8px}
   #navlinks .helpmark + button{border-left:0}
+  /* …and it is a HELP mark, not a nav link. `#navlinks button` is an id and an
+     element where `.helpmark` is one class, so every one of these was being
+     overruled by the rule for the links beside it — it came out the links'
+     grey, in their padding, with their divider stuck to its left. Said again
+     here at a weight that wins. */
+  #navlinks .helpmark{
+    width:19px;height:19px;padding:0;
+    border:1px solid rgba(var(--help-line),.75);border-radius:50%;
+    background:rgba(var(--help-line),.16);color:var(--help);
+    align-self:center;
+  }
+  #navlinks .helpmark:hover{
+    border-color:rgba(var(--help-line),1);color:#cfe2f8;
+    background:rgba(var(--help-line),.30);
+  }
   #panelbar .right{margin-left:auto}
   #whobox{display:flex;align-items:center;gap:8px;min-width:0}
   #mine{
