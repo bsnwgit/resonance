@@ -1511,6 +1511,18 @@ DISPLAY_DEFAULTS = {
     # changes with it, instead of twelve rows drifting out of step with no way
     # to see which had.
     "kiosk_profile": "",
+    # HOW THIS ROW GOT HERE: "code" for one an admin named and minted a code
+    # for, "page" for one that arrived because somebody opened the display
+    # page. Empty on rows that predate the field, which fall back to a guess —
+    # see group_kind_of.
+    #
+    # Recorded at creation because it is the one thing about a row that is
+    # true from the start and never changes. It used to be inferred from
+    # whether the row had ever pressed REQUEST ACCESS, which is a different
+    # question with a different answer: a browser sitting on the request form
+    # has not pressed it yet and is not, for that reason, a screen somebody
+    # bolted to a wall.
+    "origin": "",
     # Which network profile this device was set up on, by id. Empty is the
     # deployment's default. It decides the address and port its enrolment URL
     # names: a building with several ports has several right answers to "what
@@ -2756,7 +2768,7 @@ def new_display(asked, hint):
     secret = secrets.token_urlsafe(32)
     salt, dk = hash_key(secret)
     rec = dict(DISPLAY_DEFAULTS)
-    rec.update(asked=asked, hint=hint, salt=salt, hash=dk,
+    rec.update(origin="page", asked=asked, hint=hint, salt=salt, hash=dk,
                created=int(time.time()), last_seen=int(time.time()))
     displays[did] = rec
     write_displays(displays)
@@ -2798,7 +2810,8 @@ def invite_display(name, by, setup=None):
     now_ = int(time.time())
     rec = dict(DISPLAY_DEFAULTS)
     rec.update(name=name, approved=True, approved_by=by, approved_at=now_,
-               created=now_, code=new_code(), code_expires=code_deadline(now_))
+               created=now_, code=new_code(), code_expires=code_deadline(now_),
+               origin="code")
     # What the admin already knows about the screen, set while creating it
     # rather than found and filled in afterwards on a row among fifty.
     if isinstance(setup, dict):
@@ -3133,15 +3146,30 @@ def write_groups(groups):
 def group_kind_of(rec):
     """Which population a display row belongs to.
 
-    What an admin said it is, where they have said. Otherwise it is inferred
-    from how the row arrived — asked for access, or issued a code — which is a
-    guess about the wrong question: both of those happen in a browser on one
-    machine. The inference is kept only so that every existing row has an
-    answer without anybody visiting it."""
+    What an admin said it is, where they have said. Otherwise HOW IT ARRIVED,
+    which is recorded when the row is made and never changes: a code an admin
+    minted is a device, and a browser that opened the display page is a person
+    until somebody says otherwise.
+
+    It used to ask whether the row had ever pressed REQUEST ACCESS — a field
+    kept for deciding whether a grant expires, borrowed for this because it
+    was there. That is a different question: somebody looking at the request
+    form has not pressed it yet, and filing them under the code process until
+    they do put them on the one page that has nothing to do with them.
+
+    Rows that predate `origin` are read from what only an admin's invitation
+    leaves behind: an approver's name on a row that never asked for anything.
+    A guess, but the same guess the row's own history supports, and it costs
+    no migration."""
     k = str(rec.get("kind") or "")
     if k in GROUP_KINDS:
         return k
-    return "user" if is_guest(rec) else "device"
+    origin = str(rec.get("origin") or "")
+    if origin in ("code", "page"):
+        return "device" if origin == "code" else "user"
+    if is_guest(rec):
+        return "user"
+    return "device" if rec.get("approved_by") else "user"
 
 
 #: What the group each population lands in is called when this server has to

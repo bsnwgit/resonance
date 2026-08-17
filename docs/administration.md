@@ -793,13 +793,22 @@ population or the other, and its kind cannot be changed once it exists.
 currently listed: *It is a* — DEVICE, PERSON, or WORK IT OUT. Changing it moves
 the row into that population's group, and where you have more than one group of
 that kind a picker appears beside the control to say which. It is hidden where
-there is one, because one is not a choice. Left at WORK IT OUT it is inferred from how
-the row arrived: asked for access reads as a person, issued a code reads as a
-device. That inference answers the wrong question and is only there so every
-existing row has an answer — asking for access happens in a browser on one
-machine, which describes a device. A **person** is an identity that carries
-from a phone to a laptop, and nothing here issues one yet, so today almost
-everything is honestly a device.
+there is one, because one is not a choice.
+
+**Left at WORK IT OUT it follows how the row arrived** — recorded when the row
+was made and never changed after. A code you minted is a **device**; a browser
+that opened the display page is a **person**.
+
+It used to ask instead whether the row had ever pressed REQUEST ACCESS, which
+is a different question with a different answer: somebody looking at your
+request form has not pressed it yet, and that filed them under DEVICE
+ENROLMENT — the one page that has nothing to do with them, since nobody ever
+minted them a code. Rows made before this was recorded fall back to the old
+guess, so nothing moves under you.
+
+A **person** is still, strictly, an identity that carries from a phone to a
+laptop, and nothing here issues one yet — so "person" today means the browser
+somebody walked up with rather than the human holding it.
 
 **Changing it can drop the row from a group.** A group takes one population,
 so moving a row to the other one removes it from any group of the kind it
