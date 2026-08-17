@@ -1906,7 +1906,13 @@ it, which is why it lives beside the microphone and the voices.</div>
        settings: it was sharing a section with the question of what happens
        once somebody has reached it, and those are independent. The posture
        line lives here with it, because what it warns about is exposure. -->
-  <section class="grp" data-tab="app">
+  <!-- The tab's own title, the same treatment SECURITY and the profile lists
+       get: full width, no caret, nothing to collapse. -->
+  <section class="grp bare titleonly" data-tab="app">
+    <div class="barehead"><span class="listtitle">Admin settings</span></div>
+  </section>
+
+  <section class="grp wide" data-tab="app">
     <h4>EXT Access</h4>
     <div class="grpbody">
   <div class="pending" id="posturewarn" hidden></div>
@@ -1934,7 +1940,7 @@ nothing crosses a network. Start it, open localhost, talk to it.</div>
   </section>
 
 
-  <section class="grp" data-tab="app">
+  <section class="grp wide" data-tab="app">
     <h4>Ports</h4>
     <div class="grpbody">
   <div class="note help">The port this page answers on, and only this one.
@@ -1955,7 +1961,7 @@ using. Below 1024 needs root, and the server runs as an ordinary user.</div>
   </section>
 
 
-  <section class="grp" data-tab="app">
+  <section class="grp wide" data-tab="app">
     <h4>Maintenance</h4>
     <div class="grpbody">
   <div class="note help">What keeps a screen nobody touches working.
@@ -2039,7 +2045,13 @@ above.</div>
   </section>
 
 
-  <section class="grp" data-tab="accounts" data-signin>
+  <!-- Hidden with the rest of it where there is no sign-in: a title over three
+       sections that are not there is a heading for nothing. -->
+  <section class="grp bare titleonly" data-tab="accounts" data-signin>
+    <div class="barehead"><span class="listtitle">Admin users</span></div>
+  </section>
+
+  <section class="grp wide" data-tab="accounts" data-signin>
     <h4>Add an account</h4>
     <div class="grpbody">
   <label class="bklab">Username</label>
@@ -2059,8 +2071,8 @@ above.</div>
        worth once given. Its own topic rather than a preamble to the list: the
        list is read when somebody is deciding about a device, and these are
        settled once and then left alone for months. -->
-  <section class="grp" data-tab="accounts" data-signin>
-    <h4>Users</h4>
+  <section class="grp bare proflist" data-tab="accounts" data-signin>
+    <div class="barehead"><span class="listtitle">Accounts</span></div>
     <div class="grpbody">
   <div id="userlist"></div>
   <div class="note help" style="margin-top:10px">
