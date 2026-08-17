@@ -884,6 +884,13 @@
   .erow > .top.drow .dpick{margin:0;flex:0 0 auto;accent-color:var(--hue)}
   /* Wide enough and the actions sit on the same line as the name; narrow and
      they take one of their own rather than pushing the row off the edge. */
+  /* The bar's own name, at the weight a section heading has: it is the only
+     thing on the page that says what APPLY TO SELECTED applies. */
+  .bulktitle{
+    font-size:calc(9px * var(--fs));letter-spacing:.16em;
+    text-transform:uppercase;color:rgba(var(--paper),.95);
+    margin-right:4px;
+  }
   .bulkbar{
     display:flex;align-items:center;gap:8px;flex-wrap:wrap;
     margin:2px 0 8px;padding:6px 8px;
@@ -2712,7 +2719,10 @@ of them is one tick.</div>
   <section class="grp bare proflist" data-tab="devices">
     <div class="barehead"><span class="listtitle">Connections</span></div>
     <div class="grpbody">
+  <!-- Named for what it does. It was a row of controls with no title, so the
+       only way to find out what APPLY TO SELECTED applied was to press it. -->
   <div class="bulkbar" id="bulkbar" hidden>
+    <span class="bulktitle">Kiosk assignment</span>
     <label><input type="checkbox" id="bulkall"> ALL</label>
     <span id="bulkcount">nothing selected</span>
     <span class="spacer"></span>
@@ -6648,16 +6658,20 @@ const PICKED = new Set();
 function paintBulk(){
   const bar = $('bulkbar');
   if (!bar) return;
-  [...PICKED].forEach(id=>{ if (!DISPLAYS.some(d=> d.id === id)) PICKED.delete(id); });
+  const here = onThisScreen();
+  /* Pruned against what is ON THIS SCREEN, not against every row: a selection
+     that survived a row moving to another tab would be applied to something
+     nobody could see. */
+  [...PICKED].forEach(id=>{ if (!here.some(d=> d.id === id)) PICKED.delete(id); });
   const n = PICKED.size;
-  bar.hidden = !DISPLAYS.length;
+  bar.hidden = !here.length;
   const cnt = $('bulkcount');
   if (cnt) cnt.textContent = n ? n + (n === 1 ? ' selected' : ' selected')
                                : 'nothing selected';
   const all = $('bulkall');
   if (all){
-    all.checked = n > 0 && n === DISPLAYS.length;
-    all.indeterminate = n > 0 && n < DISPLAYS.length;
+    all.checked = n > 0 && n === here.length;
+    all.indeterminate = n > 0 && n < here.length;
   }
   const btn = $('b_bulkapply');
   if (btn) btn.disabled = !n;
@@ -6795,16 +6809,20 @@ async function refreshDisplays(){
     const top = document.createElement('div'); top.className = 'top drow';
     /* Left of everything, because it is not about this device — it is about
        which devices the next action applies to. */
-    const pick = document.createElement('input');
-    pick.type = 'checkbox'; pick.className = 'dpick';
-    pick.checked = PICKED.has(d.id);
-    pick.title = 'select for a bulk change';
-    pick.onclick = (e)=>{
-      e.stopPropagation();               // selecting must not open the row
-      if (pick.checked) PICKED.add(d.id); else PICKED.delete(d.id);
-      paintBulk();
-    };
-    top.appendChild(pick);
+    /* Only where the bar that acts on it is drawn. A tick on a row two tabs
+       away is a selection nobody can see, on a screen with no APPLY on it. */
+    if (bucket === 'users' || bucket === 'devices'){
+      const pick = document.createElement('input');
+      pick.type = 'checkbox'; pick.className = 'dpick';
+      pick.checked = PICKED.has(d.id);
+      pick.title = 'select for a kiosk assignment';
+      pick.onclick = (e)=>{
+        e.stopPropagation();             // selecting must not open the row
+        if (pick.checked) PICKED.add(d.id); else PICKED.delete(d.id);
+        paintBulk();
+      };
+      top.appendChild(pick);
+    }
     const namecell = document.createElement('div'); namecell.className = 'dname';
     /* The name, and the thing you press to open the row. It reads as the row's
        title because that is what it is; renaming happens inside, where there
@@ -7099,10 +7117,18 @@ async function refreshDisplays(){
    row at a time and says which one it refused, and inventing a second path
    into the same write would mean two places that have to agree about what a
    valid change is. A building's worth of screens is tens, not thousands. */
+/* Everything on the CONNECTIONS screen, which is the two lists this bar sits
+   under — not every row this server knows about. ALL ticked things that were
+   not on the page, on tabs the bar is not even drawn on, and then applied a
+   kiosk profile to them. */
+const onThisScreen = ()=> DISPLAYS.filter(d=> {
+  const b = dispBucket(d);
+  return b === 'users' || b === 'devices';
+});
 $('bulkall').addEventListener('click', ()=>{
   const on = $('bulkall').checked;
   PICKED.clear();
-  if (on) DISPLAYS.forEach(d=> PICKED.add(d.id));
+  if (on) onThisScreen().forEach(d=> PICKED.add(d.id));
   refreshDisplays();
 });
 $('b_bulkapply').addEventListener('click', async ()=>{
