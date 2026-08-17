@@ -828,7 +828,9 @@ On every listener:
 | `POST` | `/ask` | a question — `{"route": …}` picks one, absent means the default. `{"conversation_id": …}` continues one the endpoint is keeping, and the reply carries that id back. `403 {"refused": "display"}` where this display may not use that route |
 | `POST` | `/display/hello` | a display announcing itself: declared name in, its identity out, and a token in an `HttpOnly` cookie if it had none. Same-origin only |
 | `POST` | `/display/request` | a device asking for access, answering the form the admin built — or `{"renew": true}`, which asks again on the answers already held. Same-origin only |
-| `GET` | `/e/<code>` | an enrolment code, typed into the device being enrolled. Spends the code, sets the cookie, and redirects to the display with `?enrol=` saying how it went. Display listeners only |
+| `POST` | `/display/poll` | a display saying it is still here and asking whether anything has moved: the stamp of ITS OWN configuration, whether an admin has asked it to reload, this server's clock, and the numbers it keeps itself up with. Same-origin only |
+| `POST` | `/display/enrol` | an enrolment code redeemed in place, from the box the display page offers. Spends the code and sets the cookie, without sending anybody back to the address bar. Same-origin only, same back-off as the URL form |
+| `GET` | `/e/<code>` | the same code, typed as a URL instead — the right shape for a television with a remote and no browser open yet. Spends the code, sets the cookie, and redirects to the display with `?enrol=` saying how it went. Display listeners only |
 
 Display listeners only — the embed does not exist on the admin port:
 
@@ -2199,12 +2201,40 @@ had been arranged by what was built when, rather than by what somebody does.
   and how something comes to be here. Two titles, boxed, each with its own way
   into the manual, and a gap between them doing the work a fifth link would
   have done badly.
-- **Two bugs of my own worth recording**, because both are the same shape: a
+- **A network profile is an address and a port**, not just a port. The picker
+  offers what the machine actually has, each with the interface carrying it,
+  read from the kernel rather than by shelling out or taking a dependency for
+  a list of addresses. The port is tried before anything is allowed to use it:
+  on one address it must be free there, on ANY it is allowed if even one
+  address can carry it. Two profiles may share a port on different addresses,
+  because the machine can.
+- **Which came with two bugs of its own, in one afternoon.** The check ran over
+  every profile the panel sent, so editing one row was refused by the state of
+  another — naming a port nobody had touched. And a port this process had
+  bound reported itself as taken, because the guard for that covered the three
+  app ports and not the profile listeners, which are every port the app
+  actually answers on. Fixing that opened a third: "9701 is mine" was true of
+  every address on the machine, so moving a profile onto an address somebody
+  else held would have been allowed and then failed to bind. The guard asks
+  about the address now.
+- **A row is a person or a device by how it arrived**, recorded when it is made.
+  It used to be inferred from whether the row had ever pressed REQUEST ACCESS —
+  a field kept for deciding whether a grant expires, borrowed because it was
+  there. Somebody looking at the request form has not pressed it yet, so they
+  were filed under the code process, on the one page that had nothing to do
+  with them.
+- **A screen reloads when ITS configuration moves.** The stamp digested every
+  row, so one device opening the display page reloaded every screen in the
+  building — and deleting a row reloaded the browser that had just made it,
+  which said hello and made another. Delete, watch it return, delete again.
+- **Three bugs of my own worth recording**, because they are the same shape: a
   commit row added as a bare div appeared on every page in the panel, since the
-  machinery hides sections by an attribute a bare div does not carry; and the
-  panel is a GRID, so a section without `wide` or `bare` tiles into a narrow
-  column beside its neighbours. Matching a list's markup is not matching a
-  tab — the classes already on that tab are the thing to copy.
+  machinery hides sections by an attribute a bare div does not carry; the panel
+  is a GRID, so a section without `wide` or `bare` tiles into a narrow column
+  beside its neighbours; and ALL on the bulk bar ticked every row this server
+  knew about, including rows two tabs away with no APPLY under them. Matching a
+  list's markup is not matching a tab, and a control's scope is the page it is
+  drawn on.
 
 ### 2026-08-16 — a screen that looks perfect and does nothing
 

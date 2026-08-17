@@ -523,6 +523,23 @@ it waits until they have finished. RELOAD on a row under CONNECTIONS asks one
 directly.
 
 
+### Kiosk assignment — changing several at once
+
+The bar above the two lists on **CONNECTIONS**. Tick the rows you want, choose
+a display profile, and APPLY TO SELECTED gives all of them that profile in one
+gesture — which is what a building of identical hallway screens wants after a
+profile is renamed or a new one is made.
+
+**ALL means all of this screen**, which is the two lists the bar sits under —
+People and Devices. It does not reach the rows still arriving under
+ENROLLMENTS: those are on a page this bar is not drawn on, and a screen still
+waiting for its code has nothing yet for a profile to apply to. Rows outside
+those two lists do not draw a tick at all.
+
+A selection is dropped as soon as the row leaves the screen — a person you
+approve, or a device that takes its code — so nothing is applied to something
+you can no longer see.
+
 ### The settings above the list
 
 **Does a general user require approval?**
