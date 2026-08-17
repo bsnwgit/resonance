@@ -48,7 +48,7 @@ DOCS = [
                 "each, what a browser is told about them, and the services "
                 "behind them — models, hosted providers, and Home Assistant."},
     {"id": "app",     "file": "app-settings.md",
-     "title": "App settings & accounts", "audience": "admin",
+     "title": "Admin settings & accounts", "audience": "admin",
      "summary": "Ports, restarts, session lifetime, and the two roles."},
     {"id": "embed",   "file": "embedding.md",
      "title": "Embedding it elsewhere", "audience": "admin",

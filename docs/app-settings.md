@@ -1,4 +1,4 @@
-# App settings & accounts
+# Admin settings & accounts
 
 Everything in this document is about how the server itself is wired, as
 opposed to how the interface looks.
@@ -10,7 +10,7 @@ Two settings, deliberately not one "mode": **what it is reachable at**, and
 both starts lying the moment somebody changes half of it — "personal" would
 still read personal after the binding moved to every interface on the machine.
 
-They are two topics under APP SETTINGS for the same reason. **EXT Access**
+They are two topics under ADMIN SETTINGS for the same reason. **EXT Access**
 holds where the server can be reached from; **Sign in** holds what it takes to
 get past the door. The posture line — what it is reachable at and what the door
 is, in the words it actually means — is stated under EXT Access, because what
@@ -74,30 +74,33 @@ and disabled so the omission is visible rather than silent.
 
 The default, because the safe default is the one that assumes it can be
 reached. With sign-in set to nothing there are no accounts to manage: the
-ACCOUNTS tab is not offered, and the account routes refuse rather than quietly
+ADMIN tab is not offered, and the account routes refuse rather than quietly
 writing to a file nothing consults.
 
 ## Ports
 
-Three listeners, each with a job:
+**One port is configured here: the admin portal's**, 9702 by default — the page
+you are reading this in, which requires a sign-in.
 
-| Port | Default | Serves |
-|---|---|---|
-| display, HTTP | 9700 | the display, no microphone |
-| display, HTTPS | 9701 | the display in full |
-| admin | 9702 | the panel you are reading this in |
+Everything the app answers on is a **network profile** instead, under
+PROFILES ▸ NETWORK. A deployment can want several, and which endpoints each
+one carries is a question about the app rather than about the portal. See
+*Assistants* → *Network profiles*.
 
-The two display ports serve the same interface to anyone who can reach them.
-The admin port serves this page and requires a sign-in.
+The portal's port stays here deliberately: it is the way back in when what is
+over there is wrong. For the same reason the server refuses to put it on a
+port a network profile is using, and refuses to give a network profile this
+one.
 
-The admin routes are not merely hidden on the display ports — they **do not
+The admin routes are not merely hidden on the app's ports — they **do not
 exist** there. Asking for one returns "not found", not "unauthorised", because
 answering "unauthorised" would confirm the route is there for anyone probing.
 
 ### The plain HTTP port redirects
 
-Wherever HTTPS exists and the server is reachable beyond this machine, the
-plain port stops serving and **redirects to the HTTPS port** instead. The
+A network profile may name a plain HTTP port alongside its own. Wherever HTTPS
+exists and the server is reachable beyond this machine, that plain port does
+not serve the display — it **redirects to the profile's port** instead. The
 microphone already refuses to work on an insecure origin, so a display served
 there was half dead and mostly generated confusion about why.
 
@@ -123,8 +126,10 @@ Two cases where the plain port keeps serving normally:
   air to enforce a rule it cannot satisfy, so it keeps serving and says so at
   startup.
 
-Ports must be between 1024 and 65535 and all three different. Below 1024
-requires root, and this server deliberately runs as an ordinary user.
+A port must be between 1024 and 65535, and no two may collide — not the admin
+portal's with a network profile's, and not two profiles' with each other.
+Below 1024 requires root, and this server deliberately runs as an ordinary
+user.
 
 Before accepting a change, the server tries to bind the port. A port already
 taken by something else is refused at the point of saving — otherwise it would
@@ -187,64 +192,6 @@ Changing a role or a password drops that account's existing sessions, so the
 new rights or the new password take effect at the next sign-in rather than
 whenever the old session happens to expire.
 
-## Speaker label
-
-The two labels down the left of the transcript. They are here rather than
-under APPEARANCE because what they SAY is closer to how this server is set
-up than to how the figure looks — but they are still part of the **shared**
-settings document, not `app.json`. That is why this tab carries two commits:
-**SAVE FOR EVERYONE** publishes these, **SAVE APP SETTINGS** rewires the
-server, and neither stands in for the other.
-
-They default to **operator** and **resonance**, and either can be a fixed word
-or a variable.
-
-| Variable | Becomes |
-|---|---|
-| `{name}` | the word you say to reach whoever is answering, capitalised |
-| `{assistant}` | what that assistant is called |
-| `{display}` | the name of the device being viewed at |
-
-`{assistant}` is the **default** for *the assistant*, and with more than one
-endpoint it is the only label that can be right — a fixed word attributes
-every answer to the same name however many answered.
-
-Each line keeps the name of whoever gave it. Switching endpoints
-mid-conversation does not rewrite what is already on screen, and changing this
-field still relabels the whole transcript so you can tune it against a live
-one.
-
-An install that predates endpoints and still holds the old shipped word is
-carried across to the variable on the way out of the settings file. On a
-single endpoint of that name it renders identically; once there is a second,
-it is correct instead of wrong.
-
-`{name}` is the same variable the greeting and farewell fields already use, so
-renaming what the assistant answers to can rename what it is called in the
-transcript — put `{name}` in *the assistant* and the two never drift apart.
-
-`{display}` is the useful one for *the person*. One setting then attributes
-each transcript to the device it is being read at, with no setting per device:
-a laptop approved as *Sarah laptop* labels her lines with that, and a wall
-screen named *Kitchen* labels its own.
-
-It resolves to the first of these that exists:
-
-1. the name you gave that row under **ACCESS**
-2. `?display=` from the URL it was opened with
-3. the first thing typed on its request form
-
-A person's name as distinct from the device they are standing at — the same
-name following somebody from laptop to phone — needs an identity they carry,
-and does not exist yet.
-
-Variables mix with ordinary text: `{display} shift lead` is fine. A variable
-that resolves to nothing falls back to the default, so `{display}` on a URL
-that declared no name still reads *operator* rather than leaving the line
-attributed to nobody. A variable that is not recognised is left standing
-rather than blanked, so a typo is visible instead of silently disappearing.
-
-
 ## Accounts
 
 ### Roles
@@ -283,16 +230,20 @@ impractical quickly without ever locking a legitimate user out permanently.
 | File | Holds | Mode |
 |---|---|---|
 | `settings.json` | shared interface settings | world-readable by design |
-| `backend.json` | assistant configuration and API key | 600 |
+| `routes.json` | every AI endpoint, and which model, speech and network profile it names | 600 |
+| `displays.json` | every display and every profile — including the model profiles' API keys | 600 |
+| `backend.json` | the single assistant this server had before endpoints. Read once at the migration and never written again | ordinary |
 | `users.json` | accounts and password hashes | 600 |
 | `embeds.json` | embed keys, hashed | 600 |
-| `app.json` | ports and session lifetime | ordinary |
+| `app.json` | the admin portal's port, binding, sign-in mode and session lifetime | ordinary |
 | `server.pid` | the running process id | ordinary |
 
 `settings.json` has to be readable — every viewer's browser fetches it to
-build the interface. That is precisely why the key, the accounts and the embed
-keys live somewhere else. None of the first four should ever be committed to a
-repository.
+build the interface. That is precisely why the keys, the accounts and the
+embed keys live somewhere else: the model profiles' API keys are in
+`displays.json`, the accounts in `users.json`, the embed keys in
+`embeds.json`, none of them served by anything. **None of the files at mode
+600 should ever be committed to a repository.**
 
 ## The service, or the deliberate lack of one
 

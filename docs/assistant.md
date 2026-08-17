@@ -23,15 +23,18 @@ follow-up needs no second address, which is the only tolerable behaviour for
 speech. Say a *different* name mid-conversation and you switch to that one
 instead.
 
-Each has its own service, its own model, its own key, its own instructions,
-and optionally its own greeting and voice — so a room with more than one can
-hear which replied.
+Each names **a model profile** — the service, address, model and key, kept as
+a named set under PROFILES ▸ MODELS — and adds its own instructions. Its
+greeting and its voice come from the speech profile it names rather than from
+fields of its own, so a room with more than one can still hear which replied. Two endpoints may name the same profile: one connection, two
+names to say, two sets of instructions.
 
-**One block per endpoint**, and the block is the whole of it: the wake word
-that reaches it and the connection it reaches, saved together by the SAVE
-inside it. **ADD INSTANCE** at the foot of the tab makes another and opens it;
-each block carries its own TEST, MAKE DEFAULT, SWITCH OFF, FORGET KEY and
-DELETE.
+**One row per endpoint**, and the row is the whole of it: the speech profile
+that carries the word reaching it, the model profile it speaks to, and the
+instructions it speaks under, saved together by the SAVE inside it. **ADD
+INSTANCE** at the foot of the tab makes another and opens it; each row carries
+its own TEST, MAKE DEFAULT, SWITCH OFF and DELETE. The key is not here — it
+belongs to the profile, and is edited once for every endpoint using it.
 
 Every block's heading says what you say to reach it and what it is wired to —
 `say "house" -> house-agent` — so you can find the right one without opening
@@ -89,26 +92,26 @@ is. Restricting the **default** endpoint is worth a moment's thought: anything
 typed into the composer with no name in front of it goes there, so displays
 outside the list get nothing back when somebody types.
 
-### The instance name and the wake word are two fields
+### The instance name and the wake word are two different things
 
-They are the same word by default — the wake word follows the name as you type
-it, until you edit the wake word, after which it stays where you put it.
+The **instance name** labels the endpoint in the panel, in the log and in
+`{assistant}`; it is never spoken and never matched against. The **wake word**
+is what somebody actually says. An endpoint called *Kitchen Lights* is a
+perfectly good label and a terrible thing to say out loud.
 
-They are separate because they answer to different things. The **instance
-name** labels the endpoint in the panel, in the log and in `{assistant}`; it is
-never spoken and never matched against. The **wake word** is what somebody
-actually says. An endpoint called *Kitchen Lights* is a perfectly good label
-and a terrible thing to say out loud.
+**The word is not on this tab.** It lives in the speech profile the endpoint
+names, on SPEECH ▸ WAKE WORD, along with the spellings it will also accept and
+whether matching is forgiving. One endpoint per speech profile is enforced, so
+each endpoint still has a word of its own.
 
-### CLOSE ENOUGH and THE EXACT WORD
+### FUZZY and EXACT
 
-CLOSE ENOUGH forgives a mishearing: a transcriber gets short words wrong
-constantly, so a name that had to come back spelled correctly would make
-waking a coin flip. That is what you want from something that answers
-questions.
+FUZZY forgives a mishearing: a transcriber gets short words wrong constantly,
+so a name that had to come back spelled correctly would make waking a coin
+flip. That is what you want from something that answers questions.
 
-THE EXACT WORD is for one that *does* things. The same near-miss costs you a
-few tokens on one and switches on the lights on the other.
+EXACT is for one that *does* things. The same near-miss costs you a few tokens
+on one and switches on the lights on the other.
 
 **An exact hit always wins**, wherever it was found. Without that rule a
 near-miss on one name could steal an utterance that said another one outright
@@ -122,15 +125,18 @@ syllable counts, vowels and stress survive a noisy room; two names one letter
 apart do not. Worth settling before a household learns them, because changing
 one afterwards is its own small misery.
 
-Two assistants cannot share a word — including through *also answers to* — and
-the panel refuses it as you save. Words that merely *sound* close are not
-checked yet.
+Two assistants sharing a word is a display that cannot tell them apart, and it
+is **no longer refused at the point of saving** — the words moved to speech
+profiles, and the check compared the vestigial copy every endpoint still
+carries, which refused every save. What prevents the clash instead is that one
+speech profile may be named by only one endpoint. Two *profiles* given the
+same word are not caught. Words that merely *sound* close are not checked
+either.
 
 **LEARN HOW I SAY IT** captures what the transcriber actually returns when you
-say the word, three times, and adds those forms to *also answers to*. It
-teaches the endpoint whose block the button is in, and that endpoint has to
-have been saved first. The captured words land in the field unsaved — press **SAVE** to keep
-them.
+say the word, three times, and adds those forms to *Also accept*. It is on the
+SPEECH tab beside the word it teaches, not in an endpoint's block. The
+captured words land in the field unsaved — save the profile to keep them.
 
 ### TEST
 
@@ -154,6 +160,73 @@ is checking this endpoint's own connection, and a pass borrowed from a
 different endpoint would tell you nothing about this one. The line underneath
 names where the same question would have gone in use.
 
+## Model profiles
+
+A profile is one connection under a name: **PROFILES ▸ MODELS**, one row each,
+the same caret and the same one-open-at-a-time as every other list. **ADD A PROFILE** makes one; SAVE commits the row; MAKE DEFAULT nominates the
+one an endpoint naming nothing gets.
+
+Editing a profile changes what every endpoint naming it reaches, in one place
+— which is the point. A key typed once serves all of them, and rotating it is
+one edit rather than six.
+
+The four kinds below are what a profile can be.
+
+## Network profiles
+
+A port of this server's own, under a name: **PROFILES ▸ NETWORK**. This is
+where the app's networking lives — the only port configured under ADMIN
+SETTINGS is the admin portal's.
+
+**An endpoint belongs to exactly one network profile**, and answers there and
+nowhere else. One that names none answers on whichever profile is nominated
+**DEFAULT**, which is where they all were before this existed: an upgrade turns
+the display ports into a profile called *Display*, shared, and nothing moves
+until you move it.
+
+**Shared or not** is the whole difference between the two things you might
+want:
+
+- **Shared** — several endpoints on one port, told apart by wake word. This is
+  how the display port has always worked, and it is what an ordinary
+  deployment wants.
+- **Not shared** — a port that *is* one assistant. A browser opening it gets
+  the ordinary interface built from that endpoint's own settings, with no
+  other endpoint offered and nothing to address by name. A second endpoint
+  claiming it is refused rather than silently never reached.
+
+| Field | What it does |
+|---|---|
+| Port | 1024–65535. Refused if it is the admin portal's, or one another profile already has. |
+| Plain HTTP, redirected here | Optional. A plain port that 307s to this one, which is what 9700 has always done for 9701. Leave it empty for none. |
+| More than one endpoint | Whether this port is shared. |
+| The port is the grant | **YES** turns the request form off on that port alone — a device that can reach it uses the endpoints straight away, approved or not. **NO** applies the ordinary rules. |
+
+**The default profile is always shared.** It carries every endpoint that names
+no profile, so one that could only take a single endpoint would strand the
+rest. The panel will not offer MAKE DEFAULT on an unshared profile, and the
+server refuses the save either way.
+
+A question arriving on a port for an endpoint that port does not carry is
+given the port's own default rather than refused — the same thing the shared
+port has always done with an endpoint switched off since the page loaded.
+
+**The port is the grant** is a statement about your network rather than about
+this server. It is right when the port is on a VLAN only the intended devices
+are on, and wrong the moment it is not. It applies to that port only: the same
+device arriving on the shared display port is treated exactly as before.
+
+TLS is the same certificate the display port uses — the microphone needs a
+secure context, and a second certificate for the same machine would be one
+more thing to renew.
+
+**Ports are bound when the server starts.** Adding a profile, changing a port
+or pointing a different endpoint at one takes a restart, the same as the ports
+on ADMIN SETTINGS: a listening socket is not something to open and close under
+a mouse. A port that turns out to be taken is reported and skipped rather than
+stopping the server — everything else still answers, and you need the panel in
+order to fix it.
+
 ## The four providers
 
 ### DEMO
@@ -167,32 +240,28 @@ short panel.
 
 A **dialect, not a vendor**. Ollama, OpenClaw, LM Studio and vLLM all speak
 it, so one adapter reaches all of them and the only difference between them is
-the base URL — which is what the preset buttons fill in.
+the base URL.
 
-| Preset | Base URL | Model field |
+| Server | Base URL | Model field |
 |---|---|---|
-| OLLAMA | `http://127.0.0.1:11434/v1` | the tag, e.g. `qwen2.5:3b` |
-| OPENCLAW | `http://127.0.0.1:18789/v1` | an agent id, e.g. `openclaw:main` |
-| LM STUDIO | `http://127.0.0.1:1234/v1` | whatever is loaded |
-| OPENAI | `https://api.openai.com/v1` | e.g. `gpt-4o-mini` |
+| Ollama | `http://127.0.0.1:11434/v1` | the tag, e.g. `qwen2.5:3b` |
+| OpenClaw | `http://127.0.0.1:18789/v1` | an agent id, e.g. `openclaw:main` |
+| LM Studio | `http://127.0.0.1:1234/v1` | whatever is loaded |
+| OpenAI | `https://api.openai.com/v1` | e.g. `gpt-4o-mini` |
 
-Pick a preset, set the model, save. A local model needs no API key.
-
-Under the model field you may see **installed there:** followed by a list.
-That is an Ollama trick — the panel asks the same host what it actually has,
-so a model name is chosen rather than typed from memory and subtly wrong.
-Nothing else answers that path, so the line stays empty for other providers.
+Set the address and the model, save. A local model needs no API key.
 
 ### ANTHROPIC
 
-Its own choice rather than another preset, because the wire format genuinely
+Its own kind rather than another OpenAI-compatible address, because the
+wire format genuinely
 differs: the key rides an `x-api-key` header rather than `Authorization:
 Bearer`, a version header is required, the system prompt is a top-level field
 rather than a message in the list, a reply limit is mandatory, and the answer
 arrives as a list of content blocks rather than one string.
 
-There is exactly one endpoint — `https://api.anthropic.com` — so it has no
-preset to choose; selecting the provider fills it in. A key is **required**,
+There is exactly one endpoint — `https://api.anthropic.com` — so choosing the
+provider fills the address in. A key is **required**,
 and saving without one is refused at the point of saving rather than
 discovered later by whoever is standing in front of the screen.
 
@@ -327,13 +396,13 @@ A Home Assistant token is a key like any other here, and lives in the same
 place under the same rules — the field is labelled differently because that is
 what Home Assistant calls it, not because it is treated differently.
 
-Keys live in `routes.json`, admin-only, mode 600, one per assistant. A key is
-**never returned to a browser**: the field shows whether one is stored, not
-what it is. Leaving the field blank keeps the stored key; **FORGET KEY**
-clears it for the one selected.
+Keys live with the model profiles, in `displays.json` — admin-only, and not
+the world-readable document — one per profile rather than one per assistant.
+A key is **never returned to a browser**: the field shows whether one is
+stored, not what it is. Leaving it blank keeps the stored key.
 
-**Changing which service answers drops its key and its address**, unless you
-supply new ones in the same save. Carrying one provider's endpoint into
+**Changing which service a profile answers with drops its key and its
+address**, unless you supply new ones in the same save. Carrying one provider's endpoint into
 another would send an Anthropic key to whatever happens to be listening on
 the old URL, which is worse than an error because it looks like it worked.
 
@@ -411,7 +480,7 @@ earshot what the box is wired to.
 | the house says it does not understand | that is a pass for the built-in agent on a test sentence; on a real command, the device is not exposed to Assist or is named something else |
 | the house heard a command and did nothing audible | it did not fail silently — an action with nothing to say is spoken as "Done." If you hear nothing at all, look at the note on screen |
 | still on DEMO | that one is set to DEMO — nothing was asked of a model |
-| the wrong one answered | a near-miss; set the other to THE EXACT WORD, or move the words further apart |
+| the wrong one answered | a near-miss; set the other speech profile to EXACT, or move the words further apart |
 | nothing woke at all | the word belongs to none of them, or the gate is off — SPEECH tab |
 | a confidently wrong answer | the model, not the plumbing — see above |
 

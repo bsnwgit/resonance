@@ -103,7 +103,7 @@ remain available as a fallback.
 
 **It says why nothing happened.** A line above the input carries what was
 heard and how long each stage took, that a recording came back empty, that it
-is asleep and what it heard instead of a name, or why an endpoint failed. A
+is asleep, or why an endpoint failed. A
 voice interface that goes quiet is indistinguishable from a broken one, and
 that applies to its diagnostics as much as to its answers.
 
@@ -117,7 +117,7 @@ refreshed by each exchange; the sleep word ends it immediately.
 **The visualiser.** Canvas 2D, no WebGL, **zero runtime dependencies**. It is
 a stationary field, not a scrolling chart: standing modes carry the voice,
 formant bins place spikes at real spectral positions, and every line has its
-own uncorrelated noise floor. Four geometries, four palettes, a turntable
+own uncorrelated noise floor. Four geometries, five palettes, a turntable
 rotation, and a full glass treatment — all admin-configurable.
 
 ## Install
@@ -178,10 +178,16 @@ The microphone requires a secure origin, so generate a certificate first:
 | `https://<host>:9701` | the display in full, including the mic |
 | `https://<host>:9702` | **administration**, behind a sign-in |
 
+The first two are a **network profile** — a port under a name, carrying one
+endpoint or several — and an upgrade turns the ports an install already had
+into one called *Display*. The third is the admin portal's own, and it is the
+only port configured under ADMIN SETTINGS: it is the way back in when what is
+in a profile is wrong.
+
 The certificate is self-signed, so expect one browser warning.
 
 **On your own machine, none of that applies.** Set *reachable at* to **this
-machine only** in APP SETTINGS and restart, and there is no certificate to
+machine only** in ADMIN SETTINGS and restart, and there is no certificate to
 make, no browser warning, and no first-run password to fish out of a log:
 
 | listener | purpose |
@@ -192,7 +198,7 @@ make, no browser warning, and no first-run password to fish out of a log:
 Browsers already treat `http://localhost` as a secure origin, so `getUserMedia`
 runs and nothing crosses a network for TLS to protect. Two settings decide
 which of these you get — what it is reachable at, and what it takes to get in —
-and they are independent. See *App settings & accounts* in the manual.
+and they are independent. See *Admin settings & accounts* in the manual.
 
 ## Settings and the admin model
 
@@ -207,7 +213,7 @@ hands-free, and whether the transcript is shown.
 
 **A display says why nothing happened**, on a dim line above the input: what it
 heard and how long each stage took, that a recording came back empty, that it
-is asleep and what it heard instead of a name, or the reason an endpoint
+is asleep, or the reason an endpoint
 failed. This is not a debug affordance bolted on — the messages already
 existed and were being written to elements present only in the admin panel's
 preview, so every explanation was discarded at the one place somebody was
@@ -307,8 +313,11 @@ Two roles:
 
 ### The built-in manual
 
-**DOCUMENTATION** at the foot of the panel opens six documents covering the
-display and every tab of the admin interface. They live as markdown in
+The **?** beside the SETTINGS title opens seven documents covering the display
+and every tab of the admin interface. It is blue, the same blue as every ?
+beside a topic heading, so help is one colour wherever you meet it — there is
+no DOCUMENTATION button in the tab row any more, because it is not something
+you configure. They live as markdown in
 `docs/`, are read in a modal over the whole window rather than in the 425px
 column, and each has a **DOWNLOAD PDF** button.
 
@@ -343,11 +352,13 @@ decides what everyone sees.
 The microphone is deliberately not remembered — re-opening it on load would
 raise a permission prompt nobody asked for.
 
-### App settings
+### Admin settings
 
-**APP SETTINGS**, at the foot of the panel, covers how the server is wired
-rather than how the interface looks: the port each of the three listeners
-answers on, and how long an idle sign-in survives. It is stored in `app.json`.
+**ADMIN SETTINGS**, at the foot of the panel, covers how the server is wired
+rather than how the interface looks: where it can be reached from, what it
+takes to sign in, how long an idle sign-in survives, and the admin portal's
+own port. It is stored in `app.json`. What the app answers on is not here — a
+port carrying endpoints is a network profile, under PROFILES ▸ NETWORK.
 
 Nothing here takes effect until the process restarts — you cannot move the
 floor you are standing on. The panel shows what is configured against what is
@@ -358,7 +369,8 @@ actually bound, and says plainly when a restart is owed:
 ./serve.sh start
 ```
 
-Ports are checked before they are accepted: 1024–65535, all three different,
+The port is checked before it is accepted: 1024–65535, and not one a network
+profile is using,
 and **not already in use by something else on the machine**. A port that fails
 to bind would otherwise only reveal itself at the next restart, with the admin
 interface gone and the fix being to edit JSON on the box by hand.
@@ -367,14 +379,15 @@ interface gone and the fix being to edit JSON on the box by hand.
 pid, changing the display port would leave `stop` looking at the new port while
 the old process was still running on the old one.
 
-The `PORT` environment variable still overrides everything and still shifts all
-three listeners together, so a second instance can be run without touching the
-stored configuration.
+The `PORT` environment variable still overrides everything and still shifts
+all three together — `PORT` plain, `PORT + 1` HTTPS, `PORT + 2` admin — so a
+second instance can be run without touching the stored configuration or the
+network profiles.
 
 Accounts live in `users.json` next to the server, mode `600`, passwords stored
 as PBKDF2-SHA256 with 600,000 rounds and a per-account salt. Sessions are
 in-memory, cookie-based, `HttpOnly` + `Secure` + `SameSite=Strict`, and expire
-after 8 hours of inactivity. Failed sign-ins back off geometrically per client
+after 30 minutes of inactivity. Failed sign-ins back off geometrically per client
 address. Changing a password or a role drops that account's live sessions.
 
 **HTTPS only wherever a network is involved.** The admin listener does not
@@ -431,11 +444,12 @@ switches to it, and the conversation does not come along: what was said to
 one assistant is another party's words, and handing them over would pay for
 them twice.
 
-A route is a name, a wake word and its aliases, how strictly it matches, an
-adapter and its configuration, and optionally its own greeting and voice — so
-you can *hear* which one answered, which matters the moment two of them can
-reply to the same room. Each carries its own model, prompt, context length
-and key.
+A route is a name, the profiles it names — **speech** for the word it answers
+to and the voice it answers in, **model** for the connection, **network** for
+the port it answers on — and its own instructions and limits. You can *hear*
+which one answered, which matters the moment two of them can reply to the same
+room. The connection is not the route's: several routes can name one model
+profile, so the key is typed once and rotated once.
 
 Exactly one is the **default**, and it is where anything with no name in
 front of it goes: typed into the composer, sent through an embed, or spoken
@@ -463,8 +477,8 @@ hardware on the other. An **exact hit always beats a fuzzy one**, wherever
 each was found — otherwise a near-miss on one route steals an utterance that
 named another outright, which is the worst failure available here.
 
-Two routes cannot share a word, including through an alias, and it is refused
-at the point of saving. Words that are merely *acoustically* close are not
+Two endpoints sharing a word is prevented by one speech profile belonging to
+one endpoint, rather than by comparing words at the point of saving. Words that are merely *acoustically* close are not
 checked — that wants the matcher that does the waking rather than a string
 comparison, and it arrives with personal wake words.
 
@@ -479,12 +493,16 @@ migration was wrong.
 **DEMO** answers from the display's own built-in text. Nothing is sent
 anywhere, no key is needed, and the system prompt is ignored.
 
+**A connection is a model profile.** Provider, address, model and key are a
+named set under PROFILES ▸ MODELS, and an endpoint names one — so two
+endpoints on the same model are one connection rather than the same credential
+typed twice, and rotating a key is one edit rather than six.
+
 **OPENAI-COMPATIBLE** is a *dialect, not a vendor*. Ollama, OpenClaw, LM Studio
 and vLLM all speak it, so one adapter reaches all of them and the only
-difference between them is the base URL — which is what the preset buttons
-fill in. Pick a preset, set the model, save.
+difference between them is the base URL.
 
-| Preset | Base URL | Model field |
+| Server | Base URL | Model field |
 |---|---|---|
 | Ollama | `http://127.0.0.1:11434/v1` | the tag, e.g. `qwen2.5:3b` |
 | OpenClaw | `http://127.0.0.1:18789/v1` | an agent id, e.g. `openclaw:main` |
@@ -498,13 +516,13 @@ end to end against a server that answers in it, which catches a malformed
 request but cannot catch a wrong assumption about what the real endpoint
 accepts. Treat the first real key as the test.
 
-It is a shape of its own rather than another preset, because the wire format
-genuinely differs: the key rides an `x-api-key` header instead of
+It is a shape of its own rather than another OpenAI-compatible address,
+because the wire format genuinely differs: the key rides an `x-api-key` header instead of
 `Authorization: Bearer`, an `anthropic-version` header is required, the system
 prompt is a top-level field rather than a message in the list, `max_tokens` is
 mandatory, and the reply arrives as a list of content blocks rather than a
 single string. Base URL is `https://api.anthropic.com` and there is only one,
-so it has no preset — the provider button fills it. A key is required, and
+so choosing the provider fills it in. A key is required, and
 saving without one is refused rather than discovered later by whoever is
 standing in front of the screen.
 
@@ -664,10 +682,11 @@ and the next question waits for it to load again — measured at 28s for a 7b on
 the reference hardware. It means nothing to a hosted provider, and is never
 sent to Anthropic.
 
-**installed there:** under the model field is an Ollama trick — it asks
-`/api/tags` on the same host and lists what is actually there, so a model name
-is chosen rather than typed from memory. Nothing else answers that path, so
-the line stays empty for everyone else.
+**Listing what a host has installed** — asking Ollama's `/api/tags` on the
+same host so a model name is chosen rather than typed from memory — is
+implemented (`listModels()`) but currently reaches nothing: the element it
+paints into went with the connection when it moved to the model profiles, and
+has not been rebuilt there.
 
 **Home Assistant takes only the timeout.** No model, no prompt, no reply limit,
 no context length, no temperature, no keep-alive: it holds the conversation
@@ -724,12 +743,12 @@ one.
 
 Never in `settings.json`. That document is world-readable by design — every
 viewer's interface is built from it — so a credential there would be handed to
-anyone who opened the page. The routes live in their own `routes.json` at mode
-600, admin-only, one key per route, and a key is never returned to a browser:
-the field shows whether one is stored, not what it is. **FORGET KEY** clears
-it for the selected route.
+anyone who opened the page. Keys live with the model profiles in
+`displays.json`, admin-only at mode 600, one per profile rather than one per
+endpoint — and a key is never returned to a browser: the panel is told whether
+one is stored, not what it is. Leaving the field blank keeps what is there.
 
-Changing a route's provider drops its key and its base URL unless new ones
+Changing a profile's provider drops its key and its base URL unless new ones
 arrive in the same save. Carrying one provider's endpoint into another would
 send a hosted key to whatever is listening on the old URL — a failure in the
 one direction that looks like success.
@@ -1475,10 +1494,10 @@ it. Each entry below carries its own panel scope.
   **Groups, so a grant is made once.** Twelve people who all get the same
   endpoint is twelve ticks and a re-tick every time somebody gets a new phone,
   which is not a permission model, it is data entry. A group is a name for a
-  set of them, made under ACCOUNTS and named wherever access is granted.
+  set of them, made under GROUPS and named wherever access is granted.
 
-  **Two kinds, and they do not mix**: people who asked to be here, and devices
-  an admin created and sent a code to. They answer separate questions — *the
+  **Two kinds, and they do not mix**: people and devices, set per row under
+  DEVICES and otherwise inferred from how the row arrived. They answer separate questions — *the
   physics department*, *the screens in the east wing* — and one list that could
   hold both would be a list nobody could describe. A group's kind is fixed at
   creation, because changing it would silently empty it.
@@ -2284,7 +2303,7 @@ reason it was split from phase 2.
 Groups, and the tidying that came with using the thing for an hour.
 
 - **Twelve ticks is not a permission model, it is data entry.** So a group is a
-  name for a set of devices, made under ACCOUNTS and named wherever access is
+  name for a set of devices, made under GROUPS and named wherever access is
   granted — today an endpoint's allow-list, and anything later that grants
   something can name them the same way. That is why they live in a file of
   their own rather than inside the thing that currently uses them.

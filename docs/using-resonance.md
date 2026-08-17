@@ -16,9 +16,10 @@ Below it is the transcript, and below that a single input row.
 Between them is a dim line that reports what just happened — what it heard,
 how long transcription took, or why nothing came of it. You can ignore it
 entirely; it is there for the times when you press TALK, speak, and nothing
-appears. Then it will say whether it heard nothing at all, heard you and
-matched no assistant's name, or reached one that failed. Hiding the transcript
-with **TEXT** hides this line too.
+appears. Then it will say whether it heard nothing at all, or reached an
+assistant that failed. Speech that named no assistant is not reported: it was
+not addressed to this screen, so the line stays empty and the button reads
+ASLEEP. Hiding the transcript with **TEXT** hides this line too.
 
 ## The four controls
 

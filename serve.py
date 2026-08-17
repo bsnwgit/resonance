@@ -2,11 +2,24 @@
 """Static server + local speech-to-text for Resonance.
 
 Listeners:
-  PORT      (default 9700) plain HTTP  — redirects to HTTPS, except where it
-                                         is the whole product (see below)
-  PORT + 1  (default 9701) HTTPS       — required for getUserMedia, which the
-                                         browser refuses on an insecure origin
-  PORT + 2  (default 9702) ADMIN       — the configuration interface
+  One per NETWORK PROFILE, each carrying the endpoints that name it — one
+  assistant on a port of its own, or several told apart by wake word. The
+  profile nominated DEFAULT is where an endpoint naming none of them answers,
+  and an upgrade turns the ports an install already had into one called
+  "Display" (9701, with 9700 redirecting to it).
+
+  HTTPS wherever a certificate exists, because getUserMedia is refused on an
+  insecure origin — except on loopback, which the browser already treats as
+  secure.
+
+  ADMIN     (default 9702) the configuration interface, and the only port
+                           still configured in app.json. It stays there
+                           deliberately: it is the way back in when what is in
+                           a profile is wrong.
+
+  PORT / HTTPS_PORT / ADMIN_PORT in the environment still override all of it,
+  and PORT alone still shifts all three (PORT, PORT+1, PORT+2) so a second
+  instance needs no stored configuration of its own.
 
 Two independent settings decide what this is: `bind` (loopback | address |
 everything) and `auth` (none | accounts). They are deliberately not one
@@ -618,6 +631,11 @@ ROUTES_PATH = os.path.join(ROOT, "routes.json")
 _routes_lock = threading.Lock()
 
 ROUTE_PRESENTATION = ("name", "greeting", "voice")
+#: …and where those two now come FROM. A route names a speech profile, and the
+#: profile carries the voice, the engine, the rate and the greeting phrases —
+#: everything a route used to hold a private copy of. Two screens wanting the
+#: same voice used to mean typing it twice.
+ROUTE_SPEECH_KEYS = ("ttsvoice", "ttsengine", "vrate", "vpitch", "greetings")
 ROUTE_ROUTING = ("wakeword", "aliases", "strict")
 #: everything else is BACKEND_DEFAULTS, and it is the connection half
 ROUTE_PUBLIC = ROUTE_PRESENTATION + ROUTE_ROUTING
@@ -630,6 +648,19 @@ ROUTE_DEFAULTS.update({
     # of a route having a voice as well.
     "greeting": "",
     "voice": "",                 # blank = whatever the shared settings chose
+    # Which speech profile answers for this route. Blank is the deployment's
+    # default, the same rule a device follows.
+    "speech": "",
+    # Which network profile — that is, which port of its own — this endpoint
+    # answers on. Blank is the shared display port, which is where they all
+    # were before this existed.
+    "network": "",
+    # …and which model profile it speaks to. Same rule again, and it has to be
+    # a default rather than an incidental key: read_routes rebuilds each record
+    # from this map, so a field missing here is a field silently dropped on the
+    # next read — and an endpoint that forgot which model it uses is an
+    # endpoint that answers as DEMO without saying why.
+    "model_profile": "",
     "wakeword": "resonance",
     "aliases": [],
     # Exact matching, for routes that DO things rather than answer. The same
@@ -664,12 +695,22 @@ ROUTE_DEFAULTS.update({
 MAX_ROUTES = 24                  # a household, not a directory service
 
 
-def _norm_word(s):
-    """The matcher's normalisation, in Python. Wake words are compared here
-    only to refuse an outright collision at the point of saving — the waking
-    itself happens in the browser."""
-    s = re.sub(r"[^a-z0-9\s]", " ", str(s or "").lower())
+def _keep_word(s):
+    """A wake word as it was typed, minus what the matcher cannot carry.
+
+    Case is KEPT. It is a name, and it is printed on a wall — "say Resonance"
+    rather than "say resonance" — so forcing it down was the server deciding
+    how somebody's assistant is spelt. Nothing is lost by keeping it: the
+    browser lowercases both the word and what it heard before comparing them,
+    so what this answers to is unchanged.
+
+    The same characters are still dropped as before, and deliberately: the
+    matcher discards anything that is not a letter, a digit or a space, so
+    keeping a hyphen here would print a word that is not the word being
+    matched."""
+    s = re.sub(r"[^A-Za-z0-9\s]", " ", str(s or ""))
     return re.sub(r"\s+", " ", s).strip()
+
 
 
 def _blank_routes():
@@ -688,8 +729,8 @@ def _migrate_routes():
     stored = read_settings()
     rec = dict(ROUTE_DEFAULTS)
     rec.update({k: cfg[k] for k in BACKEND_DEFAULTS})
-    rec["wakeword"] = _norm_word(stored.get("wakeword")) or ROUTE_DEFAULTS["wakeword"]
-    rec["aliases"] = [w for w in (_norm_word(a) for a in
+    rec["wakeword"] = _keep_word(stored.get("wakeword")) or ROUTE_DEFAULTS["wakeword"]
+    rec["aliases"] = [w for w in (_keep_word(a) for a in
                                   re.split(r"[\n,]", str(stored.get("wakealiases") or "")))
                       if w]
     # A name, not a second wake word: this is what the panel and the
@@ -714,7 +755,7 @@ def read_routes():
             for rid, rec in stored["routes"].items():
                 out = dict(ROUTE_DEFAULTS)
                 out.update({k: v for k, v in rec.items() if k in ROUTE_DEFAULTS})
-                out["aliases"] = [w for w in (_norm_word(a) for a in
+                out["aliases"] = [w for w in (_keep_word(a) for a in
                                               (rec.get("aliases") or [])) if w]
                 out["displays"] = [str(d)[:32] for d in
                                    (rec.get("displays") or [])][:MAX_ALLOW]
@@ -770,6 +811,59 @@ def route_order(doc):
     return ([doc["default"]] if doc["default"] in doc["routes"] else []) + rest
 
 
+#: What a model profile carries. `fallthrough` is deliberately NOT here: it
+#: names another endpoint, so it belongs to the endpoint rather than to a
+#: connection several of them might share.
+MODEL_KEYS = ("provider", "base_url", "model", "api_key", "agent_id")
+
+
+def _model_pool():
+    try:
+        return display_settings()["models"]
+    except Exception:
+        return []
+
+
+def with_model(rec):
+    """A route's connection, resolved from the model profile it names.
+
+    Overlaid rather than replacing the record, so everything that is still the
+    ROUTE's — its system prompt, its limits, where it falls through to — is
+    untouched. A route naming no profile gets the deployment's default; one
+    whose profile has been deleted falls back to it too, rather than quietly
+    talking to whatever base URL was last typed."""
+    pool = _model_pool()
+    if not pool:
+        return rec
+    prof = find_look(str(rec.get("model_profile") or ""), pool)
+    if prof is None:
+        try:
+            prof = find_look(display_settings()["model_default"], pool)
+        except Exception:
+            prof = None
+    if not prof:
+        return rec
+    out = dict(rec)
+    for k in MODEL_KEYS:
+        if k in prof:
+            out[k] = prof[k]
+    return out
+
+
+def _speech_pool():
+    try:
+        return display_settings()["speeches"]
+    except Exception:
+        return []
+
+
+def _speech_default():
+    try:
+        return display_settings()["speech_default"]
+    except Exception:
+        return ""
+
+
 def public_routes(doc, disp=None):
     """The two halves a browser may see. The connection half is not omitted
     from the serialisation by accident — it is enumerated the other way
@@ -794,9 +888,37 @@ def public_routes(doc, disp=None):
         if not rec.get("enabled", True):
             continue
         row = {k: rec[k] for k in ROUTE_PRESENTATION}
+        # Resolved here, so a browser is handed a voice rather than the name of a
+        # profile it has no business knowing the rest of. A route naming none
+        # falls back to the deployment's default speech profile, and one whose
+        # profile has been deleted falls back with it rather than going silent.
+        prof = find_look(str(rec.get("speech") or ""), _speech_pool()) \
+               or find_look(_speech_default(), _speech_pool()) or {}
+        for k in ROUTE_SPEECH_KEYS:
+            if k in prof:
+                row[k] = prof[k]
+        # A route's own greeting still wins where somebody typed one: the
+        # profile is the deployment's voice, the route's line is this one's.
+        if not row.get("greeting") and prof.get("greetings"):
+            row["greeting"] = prof["greetings"]
+        if not row.get("voice") and prof.get("ttsvoice"):
+            row["voice"] = prof["ttsvoice"]
         row.update(id=rid, allowed=display_may(disp, rec))
         if disp:
             row.update({k: rec[k] for k in ROUTE_ROUTING})
+            # …and the words come from the speech profile now, not from the
+            # route's own record. An endpoint names a profile; the profile says
+            # what wakes it, what else to accept for it, and how close a match
+            # has to be. A route keeps its stored copy only so that unpicking
+            # this later does not lose what somebody typed.
+            if "wakeword" in prof:
+                row["wakeword"] = str(prof.get("wakeword") or "")
+            if "wakealiases" in prof:
+                row["aliases"] = [a.strip() for a
+                                  in str(prof.get("wakealiases") or "").splitlines()
+                                  if a.strip()]
+            if "wakestrict" in prof:
+                row["strict"] = bool(prof.get("wakestrict"))
         out.append(row)
     return out
 
@@ -816,6 +938,34 @@ def admin_routes(doc):
     return out
 
 
+def net_profile(nid):
+    """A network profile by id, or None."""
+    if not nid:
+        return None
+    for n in display_settings()["networks"]:
+        if n["id"] == nid:
+            return n
+    return None
+
+
+def net_members(doc, nid):
+    """Which endpoints a port carries, in order.
+
+    Read at request time rather than frozen when the listener was bound, so
+    moving an endpoint between ports takes effect on the next question — the
+    SOCKET needs a restart, the membership does not.
+
+    The default profile also carries every endpoint that names no profile at
+    all: that is what makes it the default, and it is why the default has to
+    be shared."""
+    if not nid:
+        return list(route_order(doc))
+    dflt = nid == display_settings()["network_default"]
+    return [r for r in route_order(doc)
+            if doc["routes"][r].get("network") == nid
+            or (dflt and not doc["routes"][r].get("network"))]
+
+
 def route_dest(cfg):
     """What a route reaches, for the console and the log. A model name where
     there is one; a house has none, and printing an empty field there reads
@@ -831,15 +981,19 @@ def resolve_route(doc, rid):
     """Which route answers. An id nobody recognises falls back to the default
     rather than failing: a display holding a route that was deleted while it
     was awake should keep working, and the alternative is a screen that has
-    gone quiet for a reason nobody standing in front of it can see."""
+    gone quiet for a reason nobody standing in front of it can see.
+
+    The record comes back with its connection already resolved from the model
+    profile it names — a copy, never the stored record, so nothing downstream
+    can write a profile's credential back into a route."""
     if rid and rid in doc["routes"] and doc["routes"][rid].get("enabled", True):
-        return rid, doc["routes"][rid]
+        return rid, with_model(doc["routes"][rid])
     d = doc["default"]
     if d in doc["routes"] and doc["routes"][d].get("enabled", True):
-        return d, doc["routes"][d]
+        return d, with_model(doc["routes"][d])
     for r in route_order(doc):
         if doc["routes"][r].get("enabled", True):
-            return r, doc["routes"][r]
+            return r, with_model(doc["routes"][r])
     return "", None
 
 
@@ -853,6 +1007,60 @@ def validate_route(obj, current, doc, rid=None):
     for k in ("name", "greeting", "voice"):
         if k in obj:
             rec[k] = str(obj[k] or "").strip()[:200]
+    if "speech" in obj:
+        pid = str(obj["speech"] or "")[:16]
+        if pid and not any(p["id"] == pid
+                           for p in display_settings()["speeches"]):
+            return None, ("that speech profile no longer exists — reload the "
+                          "panel to see the current list")
+        # One endpoint per profile. A speech profile carries the WAKE WORD, so
+        # two endpoints naming the same one answer to the same name and cannot
+        # be told apart — the utterance would reach whichever matched first.
+        # Refused here rather than left to be discovered by talking to it.
+        if pid:
+            taken = [k for k, r in doc["routes"].items()
+                     if k != rid and r.get("speech") == pid]
+            if taken:
+                other = doc["routes"][taken[0]].get("name") or "another endpoint"
+                return None, ("%s already uses that speech profile — a profile "
+                              "carries the wake word, so two endpoints sharing "
+                              "one would answer to the same name" % other)
+        rec["speech"] = pid
+    if "network" in obj:
+        nid = str(obj["network"] or "")[:16]
+        pool = display_settings()["networks"]
+        if nid and not any(p["id"] == nid for p in pool):
+            return None, ("that network profile no longer exists — reload the "
+                          "panel to see the current list")
+        # A SHARED port carries as many endpoints as you like and tells them
+        # apart by wake word, which is how the display port has always worked.
+        # An exclusive one is the other thing you might want — a port that IS
+        # one assistant — and a second endpoint claiming it would simply never
+        # be reached, so it is refused rather than silently ignored.
+        if nid:
+            prof = next((p for p in pool if p["id"] == nid), {})
+            if not (prof.get("values") or {}).get("shared"):
+                other = [k for k, r in doc["routes"].items()
+                         if k != rid and r.get("network") == nid]
+                if other:
+                    who = doc["routes"][other[0]].get("name") or "another endpoint"
+                    return None, ("%s already answers on that port, and it is "
+                                  "not marked shared — mark it shared, or give "
+                                  "this one a port of its own" % who)
+        rec["network"] = nid
+    if "model_profile" in obj:
+        mid = str(obj["model_profile"] or "")[:16]
+        if mid and not any(p["id"] == mid
+                           for p in display_settings()["models"]):
+            return None, ("that model profile no longer exists — reload the "
+                          "panel to see the current list")
+        rec["model_profile"] = mid
+        # Sharing one is fine and expected — several endpoints can speak to the
+        # same model. What is NOT kept is the route's own copy of the
+        # connection: a stale key sitting in routes.json reads as live, and
+        # leaves with_model two answers to choose between.
+        for k in MODEL_KEYS:
+            rec[k] = "demo" if k == "provider" else ""
     if not rec["name"]:
         return None, "a route needs a name"
     if "strict" in obj:
@@ -896,33 +1104,30 @@ def validate_route(obj, current, doc, rid=None):
                 out.append(g)
         rec["groups"] = out[:MAX_GROUPS]
     if "wakeword" in obj:
-        rec["wakeword"] = _norm_word(obj["wakeword"])[:40]
-    if not rec["wakeword"]:
-        return None, "a route needs a wake word — it is how anybody reaches it"
+        rec["wakeword"] = _keep_word(obj["wakeword"])[:40]
+    # No longer required on the route. The word lives in the speech profile the
+    # route names, and demanding one here would refuse every endpoint saved
+    # from a panel that no longer has the field. What a route DOES still need
+    # is a way to be reached, and that is now the profile — checked above.
+    rec.setdefault("wakeword", "")
     if "aliases" in obj:
         raw = obj["aliases"]
         if not isinstance(raw, (list, tuple)):
             raw = re.split(r"[\n,]", str(raw or ""))
         seen, out = set(), []
         for a in raw:
-            w = _norm_word(a)[:40]
+            w = _keep_word(a)[:40]
             if w and w not in seen:
                 seen.add(w)
                 out.append(w)
         rec["aliases"] = out[:20]
 
-    # Two routes answering to the same word is not a preference, it is a
-    # route nobody can reach. Refused here at the point of entry; words that
-    # are merely CLOSE are the personal-wake-word phase's problem, and want
-    # the matcher that does the waking rather than a string comparison.
-    mine = set([rec["wakeword"]] + list(rec["aliases"]))
-    for other, o in doc["routes"].items():
-        if other == rid:
-            continue
-        clash = mine & set([o["wakeword"]] + list(o.get("aliases") or []))
-        if clash:
-            return None, ("“%s” already reaches %s"
-                          % (sorted(clash)[0], o["name"]))
+    # Two routes answering to the same word is still a route nobody can reach,
+    # but it is no longer checked HERE: the words live in speech profiles now,
+    # every route carries the same vestigial default, and comparing those
+    # refused every save. What prevents the clash instead is one endpoint per
+    # profile, refused above — two endpoints cannot share a word because they
+    # cannot share the profile the word is in.
     return rec, None
 
 
@@ -962,6 +1167,21 @@ def validate_app(obj, current):
         if not address_bindable(cfg["bind_address"]):
             return None, ("this machine has no address %s — the server would "
                           "fail to start on it" % cfg["bind_address"])
+
+    # …and not on top of a network profile. Those are the app's ports now, and
+    # the portal landing on one of them would take the display down and the
+    # way of fixing it with the same restart.
+    for n in display_settings()["networks"]:
+        v = n.get("values") or {}
+        for key in ("port", "redirect"):
+            try:
+                got = int(v.get(key) or 0)
+            except (TypeError, ValueError):
+                continue
+            if got and got == cfg["admin_port"]:
+                return None, ("port %d is the network profile %s — the admin "
+                              "portal cannot sit on a port the app answers on"
+                              % (got, n["name"]))
 
     host = bind_host(cfg)
     for k in ("http_port", "https_port", "admin_port"):
@@ -1072,6 +1292,13 @@ def note_code_failure(ip):
 
 DISPLAY_DEFAULTS = {
     "name": "",                  # what an admin called it
+    # Which population this row belongs to when a group is drawn from one:
+    # "user", "device", or blank for "work it out". Set by an admin, because
+    # the inference below can only see how the row ARRIVED — and asking for
+    # access is something a browser on one machine does, which describes a
+    # device rather than a person. A person is an identity that carries from a
+    # phone to a laptop, and nothing here issues one yet.
+    "kind": "",
     "asked": "",                 # the ?display= name it announced itself with
     "approved": False,
     # An unspent enrolment code, and when it dies. Stored in the clear rather
@@ -1253,6 +1480,25 @@ DISPLAY_SETTINGS = {
     # Which profile in each list an ordinary display gets. One per list, always
     # set, and the profile it names cannot be removed — a list whose default
     # points at nothing would leave every screen with no appearance at all.
+    # The connection half of an endpoint, under a name: which provider, which
+    # base URL, which model, and the key for it. An endpoint names one instead
+    # of carrying its own copy — two endpoints on the same model used to be the
+    # same credential typed twice.
+    "models": [],
+    # A port, under a name, that one endpoint answers on. No nominated default
+    # here and deliberately so: every other list has one because a row naming
+    # nothing still has to look like something, and an endpoint naming no
+    # network profile is not missing a setting — it is on the shared display
+    # port, which is where every endpoint was before this existed. A default
+    # would silently move one onto a port of its own.
+    "networks": [],
+    # …and, unlike MODELS, one of them is nominated. It has to be: the display
+    # ports live here now rather than in app.json, so an endpoint naming no
+    # profile still has to answer somewhere, and that somewhere is this one.
+    # A default network profile is always SHARED, or endpoints naming nothing
+    # would be pointed at a port that refuses to carry more than one.
+    "network_default": "",
+    "model_default": "",
     "look_default": "",
     "motion_default": "",
     "speech_default": "",
@@ -1537,6 +1783,25 @@ def write_display_settings(cfg):
     _write_displays_doc(doc)
 
 
+def panel_settings():
+    """display_settings() with the credentials taken out.
+
+    A model profile holds an API key, and the panel has no business receiving
+    one — the same rule a route's key has always followed. It is told WHETHER
+    there is a key, which is what an admin needs to tell a configured profile
+    from an unconfigured one, and never the key itself."""
+    cfg = dict(display_settings())
+    out = []
+    for m in cfg.get("models") or []:
+        row = dict(m)
+        vals = dict(row.get("values") or {})
+        row["has_key"] = bool(vals.pop("api_key", ""))
+        row["values"] = vals
+        out.append(row)
+    cfg["models"] = out
+    return cfg
+
+
 def validate_display_settings(obj, current):
     """Returns (settings, error). The one rule that is not a range: guest
     requests cannot be switched off while there is nowhere for a guest to go —
@@ -1614,6 +1879,109 @@ def validate_display_settings(obj, current):
         cfg["looks"] = clean_looks(obj["looks"])
     # The geometry and speech lists, validated exactly as the appearance one is:
     # a name, and a bag of settings the display checks as it applies them.
+    if "models" in obj:
+        if not isinstance(obj["models"], (list, tuple)):
+            return None, "the model profiles must be a list"
+        if len(obj["models"]) > MAX_LOOKS:
+            return None, "there is room for %d model profiles" % MAX_LOOKS
+        for m in obj["models"]:
+            if not isinstance(m, dict):
+                return None, "a model profile must be a set of fields"
+            if not str(m.get("name") or "").strip():
+                return None, ("every profile needs a name — it is what an "
+                              "endpoint picks")
+        # The panel is never sent a key, so it cannot send one back. A profile
+        # arriving without one keeps what is stored rather than blanking it —
+        # otherwise every save would forget the credential.
+        stored = {p["id"]: dict(p.get("values") or {}) for p in cfg["models"]}
+        rows = clean_profiles(obj["models"], "n", MAX_LOOKS)
+        for r in rows:
+            had = stored.get(r["id"]) or {}
+            # Kept only while the provider is the same one. The panel never
+            # shows a key, so it sends none unless you type one — and carrying
+            # the stored one across a provider change would hand Home
+            # Assistant's token to api.anthropic.com, which is the one failure
+            # validate_backend exists to refuse. Same provider, no key typed:
+            # keep it, or every save would forget the credential.
+            if ((r["values"].get("provider") or "demo")
+                    == (had.get("provider") or "demo")
+                    and not r["values"].get("api_key") and had.get("api_key")):
+                r["values"]["api_key"] = had["api_key"]
+            # The same connection check routes used to get. It has to run here
+            # or nowhere now: an endpoint no longer carries a connection to
+            # check, and a profile saved without the key its provider needs
+            # would fail silently, in front of somebody, mid-sentence.
+            base = dict(BACKEND_DEFAULTS)
+            base.update(had)
+            _, err = validate_backend(r["values"], base)
+            if err:
+                return None, "%s: %s" % (r["name"], err)
+        cfg["models"] = rows
+    if "networks" in obj:
+        if not isinstance(obj["networks"], (list, tuple)):
+            return None, "the network profiles must be a list"
+        if len(obj["networks"]) > MAX_LOOKS:
+            return None, "there is room for %d network profiles" % MAX_LOOKS
+        rows = clean_profiles(obj["networks"], "w", MAX_LOOKS)
+        # Only the admin portal's port is reserved now. The display ports are
+        # these profiles — a profile holding what used to be app.json's
+        # https_port is the migration doing its job, not a collision.
+        adm = read_app()["admin_port"]
+        seen = {}
+        for r in rows:
+            try:
+                pv = int(r["values"].get("port"))
+            except (TypeError, ValueError):
+                return None, "%s: give it a port number" % r["name"]
+            rd = str(r["values"].get("redirect") or "").strip()
+            try:
+                rv = int(rd) if rd else 0
+            except ValueError:
+                return None, ("%s: the plain HTTP port must be a whole number, "
+                              "or empty for none" % r["name"])
+            # Before the collision sweep, or a redirect pointing at its own
+            # port reports itself as clashing with itself.
+            if rv and rv == pv:
+                return None, ("%s: the plain HTTP port cannot be the same as "
+                              "the port it redirects to" % r["name"])
+            for label, v in (("port", pv), ("plain HTTP port", rv)):
+                if not v and label != "port":
+                    continue
+                if not (PORT_MIN <= v <= PORT_MAX):
+                    return None, ("%s: the %s must be between %d and %d — "
+                                  "below %d needs root, and this server runs "
+                                  "as an ordinary user"
+                                  % (r["name"], label, PORT_MIN, PORT_MAX,
+                                     PORT_MIN))
+                if v == adm:
+                    return None, ("%s: %d is the admin portal's port — that "
+                                  "one stays under ADMIN SETTINGS, and it is "
+                                  "the way back in when something here is "
+                                  "wrong" % (r["name"], v))
+                if v in seen:
+                    return None, ("%s and %s are both on port %d"
+                                  % (seen[v], r["name"], v))
+                seen[v] = r["name"]
+            r["values"]["port"] = pv
+            r["values"]["redirect"] = rv
+            r["values"]["shared"] = bool(r["values"].get("shared"))
+            r["values"]["open"] = bool(r["values"].get("open"))
+        cfg["networks"] = rows
+        # There is always a default, and it is always shared. An endpoint
+        # naming no profile lands on it, and a default that refused to carry
+        # more than one endpoint would strand every one of them.
+        want = str(obj.get("network_default") or cfg.get("network_default") or "")
+        by_id = {r["id"]: r for r in rows}
+        if want not in by_id:
+            want = next((r["id"] for r in rows if r["values"].get("shared")), "")
+        if rows and not want:
+            return None, ("one network profile has to be shared — it is where "
+                          "an endpoint that names none of them answers")
+        if want and not by_id[want]["values"].get("shared"):
+            return None, ("%s is the default, so it has to be shared — it is "
+                          "where an endpoint that names no profile answers"
+                          % by_id[want]["name"])
+        cfg["network_default"] = want
     for key, prefix in (("motions", "m"), ("speeches", "p")):
         if key not in obj:
             continue
@@ -1673,7 +2041,7 @@ def validate_display_settings(obj, current):
     # moved between tabs cannot leave a stale copy of the answer on the server.
     # Seeding the first profile is the panel's job for the same reason.
     for dkey, lkey in (("look_default", "looks"), ("motion_default", "motions"),
-                       ("speech_default", "speeches")):
+                       ("speech_default", "speeches"), ("model_default", "models")):
         if dkey in obj:
             want = str(obj[dkey] or "")
             if want and not any(p["id"] == want for p in cfg[lkey]):
@@ -1739,6 +2107,98 @@ def write_displays(displays):
     doc = read_displays_doc()
     doc["displays"] = displays
     _write_displays_doc(doc)
+
+
+def migrate_models():
+    """One-time: lift each endpoint's connection into a model profile.
+
+    Deduplicated by the connection itself, so two endpoints already pointed at
+    the same base URL and model come back as one profile that both name —
+    which is the whole reason for the list. A profile is named after the first
+    endpoint using it, because that is the name somebody will recognise.
+
+    Runs only while the list is empty and something has a connection to lift:
+    after that the profiles are the source of truth and a route's own copy is
+    vestigial."""
+    doc = read_routes()
+    routes = doc.get("routes") or {}
+    if not routes:
+        return
+    ddoc = read_displays_doc()
+    cfg = ddoc.get("settings")
+    cfg = dict(cfg) if isinstance(cfg, dict) else {}
+    if clean_profiles(cfg.get("models"), "n", MAX_LOOKS):
+        return                              # already imported, or hand-built
+    made, order = {}, []
+    for rid in route_order(doc):
+        rec = routes[rid]
+        key = tuple(str(rec.get(k) or "") for k in MODEL_KEYS)
+        if key not in made:
+            prof = {"id": "n" + secrets.token_hex(4),
+                    "name": rec.get("name") or "endpoint",
+                    "values": {k: rec.get(k) or "" for k in MODEL_KEYS}}
+            made[key] = prof
+            order.append(prof)
+        rec["model_profile"] = made[key]["id"]
+    if not order:
+        return
+    cfg["models"] = order
+    if cfg.get("model_default") not in [p["id"] for p in order]:
+        # The default endpoint's connection is the one an endpoint naming
+        # nothing should get.
+        dflt = routes.get(doc.get("default")) or {}
+        cfg["model_default"] = dflt.get("model_profile") or order[0]["id"]
+    ddoc["settings"] = cfg
+    _write_displays_doc(ddoc)
+    doc["routes"] = routes
+    write_routes(doc)
+    print("model migration: %d endpoint(s) -> %d profile(s) (%s)"
+          % (len(routes), len(order), ", ".join(p["name"] for p in order)),
+          flush=True)
+
+
+def migrate_networks():
+    """One-time: the display's ports become a network profile.
+
+    They were in app.json beside the admin portal's, which put three ports in
+    one place that answer to two different things — the portal an admin signs
+    into, and the interface everybody else uses. The portal's stays there,
+    because it is the way back in when what is here is wrong. The display's
+    becomes a profile named DISPLAY, shared, carrying every endpoint that names
+    no other — which is exactly what that port was already doing.
+
+    Nothing is removed from app.json. The keys stay where they are, unread, so
+    an install that is rolled back comes up on the ports it always had."""
+    ddoc = read_displays_doc()
+    cfg = ddoc.get("settings")
+    cfg = dict(cfg) if isinstance(cfg, dict) else {}
+    rows = clean_profiles(cfg.get("networks"), "w", MAX_LOOKS)
+    have = str(cfg.get("network_default") or "")
+    if have and any(r["id"] == have for r in rows):
+        return                                          # already nominated
+    # A profile list built before there was a default — an exclusive port made
+    # for one endpoint, say — is not a reason to invent a second display port.
+    # Nominate a shared one if there is one; otherwise the app's own ports
+    # become the profile they always were in everything but name.
+    pick = next((r["id"] for r in rows if (r["values"] or {}).get("shared")), "")
+    if not pick:
+        app = read_app()
+        prof = {"id": "w" + secrets.token_hex(4), "name": "Display",
+                "values": {"port": app["https_port"],
+                           "redirect": app["http_port"],
+                           "shared": True, "open": False}}
+        rows = [prof] + rows
+        pick = prof["id"]
+        print("network migration: display ports %d/%d -> profile "
+              "\u201cDisplay\u201d (shared)"
+              % (app["https_port"], app["http_port"]), flush=True)
+    cfg["networks"] = rows
+    cfg["network_default"] = pick
+    ddoc["settings"] = cfg
+    _write_displays_doc(ddoc)
+    print("network migration: default port profile is \u201c%s\u201d; ADMIN "
+          "SETTINGS now holds the admin portal's port only"
+          % next(r["name"] for r in rows if r["id"] == pick), flush=True)
 
 
 def ensure_default_kiosk():
@@ -2165,7 +2625,8 @@ def open_default(doc):
 GUEST_PATH_MSG = ("guest requests are switched off, so the default endpoint is "
                   "the only thing an uninvited device can reach — it has to "
                   "stay answering and open to any display. Turn guest requests "
-                  "back on under DISPLAYS first, or make another endpoint the "
+                  "back on under SECURITY \u25b8 AI Requires Permission "
+                  "first, or make another endpoint the "
                   "default.")
 
 
@@ -2228,6 +2689,10 @@ def admin_displays():
         live = bool(rec.get("code")) and (rec.get("code_expires") or 0) > now_
         row.update(id=did, label=display_label(rec),
                    guest=is_guest(rec), expired=display_expired(rec),
+                   # What it was SET to, and what it resolves to. The panel
+                   # needs both: one is the control's value, the other is the
+                   # answer a blank control is currently getting.
+                   kind=str(rec.get("kind") or ""), group_kind=group_kind_of(rec),
                    # Three states, and the panel needs to tell them apart:
                    # INVITED is a row waiting for somebody to type its code
                    # into a screen, WAITING is a device that turned up on its
@@ -2292,9 +2757,16 @@ def write_groups(groups):
 
 
 def group_kind_of(rec):
-    """Which population a display row belongs to. Asking to be here is what
-    makes somebody a person as far as this is concerned; everything else is a
-    device an admin put somewhere."""
+    """Which population a display row belongs to.
+
+    What an admin said it is, where they have said. Otherwise it is inferred
+    from how the row arrived — asked for access, or issued a code — which is a
+    guess about the wrong question: both of those happen in a browser on one
+    machine. The inference is kept only so that every existing row has an
+    answer without anybody visiting it."""
+    k = str(rec.get("kind") or "")
+    if k in GROUP_KINDS:
+        return k
     return "user" if is_guest(rec) else "device"
 
 
@@ -3054,11 +3526,27 @@ class Handler(SimpleHTTPRequestHandler):
     #: callers to instead of answering. None means it answers normally.
     redirect_to = None
 
-    def __init__(self, *args, admin_port=False, redirect_to=None, **kw):
+    #: set per-listener by make_server: the network profile this port belongs
+    #: to. Blank is the admin listener, which is not a display port and
+    #: answers about all of them.
+    pinned_net = ""
+
+    def __init__(self, *args, admin_port=False, redirect_to=None,
+                 pinned_net="", **kw):
         # must land before super().__init__, which serves the request outright
         self.admin_port = admin_port
         self.redirect_to = redirect_to
+        self.pinned_net = pinned_net
         super().__init__(*args, **kw)
+
+    @property
+    def pinned_open(self):
+        """Whether reaching this port is itself the grant. Read live off the
+        profile rather than captured at bind time, so turning it off takes
+        effect on the next request instead of at the next restart — the socket
+        is the part that cannot move without one."""
+        n = net_profile(self.pinned_net)
+        return bool((n.get("values") or {}).get("open")) if n else False
 
     def _redirected(self):
         """The plain listener, once HTTPS is the only real way in. Kept as a
@@ -3224,6 +3712,12 @@ class Handler(SimpleHTTPRequestHandler):
                  else "none")
         may_ask = (cfg["guest_requests"] and not working
                    and not (rec.get("denied") and not rec.get("deny_repeat", True)))
+        if self.pinned_open:
+            # Reaching this port is the grant. There is nothing to ask for and
+            # nothing to wait on, so the page gets its composer rather than a
+            # form — the row still exists and still says what this device is,
+            # and it is this PORT that has stopped gating on it.
+            working, state, may_ask = True, "approved", False
         out = {"id": rec.get("id", ""), "name": display_label(rec),
                "approved": working, "state": state,
                "can_request": bool(may_ask),
@@ -3462,7 +3956,27 @@ class Handler(SimpleHTTPRequestHandler):
             # page that draws correctly and answers to nothing. The connection
             # half is not here at all, at any tier.
             doc = read_routes()
-            return self._json(200, {"routes": public_routes(doc, self._display()),
+            rows = public_routes(doc, self._display())
+            if self.pinned_net:
+                # This port carries its own endpoints and no others. They are
+                # not filtered out of a list the browser then ignores — they
+                # never leave here, which is the rule the connection half
+                # already follows. One endpoint on an exclusive port, several
+                # told apart by wake word on a shared one: the same page
+                # either way, built from what it was told.
+                mine = net_members(doc, self.pinned_net)
+                rows = [r for r in rows if r["id"] in mine]
+                if self.pinned_open:
+                    for r in rows:
+                        r["allowed"] = True
+                # The document's own default where this port carries it, and
+                # otherwise the first thing here — a port whose endpoints do
+                # not include the default still has to send a typed question
+                # somewhere.
+                dflt = (doc["default"] if doc["default"] in mine
+                        else (mine[0] if mine else ""))
+                return self._json(200, {"routes": rows, "default": dflt})
+            return self._json(200, {"routes": rows,
                                     "default": doc["default"]})
         if path == "/routes/all":
             if not self._require("admin"):
@@ -3490,7 +4004,7 @@ class Handler(SimpleHTTPRequestHandler):
             secure = RUNNING.get("https_port")
             doc = read_routes()
             return self._json(200, {"displays": admin_displays(),
-                                    "settings": display_settings(),
+                                    "settings": panel_settings(),
                                     "limits": DISPLAY_LIMITS,
                                     "max_fields": MAX_FORM_FIELDS,
                                     # Which endpoints there are to grant, and
@@ -3838,10 +4352,9 @@ class Handler(SimpleHTTPRequestHandler):
             write_routes(doc)
             # The wake word and the adapter kind, and never the key or the
             # URL it points at: a log is read by more people than the panel.
-            print("route %s (%s) saved by %s: wake=%s adapter=%s key=%s"
+            print("route %s (%s) saved by %s: wake=%s model=%s"
                   % (rid, rec["name"], s["user"], rec["wakeword"],
-                     rec["provider"], "set" if rec["api_key"] else "none"),
-                  flush=True)
+                     rec.get("model_profile") or "(default)"), flush=True)
             return self._json(200, {"ok": True, "id": rid,
                                     "routes": admin_routes(doc),
                                     "default": doc["default"]})
@@ -3950,7 +4463,9 @@ class Handler(SimpleHTTPRequestHandler):
             rid = str(obj.get("id") or "")
             if rid not in doc["routes"]:
                 return self._json(404, {"error": "no such route"})
-            rec = doc["routes"][rid]
+            # Resolved the same way /ask resolves it: a test that asked the
+            # route's own fields would be testing something no utterance uses.
+            rec = with_model(doc["routes"][rid])
             if rec["provider"] == "demo":
                 return self._json(200, {"demo": True, "name": rec["name"],
                                         "reply": "", "ms": 0})
@@ -4320,7 +4835,10 @@ class Handler(SimpleHTTPRequestHandler):
                   % (s["user"], "on" if cfg["guest_requests"] else "off",
                      cfg["max_displays"], cfg["max_pending"], cfg["guest_days"],
                      len(cfg["form"])), flush=True)
-            return self._json(200, {"ok": True, "settings": cfg,
+            # Read back rather than echoed: `cfg` is what went to disk, keys
+            # and all, and the panel is never sent one. The save response was
+            # the one path that would have handed them back.
+            return self._json(200, {"ok": True, "settings": panel_settings(),
                                     "displays": admin_displays()})
 
         if parsed.path == "/displays/decide":
@@ -4466,6 +4984,48 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"ok": True, "id": did,
                                     "displays": admin_displays()})
 
+        if parsed.path == "/displays/kind":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            did = str(obj.get("id") or "")
+            displays = read_displays()
+            if did not in displays:
+                return self._json(404, {"error": "no such display"})
+            want = str(obj.get("kind") or "")
+            if want and want not in GROUP_KINDS:
+                return self._json(400, {"error": "kind must be one of: "
+                                                 + ", ".join(GROUP_KINDS)})
+            was = group_kind_of(displays[did])
+            displays[did]["kind"] = want
+            now = group_kind_of(displays[did])
+            write_displays(displays)
+            # A group is drawn from one population, and clean_members drops a
+            # member of the wrong one — silently, at the next save of that
+            # group. Done here instead, and counted, so moving a row between
+            # populations says what it cost rather than emptying a group
+            # somebody built weeks ago with nothing on screen about it.
+            dropped = []
+            if now != was:
+                groups = read_groups()
+                touched = False
+                for gid, g in groups.items():
+                    if g["kind"] != now and did in (g.get("members") or []):
+                        g["members"] = [m for m in g["members"] if m != did]
+                        dropped.append(g["name"])
+                        touched = True
+                if touched:
+                    write_groups(groups)
+            print("display %s kind=%s by %s%s"
+                  % (did, want or "(inferred: %s)" % now, s["user"],
+                     "; dropped from " + ", ".join(dropped) if dropped else ""),
+                  flush=True)
+            return self._json(200, {"ok": True, "displays": admin_displays(),
+                                    "dropped": dropped})
+
         if parsed.path == "/displays/rename":
             s = self._require("admin")
             if not s:
@@ -4538,7 +5098,21 @@ class Handler(SimpleHTTPRequestHandler):
             # name at all when it was typed into the composer or pushed
             # through an embed, and that is what the default route is for.
             doc = read_routes()
-            rid, cfg = resolve_route(doc, str(obj.get("route") or "")[:32])
+            want = str(obj.get("route") or "")[:32]
+            if self.pinned_net:
+                # A port answers as its own endpoints and no others. Asking
+                # for one it does not carry is a caller at the wrong door —
+                # given this port's default rather than refused, which is the
+                # same thing the shared port does with a route that has been
+                # switched off since the page loaded.
+                mine = net_members(doc, self.pinned_net)
+                if want not in mine:
+                    want = (doc["default"] if doc["default"] in mine
+                            else (mine[0] if mine else ""))
+                if not want:
+                    return self._json(503, {"error": "no endpoint answers on "
+                                                     "this port"})
+            rid, cfg = resolve_route(doc, want)
             if not cfg:
                 return self._json(503, {"error": "no route is answering"})
             # The route is named back on every reply, not just when it
@@ -4554,7 +5128,7 @@ class Handler(SimpleHTTPRequestHandler):
             # one: its rights come from its key, so it reaches the endpoints
             # anything can reach and no others.
             disp = None if emb else self._display()
-            if not display_may(disp, cfg):
+            if not (self.pinned_open or display_may(disp, cfg)):
                 note_display_refused(disp, cfg["name"])
                 print("refused: %s may not use %s (%s)"
                       % (disp["id"] if disp else "a display with no token",
@@ -4764,14 +5338,16 @@ class Handler(SimpleHTTPRequestHandler):
         })
 
 
-def make_server(port, admin_port=False, host="0.0.0.0", redirect_to=None):
+def make_server(port, admin_port=False, host="0.0.0.0", redirect_to=None,
+                pinned_net=""):
     handler = functools.partial(Handler, directory=ROOT, admin_port=admin_port,
-                                redirect_to=redirect_to)
+                                redirect_to=redirect_to, pinned_net=pinned_net)
     return ThreadingHTTPServer((host, port), handler)
 
 
-def start_tls(port, cert, key, admin_port=False, host="0.0.0.0"):
-    srv = make_server(port, admin_port=admin_port, host=host)
+def start_tls(port, cert, key, admin_port=False, host="0.0.0.0", pinned_net=""):
+    srv = make_server(port, admin_port=admin_port, host=host,
+                      pinned_net=pinned_net)
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.load_cert_chain(cert, key)
     srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
@@ -4786,6 +5362,8 @@ def main():
     # wall settings silently — see migrate_kiosks.
     migrate_kiosks()
     ensure_default_kiosk()
+    migrate_models()
+    migrate_networks()
     app = read_app()
     # Environment still wins, so a one-off run on a different port needs no
     # edit to the stored configuration. Setting PORT alone moves all three,
@@ -4796,10 +5374,20 @@ def main():
             return int(os.environ[name])
         except (KeyError, ValueError):
             return None
-    port = _env("PORT") or app["http_port"]
+    # The display's ports are the DEFAULT network profile's now; app.json holds
+    # the admin portal's and nothing else that is read. The stored values are
+    # still the fallback for one case only — a settings document with no
+    # network profiles at all, which is an install somebody has edited by hand
+    # — because a server that cannot serve the display is worse than one on an
+    # unexpected port, and the admin portal is how it gets fixed either way.
+    _dnet = net_profile(display_settings()["network_default"]) or {}
+    _dvals = _dnet.get("values") or {}
     shifted = _env("PORT") is not None
-    tls_port = _env("HTTPS_PORT") or (port + 1 if shifted else app["https_port"])
-    adm_port = _env("ADMIN_PORT") or (port + 2 if shifted else app["admin_port"])
+    tls_port = _env("HTTPS_PORT") or (_env("PORT") + 1 if shifted
+                                      else _dvals.get("port") or app["https_port"])
+    port = _env("PORT") or (_dvals.get("redirect") or 0)
+    adm_port = _env("ADMIN_PORT") or (_env("PORT") + 2 if shifted
+                                      else app["admin_port"])
     SESSION_IDLE = app["session_idle_minutes"] * 60
     AUTH_MODE = app["auth"]
     host = bind_host(app)
@@ -4833,13 +5421,17 @@ def main():
 
     # The pair, reported as a pair. Not a name for the combination — a name
     # goes stale the moment one half of it changes.
+    _dflt = display_settings()["network_default"]
     print("reachable at %s · %s" % (
         "this machine only (loopback)" if personal else
         "every interface on this machine" if host == "0.0.0.0" else host,
         "no sign-in" if AUTH_MODE == "none" else "accounts and roles"), flush=True)
 
     if have_tls:
-        start_tls(tls_port, cert, key, host=host)
+        # Pinned to the default profile, so an endpoint moved onto a port of
+        # its own leaves this one. An endpoint belongs to exactly one network
+        # profile; a port carrying several is what SHARED is for.
+        start_tls(tls_port, cert, key, host=host, pinned_net=_dflt)
         RUNNING["https_port"] = tls_port
         print("HTTPS on %s:%d  (mic + local STT work here)" % (host, tls_port),
               flush=True)
@@ -4856,7 +5448,10 @@ def main():
     # rather than silently on the first question anybody asks.
     _doc = read_routes()
     for _rid in route_order(_doc):
-        _r = _doc["routes"][_rid]
+        # Resolved through the model profile, like every other reader: printing
+        # the route's own fields would have shown DEMO for everything the
+        # moment those fields stopped being kept.
+        _r = with_model(_doc["routes"][_rid])
         print("route %-10s “%s”%s%s%s" % (
             _r["name"], _r["wakeword"],
             "" if _r["provider"] == "demo" else
@@ -4864,7 +5459,62 @@ def main():
             "  (default)" if _rid == _doc["default"] else "",
             "" if _r.get("enabled", True) else "  — not answering"), flush=True)
 
-    if redirect_plain:
+    # One listener per network profile, and its plain-HTTP companion where the
+    # profile names one. Bound here rather than on save: a listening socket is
+    # not something to open and close under an admin's mouse, which is the
+    # same reason the admin portal's port has always taken a restart.
+    #
+    # The DEFAULT profile is skipped — it is the display listener started
+    # above, and binding it twice would be the server colliding with itself.
+    _dflt_id = display_settings()["network_default"]
+    for _n in display_settings()["networks"]:
+        if _n["id"] == _dflt_id:
+            continue
+        _mine = [r for r in net_members(_doc, _n["id"])
+                 if _doc["routes"][r].get("enabled", True)]
+        if not _mine:
+            # A port nothing answers on would accept connections and then have
+            # nothing to say. Said out loud rather than bound: a profile
+            # nobody has pointed an endpoint at is usually one half of a job.
+            print("network %-10s not bound — no endpoint answers on it"
+                  % _n["name"], flush=True)
+            continue
+        _vals = _n.get("values") or {}
+        try:
+            _p = int(_vals.get("port"))
+        except (TypeError, ValueError):
+            continue
+        for _bind, _to in ((_p, None), (int(_vals.get("redirect") or 0), _p)):
+            if not _bind:
+                continue
+            try:
+                if have_tls and _to is None:
+                    start_tls(_bind, cert, key, host=host, pinned_net=_n["id"])
+                else:
+                    _srv = make_server(_bind, host=host, pinned_net=_n["id"],
+                                       redirect_to=_to if have_tls else None)
+                    threading.Thread(target=_srv.serve_forever,
+                                     daemon=True).start()
+            except OSError as exc:
+                # One profile's port being taken is not a reason for the server
+                # not to come up: everything else still answers, and the admin
+                # needs the panel in order to fix it.
+                print("network %-10s port %d NOT bound: %s"
+                      % (_n["name"], _bind, exc), flush=True)
+                continue
+            if _to is not None:
+                print("HTTP  on %s:%d  → redirects to %d" % (host, _bind, _p),
+                      flush=True)
+            else:
+                print("%-5s on %s:%d  → %s%s"
+                      % ("HTTPS" if have_tls else "HTTP", host, _bind,
+                         ", ".join(_doc["routes"][r]["name"] for r in _mine),
+                         "  (no approval — the port is the grant)"
+                         if _vals.get("open") else ""), flush=True)
+
+    if not port:
+        pass                     # the default profile names no plain port
+    elif redirect_plain:
         print("HTTP  on %s:%d  → redirects to HTTPS on %d"
               % (host, port, tls_port), flush=True)
     else:
@@ -4915,13 +5565,21 @@ def main():
         print("  " + "!" * 68, flush=True)
         print("  NO SIGN-IN, AND REACHABLE FROM THE NETWORK", flush=True)
         print("  " + warn, flush=True)
-        print("  Bind to loopback, or switch sign-in to accounts, in APP "
+        print("  Bind to loopback, or switch sign-in to accounts, in ADMIN "
               "SETTINGS.", flush=True)
         print("  " + "!" * 68, flush=True)
         print("", flush=True)
 
-    make_server(port, host=host,
-                redirect_to=tls_port if redirect_plain else None).serve_forever()
+    if port:
+        make_server(port, host=host, pinned_net=_dflt,
+                    redirect_to=tls_port if redirect_plain else None
+                    ).serve_forever()
+    else:
+        # The default profile names no plain HTTP port, so there is no
+        # foreground listener to run. Everything is on daemon threads, and a
+        # process that returned from main() here would take them with it.
+        print("no plain HTTP port on the default network profile", flush=True)
+        threading.Event().wait()
 
 
 if __name__ == "__main__":

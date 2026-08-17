@@ -271,15 +271,32 @@
   #panelhead > .findrow,
   #panelhead > .tabgroup,
   #panelhead > .tabs{max-width:560px}
+  /* …but the tab row itself runs the whole width, out to the edge of the
+     preview, because it now carries two groups that have to sit apart. */
+  #panelhead > .tabrow{max-width:none}
+  .tabrow{display:flex;align-items:stretch;gap:14px;margin-bottom:2px}
+  .tabside{display:flex;flex-direction:column;min-width:0}
+  .tabside .tabs{margin-bottom:0}
+  /* Equal halves, so the rule lands in the middle of the row. Connections sits
+     at the LEFT of its half, hard against the rule, so the two groups read as
+     a pair either side of it rather than as two things at opposite ends of a
+     wide row with nothing between them. */
+  .tabside{flex:2 1 0}
+  .connside{flex:1 1 0;align-items:flex-start}
+
+  /* Heavy on purpose: this is a boundary between subjects, not a gap between
+     controls, and the panel's hairlines read as the latter. */
+  .tabsplit{flex:0 0 2px;align-self:stretch;
+            background:rgba(var(--glass),.34);margin-bottom:10px}
 
   /* The app tab's own commit row, at the foot of the box. Hidden outright
      on every other tab: a save button that belongs to settings you cannot
      currently see is a save button somebody will eventually press. */
-  #approw,#airow,#profrow,.uirow{display:none;margin-top:14px;padding-top:10px;
+  #approw,.uirow{display:none;margin-top:14px;padding-top:10px;
           border-top:1px solid rgba(var(--glass),.30)}
-  #approw.on,#airow.on,#profrow.on,.uirow.on{display:block}
-  #approw .seg,#airow .seg,#profrow .seg,.uirow .seg{justify-content:flex-end;margin-top:8px}
-  #approw .seg button,#airow .seg button,#profrow .seg button,
+  #approw.on,.uirow.on{display:block}
+  #approw .seg,.uirow .seg{justify-content:flex-end;margin-top:8px}
+  #approw .seg button,
   .uirow .seg button{border-width:2px;border-style:solid;padding:6px 10px}
   /* What this row's scope actually is. Worth a line, because "shared" is the
      property that separates these from the three controls a viewer keeps. */
@@ -294,7 +311,7 @@
   .uirow .state.alert{color:#eaa8a8}
   /* Spans every column once the topics tile, so it reads as the foot of the
      whole box rather than the tail of whichever column it landed in. */
-  @container (min-width:700px){ #approw,#airow,#profrow,.uirow{grid-column:1/-1} }
+  @container (min-width:700px){ #approw,.uirow{grid-column:1/-1} }
 
   /* The caption over a row of tabs. Quieter than anything it labels — it is
      there to be read once and then ignored, not to compete with the tabs
@@ -305,6 +322,8 @@
     margin:0 0 5px;
   }
   #panelfoot .tabgroup{margin-top:2px}
+  #panelfoot .tabrow{align-items:flex-end}
+  #panelfoot .tabside .tabs{margin-bottom:0}
   #panelfoot{
     flex:0 0 auto;padding:10px 14px 12px;
     /* same strength as the rules bracketing the save row: this separates the
@@ -315,6 +334,11 @@
   /* Same measure as the header, so the pinned entries and the identity stay
      in one column down the left rather than a row of buttons a metre wide. */
   #panelfoot > *{max-width:560px}
+  /* …except the tab row, which carries two groups either side of a rule and
+     has to run the whole width out to the preview edge, the same as the row at
+     the top. Capping it at a readable measure left the rule and Connections
+     stranded in the left half of the panel. */
+  #panelfoot > .tabrow{max-width:none}
   /* nothing but the tab row lives here now — the identity moved to the bar
      at the top of the panel, where it does not scroll away */
   /* the one state where the admin's view and everyone else's disagree */
@@ -336,13 +360,42 @@
      topics into 300px columns, this one takes the full width of them — rows
      that read across need the room, and a device row has four things on it
      before the profile picker lands. */
-  #grpbox .grp.bare{grid-column:1 / -1}
+  /* Out to the same edges as the tab row above: a list is not a settings
+     column, and the box's own inset left it starting short of the tabs. The
+     negatives are the box's padding plus its border, so the two line up. */
+  #grpbox .grp.bare{grid-column:1 / -1;margin-left:-11px;margin-right:-11px}
+  /* Same span without the bare treatment: a topic that keeps its heading and
+     its caret, but has no siblings to tile beside. One narrow column with the
+     rest of the row empty reads as something that failed to load. */
+  #grpbox .grp.wide{grid-column:1 / -1}
+  #grpbox .grp.bare > .barehead,
+  #grpbox .grp.bare > .grpbody{padding-left:11px;padding-right:11px}
   /* Inside a profile the controls are part of the row, not topics in the box:
      no frame of their own, indented under the name they belong to. */
   .profsettings{margin:8px 0 2px;padding-left:9px;
                 border-left:2px solid rgba(var(--glass),.22)}
   .profsettings .grp{border:0;margin:0;padding:0}
   .profsettings .grp + .grp{margin-top:9px}
+  /* An endpoint's subsections are .subgrp rather than .grp, so they need
+     saying separately — but they are the same thing to the eye: a caret, a
+     name, and a body that opens. */
+  .erow[data-rid] .subgrp{border:0;margin:0}
+  .erow[data-rid] .subgrp + .subgrp{margin-top:9px}
+  /* One per line, full width, the way a profile's sections stack — rather than
+     tiling into 215px columns. An endpoint reads down its own row instead of
+     across it, and the two lists look like the same kind of thing. */
+  .erow[data-rid] .subwrap{
+    display:block;margin:8px 0 2px;padding-left:9px;
+    border-left:2px solid rgba(var(--glass),.22);
+  }
+  /* No box of its own either: a profile's sections are separated by a hairline
+     under the name, not by a frame each. */
+  .erow[data-rid] .subgrp{
+    border:0;border-top:1px solid rgba(var(--glass),.10);
+    background:none;margin:0;
+  }
+  .erow[data-rid] .subgrp:first-child{border-top:0}
+  .erow[data-rid] .subgrp > h5{padding-left:20px}
 
   /* the first topic's own top rule would double up with the box edge */
   #grpbox .grp:first-of-type{border-top:0;margin-top:6px}
@@ -360,6 +413,16 @@
     border:1px solid rgba(var(--glass),.42);
     background:rgba(var(--glass),.035);
     padding:0 11px 10px;
+  }
+  /* …except a section that is nothing but a title. The rule above exists to
+     put an edge around a block of CONTROLS that belongs to a heading, and a
+     heading with no controls under it gets an empty box instead — which reads
+     as something that failed to load rather than as a caption. The profile
+     lists keep theirs because theirs has a list in it.
+
+     Same specificity as the rule above, so this has to sit after it. */
+  #grpbox .grp.titleonly{
+    border:0;background:none;padding:0;
   }
   /* The heading keeps its own underline inside the box, separating the
      title from the controls. Left where it is rather than pulled out to the
@@ -485,6 +548,26 @@
                    background:rgba(var(--help-line),.30)}
   #panelbar .right{margin-left:auto}
   #whobox{display:flex;align-items:center;gap:8px;min-width:0}
+  #mine{
+    display:none;position:fixed;inset:0;z-index:60;
+    align-items:center;justify-content:center;padding:24px;
+    background:rgba(0,0,0,.72);
+  }
+  #mine.on{display:flex}
+  #minebox{
+    width:100%;max-width:360px;padding:20px 22px;
+    background:#0b0e12;border:1px solid rgba(var(--glass),.4);
+  }
+  #minehead{
+    font-size:calc(11px * var(--fs));letter-spacing:.16em;text-transform:uppercase;
+    color:rgba(var(--paper),.6);margin-bottom:10px;
+  }
+  #minebox input{
+    width:100%;margin:4px 0;font:inherit;font-size:calc(9.5px * var(--fs));
+    padding:5px 6px;background:rgba(0,0,0,.6);color:var(--text);
+    border:1px solid rgba(var(--glass),.16);outline:0;
+  }
+  #minebox input:focus{border-color:var(--hue-dim)}
   #whoname{font:inherit;background:none;border:0;padding:0;cursor:pointer;
     text-decoration:underline;text-decoration-color:rgba(var(--glass),.45);
     text-underline-offset:3px;
@@ -521,26 +604,6 @@
   .note.bad{color:#ff8a8a}
   #whoname:hover{color:var(--hue);text-decoration-color:var(--hue)}
   /* Your own account, over the panel rather than inside it. */
-  #mine{
-    display:none;position:fixed;inset:0;z-index:60;
-    align-items:center;justify-content:center;padding:24px;
-    background:rgba(0,0,0,.72);
-  }
-  #mine.on{display:flex}
-  #minebox{
-    width:100%;max-width:360px;padding:20px 22px;
-    background:#0b0e12;border:1px solid rgba(var(--glass),.4);
-  }
-  #minehead{
-    font-size:calc(11px * var(--fs));letter-spacing:.16em;text-transform:uppercase;
-    color:rgba(var(--paper),.6);margin-bottom:10px;
-  }
-  #minebox input{
-    width:100%;margin:4px 0;font:inherit;font-size:calc(9.5px * var(--fs));
-    padding:5px 6px;background:rgba(0,0,0,.6);color:var(--text);
-    border:1px solid rgba(var(--glass),.16);outline:0;
-  }
-  #minebox input:focus{border-color:var(--hue-dim)}
   .whoami{font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.92);
           padding-bottom:6px}
   .bklab{display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;
@@ -574,6 +637,10 @@
         border-bottom:1px solid rgba(var(--glass),.08)}
   .erow .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .erow .nm{font-size:calc(10px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.96)}
+  /* An endpoint row wears the same title and badge as every other row in the
+     panel, so a list of endpoints reads like a list of profiles. */
+  .erow > .top > .rtname{font-size:calc(10px * var(--fs));letter-spacing:.08em;
+                         color:rgba(var(--paper),.96)}
   /* Each row collapses by its name, one open at a time — a register of fifty
      devices that you scroll through is one nobody reads. The header keeps the
      name and the badges, so a shut row still says what state it is in. */
@@ -591,6 +658,8 @@
      labelled field rather than a box somebody clicks by accident while trying
      to open the thing. */
   .erow .namerow{display:flex;align-items:center;gap:8px;margin:7px 0 2px}
+  /* …and anything destructive on that line sits at the far end of it. */
+  .erow .namerow > button.act-danger{margin-left:auto}
   .erow .namerow > b{
     font-weight:400;letter-spacing:.1em;font-size:calc(8px * var(--fs));
     color:rgba(var(--paper),.5);white-space:nowrap;
@@ -674,12 +743,15 @@
      numbers side by side, where reading them as a row is the point. */
   .svnums{display:flex;gap:8px;margin-top:4px}
   .svnums > div{flex:1 1 0;min-width:0;display:flex;flex-direction:column}
-  .svnums input{
+  .svnums input,
+  .svnums select{
     width:100%;margin-top:auto;padding:5px 6px;font:inherit;
     font-size:calc(9.5px * var(--fs));
     background:rgba(0,0,0,.6);color:var(--text);
     border:1px solid rgba(var(--glass),.16);outline:0;
   }
+  /* An hour is four characters wide whatever else is on the row. */
+  .svnums select{width:auto;max-width:100%}
   .svnums input:focus{border-color:var(--hue-dim)}
   /* PREVIEW is a toggle, and the profile it is showing has to be the one that
      looks pressed — otherwise two rows both offer to start it and neither says
@@ -694,9 +766,16 @@
      may, and a select's content is its widest option. Without min-width the
      appearance picker sat at the width of its longest profile name and ran
      straight out of the box. */
-  #dp_kiosks .namerow{min-width:0}
-  #dp_kiosks .namerow select.ppick{
-    flex:1 1 auto;min-width:0;max-width:100%;box-sizing:border-box;
+  /* Not scoped to one list. The same picker appears on MODELS and on an AI
+     endpoint, and scoped to #dp_kiosks those two fell back to the browser's
+     own select — larger type than everything around them. */
+  .namerow{min-width:0}
+  /* As wide as its longest option, no wider. A select stretched to the box is
+     a control whose size says nothing about what is in it, and next to a short
+     list of profile names it reads as an empty field. Still allowed to shrink
+     and capped at the row, so a long name cannot push it past the edge. */
+  select.ppick{
+    width:auto;flex:0 1 auto;min-width:0;max-width:100%;box-sizing:border-box;
     padding:3px 6px;font:inherit;
     font-size:calc(9px * var(--fs));letter-spacing:.06em;
     background:rgba(0,0,0,.55);color:rgba(var(--paper),.96);
@@ -1098,7 +1177,13 @@
   .grp.shut .grpbody{display:none}
   .grpbody{padding-bottom:4px}
   /* No title, so the ? has nothing to sit beside — give it a line. */
-  .barehead{display:flex;justify-content:flex-end;margin:2px 0 4px}
+  /* A title on the left, the ? on the right. No caret: there is nothing to
+     collapse — the list IS the tab, and an arrow on it would be a control that
+     does nothing. */
+  .barehead{display:flex;align-items:center;justify-content:space-between;
+            gap:8px;margin:2px 0 6px}
+  .listtitle{font-size:calc(10px * var(--fs));letter-spacing:.14em;
+             text-transform:uppercase;color:rgba(var(--paper),.9)}
   .grp.bare{border-top:0;padding-top:2px}
   .seg{display:flex;flex-wrap:wrap;gap:4px}
   /* Committing a block — CREATE, SAVE, REVERT — in the corner every dialog
@@ -1111,6 +1196,13 @@
      spacer holding the destructive actions apart. Right-aligning SAVE there
      would park it against DELETE. */
   .actrow{justify-content:flex-end;margin-top:10px}
+  /* A commit on SECURITY is the same act as the commit in an APPEARANCE
+     profile row, so it is the same size: `.erow button`'s 8.5px on 3/6,
+     rather than `.seg button`'s 9.5px on 5/8 which it would otherwise take
+     from the row it sits in. */
+  #panel .grp[data-tab="security"] .actrow button{
+    font-size:calc(8.5px * var(--fs));padding:3px 6px;
+  }
   /* Where a row carries both, ADD sits hard left and the commits hard right:
      making another profile is not the same kind of act as publishing the ones
      already there, and the gap between them says so. */
@@ -1173,8 +1265,7 @@
      has to read as one — {display} typed into a lowercasing field still
      works, but it stops looking like the token it is */
   #opname,#ainame{letter-spacing:.06em}
-  #panel input[data-f="api_key"]{letter-spacing:.18em}
-  #panel input[data-f="base_url"],#panel input[data-f="model"],
+  #panel input[data-f="api_key"],#dp_models input[type=password]{letter-spacing:.18em}
   #panel input[data-f="keep_alive"]{letter-spacing:.04em}
   #greetings,#sleepaliases,#farewells,
   #panel textarea[data-f]{resize:vertical;line-height:1.6;min-height:44px}
@@ -1351,26 +1442,32 @@
        every viewer sees, and how the server itself is run. Saying so is
        cheaper than leaving somebody to infer it from which tabs happen to
        carry the SAVE FOR EVERYONE button. -->
-  <div class="tabgroup">User interface settings</div>
+  <!-- Two groups on one row, full width to the edge of the preview. What a
+       display LOOKS and SOUNDS like on the left; what it is wired to and which
+       machines are here on the right. The rule between them is the point: they
+       are different subjects that happen to share a row. -->
+  <!-- One group, the full width of the panel. What a display looks and
+       sounds like: nothing else shares this row. -->
+  <div class="tabgroup">Profile settings</div>
   <div class="tabs">
-    <!-- APPEARANCE rather than LOOK, so the tab and the "Appearance profiles"
-         under PROFILES read as the same subject. data-tab stays "look": it is
-         the storage key for these settings, and renaming it would rewrite
-         every stored document for a label change. -->
-    <button data-tab="look"   class="on">APPEARANCE</button>
-<!-- GEOMETRY rather than MOTION. data-tab stays "motion": it is the
-         storage key these settings are saved under, and renaming it would
-         rewrite every stored document for a label. -->
+    <!-- APPEARANCE rather than LOOK, so the tab and the "Appearance
+     profiles" read as the same subject. data-tab stays "look": it is
+     the storage key, and renaming it would rewrite every stored
+     document for a label. -->
+    <button data-tab="look" class="on">APPEARANCE</button>
+    <!-- GEOMETRY rather than MOTION, and data-tab stays "motion" for the
+     same reason. -->
     <button data-tab="motion">GEOMETRY</button>
     <button data-tab="speech">SPEECH</button>
-    <button id="tab_ai" data-tab="ai">AI</button>
-    <!-- What a screen IS, as against who may use it — which is what ACCESS
-         became. Not in UI_TABS or SETTINGS_TABS: like AI, nothing here writes
-         the shared settings document, so SAVE FOR EVERYONE would be a button
-         saving nothing on the tab it sits on. What belongs to one screen is
-         saved from inside that screen's own block. -->
-    <button id="tab_devices" data-tab="devices">DEVICES</button>
+    <button data-tab="savers">SCREENSAVER</button>
+    <button id="tab_account" data-tab="account">GROUPS</button>
+    <button data-tab="models">MODELS</button>
+    <!-- Beside MODELS because they are the two halves of an endpoint that are
+         not the endpoint: what it speaks to, and what it answers on. -->
+    <button data-tab="network">NETWORK</button>
+    <button data-tab="devprof">DEVICE</button>
   </div>
+
   <div class="rule"></div>
   </div><!-- /panelhead -->
 
@@ -1468,12 +1565,62 @@ size it is setting, so you read the choice while making it.</div>
   <div class="sl"><label>Scanlines</label><output id="o_scan"></output><input id="s_scan" type="range" min="0" max="1" step=".01"></div>
   <div class="sl"><label>Line weight</label><output id="o_lw"></output><input id="s_lw" type="range" min=".3" max="3" step=".05"></div></div>
   </section>
-  <!-- One block per AI endpoint, built at runtime by paintBlocks(), inserted
-       before this anchor. The AI tab holds nothing else: testing an endpoint
-       is the TEST inside that endpoint's own block, which uses its own
-       adapter — so it tests demo against demo and a real service against
-       that service, with nothing to keep in step. -->
-  <div id="ai_anchor" hidden></div>
+  <!-- On APPEARANCE, and captured by an appearance profile like everything
+       else on this tab: what the transcript calls each speaker is part of how
+       a place reads, and a hallway screen and a laptop can want different
+       answers. It writes the shared settings document, which is what the rest
+       of this tab writes — it was on ADMIN SETTINGS, which meant the one tab
+       carried two different commits. -->
+  <section class="grp" data-prof="look" data-tab="look">
+    <h4>Speaker label</h4>
+    <div class="grpbody">
+  <label class="bklab">The person</label>
+  <input id="opname" type="text" spellcheck="false" placeholder="operator">
+  <label class="bklab">The assistant</label>
+  <input id="ainame" type="text" spellcheck="false" placeholder="resonance">
+  <div class="note help">The two labels down the left of the transcript.
+
+Either can be a variable instead of a fixed word:
+
+<b>{name}</b> — the word you say to reach whichever assistant is answering, so
+renaming that renames this. Already what the greeting and farewell fields use.
+
+<b>{assistant}</b> — what answered, which is its own field on each endpoint.
+<b>This is the default</b>, and with more than one endpoint it is the only
+label that can be right: a fixed word attributes every answer to the same
+name. Each line keeps the name of whoever gave it, so switching endpoints
+mid-conversation does not rewrite what is already on screen.
+
+<b>{display}</b> — the name of the device this is being viewed at. Put it in
+<i>the person</i> and every device attributes the transcript to itself, with no
+setting per device.
+
+It resolves to the first of these that exists: the name you gave that row under
+ACCESS, then <b>?display=</b> from its URL, then the first thing typed on its
+request form. So a laptop you approved as <i>Sarah laptop</i> labels her lines
+with that, and a wall screen named <i>Kitchen</i> labels its own.
+
+A person's name as distinct from the device they are at — the same name
+following somebody from laptop to phone — needs an identity they carry, and
+does not exist yet.
+
+Mix them with ordinary text — <b>{display} shift lead</b> is fine. A variable
+that resolves to nothing falls back to the default, and one that is not
+recognised is left standing so a typo is visible rather than silent.</div>
+    </div>
+  </section>
+  <!-- One list, one row per endpoint, built at runtime by paintBlocks(). The
+       same shape as a profile list: rows shut by default, one open at a time,
+       everything about an endpoint inside the row you opened. -->
+  <section class="grp bare proflist" data-tab="ai">
+    <div class="grpbody">
+  <div id="rtlist"></div>
+  <div class="note" id="rtlistnote"></div>
+  <div class="seg addrow">
+    <button id="b_addroute" class="act-add">ADD INSTANCE</button>
+  </div>
+    </div>
+  </section>
 
   <section class="grp" data-prof="speech" data-tab="speech">
     <h4>Wake word</h4>
@@ -1482,6 +1629,25 @@ size it is setting, so you read the choice while making it.</div>
 lasts. <b>The words themselves live on the routes</b>, in AI — with several
 routes the word is what picks between them, so it belongs to the thing it
 picks.</div>
+  <label class="bklab" style="margin-top:8px">The word</label>
+  <input id="wakeword" type="text" spellcheck="false" autocomplete="off"
+         placeholder="resonance">
+  <label class="bklab">Also accept</label>
+  <textarea id="wakealiases" rows="3" spellcheck="false"
+            placeholder="one per line — what a transcriber actually hears"></textarea>
+  <div class="seg" style="margin-top:6px"><button id="b_learnwake">LEARN HOW I SAY IT (3x)</button></div>
+  <div id="learnwakenote" class="learnnote"></div>
+  <label class="bklab">Matching</label>
+  <div class="seg" data-set="wakestrict">
+    <button data-v="0" class="on">FUZZY</button>
+    <button data-v="1">EXACT</button>
+  </div>
+  <div class="note help">The word that reaches an endpoint using this profile,
+the spellings a transcriber actually returns for it, and how close a match has
+to be. <b>EXACT</b> is for a profile whose endpoint DOES things rather than
+answers — the same false-positive rate costs a few tokens on one and actuates
+hardware on the other.</div>
+
   <div class="seg" data-set="wake" style="margin-top:8px">
     <button data-v="off">OFF</button>
     <button data-v="auto" class="on">AUTO ONLY</button>
@@ -1694,21 +1860,20 @@ pointed at a display rather than a person, so it lands with that.</div>
   <section class="grp" data-tab="app">
     <h4>Ports</h4>
     <div class="grpbody">
-  <div class="note help">Which port each interface answers on. The two display
-ports serve the AI interface people use; the admin port serves this page.</div>
+  <div class="note help">The port this page answers on, and only this one.
+What the app answers on is a <b>network profile</b> — PROFILES ▸ NETWORK —
+because a deployment can want several, and which endpoints each carries is a
+question about the app rather than about the portal.
+
+This one stays here on purpose: it is the way back in when what is over there
+is wrong.</div>
   <div id="portgrid">
-    <label for="ap_http">display · plain HTTP</label>
-    <input id="ap_http" type="number" inputmode="numeric">
-    <div class="now" id="now_http"></div>
-    <label for="ap_https">display · HTTPS (microphone)</label>
-    <input id="ap_https" type="number" inputmode="numeric">
-    <div class="now" id="now_https"></div>
     <label for="ap_admin">administration</label>
     <input id="ap_admin" type="number" inputmode="numeric">
     <div class="now" id="now_admin"></div>
   </div>
-  <div class="note help">Must be 1024–65535 and all different. Below 1024 needs
-root, and the server runs as an ordinary user.</div>
+  <div class="note help">1024–65535, and not a port a network profile is
+using. Below 1024 needs root, and the server runs as an ordinary user.</div>
     </div>
   </section>
 
@@ -1723,48 +1888,6 @@ returns you to the sign-in as soon as it lapses.
 
 Short by default — this session configures what everyone else is looking at.
 5 to 480. Full reasoning in DOCUMENTATION → App settings &amp; accounts.</div>
-    </div>
-  </section>
-  <!-- Moved off APPEARANCE: what the two transcript labels SAY is closer to
-       how this server is set up than to how the figure looks. It still writes
-       the SHARED settings document rather than app.json, which is why this tab
-       now carries both commits — see UI_TABS below. -->
-  <section class="grp" data-tab="app">
-    <h4>Speaker label</h4>
-    <div class="grpbody">
-  <label class="bklab">The person</label>
-  <input id="opname" type="text" spellcheck="false" placeholder="operator">
-  <label class="bklab">The assistant</label>
-  <input id="ainame" type="text" spellcheck="false" placeholder="resonance">
-  <div class="note help">The two labels down the left of the transcript.
-
-Either can be a variable instead of a fixed word:
-
-<b>{name}</b> — the word you say to reach whichever assistant is answering, so
-renaming that renames this. Already what the greeting and farewell fields use.
-
-<b>{assistant}</b> — what answered, which is its own field on each endpoint.
-<b>This is the default</b>, and with more than one endpoint it is the only
-label that can be right: a fixed word attributes every answer to the same
-name. Each line keeps the name of whoever gave it, so switching endpoints
-mid-conversation does not rewrite what is already on screen.
-
-<b>{display}</b> — the name of the device this is being viewed at. Put it in
-<i>the person</i> and every device attributes the transcript to itself, with no
-setting per device.
-
-It resolves to the first of these that exists: the name you gave that row under
-ACCESS, then <b>?display=</b> from its URL, then the first thing typed on its
-request form. So a laptop you approved as <i>Sarah laptop</i> labels her lines
-with that, and a wall screen named <i>Kitchen</i> labels its own.
-
-A person's name as distinct from the device they are at — the same name
-following somebody from laptop to phone — needs an identity they carry, and
-does not exist yet.
-
-Mix them with ordinary text — <b>{display} shift lead</b> is fine. A variable
-that resolves to nothing falls back to the default, and one that is not
-recognised is left standing so a typo is visible rather than silent.</div>
     </div>
   </section>
 
@@ -1806,11 +1929,13 @@ recognised is left standing so a typo is visible rather than silent.</div>
        admin put somewhere. Named wherever access is granted — today an
        endpoint's allow-list, and anything later that grants something can name
        them the same way. -->
-  <section class="grp" data-tab="accounts">
-    <h4>Groups</h4>
+  <!-- The tab is called GROUPS; a section called Groups inside it says the
+       word twice. Bare, like the profile lists. -->
+  <section class="grp bare proflist" data-tab="account">
+    <div class="barehead"><span class="listtitle">Groups</span></div>
     <div class="grpbody">
   <div id="grouplist"></div>
-  <div class="labrow" style="margin-top:10px">
+  <div class="labrow" id="gr_addrow" style="margin-top:10px">
     <input id="gr_name" type="text" spellcheck="false" autocomplete="off"
            placeholder="Physics department">
     <div class="seg" id="gr_kind">
@@ -1838,8 +1963,18 @@ thing they belong to.</div>
     </div>
   </section>
 
-  <section class="grp" data-tab="displays">
-    <h4>Requested Access</h4>
+  <!-- Whether the app takes a sign-in at all, and what a grant is worth once
+       given. On SECURITY rather than ACCESS: ACCESS answers WHICH device may
+       reach which endpoint, and whether anybody has to be approved in the
+       first place is a different question — it is the door, not the key. -->
+  <!-- The tab's own title, the same treatment the profile lists get: full
+       width, and no caret, because there is nothing to collapse. -->
+  <section class="grp bare titleonly" data-tab="security">
+    <div class="barehead"><span class="listtitle">Security</span></div>
+  </section>
+
+  <section class="grp wide" data-tab="security">
+    <h4>AI Requires Permission</h4>
     <div class="grpbody">
   <div class="labrow">
     <label class="bklab">General users require approval</label>
@@ -1879,13 +2014,13 @@ When more than the waiting limit are queued, the oldest one waiting is dropped
 to make room — so set it high enough that a real request cannot be pushed out
 by noise.</div>
 
-  <div class="seg actrow">
-    <button id="b_dpsave" class="act-save">SAVE GUEST ACCESS</button>
-    <button id="b_dprevert" class="act-undo">REVERT</button>
-  </div>
   <div class="note" id="dpnote"></div>
+  <div class="seg actrow">
+    <button id="b_dpsave" class="act-save">SAVE</button>
+  </div>
     </div>
   </section>
+
   <section class="grp" data-tab="displays">
     <h4>Created Access</h4>
     <div class="grpbody">
@@ -1937,6 +2072,7 @@ is back to being a browser that has never been here.</div>
   <!-- The other half of a place: what it looks like when somebody IS there.
        Its own list, because appearance and the screensaver are different axes. -->
   <section class="grp bare proflist" data-tab="look">
+    <div class="barehead"><span class="listtitle">Appearance profiles</span></div>
     <div class="grpbody">
   <div id="dp_looks"></div>
   <div class="note" id="prnote_looks"></div>
@@ -1968,6 +2104,7 @@ change, not this.</div>
     </div>
   </section>
   <section class="grp bare proflist" data-tab="motion">
+    <div class="barehead"><span class="listtitle">Geometry profiles</span></div>
     <div class="grpbody">
   <div id="dp_motions"></div>
   <div class="note" id="prnote_motions"></div>
@@ -1986,6 +2123,7 @@ controls by hand.</div>
   </section>
 
   <section class="grp bare proflist" data-tab="speech">
+    <div class="barehead"><span class="listtitle">Speech profiles</span></div>
     <div class="grpbody">
   <div id="dp_speeches"></div>
   <div class="note" id="prnote_speeches"></div>
@@ -2004,10 +2142,72 @@ what the tab says now.</div>
 
   <!-- Central, and named from a device rather than copied into it. A
        deployment has a handful of kinds of place, not one setting per screen. -->
-  <section class="grp" data-tab="profiles">
-    <h4>Screensaver profiles</h4>
+  <!-- The connection half of an endpoint, under a name. An endpoint names one
+       instead of carrying its own copy — two endpoints on the same model used
+       to be the same base URL and the same credential typed twice. -->
+  <section class="grp bare proflist" data-tab="models">
+    <div class="barehead"><span class="listtitle">Model profiles</span></div>
+    <div class="grpbody">
+  <div id="dp_models"></div>
+  <div class="note" id="modelnote"></div>
+  <div class="seg addrow">
+    <button id="b_addmodel" class="act-add">ADD A PROFILE</button>
+  </div>
+  <div class="note help">Where the connection lives: which provider, which base
+URL, which model, and the key for it. An endpoint on the AI tab picks one.
+
+<b>The key never comes back to this page.</b> It is stored on the server and
+the panel is told only whether there is one — so a profile shows
+<b>key stored</b> rather than the key, and saving without typing one keeps what
+is already there.
+
+<b>DEMO</b> needs nothing else: the display answers from built-in replies,
+which is how you tell a fault in the interface from a fault in whatever it is
+pointed at.</div>
+    </div>
+  </section>
+  <!-- A port, under a name. The ports on ADMIN SETTINGS are the admin
+       portal's own; what the app answers on is here, with the rest of what an
+       endpoint is made of. -->
+  <section class="grp bare proflist" data-tab="network">
+    <div class="barehead"><span class="listtitle">Network profiles</span></div>
+    <div class="grpbody">
+  <div id="dp_networks"></div>
+  <div class="note" id="networknote"></div>
+  <div class="seg addrow">
+    <button id="b_addnetwork" class="act-add">ADD A PROFILE</button>
+  </div>
+  <div class="note help">A port of this server's own, answering as one
+endpoint and nothing else. An endpoint on the AI tab picks one; an endpoint
+that picks none is reached on the shared display port, by its wake word, as
+they all were before this existed.
+
+What a browser opening that port gets is the ordinary interface built from
+that endpoint's own settings — its speech profile, its greeting, its voice —
+with no other endpoint offered and nothing to address by name.
+
+<b>The port is the grant</b> turns off the request form on that port alone: a
+device that can reach it uses the endpoint straight away. That is a statement
+about your network, not about this server — it is right when the port is on a
+VLAN only the intended devices are on, and wrong the moment it is not.
+
+TLS is the same certificate the display port uses, because the microphone
+needs a secure context and a second certificate for the same machine would be
+one more thing to renew.
+
+<b>Ports are bound when the server starts.</b> Adding a profile, changing a
+port or pointing a different endpoint at one takes a restart, exactly as the
+ports on ADMIN SETTINGS do — a listening socket is not something to open and
+close under a mouse.</div>
+    </div>
+  </section>
+
+
+  <section class="grp bare proflist" data-tab="savers">
+    <div class="barehead"><span class="listtitle">Screensaver profiles</span></div>
     <div class="grpbody">
   <div id="dp_savers"></div>
+  <div class="note" id="savernote"></div>
   <div class="seg addrow">
     <button id="b_addsaver" class="act-add">ADD A PROFILE</button>
   </div>
@@ -2099,10 +2299,11 @@ a setting that changes twice a year would be the wrong trade.</div>
   </section>
   <!-- What a public screen IS, and the only one of the three a device names.
        The other lists are things a device profile points at. -->
-  <section class="grp" data-tab="profiles">
-    <h4>Device profiles</h4>
+  <section class="grp bare proflist" data-tab="devprof">
+    <div class="barehead"><span class="listtitle">Device profiles</span></div>
     <div class="grpbody">
   <div id="dp_kiosks"></div>
+  <div class="note" id="kiosknote"></div>
   <div class="seg addrow">
     <button id="b_addkiosk" class="act-add">ADD A PROFILE</button>
   </div>
@@ -2303,27 +2504,7 @@ button to download it as a PDF.</div>
        left half-adjusted on APPEARANCE — a save whose scope was wider than the
        thing you were looking at. -->
 
-  <div id="airow">
-    <div class="note" id="rtlistnote"></div>
-    <div class="seg actrow">
-      <button id="b_addroute" class="act-add">ADD INSTANCE</button>
-    </div>
-  </div>
-  <!-- One commit for the whole tab, the way the shared-settings tabs have one.
-       The three lists are three parts of a single document, so three SAVEs was
-       three buttons writing the same file — and a device profile naming an
-       appearance you had just added, but not yet saved, could only be stored
-       by pressing them in the right order. -->
-  <!-- Where a tab's controls sit while none of its profiles is open. -->
-  <div id="profstash" hidden></div>
-  <div id="profrow">
-    <div class="note" id="profnote"></div>
-    <div class="seg actrow">
-      <button id="b_profsave" class="act-save">SAVE PROFILES</button>
-      <button id="b_profrevert" class="act-undo">REVERT</button>
-    </div>
-  </div>
-  <div id="approw">
+    <div id="approw">
     <div class="note" id="appnote"></div>
     <div class="pending" id="apppending" hidden></div>
     <div class="seg actrow">
@@ -2334,28 +2515,64 @@ button to download it as a PDF.</div>
   </div><!-- /grpbox -->
   </div><!-- /panelscroll -->
 
+  <!-- Where a tab's settings sections live while no profile of that tab is
+       open. They are MOVED into the open row rather than copied, so they need
+       somewhere to be the rest of the time — and it has to be inside #panel,
+       because profSections() looks for them there and anything outside it
+       would be lost to the next query.
+
+       This element did not exist, and stashSections() has been asking for it
+       by id since it was written. $('profstash') was null, the stash was a
+       silent no-op, and the sections simply stayed inside whichever profile
+       row last held them — so `box.innerHTML = ''` at the top of
+       paintProfiles took them out of the document with the row. Adding a
+       second profile, or removing one, left every following profile opening
+       with nothing in it but its name and its buttons, until a reload. -->
+  <div id="profstash" hidden></div>
+
   <div id="panelfoot">
     <!-- The same row treatment as the tabs at the top. They were full-width
          stacked entries because a 425px column had no room to put four
          side by side; it does now, and four buttons that behave like tabs
          should look like the tabs. -->
+    <div class="tabrow">
+    <div class="tabside">
     <div class="tabgroup">Admin settings</div>
     <div class="tabs" id="foottabs">
-      <button id="tab_app" data-tab="app">APP SETTINGS</button>
+      <button id="tab_app" data-tab="app">ADMIN SETTINGS</button>
       <!-- A profile is a kind of place — a hallway, a shop floor — rather than
            a screen, so it belongs beside the deployment's own settings and not
            in with who may use the server. Both lists moved off ACCESS: what a
            screen looks like and what it is allowed to do were never the same
            question. -->
-      <button id="tab_profiles" data-tab="profiles">PROFILES</button>
       <!-- Accounts before devices: a group is made here and named over there,
            so the order follows the order you do them in. -->
-      <button id="tab_accounts" data-tab="accounts">ACCOUNTS</button>
+      <button id="tab_accounts" data-tab="accounts">ADMIN</button>
       <button id="tab_displays" data-tab="displays">ACCESS</button>
       <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
       <!-- DOCUMENTATION is not here any more. It is reached from the ? beside
            the panel title, because it is not something you configure and it
            was taking a slot in a row of things that are. -->
+    </div>
+    </div>
+    <div class="tabsplit"></div>
+    <!-- What this server is wired to, and which machines are here. Beside the
+         admin tabs rather than above them: both rows are things you administer,
+         and the rule says they are different subjects. -->
+    <div class="tabside connside">
+      <div class="tabgroup">Connections</div>
+      <div class="tabs">
+        <button id="tab_ai" data-tab="ai">AI</button>
+        <!-- The register: every device this server knows about. Not in
+             UI_TABS or SETTINGS_TABS — like AI, nothing here writes the shared
+             settings document. -->
+        <button id="tab_devices" data-tab="devices">DEVICES</button>
+        <!-- What this deployment is exposed as, as opposed to who may use it:
+             ACCESS answers "which device, which endpoint", and that is a
+             different question from how the server itself is defended. -->
+        <button id="tab_security" data-tab="security">SECURITY</button>
+      </div>
+    </div>
     </div>
   </div>
 </div>
@@ -2363,6 +2580,7 @@ button to download it as a PDF.</div>
 <!-- Your own account, opened from your name in the corner rather than
      sitting as a topic on a tab about everybody else's. It is one thing you do
      to yourself — change your password — and it belongs where your name is. -->
+
 <div id="mine">
   <div id="minebox">
     <div id="minehead">Your account</div>
@@ -2734,7 +2952,7 @@ function repaintControls(){
   FIELDS.forEach(f=>f());
   document.querySelectorAll('.seg[data-set]').forEach(s=> syncSeg(s.dataset.set));
 }
-const BOOL_KEYS = new Set(['ptt','byeontimeout']);
+const BOOL_KEYS = new Set(['ptt','byeontimeout','wakestrict']);
 const FMT = {
   amp:2, spin:2, tilt:3, wobble:2, roll:2, tumble:2, bloom:2, milk:2, grain:2,
   scan:2, lw:2, vrate:'x', vpitch:2, micgain:2, micgate:3, spike:3, decay:2,
@@ -2797,7 +3015,8 @@ function syncSeg(key){
 function buildControls(){
   document.querySelectorAll('#panel input[type="range"]').forEach(bindSlider);
   // no wakeword or wakealiases: those are a route's, saved with the route
-  ['sleepword','sleepaliases','greetings','farewells',
+  ['wakeword','wakealiases',
+   'sleepword','sleepaliases','greetings','farewells',
    'opname','ainame']
     .forEach(id=>{ const el = $(id); if (el) bindField(el, id); });
 
@@ -2817,7 +3036,7 @@ function buildControls(){
   const ACTIONS = {
     b_reo:'reorient', b_idle:'idle', b_think:'thinking', b_speak:'speak',
     b_beep:'beep', b_test:'testvoice', b_diag:'diagnose', b_cal:'calibrate',
-    b_mic:'miconly', b_learnsleep:'learnsleep',
+    b_mic:'miconly', b_learnsleep:'learnsleep', b_learnwake:'learnwake',
     b_bye:'farewell', b_greet:'greet'
   };
   Object.keys(ACTIONS).forEach(id=>{
@@ -2985,10 +3204,9 @@ function status(m, bad, tab){
    something, be satisfied by the preview, and walk away having changed
    nothing for anybody. */
 /* Tabs carrying settings from the SHARED document, and therefore a
-   SAVE FOR EVERYONE of their own. `app` is here because the speaker labels
-   live on it now: the tab also has SAVE APP SETTINGS, and the two are not
-   interchangeable — one publishes what every viewer sees, the other rewires
-   the server. Two documents, two buttons, each saying which it writes. */
+   SAVE FOR EVERYONE of their own. `app` was here while the speaker labels sat
+   on it; they are an appearance setting again, so the tab is back to writing
+   only app.json under its own SAVE — one document, one button. */
 /* Empty now. APPEARANCE, GEOMETRY and SPEECH stopped being settings tabs: what
    every viewer gets is whichever profile is nominated default, published when
    that profile is saved. Leaving them here put a SAVE FOR EVERYONE beside each
@@ -3088,8 +3306,8 @@ window.addEventListener('beforeunload', e=>{
 /* How the server is wired, as opposed to how the interface looks. None of it
    can take effect while the process is running, so the page's real job is to
    be honest about what is configured versus what is actually bound. */
-const APP_FIELDS = {ap_http:'http_port', ap_https:'https_port',
-                    ap_admin:'admin_port', ap_session:'session_idle_minutes'};
+const APP_FIELDS = {ap_admin:'admin_port',
+                    ap_session:'session_idle_minutes'};
 
 /* The two axes are a segmented control each, so they read as one choice from
    a closed set rather than a value you could mistype. */
@@ -3133,7 +3351,7 @@ function showPending(j){
                  bind:'reachable at', bind_address:'which address',
                  auth:'to get in'};
   const run = j.running || {};
-  ['http','https','admin'].forEach(k=>{
+  ['admin'].forEach(k=>{
     const el = $('now_' + k), p = run[k + '_port'];
     if (el) el.textContent = p ? 'running on ' + p : 'not bound';
   });
@@ -3245,8 +3463,9 @@ $('b_appsave').addEventListener('click', async ()=>{
 });
 
 /* ------------------------------------------------- AI endpoints (routes) */
-/* One block per endpoint, and the block is the whole of it: the wake word
-   that reaches it and the connection it reaches, together, saved together.
+/* One block per endpoint, and the block is the whole of it: the speech profile
+   whose word reaches it, the model profile it speaks to, and the instructions
+   it speaks under — together, saved together.
 
    This replaced a list plus three shared topics that repainted for whichever
    row was selected. That shape asked you to hold "which one am I editing" in
@@ -3258,24 +3477,19 @@ $('b_appsave').addEventListener('click', async ()=>{
    Fields are addressed by `data-f` within a block rather than by id, because
    there are now several of every field on the page and an id can only ever
    name one of them. */
-const RT_FIELDS = ['name','wakeword','aliases','greeting','voice','base_url',
-                   'model','system','keep_alive','agent_id'];
+/* greeting and voice are gone: a speech profile carries both, and an endpoint
+   names one. Two endpoints wanting the same voice used to be two copies of the
+   same choice. */
+/* wakeword, aliases and strict have gone the same way as greeting and voice:
+   the speech profile carries them, and an endpoint names a profile. */
+/* The connection went the way of the greeting and the wake word: a model
+   profile carries it, and an endpoint names one. */
+const RT_FIELDS = ['name','speech','model_profile','network','system',
+                   'keep_alive'];
 const RT_SLIDERS = {max_tokens:  v=> v,
                     temperature: v=> (+v).toFixed(2),
                     history_turns: v=> v == 0 ? 'none' : v,
                     timeout:     v=> v + 's'};
-/* A preset is only a base URL and a hint at the model format. It exists so
-   nobody has to remember that OpenClaw listens on 18789 and routes by putting
-   an agent id in the model field. */
-const BK_PRESETS = {
-  ollama:   {base_url:'http://127.0.0.1:11434/v1', hint:'qwen2.5:3b',    keep_alive:'30m', provider:'openai'},
-  openclaw: {base_url:'http://127.0.0.1:18789/v1', hint:'openclaw:main', keep_alive:'',    provider:'openai'},
-  lmstudio: {base_url:'http://127.0.0.1:1234/v1',  hint:'',              keep_alive:'',    provider:'openai'},
-  openai:   {base_url:'https://api.openai.com/v1', hint:'gpt-4o-mini',   keep_alive:'',    provider:'openai'}
-  /* No Anthropic preset. A preset exists to fill in a base URL you would
-     otherwise have to remember, and Anthropic has exactly one — the provider
-     button already fills it. */
-};
 const SHIPPED_PROMPT = 'You are a spoken assistant. Answer in one or two ' +
   'short sentences unless asked for more. Write plain prose only — no ' +
   'markdown, lists, headings, or emoji — because your reply is read aloud.';
@@ -3316,7 +3530,7 @@ const rtEsc = t => String(t == null ? '' : t)
    sets it up: what reaches it, then what it reaches, then what it is told. */
 function blockHTML(r){
   return `
-  <h4><span class="rtname"></span><span class="rtsum"></span></h4>
+  <div class="top"><span class="nm rtname"></span><span class="badge rtsum"></span></div>
   <div class="grpbody">
   <label class="bklab" style="margin-top:2px">Instance name</label>
   <input data-f="name" type="text" spellcheck="false" autocomplete="off"
@@ -3326,37 +3540,6 @@ server log, and wherever a transcript label uses <b>{assistant}</b>. It is
 never spoken and never matched against.</div>
 
   <div class="subwrap">
-  <div class="subgrp" data-g="wake">
-    <h5>Wake word<span class="subsum"></span></h5>
-    <div class="subbody">
-  <label class="bklab">Wake word</label>
-  <input data-f="wakeword" type="text" spellcheck="false" autocomplete="off"
-         placeholder="house">
-  <div class="seg" style="margin-top:6px"><button data-a="learn">LEARN HOW I SAY IT (3x)</button></div>
-  <div data-r="learnnote" class="learnnote"></div>
-  <label class="bklab">Also answers to</label>
-  <textarea data-f="aliases" rows="3" spellcheck="false" placeholder="one per line"></textarea>
-  <label class="bklab">Matching</label>
-  <div class="seg" data-f="strict">
-    <button data-v="0" class="on">CLOSE ENOUGH</button>
-    <button data-v="1">THE EXACT WORD</button>
-  </div>
-  <div class="note help">What somebody says to reach this endpoint. It follows
-the instance name until you edit it, then stays where you put it — an endpoint
-named <b>Kitchen Lights</b> is a good label and a poor thing to say out loud.
-
-Pick words that sound <b>far apart</b>, not merely different: differing
-syllable counts, vowels and stress survive a noisy room, two words one letter
-apart do not. LEARN records how you actually say it, three times, and adds
-what the transcriber returns.
-
-CLOSE ENOUGH forgives a mishearing, which is what an endpoint that answers
-questions wants. THE EXACT WORD is for one that <i>does</i> things — the same
-near-miss costs a few tokens on one and switches on the lights on the
-other.</div>
-    </div>
-  </div>
-
   <div class="subgrp" data-g="who">
     <h5>Who may use it<span class="subsum"></span></h5>
     <div class="subbody">
@@ -3366,8 +3549,6 @@ other.</div>
   </div>
   <label class="bklab" data-r="grouplab">Groups</label>
   <div class="cks" data-r="groups"></div>
-  <label class="bklab" data-r="onelab">One at a time</label>
-  <div class="cks" data-r="displays"></div>
   <div class="note" data-r="whonote"></div>
   <div class="note help">Two reasons to restrict one. <b>A room with several
 microphones in it</b> — one person addresses the wall screen and every other
@@ -3390,67 +3571,38 @@ Devices enrol themselves and are approved under ACCESS.</div>
   </div>
 
   <div class="subgrp" data-g="voice">
-    <h5>Greeting &amp; voice<span class="subsum"></span></h5>
+    <h5>Speech<span class="subsum"></span></h5>
     <div class="subbody">
-  <label class="bklab">Greeting</label>
-  <input data-f="greeting" type="text" spellcheck="false" autocomplete="off"
-         placeholder="leave blank for the shared phrases">
-  <label class="bklab">Voice</label>
-  <select data-f="voice"></select>
-  <div class="note help">The greeting is spoken when its wake word is said and
-nothing else; blank falls back to the phrases on the SPEECH tab. Give the
-endpoints different voices and you can tell which replied without looking at
-the screen — which is all a wall display offers.</div>
+  <select data-f="speech" class="ppick"></select>
+  <div class="note help">Which <b>speech profile</b> answers for this endpoint —
+the voice, the engine, the rate and pitch, and the greeting phrases. Blank is
+the deployment's default.
+
+This used to be a greeting and a voice typed onto each endpoint, which meant
+two endpoints wanting the same voice were two copies of the same choice, and
+changing it was a change in as many places as you had endpoints. Build it once
+under SPEECH and point at it.
+
+Give the endpoints different profiles and you can tell which replied without
+looking at the screen — which is all a kiosk offers.</div>
     </div>
   </div>
 
   <div class="subgrp" data-g="conn">
-    <h5>Connection<span class="subsum"></span></h5>
+    <h5>Model<span class="subsum"></span></h5>
     <div class="subbody">
-  <div class="note help">OPENAI-COMPATIBLE is a shape, not a company: Ollama,
-OpenClaw, LM Studio and vLLM all speak it and differ only by base URL. DEMO
-answers from built-in text and reaches nothing. HOME ASSISTANT talks to a
-house rather than to a model — it is an endpoint like any other here, and
-everything it can be asked to touch is decided over there.</div>
-  <div class="seg" data-f="provider">
-    <button data-v="demo" class="on">DEMO</button>
-    <button data-v="openai">OPENAI-COMPATIBLE</button>
-    <button data-v="anthropic">ANTHROPIC</button>
-    <button data-v="homeassistant">HOME ASSISTANT</button>
-  </div>
-  <div data-r="conn">
-  <div data-r="presetrow">
-  <label class="bklab">Preset</label>
-  <div class="seg" data-r="preset">
-    <button data-v="ollama">OLLAMA</button>
-    <button data-v="openclaw">OPENCLAW</button>
-    <button data-v="lmstudio">LM STUDIO</button>
-    <button data-v="openai">OPENAI</button>
-  </div>
-  </div>
-  <label class="bklab" data-r="urllabel">Base URL</label>
-  <input data-f="base_url" type="text" spellcheck="false" autocomplete="off"
-         placeholder="http://127.0.0.1:11434/v1">
-  <div data-r="modelrow">
-  <label class="bklab">Model</label>
-  <input data-f="model" type="text" spellcheck="false" autocomplete="off"
-         placeholder="qwen2.5:3b">
-  </div>
-  <div class="note" data-r="models"></div>
-  <label class="bklab" data-r="keylabel">API key</label>
-  <input data-f="api_key" type="password" spellcheck="false" autocomplete="off"
-         placeholder="unchanged">
-  <div class="note" data-r="keynote"></div>
+  <select data-f="model_profile" class="ppick"></select>
+  <div class="note help">Which <b>model profile</b> answers for this endpoint —
+the provider, the base URL, the model and the key. Built once under MODELS and
+named here, so two endpoints on the same model are one connection rather than
+the same credential typed twice. Blank is the deployment's default.
+
+<b>DEMO</b> answers from built-in text and reaches nothing, which is how you
+tell a fault in the interface from a fault in whatever it is pointed at.</div>
+
   <div data-r="harows">
-  <label class="bklab">Conversation agent</label>
-  <input data-f="agent_id" type="text" spellcheck="false" autocomplete="off"
-         placeholder="leave blank for the configured default">
-  <div class="note help">Which agent in Home Assistant answers. The built-in
-one matches sentences, so it does what it is told and nothing else; an
-LLM-backed one interprets, so "it's a bit dark in here" works and costs a model
-call. Blank uses whichever is set as default over there.</div>
   <label class="bklab">When it recognises nothing, ask</label>
-  <select data-f="fallthrough"></select>
+  <select data-f="fallthrough" class="ppick"></select>
   <div class="note help">Nobody remembers which name owns which capability, so
 somebody will ask the house a general question. Name another endpoint here and
 it answers instead — in this one's name and voice, so the person is never told
@@ -3458,11 +3610,27 @@ they used the wrong word. It only fires when the house recognised no command
 at all, which an LLM-backed agent essentially never reports: leave it at
 nothing for one of those.</div>
   </div>
-  </div>
     </div>
   </div>
+  <div class="subgrp" data-g="net">
+    <h5>Network<span class="subsum"></span></h5>
+    <div class="subbody">
+  <select data-f="network" class="ppick"></select>
+  <div class="note help">A <b>port of this server's own</b> that reaches this
+endpoint and nothing else — built under PROFILES ▸ NETWORK and named here.
+Leave it at the shared display port and this endpoint is reached the way they
+all are, by saying its name.
 
-  <div class="subgrp" data-g="limits">
+A browser opening that port gets the ordinary interface built from this
+endpoint's settings, with no other endpoint offered and nothing to address by
+name. One port reaches one endpoint, so a profile another endpoint already
+answers on is not offered here.
+
+<b>The port is bound when the server starts</b>, so choosing one here takes a
+restart to come into effect — the same as the ports on ADMIN SETTINGS.</div>
+    </div>
+  </div>
+<div class="subgrp" data-g="limits">
     <h5>Limits<span class="subsum"></span></h5>
     <div class="subbody">
   <div class="sl" data-r="maxrow"><label>Reply limit (tokens)</label><output data-o="max_tokens"></output><input data-s="max_tokens" type="range" min="16" max="2000" step="16"></div>
@@ -3475,25 +3643,33 @@ nothing for one of those.</div>
          placeholder="30m">
   </div>
   <div class="note" data-r="anthnote" style="display:none">Temperature and
-keep-alive are not sent to Anthropic — steer it with the system prompt.</div>
+keep-alive are not sent to Anthropic.</div>
+  <!-- One line, because it is STATE: which of these apply to what this
+       endpoint is currently pointed at. The reasoning behind it moved under
+       the ? with the rest of the prose. -->
   <div class="note" data-r="hanote" style="display:none">Only the timeout
-applies to Home Assistant. It holds the conversation itself, and what the
-agent is told is configured over there — so the reply limit, the temperature,
-the context length and the whole System prompt section are not shown here:
-nothing would read them. Any wording already typed is kept, and comes back if
-this endpoint is pointed at a model again.
-
-Set the timeout to the <b>agent</b>, not to "Home Assistant": the built-in
-intent engine answers in about a tenth of a second, while an LLM-backed one is
-two model passes with your exposed entities in the prompt each time. On modest
-hardware that is tens of seconds, and a timeout chosen for the first cuts off
-the second just before it succeeds.</div>
+applies to Home Assistant.</div>
   <div class="note help">A cold model can take half a minute to load before it
 says anything, so keep the timeout generous — one tuned to a warm model looks
 like a dead server every morning. <b>turns of context</b> is how much of the
 conversation goes back with each question: at zero, "and the other one?" means
 nothing. <b>keep model loaded</b> is an Ollama extension that holds it in
-memory so the next question isn't the slow one.</div>
+memory so the next question isn't the slow one.
+
+<b>Home Assistant holds the conversation itself</b>, and what the agent is told
+is configured over there — so the reply limit, the temperature, the context
+length and the whole System prompt section are not shown when it is pointed at
+one: nothing would read them. Any wording already typed is kept, and comes back
+if this endpoint is pointed at a model again.
+
+Set the timeout to the <b>agent</b>, not to "Home Assistant": the built-in
+intent engine answers in about a tenth of a second, while an LLM-backed one is
+two model passes with your exposed entities in the prompt each time. On modest
+hardware that is tens of seconds, and a timeout chosen for the first cuts off
+the second just before it succeeds.
+
+<b>Anthropic</b> is not sent the temperature or the keep-alive — steer it with
+the system prompt.</div>
     </div>
   </div>
 
@@ -3513,13 +3689,14 @@ out loud, so ask for plain prose.</div>
 
   </div><!-- /subwrap -->
 
+  <!-- The same shape as a profile's foot: what this endpoint IS on the left,
+       committing it and ending it on the right. -->
   <div class="rtacts">
-    <button data-a="save" class="act-save">SAVE</button>
-    <button data-a="test">TEST</button>
     <button data-a="default">MAKE DEFAULT</button>
+    <button data-a="test">TEST</button>
     <button data-a="enable">SWITCH OFF</button>
     <span class="spacer"></span>
-    <button data-a="forget" class="act-undo">FORGET KEY</button>
+    <button data-a="save" class="act-save">SAVE</button>
     <button data-a="delete" class="act-danger">DELETE</button>
   </div>
   <div class="note" data-r="note"></div>
@@ -3539,14 +3716,32 @@ function blockNote(blk, m, bad){
 /* Nothing below the provider choice applies to DEMO: there is no connection to
    configure and the built-in replies ignore the prompt. Leaving the fields on
    screen would be a block full of controls wired to nothing. */
+/* A route's provider, base URL and model are the MODEL PROFILE's now. The
+   route keeps a blanked copy — provider 'demo', the rest empty — so that a
+   stale credential cannot sit in routes.json looking live, which means
+   reading r.provider gives 'demo' for every endpoint on the server. Anything
+   that used to branch on it has to resolve the profile instead. */
+function routeModel(r){
+  const pool = (DPCFG && DPCFG.models) || [];
+  return pool.filter(x=> x.id === ((r && r.model_profile) || ''))[0]
+      || pool.filter(x=> x.id === ((DPCFG && DPCFG.model_default) || ''))[0]
+      || null;
+}
+function routeProvider(r){
+  const m = routeModel(r);
+  return (m && m.values && m.values.provider) || 'demo';
+}
+
 function blockSyncProvider(blk){
-  const on = blk.querySelector('[data-f="provider"] button.on');
-  const v = on ? on.dataset.v : 'demo';
+  /* Read off the model profile this endpoint names, not off a control — the
+     provider is the profile's now. Reading a control that no longer exists
+     made every endpoint look like DEMO, which hid its limits and its system
+     prompt. */
+  const sel = blk.querySelector('[data-f="model_profile"]');
+  const v = routeProvider({model_profile: sel ? sel.value : ''});
   const connected = v !== 'demo', anth = v === 'anthropic',
         ha = v === 'homeassistant';
   const show = (name, yes)=>{ const el = R(blk, name); if (el) el.style.display = yes ? '' : 'none'; };
-  show('conn', connected);
-  show('promptblock', connected);
   /* Anthropic takes neither of these — see the note that replaces them. A
      slider wired to a field the adapter deliberately never sends is the same
      defect as a toggle nothing reads. Home Assistant takes fewer still: it
@@ -3559,9 +3754,6 @@ function blockSyncProvider(blk){
   show('anthnote', anth);
   show('hanote', ha);
   show('harows', ha);
-  show('modelrow', connected && !ha);      // HA is not a model
-  show('presetrow', connected && !anth && !ha);   // one endpoint; nothing to pick
-  show('models', connected && !anth && !ha);      // that listing is an Ollama trick
   const t = blk.querySelector('[data-a="test"]');
   if (t) t.disabled = !connected;
   /* DEMO reaches nothing, so its limits and its prompt are inert. Dimmed and
@@ -3583,23 +3775,9 @@ function blockSyncProvider(blk){
     box.style.opacity = connected ? '' : '.45';
     if (!connected || gone) box.classList.remove('open');
   });
-  const url = F(blk, 'base_url');
-  if (url) url.placeholder = anth ? 'https://api.anthropic.com'
-                          : ha   ? 'http://homeassistant.local:8123'
-                                 : 'http://127.0.0.1:11434/v1';
-  const model = F(blk, 'model');
-  if (model && anth && !model.placeholder.startsWith('claude'))
-    model.placeholder = 'claude-opus-5';
-  const ul = R(blk, 'urllabel');
-  if (ul) ul.textContent = ha ? 'Home Assistant address' : 'base URL';
-  const kl = R(blk, 'keylabel');
-  if (kl) kl.textContent = ha ? 'long-lived access token' : 'API key';
-  const kn = R(blk, 'keynote');
-  if (kn) kn.textContent = ha
-    ? 'Required. Make it a non-admin Home Assistant user of its own: the token carries that user’s permissions and never expires, and every action appears in the logbook as that user whoever spoke. Held on the server, never sent back to a browser; blank keeps the stored one.'
-    : anth
-    ? 'Required. Held on the server, never sent back to a browser. Blank keeps the stored one.'
-    : 'Held on the server, never sent back to a browser. Blank keeps the stored one; a local model needs none.';
+  /* The address, the model and the key are the model profile's now, and are
+     labelled where they live — this used to relabel them here because the
+     endpoint held them. */
 }
 
 function blockPaint(blk, r){
@@ -3609,10 +3787,11 @@ function blockPaint(blk, r){
   blk.classList.toggle('isoff', r.enabled === false);
   blk.querySelector('.rtname').textContent = r.name || (r.id ? '(unnamed)' : 'New endpoint');
   const sum = blk.querySelector('.rtsum');
+  const rp = routeProvider(r), rm = routeModel(r);
   const where = !r.id ? 'unsaved'
-    : r.provider === 'demo' ? 'built-in replies'
-    : r.provider === 'homeassistant' ? 'Home Assistant'
-    : (r.model || 'no model');
+    : rp === 'demo' ? 'built-in replies'
+    : rp === 'homeassistant' ? 'Home Assistant'
+    : (((rm && rm.values) || {}).model || 'no model');
   sum.innerHTML = (r.wakeword ? 'say <b>&ldquo;' + rtEsc(r.wakeword) + '&rdquo;</b> &rarr; ' : '')
                 + rtEsc(where)
                 + (r.is_default ? ' &middot; default' : '')
@@ -3635,19 +3814,55 @@ function blockPaint(blk, r){
   blk.querySelectorAll('[data-f="restricted"] button').forEach(b=>
     b.classList.toggle('on', (b.dataset.v === '1') === !!r.restricted));
   blockFillWho(blk, r);
-  blk.querySelectorAll('[data-f="provider"] button').forEach(b=>
-    b.classList.toggle('on', b.dataset.v === r.provider));
-  /* Light the preset the base URL actually corresponds to, rather than
-     whichever was last pressed — after a reload nothing was pressed, and the
-     honest answer is which one you are on. */
-  const u = (r.base_url || '').replace(/\/+$/, '');
-  blk.querySelectorAll('[data-r="preset"] button').forEach(b=>{
-    const pre = BK_PRESETS[b.dataset.v];
-    b.classList.toggle('on', !!pre && pre.provider === r.provider
-                                   && pre.base_url.replace(/\/+$/, '') === u);
-  });
-  const key = F(blk, 'api_key');
-  if (key) key.placeholder = r.has_key ? 'unchanged — a key is stored' : 'none stored';
+  /* The model picker, by profile name. A profile that has been deleted is
+     still offered on the endpoint naming it, marked, rather than silently
+     reading as the default. */
+  /* The ports, less the ones another endpoint already answers on — a port
+     reaches one endpoint, so offering a taken one would be offering a save
+     the server is going to refuse. Its own stays offered, obviously. */
+  const nw = F(blk, 'network');
+  if (nw){
+    const want = r.network || '';
+    /* A SHARED port is always on offer — carrying several endpoints is what it
+       is for. An exclusive one another endpoint already answers on is not:
+       offering it would be offering a save the server is going to refuse. */
+    const taken = {};
+    (RT.routes || []).forEach(x=>{ if (x.id !== r.id && x.network)
+                                     taken[x.network] = x.name; });
+    const all = (DPCFG && DPCFG.networks) || [];
+    const pool = all.filter(x=> (x.values || {}).shared || !taken[x.id]);
+    const def = all.filter(x=> x.id === ((DPCFG && DPCFG.network_default) || ''))[0];
+    nw.innerHTML = '';
+    const opts = [['', def ? 'DEFAULT — ' + def.name
+                            + ((def.values || {}).port ? ' · ' + def.values.port : '')
+                           : 'THE SHARED DISPLAY PORT']]
+                   .concat(pool.filter(x=> !def || x.id !== def.id).map(x=> [x.id,
+                     x.name + ((x.values || {}).port ? ' · ' + x.values.port : '')]));
+    if (want && !pool.some(x=> x.id === want))
+      opts.push([want, 'a profile that no longer exists']);
+    opts.forEach(([v, label])=>{
+      const o = document.createElement('option');
+      o.value = v; o.textContent = label; nw.appendChild(o);
+    });
+    nw.value = want;
+  }
+
+  const mp = F(blk, 'model_profile');
+  if (mp){
+    const want = r.model_profile || '';
+    const pool = (DPCFG && DPCFG.models) || [];
+    const def = pool.filter(x=> x.id === ((DPCFG && DPCFG.model_default) || ''))[0];
+    mp.innerHTML = '';
+    const opts = [['', def ? 'DEFAULT — ' + def.name : 'DEFAULT']]
+                   .concat(pool.map(x=> [x.id, x.name]));
+    if (want && !pool.some(x=> x.id === want))
+      opts.push([want, 'a profile that no longer exists']);
+    opts.forEach(([v, label])=>{
+      const o = document.createElement('option');
+      o.value = v; o.textContent = label; mp.appendChild(o);
+    });
+    mp.value = want;
+  }
 
   /* Every OTHER endpoint, because falling through to yourself is a loop and
      falling through to a house is asking the thing that just declined. Built
@@ -3662,7 +3877,7 @@ function blockPaint(blk, r){
        Another house is offered — two of them in one building is a real
        arrangement, and one may know a room the other does not. */
     const opts = [['', 'nothing — it answers for itself']].concat(
-      (RT.routes || []).filter(x=> x.id !== r.id && x.provider !== 'demo')
+      (RT.routes || []).filter(x=> x.id !== r.id && routeProvider(x) !== 'demo')
                        .map(x=> [x.id, x.name]));
     if (want && !opts.some(([v])=> v === want)) opts.push([want, 'an endpoint that is gone']);
     opts.forEach(([v, label])=>{
@@ -3690,35 +3905,42 @@ function blockPaint(blk, r){
     voice: (r.greeting ? '“' + r.greeting.slice(0, 28)
                        + (r.greeting.length > 28 ? '…' : '') + '” · ' : 'shared greeting · ')
          + (r.voice || 'shared voice'),
-    conn: r.provider === 'demo' ? 'demo — built-in replies'
-        : r.provider === 'homeassistant'
-        ? 'Home Assistant · ' + (r.agent_id || 'default agent')
-          + (r.has_key ? ' · token stored' : ' · no token')
-        : (r.model || 'no model') + (r.has_key ? ' · key stored' : ''),
-    limits: r.provider === 'homeassistant' ? r.timeout + 's'
+    conn: (()=>{
+      const pool = (DPCFG && DPCFG.models) || [];
+      const p = pool.filter(x=> x.id === (r.model_profile || ''))[0]
+             || pool.filter(x=> x.id === ((DPCFG && DPCFG.model_default) || ''))[0];
+      return p ? p.name : 'no model profile';
+    })(),
+    limits: routeProvider(r) === 'homeassistant' ? r.timeout + 's'
           : r.max_tokens + ' tokens · '
           + (r.history_turns ? r.history_turns + ' turns' : 'no context') + ' · '
           + r.timeout + 's',
-    prompt: r.provider === 'demo' ? 'not used in demo'
-          : r.provider === 'homeassistant' ? 'set in Home Assistant'
+    prompt: routeProvider(r) === 'demo' ? 'not used in demo'
+          : routeProvider(r) === 'homeassistant' ? 'set in Home Assistant'
           : ((r.system || '').trim().split(/\s+/).filter(Boolean).length + ' words'),
   };
   Object.keys(sums).forEach(g=>{
     const h = blk.querySelector('[data-g="' + g + '"] .subsum');
     if (h) h.textContent = sums[g];
   });
-  const voice = F(blk, 'voice');
-  if (voice){
-    const want = r.voice || '';
-    voice.innerHTML = '';
-    const opts = [['', 'the shared voice']].concat((RT.voices || []).map(v=> [v, v]));
-    if (want && !(RT.voices || []).includes(want))
-      opts.push([want, want + ' — not installed here']);
+  /* The speech profiles, by name. A profile that has been deleted is still
+     offered on the row that names it, marked, rather than silently becoming
+     "the default" in a select the admin never touched. */
+  const sp = F(blk, 'speech');
+  if (sp){
+    const want = r.speech || '';
+    const pool = (DPCFG && DPCFG.speeches) || [];
+    const def  = pool.filter(x=> x.id === ((DPCFG && DPCFG.speech_default) || ''))[0];
+    sp.innerHTML = '';
+    const opts = [['', def ? 'DEFAULT — ' + def.name : 'DEFAULT']]
+                   .concat(pool.map(x=> [x.id, x.name]));
+    if (want && !pool.some(x=> x.id === want))
+      opts.push([want, 'a profile that no longer exists']);
     opts.forEach(([v, label])=>{
       const o = document.createElement('option');
-      o.value = v; o.textContent = label; voice.appendChild(o);
+      o.value = v; o.textContent = label; sp.appendChild(o);
     });
-    voice.value = want;
+    sp.value = want;
   }
   // buttons that only mean something once it exists on the server
   const set = (a, hide, label)=>{
@@ -3729,7 +3951,6 @@ function blockPaint(blk, r){
   };
   set('default', !r.id || r.is_default || r.enabled === false);
   set('enable',  !r.id, r.enabled === false ? 'SWITCH ON' : 'SWITCH OFF');
-  set('forget',  !r.id);
   set('test',    !r.id);
   // always offered: a draft you cannot back out of is a trap
   set('delete',  false, r.id ? 'DELETE' : 'DISCARD');
@@ -3742,11 +3963,18 @@ function blockPaint(blk, r){
    arrived a minute ago is there to tick. */
 function blockFillWho(blk, r){
   const box = R(blk, 'displays'), gbox = R(blk, 'groups');
-  if (!box) return;
+  // Groups are filled here as well, so this must not give up when the
+  // per-display box is absent — it is, now that restricting one device at a
+  // time has gone and a grant is made to a group.
+  if (!box && !gbox) return;
   const want = r.displays || [], wantG = r.groups || [];
   // Never rebuilt under somebody's cursor — replacing the nodes would drop
   // the tick they were in the middle of making.
-  if (!box.contains(document.activeElement)
+  // Both guarded. `box` is gone now that a grant is made to groups rather than
+  // to devices one at a time, and reading .contains off it threw on every
+  // endpoint paint — which aborted the loop, so only the first endpoint drew
+  // and the block was never hidden when you left the tab.
+  if (!(box && box.contains(document.activeElement))
       && !(gbox && gbox.contains(document.activeElement))){
     /* Groups first, and in their own box. Naming a group is the grant you
        want to make most of the time — twelve people who all get the same
@@ -3770,6 +3998,7 @@ function blockFillWho(blk, r){
         gbox.appendChild(em);
       }
     }
+    if (box){
     box.innerHTML = '';
     DISPLAYS.forEach(d=>{
       const lab = document.createElement('label');
@@ -3786,6 +4015,7 @@ function blockFillWho(blk, r){
       em.textContent = 'no displays have loaded the page yet';
       box.appendChild(em);
     }
+    }
   }
   blockSyncWho(blk);
 }
@@ -3796,7 +4026,7 @@ function blockFillWho(blk, r){
 function blockSyncWho(blk){
   const on = blk.querySelector('[data-f="restricted"] button.on');
   const restricted = !!on && on.dataset.v === '1';
-  ['groups', 'grouplab', 'onelab', 'displays'].forEach(n=>{
+  ['groups', 'grouplab'].forEach(n=>{
     const el = R(blk, n);
     if (el) el.style.display = restricted ? '' : 'none';
   });
@@ -3855,8 +4085,9 @@ function blockCollect(blk){
     const el = blk.querySelector('[data-s="' + k + '"]');
     if (el) body[k] = parseFloat(el.value);
   });
-  const prov = blk.querySelector('[data-f="provider"] button.on');
-  body.provider = prov ? prov.dataset.v : 'demo';
+  /* No provider, base URL, model or key here any more: they belong to the
+     model profile. Sending them would publish a stale copy — and reading a
+     control that is gone sent every endpoint back as DEMO. */
   const strict = blk.querySelector('[data-f="strict"] button.on');
   body.strict = !!strict && strict.dataset.v === '1';
   const who = blk.querySelector('[data-f="restricted"] button.on');
@@ -3864,8 +4095,12 @@ function blockCollect(blk){
   /* Sent whether or not the switch is on, so turning it off and on again
      brings back the displays that were ticked rather than an empty list
      somebody has to fill in twice. */
-  body.displays = [...blk.querySelectorAll('[data-r="displays"] input:checked')]
-                    .map(cb=> cb.dataset.d);
+  /* Only where the control exists. Sending an empty list from a panel that no
+     longer has the box would wipe every per-device grant a route was already
+     carrying; omitting the field leaves the server's copy alone. */
+  const dbox = blk.querySelector('[data-r="displays"]');
+  if (dbox)
+    body.displays = [...dbox.querySelectorAll('input:checked')].map(cb=> cb.dataset.d);
   body.groups = [...blk.querySelectorAll('[data-r="groups"] input:checked')]
                   .map(cb=> cb.dataset.g);
   const ft = F(blk, 'fallthrough');
@@ -3897,6 +4132,10 @@ function wireBlock(blk){
      is a change rather than an input. */
   blk.addEventListener('change', e=>{
     if (e.target.closest('[data-r="displays"]')) blockSyncWho(blk);
+    /* Which limits and which notes apply is the PROFILE's provider, so
+       choosing a different profile rearranges the block the same way choosing
+       a different provider used to. */
+    if (e.target.closest('[data-f="model_profile"]')) blockSyncProvider(blk);
   });
   blk.addEventListener('input', e=>{
     const f = e.target.closest('[data-f]');
@@ -3904,10 +4143,14 @@ function wireBlock(blk){
     /* The wake word follows the name while nobody has touched it. Typing the
        same word twice for the common case is the duplication people notice;
        keeping them separate fields is what lets an endpoint be called
-       "Kitchen Lights" and answer to "kitchen". */
+       "Kitchen Lights" and answer to "kitchen".
+
+       Case is carried across rather than flattened: the word is printed on the
+       wall as "say Resonance", and what it answers to is unaffected — the
+       matcher lowercases both sides before comparing. */
     if (f && f.dataset.f === 'name'){
       const w = F(blk, 'wakeword');
-      if (w && w.dataset.touched !== '1') w.value = f.value.toLowerCase().trim();
+      if (w && w.dataset.touched !== '1') w.value = f.value.trim();
     }
     const s = e.target.closest('[data-s]');
     if (s){
@@ -3924,49 +4167,10 @@ function wireBlock(blk){
     if (h5){ h5.parentNode.classList.toggle('open'); return; }
     const b = e.target.closest('button');
     if (!b) return;
-    const seg = b.closest('.seg[data-f], .seg[data-r="preset"]');
+    const seg = b.closest('.seg[data-f]');
     if (seg){
-      const was = seg.dataset.f === 'provider' ? seg.querySelector('button.on') : null;
-      const from = was ? was.dataset.v : '';
       seg.querySelectorAll('button').forEach(x=> x.classList.toggle('on', x === b));
-      if (seg.dataset.f === 'provider'){
-        /* A base URL and a key belong to a provider, and neither survives a
-           change of one — the server refuses to carry them across, and this
-           panel used to defeat that by sending the field back unchanged with
-           every save. Left alone, an endpoint switched to a hosted provider
-           kept whatever address it had, so a hosted key went to whatever was
-           listening on the old URL: a failure in the one direction that looks
-           like success. Cleared here, visibly, rather than on the server
-           where nobody would see it happen. */
-        if (from && from !== b.dataset.v){
-          const url = F(blk, 'base_url');
-          if (url){
-            url.value = b.dataset.v === 'anthropic' ? 'https://api.anthropic.com'
-                      : b.dataset.v === 'homeassistant' ? ''
-                      : b.dataset.v === 'openai' ? 'http://127.0.0.1:11434/v1' : '';
-            url.dataset.touched = '1';
-          }
-          const key = F(blk, 'api_key');
-          if (key) key.value = '';
-          if (b.dataset.v !== 'demo')
-            blockNote(blk, 'address and key cleared — they belonged to the '
-                         + 'endpoint you just switched away from');
-        }
-        blockSyncProvider(blk);
-      }
       if (seg.dataset.f === 'restricted') blockSyncWho(blk);
-      if (seg.dataset.r === 'preset'){
-        const pre = BK_PRESETS[b.dataset.v];
-        if (pre){
-          F(blk, 'base_url').value = pre.base_url;
-          F(blk, 'keep_alive').value = pre.keep_alive;
-          if (pre.hint) F(blk, 'model').placeholder = pre.hint;
-          blk.querySelectorAll('[data-f="provider"] button').forEach(x=>
-            x.classList.toggle('on', x.dataset.v === pre.provider));
-          blockSyncProvider(blk);
-          blockNote(blk, 'preset filled in — set the model, then SAVE');
-        }
-      }
       return;
     }
     const act = b.dataset.a;
@@ -4009,10 +4213,13 @@ async function blockAction(blk, act, btn){
       const now = document.querySelector('#panel .grp[data-rid="' + j.id + '"]');
       const rec = RT.routes.find(x=> x.id === j.id) || {};
       if (now) blockNote(now, 'saved · say “' + rec.wakeword + '” to reach '
-        + rec.name + ' · ' + (rec.provider === 'demo' ? 'built-in replies'
-                            : rec.provider === 'homeassistant'
-                            ? 'Home Assistant at ' + rec.base_url
-                            : rec.model + ' at ' + rec.base_url));
+        + rec.name + ' · ' + (()=>{
+          const m = routeModel(rec), mv = (m && m.values) || {};
+          return routeProvider(rec) === 'demo' ? 'built-in replies'
+               : routeProvider(rec) === 'homeassistant'
+               ? 'Home Assistant at ' + (mv.base_url || '')
+               : (mv.model || 'no model') + ' at ' + (mv.base_url || '');
+        })());
       return;
     }catch(e){ return blockNote(blk, e.message, true); }
   }
@@ -4034,10 +4241,9 @@ async function blockAction(blk, act, btn){
                  + 'reaching anything immediately, and its key goes with it.')) return;
   }
   const path = {default:'/routes/default', enable:'/routes/enable',
-                delete:'/routes/delete', forget:'/routes/save'}[act];
+                delete:'/routes/delete'}[act];
   if (!path) return;
   const body = act === 'enable' ? {id: rid, enabled: rec.enabled === false}
-             : act === 'forget' ? {id: rid, clear_key: true}
              : {id: rid};
   blockNote(blk, 'working…');
   try{
@@ -4059,12 +4265,21 @@ async function blockAction(blk, act, btn){
 
    `keepOpen` is the endpoint whose block should be showing afterwards. */
 let DRAFT = null;
+/* Which endpoint is open, by id. A draft has no id yet, so it answers to a
+   name of its own until it is saved. */
+let OPENRT = '';
+
+function syncAddRoute(){
+  const b = $('b_addroute');
+  if (b){ b.hidden = !!OPENRT; b.disabled = !!OPENRT; }
+}
+
 function paintBlocks(keepOpen){
-  const anchor = $('ai_anchor');
+  const anchor = $('rtlist');
   if (!anchor) return;
   const list = RT.routes.slice();
   if (DRAFT) list.push(DRAFT);
-  const have = [...document.querySelectorAll('#panel .grp[data-tab="ai"][data-rid]')];
+  const have = [...anchor.querySelectorAll('.erow[data-rid]')];
   const kept = new Set(), order = [];
   let target = null;
   list.forEach(r=>{
@@ -4072,17 +4287,27 @@ function paintBlocks(keepOpen){
     let blk = have.find(g=> !kept.has(g) && g.dataset.rid === rid
                             && (!!rid || g.classList.contains('isdraft')));
     if (!blk){
-      blk = document.createElement('section');
-      blk.className = 'grp' + (rid ? '' : ' isdraft');
-      blk.dataset.tab = 'ai';
+      blk = document.createElement('div');
+      blk.className = 'erow' + (rid ? '' : ' isdraft');
       blk.dataset.rid = rid;
       blk.innerHTML = blockHTML(r);
-      anchor.parentNode.insertBefore(blk, anchor);
+      anchor.appendChild(blk);
       wireBlock(blk);
+      /* One open at a time, by id — the list is rebuilt on every save and an
+         index would move under it. */
+      blk.querySelector('.top').addEventListener('click', e=>{
+        if (e.target.closest('input, button, select, textarea')) return;
+        const opening = blk.classList.contains('shut');
+        OPENRT = opening ? (blk.dataset.rid || '(new)') : '';
+        anchor.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+        blk.classList.toggle('shut', !opening);
+        syncAddRoute();
+      });
       // a new endpoint opens on the two boxes you have to fill in
       if (!rid) blk.querySelectorAll('[data-g="wake"],[data-g="conn"]')
                    .forEach(x=> x.classList.add('open'));
     }
+    blk.classList.toggle('shut', OPENRT !== (rid || '(new)'));
     order.push(blk);
     kept.add(blk);
     blockPaint(blk, r);
@@ -4099,12 +4324,17 @@ function paintBlocks(keepOpen){
      element blurs it, and taking the cursor out of a field somebody is typing
      in is worse than a list briefly out of order. It settles on the next
      paint. */
-  const live = [...document.querySelectorAll('#panel .grp[data-tab="ai"][data-rid]')];
+  const live = [...anchor.querySelectorAll('.erow[data-rid]')];
   const same = live.length === order.length && live.every((g, i)=> g === order[i]);
   if (!same && !order.some(g=> g.contains(document.activeElement)))
-    order.forEach(g=> anchor.parentNode.insertBefore(g, anchor));
-  rescanGroups();
-  if (target) openTopic(target);
+    order.forEach(g=> anchor.appendChild(g));
+  syncAddRoute();
+  if (target){
+    OPENRT = target.dataset.rid || '(new)';
+    anchor.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+    target.classList.remove('shut');
+    syncAddRoute();
+  }
   rtListNote(RT.routes.length
     ? RT.routes.length + (RT.routes.length === 1 ? ' endpoint' : ' endpoints')
       + ' · say ' + RT.routes.map(r=> '“' + r.wakeword + '”').join(' or ')
@@ -4167,6 +4397,10 @@ function groupNote(m, bad){
   el.textContent = m || '';
 }
 
+/* Which group is open, by id rather than index: every membership tick
+   repaints the whole list, and an index would move under it. */
+let OPENGR = '';
+
 async function refreshGroups(){
   const box = $('grouplist');
   if (!box || ME.role !== 'admin'){ if (box) box.textContent = ''; return; }
@@ -4179,21 +4413,66 @@ async function refreshGroups(){
     return;
   }
   box.className = '';
-  GROUPS.forEach(g=>{
+  // A repaint happens on every tick, so the add row's state is decided here
+  // rather than only in the click that opened a group.
+  const addrow = $('gr_addrow');
+  if (addrow) addrow.hidden = !!OPENGR && GROUPS.some(x=> x.id === OPENGR);
+  GROUPS.forEach((g, i)=>{
     const row = document.createElement('div');
     row.className = 'erow';
+    if (OPENGR !== g.id) row.classList.add('shut');
 
+    /* Shut, the name is the row's title and the badge says which population it
+       is drawn from. Open, the name is the field you rename it in — the same
+       arrangement a profile row uses, so the two read alike. */
     const top = document.createElement('div'); top.className = 'top';
-    const nm = document.createElement('input');
-    nm.type = 'text'; nm.className = 'nm'; nm.value = g.name; nm.spellcheck = false;
-    nm.onkeydown = (e)=>{ if (e.key === 'Enter') nm.blur(); };
-    nm.onchange = ()=> groupAction('/groups/save', {id: g.id, name: nm.value.trim()});
-    top.appendChild(nm);
+    const nmt = document.createElement('span');
+    nmt.className = 'nm';
+    nmt.textContent = (g.name || '').trim() || 'unnamed group';
+    top.appendChild(nmt);
     const b = document.createElement('span');
     b.className = 'badge';
     b.textContent = g.kind === 'user' ? 'PEOPLE' : 'DEVICES';
     top.appendChild(b);
+    const cnt = document.createElement('span');
+    cnt.className = 'badge';
+    cnt.textContent = g.members.length + (g.members.length === 1 ? ' member' : ' members');
+    top.appendChild(cnt);
+    top.onclick = (e)=>{
+      if (e.target.closest('input, button, select, textarea')) return;
+      const opening = row.classList.contains('shut');
+      OPENGR = opening ? g.id : '';
+      box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+      row.classList.toggle('shut', !opening);
+      const ab = $('gr_addrow');
+      if (ab) ab.hidden = !!OPENGR;
+    };
     row.appendChild(top);
+
+    const namerow = document.createElement('div');
+    namerow.className = 'namerow';
+    const nlab = document.createElement('b');
+    nlab.textContent = 'Name';
+    namerow.appendChild(nlab);
+    const nm = document.createElement('input');
+    nm.type = 'text'; nm.className = 'nmedit'; nm.value = g.name; nm.spellcheck = false;
+    nm.onkeydown = (e)=>{ if (e.key === 'Enter') nm.blur(); };
+    nm.onchange = ()=> groupAction('/groups/save', {id: g.id, name: nm.value.trim()});
+    namerow.appendChild(nm);
+    /* On the name's own line, hard right. Deleting a group is the one thing
+       here that cannot be undone, and it belongs beside the thing it names
+       rather than at the foot of a list of ticks. */
+    const del = document.createElement('button');
+    del.textContent = 'DELETE';
+    del.className = 'act-danger';
+    del.onclick = ()=>{
+      if (confirm('Delete the group "' + g.name + '"? It is removed from every '
+                  + 'endpoint that names it. Nothing in it is deleted — a group '
+                  + 'is a way of referring to them, not a thing they belong to.'))
+        groupAction('/groups/delete', {id: g.id});
+    };
+    namerow.appendChild(del);
+    row.appendChild(namerow);
 
     /* Membership is the group. Ticked in place rather than behind an EDIT,
        because the list is short and the whole reason to open a group is to
@@ -4239,19 +4518,6 @@ async function refreshGroups(){
     });
     row.appendChild(meta);
 
-    const acts = document.createElement('div');
-    acts.className = 'acts';
-    const del = document.createElement('button');
-    del.textContent = 'DELETE';
-    del.className = 'act-danger';
-    del.onclick = ()=>{
-      if (confirm('Delete the group "' + g.name + '"? It is removed from every '
-                  + 'endpoint that names it. Nothing in it is deleted — a group '
-                  + 'is a way of referring to them, not a thing they belong to.'))
-        groupAction('/groups/delete', {id: g.id});
-    };
-    acts.appendChild(del);
-    row.appendChild(acts);
     box.appendChild(row);
   });
 }
@@ -4298,6 +4564,8 @@ function paintDpSettings(){
                                           DPCFG[DEF_KEY[k.key]] || ''));
   paintSavers(DPCFG.savers || []);
   paintKiosks(DPCFG.kiosks || [], DPCFG.kiosk_default || '');
+  paintModels(DPCFG.models || [], DPCFG.model_default || '');
+  paintNetworks(DPCFG.networks || [], DPCFG.network_default || '');
 }
 
 /* The two profile lists live on their own tab now, and they are painted from
@@ -4382,6 +4650,11 @@ async function saveDp(body, slot){
     DPCFG = j.settings;
     paintDpSettings();
     await refreshDisplays();
+    /* An endpoint names a model profile, so renaming one, adding one or
+       removing one changes what its picker should be offering. Rebuilt from
+       the settings that just came back rather than left until the AI tab is
+       next opened, where it would be showing a name that no longer exists. */
+    if (RT.routes.length) paintBlocks();
     dpNote('saved', false, slot);
   }catch(e){ dpNote(e.message, true, slot); }
 }
@@ -4394,10 +4667,6 @@ $('b_addfield').addEventListener('click', ()=>{
 $('dp_guest').addEventListener('click', e=>{
   const b = e.target.closest('button');
   if (b) segSet('dp_guest', b.dataset.v);
-});
-$('b_dprevert').addEventListener('click', ()=>{
-  paintDpSettings();
-  dpNote('back to what is saved');
 });
 $('b_dpsave').addEventListener('click', ()=>{
   const on = document.querySelector('#dp_guest button.on');
@@ -4415,6 +4684,340 @@ $('b_formrevert').addEventListener('click', ()=>{
 });
 $('b_formsave').addEventListener('click', ()=>{
   saveDp({form: DPFORM.filter(f=> (f.label || '').trim())}, 'formnote');
+});
+
+/* ---- the model profiles ----
+   The connection, under a name. Same row, same caret, same one-open-at-a-time
+   as every other list; the key is the one field that is never read back from
+   the server, so an empty box means "keep what is stored" rather than "clear
+   it". */
+let DPMODELS = [], DPMDEF = '', OPENMD = -1;
+
+const PROVIDERS = [['demo','DEMO'], ['openai','OPENAI-COMPATIBLE'],
+                   ['anthropic','ANTHROPIC'], ['homeassistant','HOME ASSISTANT']];
+
+function paintModels(list, def){
+  if (def !== undefined) DPMDEF = def || '';
+  DPMODELS = (list || []).map(m=> ({id: m.id || '', _new: !!m._new,
+                                    name: m.name || '', has_key: !!m.has_key,
+                                    values: Object.assign({}, m.values || {})}));
+  const box = $('dp_models');
+  if (!box) return;
+  box.innerHTML = '';
+  if (!DPMDEF && DPMODELS.length) DPMDEF = DPMODELS[0].id;
+  DPMODELS.forEach((m, i)=>{
+    const v = m.values;
+    const row = document.createElement('div');
+    row.className = 'erow';
+    if (OPENMD !== i) row.classList.add('shut');
+
+    const top = document.createElement('div'); top.className = 'top';
+    const nmt = document.createElement('span'); nmt.className = 'nm';
+    top.appendChild(nmt);
+    const sum = document.createElement('span'); sum.className = 'badge';
+    top.appendChild(sum);
+    const dflag = document.createElement('span');
+    dflag.className = 'badge isdefault'; dflag.textContent = 'DEFAULT';
+    top.appendChild(dflag);
+    const retitle = ()=>{
+      nmt.textContent = (m.name || '').trim() || 'unnamed profile';
+      sum.textContent = v.provider === 'demo' ? 'demo — built-in replies'
+        : v.provider === 'homeassistant'
+          ? 'Home Assistant · ' + (v.agent_id || 'default agent')
+          : (v.model || 'no model') + (m.has_key ? ' · key stored' : '');
+      dflag.style.display = (m.id && m.id === DPMDEF) ? '' : 'none';
+    };
+    retitle();
+    top.onclick = (e)=>{
+      if (e.target.closest('input, button, select, textarea')) return;
+      const opening = row.classList.contains('shut');
+      OPENMD = opening ? i : -1;
+      box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+      row.classList.toggle('shut', !opening);
+      const ab = $('b_addmodel');
+      if (ab){ ab.hidden = OPENMD >= 0; ab.disabled = OPENMD >= 0; }
+    };
+    row.appendChild(top);
+
+    const field = (label, el)=>{
+      const w = document.createElement('div'); w.className = 'namerow';
+      const b = document.createElement('b'); b.textContent = label;
+      w.appendChild(b); w.appendChild(el); row.appendChild(w); return el;
+    };
+    const text = (label, key, ph, type)=>{
+      const inp = document.createElement('input');
+      inp.type = type || 'text'; inp.className = 'nmedit';
+      inp.value = v[key] || ''; inp.placeholder = ph || '';
+      inp.spellcheck = false;
+      inp.oninput = ()=>{ v[key] = inp.value; retitle(); };
+      return field(label, inp);
+    };
+
+    const nm = document.createElement('input');
+    nm.type = 'text'; nm.className = 'nmedit'; nm.value = m.name;
+    nm.spellcheck = false; nm.placeholder = 'Ollama';
+    nm.oninput = ()=>{ m.name = nm.value; retitle(); };
+    field('Name', nm);
+
+    const psel = document.createElement('select');
+    psel.className = 'ppick';
+    PROVIDERS.forEach(([val, label])=>{
+      const o = document.createElement('option');
+      o.value = val; o.textContent = label; psel.appendChild(o);
+    });
+    psel.value = v.provider || 'demo';
+    psel.onchange = ()=>{ v.provider = psel.value; retitle(); paintModels(DPMODELS); };
+    field('Preset', psel);
+
+    /* Only what this provider actually reads. DEMO answers from the display,
+       so it needs none of it. */
+    if (v.provider === 'openai' || v.provider === 'anthropic'){
+      text('Base URL', 'base_url', 'http://127.0.0.1:11434/v1');
+      text('Model', 'model', 'qwen2.5:3b');
+    }
+    if (v.provider === 'homeassistant'){
+      text('Base URL', 'base_url', 'http://homeassistant.local:8123');
+      text('Conversation agent', 'agent_id', 'leave blank for the default');
+    }
+    if (v.provider !== 'demo'){
+      const k = text('API key', 'api_key', m.has_key ? 'stored — type to replace'
+                                                     : '', 'password');
+      k.value = '';
+      k.oninput = ()=>{ v.api_key = k.value; };
+    }
+
+    const acts = document.createElement('div'); acts.className = 'acts';
+    const mk = document.createElement('button');
+    mk.textContent = 'MAKE DEFAULT';
+    if (m.id && m.id === DPMDEF){ mk.disabled = true;
+      mk.title = 'an endpoint naming no profile gets this one'; }
+    else mk.onclick = ()=>{ DPMDEF = m.id; paintModels(DPMODELS); };
+    acts.appendChild(mk);
+    const gap = document.createElement('span'); gap.className = 'spacer';
+    acts.appendChild(gap);
+
+    const save = document.createElement('button');
+    save.textContent = 'SAVE'; save.className = 'act-save';
+    save.onclick = ()=>{
+      const keep = DPMODELS.filter(x=> (x.name || '').trim());
+      if (!keep.length){
+        dpNote('a profile needs a name before it can be saved', true, 'modelnote');
+        return;
+      }
+      m._new = false; OPENMD = -1;
+      saveDp({models: keep.map(x=> ({id:x.id, name:x.name, values:x.values})),
+              model_default: DPMDEF}, 'modelnote');
+    };
+    acts.appendChild(save);
+
+    const del = document.createElement('button');
+    del.textContent = 'REMOVE'; del.className = 'act-danger';
+    if (m.id && m.id === DPMDEF){ del.disabled = true;
+      del.title = 'make another profile the default first'; }
+    else del.onclick = ()=>{
+      OPENMD = -1; DPMODELS.splice(i, 1); paintModels(DPMODELS);
+    };
+    acts.appendChild(del);
+    row.appendChild(acts);
+    box.appendChild(row);
+  });
+  const btn = $('b_addmodel');
+  if (btn){
+    const busy = OPENMD >= 0 || DPMODELS.some(x=> x._new);
+    btn.hidden = busy;
+    btn.disabled = busy || DPMODELS.length >= 8;
+  }
+}
+
+/* ---- the network profiles ----
+   A port, under a name, that one endpoint answers on. Same row and same
+   one-open-at-a-time as every other list, with one difference: there is no
+   MAKE DEFAULT. Every other list has one because a row naming nothing still
+   has to look like something; an endpoint naming no network profile is not
+   missing a setting, it is on the shared display port. A nominated default
+   here would move endpoints onto ports of their own without being asked. */
+let DPNETS = [], DPNWDEF = '', OPENNW = -1;
+
+function paintNetworks(list, def){
+  if (def !== undefined) DPNWDEF = def || '';
+  DPNETS = (list || []).map(n=> ({id: n.id || '', _new: !!n._new,
+                                  name: n.name || '',
+                                  values: Object.assign({}, n.values || {})}));
+  const box = $('dp_networks');
+  if (!box) return;
+  box.innerHTML = '';
+  DPNETS.forEach((n, i)=>{
+    const v = n.values;
+    const row = document.createElement('div');
+    row.className = 'erow';
+    if (OPENNW !== i) row.classList.add('shut');
+
+    const top = document.createElement('div'); top.className = 'top';
+    const nmt = document.createElement('span'); nmt.className = 'nm';
+    top.appendChild(nmt);
+    const sum = document.createElement('span'); sum.className = 'badge';
+    top.appendChild(sum);
+    /* Which endpoint answers here, read off the endpoints rather than stored
+       twice: the route names the profile, so the profile has no field to go
+       stale. A profile nothing names is a port that will not be bound, and
+       saying so is the whole of what somebody needs to know about it. */
+    const used = document.createElement('span'); used.className = 'badge';
+    top.appendChild(used);
+    const dflag = document.createElement('span');
+    dflag.className = 'badge isdefault'; dflag.textContent = 'DEFAULT';
+    top.appendChild(dflag);
+    const retitle = ()=>{
+      nmt.textContent = (n.name || '').trim() || 'unnamed profile';
+      sum.textContent = (v.port ? 'port ' + v.port : 'no port')
+                      + (v.redirect ? ' · ' + v.redirect + ' redirects' : '')
+                      + (v.shared ? ' · shared' : '')
+                      + (v.open ? ' · no approval' : '');
+      /* Everything this port carries, which on the default one includes every
+         endpoint that has named no profile at all — that is what makes it the
+         default, and reading it off the endpoints keeps it from going stale. */
+      const on = (RT.routes || []).filter(r=> r.network === n.id
+                    || (n.id === DPNWDEF && !r.network)).map(r=> r.name);
+      used.textContent = on.length ? on.join(', ') : 'no endpoint';
+      dflag.style.display = (n.id && n.id === DPNWDEF) ? '' : 'none';
+    };
+    retitle();
+    top.onclick = (e)=>{
+      if (e.target.closest('input, button, select, textarea')) return;
+      const opening = row.classList.contains('shut');
+      OPENNW = opening ? i : -1;
+      box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+      row.classList.toggle('shut', !opening);
+      const ab = $('b_addnetwork');
+      if (ab){ ab.hidden = OPENNW >= 0; ab.disabled = OPENNW >= 0; }
+    };
+    row.appendChild(top);
+
+    const field = (label, el)=>{
+      const w = document.createElement('div'); w.className = 'namerow';
+      const b = document.createElement('b'); b.textContent = label;
+      w.appendChild(b); w.appendChild(el); row.appendChild(w); return el;
+    };
+
+    const nm = document.createElement('input');
+    nm.type = 'text'; nm.className = 'nmedit'; nm.value = n.name;
+    nm.spellcheck = false; nm.placeholder = 'Reception';
+    nm.oninput = ()=>{ n.name = nm.value; retitle(); };
+    field('Name', nm);
+
+    const pt = document.createElement('input');
+    pt.type = 'number'; pt.className = 'nmedit portedit';
+    pt.min = 1024; pt.max = 65535; pt.inputMode = 'numeric';
+    pt.value = v.port || ''; pt.placeholder = '9711';
+    pt.oninput = ()=>{ v.port = pt.value; retitle(); };
+    field('Port', pt);
+
+    const rd = document.createElement('input');
+    rd.type = 'number'; rd.className = 'nmedit portedit';
+    rd.min = 1024; rd.max = 65535; rd.inputMode = 'numeric';
+    rd.value = v.redirect || ''; rd.placeholder = 'none';
+    rd.oninput = ()=>{ v.redirect = rd.value; retitle(); };
+    field('Plain HTTP, redirected here', rd);
+
+    const yesno = (label, key, after)=>{
+      const seg = document.createElement('div');
+      seg.className = 'seg';
+      [['1', 'YES'], ['0', 'NO']].forEach(([val, txt])=>{
+        const b = document.createElement('button');
+        b.dataset.v = val; b.textContent = txt;
+        b.classList.toggle('on', (val === '1') === !!v[key]);
+        b.onclick = ()=>{
+          v[key] = val === '1';
+          seg.querySelectorAll('button').forEach(x=>
+            x.classList.toggle('on', x === b));
+          retitle();
+          if (after) after();
+        };
+        seg.appendChild(b);
+      });
+      return field(label, seg);
+    };
+    /* The default carries every endpoint that named nothing, so it cannot
+       stop being shared while it is the default — the server refuses that
+       save, and refusing it here as well means not offering the button that
+       leads to the refusal. */
+    yesno('More than one endpoint', 'shared',
+          ()=>{ if (!v.shared && n.id === DPNWDEF) DPNWDEF = '';
+                paintNetworks(DPNETS); });
+    yesno('The port is the grant', 'open');
+
+    const acts = document.createElement('div'); acts.className = 'acts';
+    const mk = document.createElement('button');
+    mk.textContent = 'MAKE DEFAULT';
+    if (n.id && n.id === DPNWDEF){ mk.disabled = true;
+      mk.title = 'an endpoint naming no profile answers here'; }
+    else if (!v.shared){ mk.disabled = true;
+      mk.title = 'the default carries every endpoint that names no profile, '
+               + 'so it has to take more than one'; }
+    else mk.onclick = ()=>{ DPNWDEF = n.id; paintNetworks(DPNETS); };
+    acts.appendChild(mk);
+    const gap = document.createElement('span'); gap.className = 'spacer';
+    acts.appendChild(gap);
+
+    const save = document.createElement('button');
+    save.textContent = 'SAVE'; save.className = 'act-save';
+    save.onclick = ()=>{
+      const keep = DPNETS.filter(x=> (x.name || '').trim());
+      if (!keep.length){
+        dpNote('a profile needs a name before it can be saved', true,
+               'networknote');
+        return;
+      }
+      n._new = false; OPENNW = -1;
+      saveDp({networks: keep.map(x=> ({id:x.id, name:x.name,
+                values:{port: parseInt(x.values.port, 10),
+                        redirect: parseInt(x.values.redirect, 10) || 0,
+                        shared: !!x.values.shared,
+                        open: !!x.values.open}})),
+              network_default: DPNWDEF}, 'networknote');
+    };
+    acts.appendChild(save);
+
+    const del = document.createElement('button');
+    del.textContent = 'REMOVE'; del.className = 'act-danger';
+    /* A profile an endpoint is answering on cannot be removed from under it —
+       the endpoint would keep naming an id that is gone and quietly fall back
+       to the shared port at the next restart, which is a port disappearing
+       with nothing said about it. */
+    const on = (RT.routes || []).filter(r=> r.network === n.id)[0];
+    if (n.id && n.id === DPNWDEF){ del.disabled = true;
+      del.title = 'this is the default — make another profile the default first'; }
+    else if (on){ del.disabled = true;
+      del.title = on.name + ' answers on this port — point it elsewhere first'; }
+    else del.onclick = ()=>{
+      OPENNW = -1; DPNETS.splice(i, 1); paintNetworks(DPNETS);
+    };
+    acts.appendChild(del);
+    row.appendChild(acts);
+    box.appendChild(row);
+  });
+  const btn = $('b_addnetwork');
+  if (btn){
+    const busy = OPENNW >= 0 || DPNETS.some(x=> x._new);
+    btn.hidden = busy;
+    btn.disabled = busy || DPNETS.length >= 8;
+  }
+}
+
+$('b_addnetwork').addEventListener('click', ()=>{
+  if (DPNETS.length >= 8) return;
+  DPNETS.push({id: profileId('w'), _new: true, name: '',
+               values: {port: '', redirect: 0, shared: true, open: false}});
+  OPENNW = DPNETS.length - 1;
+  paintNetworks(DPNETS);
+});
+
+$('b_addmodel').addEventListener('click', ()=>{
+  if (DPMODELS.length >= 8) return;
+  DPMODELS.push({id: profileId('n'), _new: true, name: '', has_key: false,
+                 values: {provider: 'demo', base_url: '', model: '',
+                          api_key: '', agent_id: ''}});
+  OPENMD = DPMODELS.length - 1;
+  paintModels(DPMODELS);
 });
 
 $('b_addsaver').addEventListener('click', ()=>{
@@ -4551,8 +5154,19 @@ function profSections(tab){
   return [...document.querySelectorAll('#panel .grp[data-prof="' + tab + '"]')];
 }
 function stashSections(tab){
-  const st = $('profstash');
-  if (st) profSections(tab).forEach(g=> st.appendChild(g));
+  /* Built here if it is not in the markup. `if (st)` is what made this bug
+     survivable-looking: a missing element turned the stash into a silent
+     no-op, the sections stayed in a row that was about to be replaced, and
+     `box.innerHTML = ''` took them out of the document. A move with nowhere
+     to move to has to be impossible rather than quiet. */
+  let st = $('profstash');
+  if (!st){
+    st = document.createElement('div');
+    st.id = 'profstash';
+    st.hidden = true;
+    ($('panel') || document.body).appendChild(st);
+  }
+  profSections(tab).forEach(g=> st.appendChild(g));
 }
 
 /* The controls belong to whichever profile is open, and ONE function decides
@@ -4743,7 +5357,20 @@ PROFILE_KINDS.forEach(kind=>{
     const arr = PROFILES[kind.key];
     if (arr.length >= 8) return;
     /* Captured from the tab as it is RIGHT NOW, which is the whole idea: you
-       set it up, you look at it, you name it. */
+       set it up, you look at it, you name it.
+
+       The wake word is the exception, and it is cleared on the TAB rather
+       than only in the captured values — SAVE re-reads the tab, so blanking
+       the copy alone would put the old word straight back. A second speech
+       profile carrying the first one's word is the one thing that cannot be
+       right: the word is what tells two assistants apart, and one profile may
+       be named by only one endpoint. Empty, and you type the name this one
+       answers to. */
+    if (kind.key === 'speeches' && 'wakeword' in S){
+      S.wakeword = '';
+      repaintControls();
+      push();
+    }
     arr.push({id: profileId(kind.pre), _new: true, name: '',
               values: tabKeys(kind.tab)});
     OPENPR[kind.key] = arr.length - 1;
@@ -4831,6 +5458,8 @@ function paintSavers(list){
       if (e.target.closest('input, button, select, textarea')) return;
       const opening = row.classList.contains('shut');
       OPENSV = opening ? i : -1;
+      const ab = $('b_addsaver');
+      if (ab){ ab.hidden = OPENSV >= 0; ab.disabled = OPENSV >= 0; }
       // One at a time, the same as the device register: eight profiles you
       // scroll through is a list nobody reads.
       box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
@@ -4923,6 +5552,27 @@ function paintSavers(list){
     };
     acts.appendChild(show);
 
+    /* Each profile commits itself, like every other list. One SAVE at the foot
+       of the tab published every row at once, including any half-edited. */
+    const gap = document.createElement('span');
+    gap.className = 'spacer';
+    acts.appendChild(gap);
+
+    const save = document.createElement('button');
+    save.textContent = 'SAVE';
+    save.className = 'act-save';
+    save.onclick = ()=>{
+      const keep = DPSAVERS.filter(x=> (x.name || '').trim());
+      if (!keep.length){
+        dpNote('a profile needs a name before it can be saved', true, 'savernote');
+        return;
+      }
+      stopSaverPreview();
+      OPENSV = -1;
+      saveDp({savers: keep}, 'savernote');
+    };
+    acts.appendChild(save);
+
     const del = document.createElement('button');
     del.textContent = 'REMOVE';
     del.className = 'act-danger';
@@ -4945,9 +5595,9 @@ function paintSavers(list){
      It comes back when the profiles are saved, or when the new one is
      reverted or removed. */
   if (btn){
-    const fresh = DPSAVERS.some(x=> !x.id);
-    btn.hidden = fresh;
-    btn.disabled = fresh || DPSAVERS.length >= 8;
+    const busy = OPENSV >= 0 || DPSAVERS.some(x=> !x.id);
+    btn.hidden = busy;
+    btn.disabled = busy || DPSAVERS.length >= 8;
   }
 }
 /* ---- the device profiles ----
@@ -5024,6 +5674,8 @@ function paintKiosks(list, def){
       if (e.target.closest('input, button, select, textarea')) return;
       const opening = row.classList.contains('shut');
       OPENKI = opening ? i : -1;
+      const ab = $('b_addkiosk');
+      if (ab){ ab.hidden = OPENKI >= 0; ab.disabled = OPENKI >= 0; }
       box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
       row.classList.toggle('shut', !opening);
     };
@@ -5124,6 +5776,32 @@ function paintKiosks(list, def){
     }
     acts.appendChild(mk);
 
+    /* Each profile commits itself, the way appearance, geometry and speech do.
+       One SAVE at the foot of the tab published every row at once, including
+       any somebody was halfway through. */
+    const gap = document.createElement('span');
+    gap.className = 'spacer';
+    acts.appendChild(gap);
+
+    const save = document.createElement('button');
+    save.textContent = 'SAVE';
+    save.className = 'act-save';
+    save.onclick = ()=>{
+      const keep = DPKIOSKS.filter(x=> (x.name || '').trim());
+      if (!keep.length){
+        dpNote('a profile needs a name before it can be saved', true, 'kiosknote');
+        return;
+      }
+      k._new = false;
+      OPENKI = -1;
+      saveDp({kiosks: keep.map(x=> ({id:x.id, name:x.name, voice_only:x.voice_only,
+                                     look:x.look, motion:x.motion, speech:x.speech,
+                                     saver:x.saver, fullscreen:x.fullscreen,
+                                     prompt:x.prompt, prompt_text:x.prompt_text})),
+              kiosk_default: DPKDEF}, 'kiosknote');
+    };
+    acts.appendChild(save);
+
     const del = document.createElement('button');
     del.textContent = 'REMOVE';
     del.className = 'act-danger';
@@ -5150,9 +5828,9 @@ function paintKiosks(list, def){
      It comes back when the profiles are saved, or when the new one is
      reverted or removed. */
   if (btn){
-    const fresh = DPKIOSKS.some(x=> x._new);
-    btn.hidden = fresh;
-    btn.disabled = fresh || DPKIOSKS.length >= 8;
+    const busy = DPKIOSKS.some(x=> x._new) || OPENKI >= 0;
+    btn.hidden = busy;
+    btn.disabled = busy || DPKIOSKS.length >= 8;
   }
 }
 
@@ -5205,6 +5883,38 @@ function kioskBlock(d){
      tick. The shut row says what it IS in words instead — a checkbox you
      cannot press without opening the row would be a control pretending to be
      a status. */
+  /* Which population this row belongs to when a group is drawn from one.
+     It used to be inferred from how the row arrived — asked for access, or
+     issued a code — which answers the wrong question: both happen in a
+     browser on one machine, and that describes a device. A person is an
+     identity that carries from a phone to a laptop, so it is a thing to be
+     told rather than guessed at. */
+  const krow = document.createElement('div');
+  krow.className = 'namerow';
+  const klab = document.createElement('b');
+  klab.textContent = 'It is a';
+  krow.appendChild(klab);
+  const kseg = document.createElement('div');
+  kseg.className = 'seg';
+  const kindNow = d.kind || '';
+  [['device', 'DEVICE'], ['user', 'PERSON'], ['', 'WORK IT OUT']].forEach(([v, txt])=>{
+    const b = document.createElement('button');
+    b.dataset.v = v; b.textContent = txt;
+    b.classList.toggle('on', v === kindNow);
+    b.onclick = ()=>{
+      kseg.querySelectorAll('button').forEach(x=> x.classList.toggle('on', x === b));
+    };
+    kseg.appendChild(b);
+  });
+  krow.appendChild(kseg);
+  box.appendChild(krow);
+  const kindNote = document.createElement('div');
+  kindNote.className = 'note';
+  kindNote.textContent = d.kind ? ''
+    : 'Not set — currently read as ' + (d.group_kind === 'user' ? 'a person' : 'a device')
+      + ' from how it arrived.';
+  box.appendChild(kindNote);
+
   const l = document.createElement('label');
   l.className = 'vo';
   const kb = document.createElement('input');
@@ -5274,7 +5984,24 @@ function kioskBlock(d){
          row somebody has open and this message with it, and nothing else on
          screen draws these two values. */
       if (j.displays) DISPLAYS = j.displays;
-      said.textContent = 'saved';
+      /* Its own call, because it is its own document: changing which
+         population a row is in can drop it from groups of the other one, and
+         the server says which so this can report it rather than let a group
+         quietly lose a member. */
+      const wantKind = (kseg.querySelector('button.on') || {}).dataset.v || '';
+      let extra = '';
+      if (wantKind !== (d.kind || '')){
+        const k = await api('/displays/kind', {method:'POST', body: JSON.stringify(
+          {id: d.id, kind: wantKind})});
+        if (k.displays) DISPLAYS = k.displays;
+        d.kind = wantKind;
+        kindNote.textContent = '';
+        if ((k.dropped || []).length)
+          extra = ' · removed from ' + k.dropped.join(', ')
+                + ' — a group takes one population';
+        if (typeof refreshGroups === 'function') refreshGroups();
+      }
+      said.textContent = 'saved' + extra;
     }catch(e){
       said.className = 'note bad';
       said.textContent = e.message;
@@ -5289,6 +6016,8 @@ function kioskBlock(d){
        screen, it does not go looking for what changed elsewhere meanwhile. */
     kb.checked = !!d.kiosk;
     sel.value = d.kiosk_profile || '';
+    kseg.querySelectorAll('button').forEach(x=>
+      x.classList.toggle('on', x.dataset.v === (d.kind || '')));
     sync();
     said.className = 'note';
     said.textContent = 'back to what is saved';
@@ -5650,40 +6379,6 @@ async function refreshDisplays(){
   paintBulk();
 }
 
-/* ---- one commit for all three lists ----
-   They are three parts of one document, so they are written in one request.
-   Three separate saves meant a device profile naming an appearance you had just
-   added could only be stored by pressing the buttons in the right order, and
-   the server validates the three together anyway. */
-$('b_profsave').addEventListener('click', ()=>{
-  stopSaverPreview();
-  stopLookPreview();
-  const kiosks = DPKIOSKS.filter(k=> (k.name || '').trim());
-  if (!kiosks.length){
-    dpNote('there has to be at least one device profile — a screen ticked as a '
-           + 'kiosk needs something to be', true, 'profnote');
-    return;
-  }
-  /* Only when it names one of the profiles being sent. Otherwise it is left
-     out and the server nominates the first — which is the right answer for a
-     deployment saving its very first profile, and beats refusing the save for
-     the want of a choice nobody has been offered yet. */
-  /* Only the two lists still on this tab. Appearance, geometry and speech each
-     live on their own tab now and each profile saves itself from its own row. */
-  const body = {savers: DPSAVERS.filter(x=> (x.name || '').trim()),
-                kiosks: kiosks};
-  if (kiosks.some(k=> k.id === DPKDEF)) body.kiosk_default = DPKDEF;
-  saveDp(body, 'profnote');
-});
-$('b_profrevert').addEventListener('click', ()=>{
-  stopSaverPreview();
-  stopLookPreview();
-  OPENKI = -1;
-  paintSavers((DPCFG && DPCFG.savers) || []);
-  paintKiosks((DPCFG && DPCFG.kiosks) || [], (DPCFG && DPCFG.kiosk_default) || '');
-  dpNote('back to what is saved', false, 'profnote');
-});
-
 /* ---- applying one profile to many devices ----
    One request per device rather than a bulk endpoint. The server validates a
    row at a time and says which one it refused, and inventing a second path
@@ -5878,7 +6573,7 @@ function routesChanged(){
 $('b_addroute').addEventListener('click', ()=>{
   DRAFT = newInstance();
   paintBlocks('');
-  const blk = document.querySelector('#panel .grp.isdraft');
+  const blk = document.querySelector('#panel .erow.isdraft');
   if (blk){
     const n = F(blk, 'name');
     if (n) n.focus();
@@ -6473,7 +7168,7 @@ function panelNav(){
     });
     /* The app tab's own commit row. Only on that tab, and only when nothing
        is being filtered — a filter mixes sections from every tab, so a row
-       labelled SAVE APP SETTINGS sitting under a match from SPEECH would be
+       labelled SAVE sitting under a match from SPEECH would be
        offering to save something that is not on screen. */
     const ar = $('approw');
     if (ar) ar.classList.toggle('on',
@@ -6481,12 +7176,6 @@ function panelNav(){
     /* ADD INSTANCE is not inside any block, because it makes one — it has to
        stay reachable whichever block happens to be open, or the only way to
        add a second endpoint is to first collapse the first. */
-    const pr = $('profrow');
-    if (pr) pr.classList.toggle('on',
-      tab === 'profiles' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
-    const air = $('airow');
-    if (air) air.classList.toggle('on',
-      tab === 'ai' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
   }
   /* Takes a tab button, or a tab's NAME for a tab that no longer has one.
      Documentation is reached from the ? beside the panel title now, so there
@@ -6505,17 +7194,33 @@ function panelNav(){
     render();
     syncSaveRow();
     $('panelscroll').scrollTop = 0;
-    if (tab === 'accounts'){ refreshUsers(); refreshGroups(); }
-    if (tab === 'displays' || tab === 'devices') refreshDisplays();
+    if (tab === 'accounts') refreshUsers();
+    // Groups moved to ACCOUNT, and it is populated by its own fetch — without
+    // this the list would be empty on the tab it now lives on.
+    if (tab === 'account') refreshGroups();
+    if (tab === 'displays' || tab === 'devices' || tab === 'security')
+      refreshDisplays();
     /* The three settings tabs ARE profile lists now, and those lists live in
        the displays document — so arriving at one has to fetch it, exactly as
        PROFILES does. Without this the lists were painted only if you happened
        to visit PROFILES first, which on a panel that opens on APPEARANCE
        meant they were blank. */
-    if (tab === 'profiles' || PROF_OF[tab]) refreshProfiles();
+    if (tab === 'savers' || tab === 'devprof' || tab === 'models'
+        || tab === 'network' || PROF_OF[tab]) refreshProfiles();
+    /* NETWORK says which endpoint answers on each port, and that is read off
+       the endpoints — which this tab has never fetched. Repainted once they
+       arrive rather than left saying "no endpoint" about every port. */
+    if (tab === 'network')
+      Promise.resolve(loadBackend()).then(()=> paintNetworks(DPNETS));
     if (tab === 'embeds') refreshEmbeds();
     if (tab === 'app') loadApp();
-    if (tab === 'ai') loadBackend();
+    if (tab === 'ai'){
+      /* The endpoint blocks list SPEECH PROFILES, and those live in the
+         displays document — which this tab never fetched. Painted before it
+         arrives, every picker on every endpoint is empty but for DEFAULT.
+         Load first, then paint. */
+      Promise.resolve(refreshProfiles()).then(loadBackend);
+    }
     if (tab === 'docs') loadDocs();
   }
   tabButtons.forEach(b=> b.addEventListener('click', ()=> selectTab(b)));

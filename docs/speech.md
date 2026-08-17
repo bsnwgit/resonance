@@ -19,11 +19,23 @@ Without a wake word, an AUTO display responds to any speech near it —
 including two people talking to each other. The wake word is what makes it
 usable in an occupied room.
 
-**The words themselves are not here.** Each belongs to an assistant, on the AI
-tab: with more than one, the word is what picks between them, so it belongs to
-the thing it picks. LEARN, the alternative spellings and each one's own
-greeting are all there too. What is on this tab is the gate's behaviour, which
-is one thing for the whole display however many assistants it can reach.
+**The words themselves are here**, in the speech profile — the word, the
+spellings it will also accept, LEARN, whether matching is forgiving, how long
+it stays awake, and the greeting. An endpoint names a profile and takes all of
+it, and one profile may be named by only one endpoint, so with several
+assistants each still has a word of its own.
+
+**A new profile starts with the word empty.** Everything else it inherits from
+the tab as you have it set up, which is the point of capturing a profile
+there — but a second profile carrying the first one's word is a clash by
+construction, since the word is what tells two assistants apart.
+
+**It is stored as you type it, capitals and all**, so a display can say
+*Resonance* rather than *resonance*. What it answers to is unaffected: the
+matcher lowercases both the stored word and what it heard before comparing
+them. Anything that is not a letter, a digit or a space is dropped, because
+the matcher drops it too — a hyphen kept here would print a word that is not
+the word being matched.
 
 | Mode | Behaviour |
 |---|---|
@@ -95,8 +107,8 @@ panel lists which models are resident right now.
 
 If people report being misheard, change this before changing anything else.
 
-**The choice interacts with THE EXACT WORD.** An assistant set to match only
-its exact name refuses `"Magnolia's"` where a CLOSE ENOUGH one forgives it — so
+**The choice interacts with EXACT.** An assistant set to match only its exact
+name refuses `"Magnolia's"` where a FUZZY one forgives it — so
 a smaller model buys speed at the cost of the occasional wake word that does
 not land, and the assistants most likely to be set to exact are the ones that
 switch things on. Measured on the reference box: `small.en` took 4.4s to decode
@@ -179,9 +191,8 @@ answer to *"why did nothing happen?"* now appears:
 | `transcribing…` | the recording is with the server |
 | `heard you · woken · 340ms decode, 512ms round trip` | it acted on what you said, and how long each stage took |
 | `nothing recognised — try speaking a little louder` | the recording came back empty; nothing to match against |
-| `asleep — that named none of "house" or "ada"` | somebody said something near it and no assistant was named. **It does not say what was said** |
 | `"house" is not for this display — ignored` | somebody addressed an assistant this display is not allowed to use. Nothing was sent, nothing was answered, and the conversation it was already having was left alone |
-| `waiting to be approved — kitchen (d4a19…)` | this display has never been approved. It renders correctly and answers to nothing; the id is what an administrator looks for in DISPLAYS |
+| `waiting to be approved — kitchen (d4a19…)` | this display has never been approved. It renders correctly and answers to nothing; the id is what an administrator looks for in DEVICES |
 | `enrolled as kitchen wall — say "house" or "ada"` | an enrolment code was just typed into this screen and it worked |
 | `that code was not recognised — check it and try again` | a mistyped or already-used enrolment code. Case and dashes do not matter, so it is a wrong character rather than a wrong format |
 | `that code had expired — ask for a new one` | the code was real but older than ten minutes. REISSUE in the panel gives another |
@@ -189,16 +200,20 @@ answer to *"why did nothing happen?"* now appears:
 | `refused: this display may not use house` | a question typed into the box went to an assistant this display is not allowed to use |
 | `backend: …` | why an endpoint failed, in full, where the spoken reply gives only the name |
 
-**It never shows what it overheard.** While it is asleep the line says that
-something was said and that no assistant was named — never the words. A display
-in an occupied room that printed everything within earshot would be putting
-other people's conversations on a wall, which is exactly what the wake word
-exists to prevent: answering an unaddressed sentence and publishing one are the
-same breach. Nothing is written to the line until the gate has decided the
-display was being spoken to.
+**It says nothing at all about what it overheard.** Speech that named no
+assistant was not addressed to this screen, and the line stays empty — it does
+not report the words, and it does not report that anything was heard. A display
+in an occupied room that announced every sentence within earshot would be
+putting other people's conversations on a wall, which is exactly what the wake
+word exists to prevent: answering an unaddressed sentence and remarking on one
+are the same breach. Nothing is written to the line until the gate has decided
+the display was being spoken to.
 
-The cost is real and worth knowing: a wake word that is being *misheard* used
-to be diagnosable from that line. It is not any more. **LEARN HOW I SAY IT** is
+The state is on the button rather than in a line of text: while the gate is
+shut it reads **ASLEEP**.
+
+The cost is real and worth knowing: a wake word that is being *misheard*
+produces no line at all, so it looks the same as nobody having spoken. **LEARN HOW I SAY IT** is
 the tool for that instead — it asks before it listens, captures three
 deliberate attempts, and adds the spellings the transcriber actually returns.
 
