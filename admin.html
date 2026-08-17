@@ -546,21 +546,25 @@
      Marked by weight and colour alone: where you are is the brightest thing
      in the row, and the rule under it is the only ornament — anything more
      turns navigation back into buttons. */
-  #navlinks{display:flex;align-items:center;gap:14px;min-width:0;flex-wrap:wrap}
+  /* Stretched rather than centred, so the dividers below run the full height
+     of the row and read as one rule broken by words rather than as ticks
+     floating between them. */
+  #navlinks{display:flex;align-items:stretch;gap:0;min-width:0;flex-wrap:wrap}
   #navlinks button{
+    display:flex;align-items:center;
     font:inherit;font-size:inherit;letter-spacing:inherit;
-    padding:2px 0;background:none;border:0;cursor:pointer;
+    padding:2px 14px;background:none;border:0;cursor:pointer;
     color:rgba(var(--paper),.62);
     border-bottom:1px solid transparent;
   }
   #navlinks button:hover{color:rgba(var(--paper),.95)}
   #navlinks button.on{color:var(--hue);border-bottom-color:var(--hue-dim)}
-  /* A hairline between the title and the places it can take you, so the two
-     do not read as one long row of words. */
-  #navlinks::before{
-    content:"";align-self:stretch;width:1px;margin-right:2px;
-    background:rgba(var(--glass),.28);
-  }
+  /* One between each pair, and one before the first — which separates the
+     places you can go from the title of the page you are on. The same
+     hairline in both cases: they are doing the same job. */
+  #navlinks::before{content:""}
+  #navlinks::before,
+  #navlinks button + button{border-left:1px solid rgba(var(--glass),.28)}
   #panelbar .right{margin-left:auto}
   #whobox{display:flex;align-items:center;gap:8px;min-width:0}
   #mine{
@@ -1452,7 +1456,7 @@
       <button id="tab_app" data-tab="app">ADMIN SETTINGS</button>
       <!-- Accounts before devices: a group is made here and named over there,
            so the order follows the order you do them in. -->
-      <button id="tab_accounts" data-tab="accounts">ADMIN</button>
+      <button id="tab_accounts" data-tab="accounts">ADMIN USERS</button>
       <button id="tab_displays" data-tab="displays">ACCESS</button>
       <!-- How the server itself is defended, which is administration rather
            than a connection: ACCESS answers "which device, which endpoint",
