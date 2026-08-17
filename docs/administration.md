@@ -50,7 +50,8 @@ At the top:
 At the foot, pinned so they are always reachable:
 
 - **ADMIN SETTINGS** — how the server itself is wired: where it can be reached
-  from, signing in, ports and sessions.
+  from, signing in, sessions, and the admin portal's own port. What the app
+  answers on is a network profile, not here.
 - **ACCOUNTS** — who can sign in, and the groups access is granted to.
 - **ACCESS** — what may use this server, and what each may reach.
 - **EMBEDS** — keys that let another application frame this interface.
@@ -116,7 +117,7 @@ Each of these writes a different document, so each has its own button:
 |---|---|---|
 | SAVE FOR EVERYONE (per tab) | the shared interface settings on that tab | immediately, everywhere |
 | SAVE, inside an AI endpoint's box | that endpoint alone | immediately, next question |
-| SAVE, on ADMIN SETTINGS | ports, binding, session lifetime | only after a restart |
+| SAVE, on ADMIN SETTINGS | the admin port, binding, session lifetime | only after a restart |
 
 Offering one button that meant all of them is how somebody presses the wrong
 one. A tab that writes nothing shared shows no SAVE FOR EVERYONE at all — the

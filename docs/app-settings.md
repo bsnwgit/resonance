@@ -79,16 +79,22 @@ writing to a file nothing consults.
 
 ## Ports
 
-Three listeners, each with a job:
+**One port is configured here: the admin portal's**, 9702 by default — the page
+you are reading this in, which requires a sign-in.
 
-| Port | Default | Serves |
-|---|---|---|
-| display, HTTP | 9700 | the display, no microphone |
-| display, HTTPS | 9701 | the display in full |
-| admin | 9702 | the panel you are reading this in |
+Everything the app answers on is a **network profile** instead, under
+PROFILES ▸ NETWORK. A deployment can want several, and which endpoints each
+one carries is a question about the app rather than about the portal. See
+*Assistants* → *Network profiles*.
 
-The two display ports serve the same interface to anyone who can reach them.
-The admin port serves this page and requires a sign-in.
+The portal's port stays here deliberately: it is the way back in when what is
+over there is wrong. For the same reason the server refuses to put it on a
+port a network profile is using, and refuses to give a network profile this
+one.
+
+The admin routes are not merely hidden on the app's ports — they **do not
+exist** there. Asking for one returns "not found", not "unauthorised", because
+answering "unauthorised" would confirm the route is there for anyone probing.
 
 The admin routes are not merely hidden on the display ports — they **do not
 exist** there. Asking for one returns "not found", not "unauthorised", because
@@ -96,8 +102,9 @@ answering "unauthorised" would confirm the route is there for anyone probing.
 
 ### The plain HTTP port redirects
 
-Wherever HTTPS exists and the server is reachable beyond this machine, the
-plain port stops serving and **redirects to the HTTPS port** instead. The
+A network profile may name a plain HTTP port alongside its own. Wherever HTTPS
+exists and the server is reachable beyond this machine, that plain port does
+not serve the display — it **redirects to the profile's port** instead. The
 microphone already refuses to work on an insecure origin, so a display served
 there was half dead and mostly generated confusion about why.
 

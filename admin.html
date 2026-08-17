@@ -1839,21 +1839,20 @@ pointed at a display rather than a person, so it lands with that.</div>
   <section class="grp" data-tab="app">
     <h4>Ports</h4>
     <div class="grpbody">
-  <div class="note help">Which port each interface answers on. The two display
-ports serve the AI interface people use; the admin port serves this page.</div>
+  <div class="note help">The port this page answers on, and only this one.
+What the app answers on is a <b>network profile</b> — PROFILES ▸ NETWORK —
+because a deployment can want several, and which endpoints each carries is a
+question about the app rather than about the portal.
+
+This one stays here on purpose: it is the way back in when what is over there
+is wrong.</div>
   <div id="portgrid">
-    <label for="ap_http">display · plain HTTP</label>
-    <input id="ap_http" type="number" inputmode="numeric">
-    <div class="now" id="now_http"></div>
-    <label for="ap_https">display · HTTPS (microphone)</label>
-    <input id="ap_https" type="number" inputmode="numeric">
-    <div class="now" id="now_https"></div>
     <label for="ap_admin">administration</label>
     <input id="ap_admin" type="number" inputmode="numeric">
     <div class="now" id="now_admin"></div>
   </div>
-  <div class="note help">Must be 1024–65535 and all different. Below 1024 needs
-root, and the server runs as an ordinary user.</div>
+  <div class="note help">1024–65535, and not a port a network profile is
+using. Below 1024 needs root, and the server runs as an ordinary user.</div>
     </div>
   </section>
 
@@ -3271,8 +3270,8 @@ window.addEventListener('beforeunload', e=>{
 /* How the server is wired, as opposed to how the interface looks. None of it
    can take effect while the process is running, so the page's real job is to
    be honest about what is configured versus what is actually bound. */
-const APP_FIELDS = {ap_http:'http_port', ap_https:'https_port',
-                    ap_admin:'admin_port', ap_session:'session_idle_minutes'};
+const APP_FIELDS = {ap_admin:'admin_port',
+                    ap_session:'session_idle_minutes'};
 
 /* The two axes are a segmented control each, so they read as one choice from
    a closed set rather than a value you could mistype. */
@@ -3316,7 +3315,7 @@ function showPending(j){
                  bind:'reachable at', bind_address:'which address',
                  auth:'to get in'};
   const run = j.running || {};
-  ['http','https','admin'].forEach(k=>{
+  ['admin'].forEach(k=>{
     const el = $('now_' + k), p = run[k + '_port'];
     if (el) el.textContent = p ? 'running on ' + p : 'not bound';
   });
@@ -3775,13 +3774,20 @@ function blockPaint(blk, r){
   const nw = F(blk, 'network');
   if (nw){
     const want = r.network || '';
+    /* A SHARED port is always on offer — carrying several endpoints is what it
+       is for. An exclusive one another endpoint already answers on is not:
+       offering it would be offering a save the server is going to refuse. */
     const taken = {};
     (RT.routes || []).forEach(x=>{ if (x.id !== r.id && x.network)
                                      taken[x.network] = x.name; });
-    const pool = ((DPCFG && DPCFG.networks) || []).filter(x=> !taken[x.id]);
+    const all = (DPCFG && DPCFG.networks) || [];
+    const pool = all.filter(x=> (x.values || {}).shared || !taken[x.id]);
+    const def = all.filter(x=> x.id === ((DPCFG && DPCFG.network_default) || ''))[0];
     nw.innerHTML = '';
-    const opts = [['', 'THE SHARED DISPLAY PORT']]
-                   .concat(pool.map(x=> [x.id,
+    const opts = [['', def ? 'DEFAULT — ' + def.name
+                            + ((def.values || {}).port ? ' · ' + def.values.port : '')
+                           : 'THE SHARED DISPLAY PORT']]
+                   .concat(pool.filter(x=> !def || x.id !== def.id).map(x=> [x.id,
                      x.name + ((x.values || {}).port ? ' · ' + x.values.port : '')]));
     if (want && !pool.some(x=> x.id === want))
       opts.push([want, 'a profile that no longer exists']);
@@ -4503,7 +4509,7 @@ function paintDpSettings(){
   paintSavers(DPCFG.savers || []);
   paintKiosks(DPCFG.kiosks || [], DPCFG.kiosk_default || '');
   paintModels(DPCFG.models || [], DPCFG.model_default || '');
-  paintNetworks(DPCFG.networks || []);
+  paintNetworks(DPCFG.networks || [], DPCFG.network_default || '');
 }
 
 /* The two profile lists live on their own tab now, and they are painted from
@@ -4778,9 +4784,10 @@ function paintModels(list, def){
    has to look like something; an endpoint naming no network profile is not
    missing a setting, it is on the shared display port. A nominated default
    here would move endpoints onto ports of their own without being asked. */
-let DPNETS = [], OPENNW = -1;
+let DPNETS = [], DPNWDEF = '', OPENNW = -1;
 
-function paintNetworks(list){
+function paintNetworks(list, def){
+  if (def !== undefined) DPNWDEF = def || '';
   DPNETS = (list || []).map(n=> ({id: n.id || '', _new: !!n._new,
                                   name: n.name || '',
                                   values: Object.assign({}, n.values || {})}));
@@ -4804,12 +4811,22 @@ function paintNetworks(list){
        saying so is the whole of what somebody needs to know about it. */
     const used = document.createElement('span'); used.className = 'badge';
     top.appendChild(used);
+    const dflag = document.createElement('span');
+    dflag.className = 'badge isdefault'; dflag.textContent = 'DEFAULT';
+    top.appendChild(dflag);
     const retitle = ()=>{
       nmt.textContent = (n.name || '').trim() || 'unnamed profile';
       sum.textContent = (v.port ? 'port ' + v.port : 'no port')
+                      + (v.redirect ? ' · ' + v.redirect + ' redirects' : '')
+                      + (v.shared ? ' · shared' : '')
                       + (v.open ? ' · no approval' : '');
-      const on = (RT.routes || []).filter(r=> r.network === n.id)[0];
-      used.textContent = on ? on.name : 'no endpoint';
+      /* Everything this port carries, which on the default one includes every
+         endpoint that has named no profile at all — that is what makes it the
+         default, and reading it off the endpoints keeps it from going stale. */
+      const on = (RT.routes || []).filter(r=> r.network === n.id
+                    || (n.id === DPNWDEF && !r.network)).map(r=> r.name);
+      used.textContent = on.length ? on.join(', ') : 'no endpoint';
+      dflag.style.display = (n.id && n.id === DPNWDEF) ? '' : 'none';
     };
     retitle();
     top.onclick = (e)=>{
@@ -4842,23 +4859,50 @@ function paintNetworks(list){
     pt.oninput = ()=>{ v.port = pt.value; retitle(); };
     field('Port', pt);
 
-    const seg = document.createElement('div');
-    seg.className = 'seg';
-    [['1', 'YES'], ['0', 'NO']].forEach(([val, label])=>{
-      const b = document.createElement('button');
-      b.dataset.v = val; b.textContent = label;
-      b.classList.toggle('on', (val === '1') === !!v.open);
-      b.onclick = ()=>{
-        v.open = val === '1';
-        seg.querySelectorAll('button').forEach(x=>
-          x.classList.toggle('on', x === b));
-        retitle();
-      };
-      seg.appendChild(b);
-    });
-    field('The port is the grant', seg);
+    const rd = document.createElement('input');
+    rd.type = 'number'; rd.className = 'nmedit portedit';
+    rd.min = 1024; rd.max = 65535; rd.inputMode = 'numeric';
+    rd.value = v.redirect || ''; rd.placeholder = 'none';
+    rd.oninput = ()=>{ v.redirect = rd.value; retitle(); };
+    field('Plain HTTP, redirected here', rd);
+
+    const yesno = (label, key, after)=>{
+      const seg = document.createElement('div');
+      seg.className = 'seg';
+      [['1', 'YES'], ['0', 'NO']].forEach(([val, txt])=>{
+        const b = document.createElement('button');
+        b.dataset.v = val; b.textContent = txt;
+        b.classList.toggle('on', (val === '1') === !!v[key]);
+        b.onclick = ()=>{
+          v[key] = val === '1';
+          seg.querySelectorAll('button').forEach(x=>
+            x.classList.toggle('on', x === b));
+          retitle();
+          if (after) after();
+        };
+        seg.appendChild(b);
+      });
+      return field(label, seg);
+    };
+    /* The default carries every endpoint that named nothing, so it cannot
+       stop being shared while it is the default — the server refuses that
+       save, and refusing it here as well means not offering the button that
+       leads to the refusal. */
+    yesno('More than one endpoint', 'shared',
+          ()=>{ if (!v.shared && n.id === DPNWDEF) DPNWDEF = '';
+                paintNetworks(DPNETS); });
+    yesno('The port is the grant', 'open');
 
     const acts = document.createElement('div'); acts.className = 'acts';
+    const mk = document.createElement('button');
+    mk.textContent = 'MAKE DEFAULT';
+    if (n.id && n.id === DPNWDEF){ mk.disabled = true;
+      mk.title = 'an endpoint naming no profile answers here'; }
+    else if (!v.shared){ mk.disabled = true;
+      mk.title = 'the default carries every endpoint that names no profile, '
+               + 'so it has to take more than one'; }
+    else mk.onclick = ()=>{ DPNWDEF = n.id; paintNetworks(DPNETS); };
+    acts.appendChild(mk);
     const gap = document.createElement('span'); gap.className = 'spacer';
     acts.appendChild(gap);
 
@@ -4873,9 +4917,11 @@ function paintNetworks(list){
       }
       n._new = false; OPENNW = -1;
       saveDp({networks: keep.map(x=> ({id:x.id, name:x.name,
-                                       values:{port: parseInt(x.values.port, 10),
-                                               open: !!x.values.open}}))},
-             'networknote');
+                values:{port: parseInt(x.values.port, 10),
+                        redirect: parseInt(x.values.redirect, 10) || 0,
+                        shared: !!x.values.shared,
+                        open: !!x.values.open}})),
+              network_default: DPNWDEF}, 'networknote');
     };
     acts.appendChild(save);
 
@@ -4886,7 +4932,9 @@ function paintNetworks(list){
        to the shared port at the next restart, which is a port disappearing
        with nothing said about it. */
     const on = (RT.routes || []).filter(r=> r.network === n.id)[0];
-    if (on){ del.disabled = true;
+    if (n.id && n.id === DPNWDEF){ del.disabled = true;
+      del.title = 'this is the default — make another profile the default first'; }
+    else if (on){ del.disabled = true;
       del.title = on.name + ' answers on this port — point it elsewhere first'; }
     else del.onclick = ()=>{
       OPENNW = -1; DPNETS.splice(i, 1); paintNetworks(DPNETS);
@@ -4906,7 +4954,7 @@ function paintNetworks(list){
 $('b_addnetwork').addEventListener('click', ()=>{
   if (DPNETS.length >= 8) return;
   DPNETS.push({id: profileId('w'), _new: true, name: '',
-               values: {port: '', open: false}});
+               values: {port: '', redirect: 0, shared: true, open: false}});
   OPENNW = DPNETS.length - 1;
   paintNetworks(DPNETS);
 });

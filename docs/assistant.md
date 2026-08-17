@@ -172,26 +172,42 @@ The four kinds below are what a profile can be.
 
 ## Network profiles
 
-A port of this server's own, under a name: **PROFILES ▸ NETWORK**. An endpoint
-names one and answers there and nowhere else; an endpoint naming none is
-reached on the shared display port by its wake word, as they all were before
-this existed.
+A port of this server's own, under a name: **PROFILES ▸ NETWORK**. This is
+where the app's networking lives — the only port configured under ADMIN
+SETTINGS is the admin portal's.
 
-A browser opening that port gets the ordinary interface, built from that
-endpoint's own settings — its speech profile, its greeting, its voice — with
-no other endpoint offered and nothing to address by name. **One port reaches
-one endpoint**, so a profile another endpoint already answers on is not
-offered, and the server refuses a save that would put two on one port.
+**An endpoint belongs to exactly one network profile**, and answers there and
+nowhere else. One that names none answers on whichever profile is nominated
+**DEFAULT**, which is where they all were before this existed: an upgrade turns
+the display ports into a profile called *Display*, shared, and nothing moves
+until you move it.
 
-There is no MAKE DEFAULT here, and that is deliberate. Every other list has one
-because a row naming nothing still has to look like something; an endpoint
-naming no network profile is not missing a setting. A nominated default would
-move endpoints onto ports of their own without being asked.
+**Shared or not** is the whole difference between the two things you might
+want:
+
+- **Shared** — several endpoints on one port, told apart by wake word. This is
+  how the display port has always worked, and it is what an ordinary
+  deployment wants.
+- **Not shared** — a port that *is* one assistant. A browser opening it gets
+  the ordinary interface built from that endpoint's own settings, with no
+  other endpoint offered and nothing to address by name. A second endpoint
+  claiming it is refused rather than silently never reached.
 
 | Field | What it does |
 |---|---|
-| Port | 1024–65535. Refused if it is one of the admin portal's own ports, or one another profile already has. |
-| The port is the grant | **YES** turns the request form off on that port alone — a device that can reach it uses the endpoint straight away, approved or not. **NO** applies the ordinary rules. |
+| Port | 1024–65535. Refused if it is the admin portal's, or one another profile already has. |
+| Plain HTTP, redirected here | Optional. A plain port that 307s to this one, which is what 9700 has always done for 9701. Leave it empty for none. |
+| More than one endpoint | Whether this port is shared. |
+| The port is the grant | **YES** turns the request form off on that port alone — a device that can reach it uses the endpoints straight away, approved or not. **NO** applies the ordinary rules. |
+
+**The default profile is always shared.** It carries every endpoint that names
+no profile, so one that could only take a single endpoint would strand the
+rest. The panel will not offer MAKE DEFAULT on an unshared profile, and the
+server refuses the save either way.
+
+A question arriving on a port for an endpoint that port does not carry is
+given the port's own default rather than refused — the same thing the shared
+port has always done with an endpoint switched off since the page loaded.
 
 **The port is the grant** is a statement about your network rather than about
 this server. It is right when the port is on a VLAN only the intended devices
