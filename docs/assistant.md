@@ -196,6 +196,19 @@ refused, with the addresses named. This happens at the point of saving rather
 than at the next restart, when the fix would be editing JSON on the box by
 hand.
 
+**A socket this server is already holding does not count as taken**, and only
+the same socket. The question a save has to answer is not *is this port free*
+but *will it be free once the server has restarted* — so moving a profile from
+ANY onto one of its own addresses, or off an address back onto ANY, is allowed,
+while the same port held by **another process** on the address you are moving
+to is refused. Without that distinction a profile could not be moved at all
+without first stopping the server it is running on.
+
+**Only a profile that moved is checked.** The panel sends every profile on
+every save, and a row whose address and ports are unchanged is either already
+running or already known to be broken — so it is not allowed to refuse an edit
+to a different row.
+
 **An endpoint belongs to exactly one network profile**, and answers there and
 nowhere else. One that names none answers on whichever profile is nominated
 **DEFAULT**, which is where they all were before this existed: an upgrade turns

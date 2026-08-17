@@ -267,11 +267,12 @@ def port_free(p, host="0.0.0.0"):
     if p in (RUNNING.get("http_port"), RUNNING.get("https_port"),
              RUNNING.get("admin_port")):
         return True
-    # …and so is every port this process bound for a network profile. Without
-    # this, a profile that is up and answering reports its own port as taken
-    # and cannot be saved — which made editing ANY profile fail on the ports
-    # of all the OTHERS, naming a port the admin had not touched.
-    if p in (RUNNING.get("net_ports") or ()):
+    # …and so is a socket this process is already holding — but only the same
+    # socket. Asked WITHOUT the address, this said "9701 is mine" about every
+    # address on the machine, so moving a profile onto an address where some
+    # OTHER process holds that port would have been allowed and then failed to
+    # bind at the next restart. See holding_it.
+    if holding_it(host, p):
         return True
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
@@ -308,6 +309,27 @@ def local_addresses():
     finally:
         s.close()
     return sorted(found)
+
+
+def holding_it(host, port):
+    """Is this exact listening socket one this process already has?
+
+    The question a profile's save has to ask is not "is this port free" but
+    "will this port be free once I have restarted", and the difference is
+    entirely the sockets this process is holding right now. Three ways one of
+    ours covers the address being asked about:
+
+    - the same pair, which is a profile being edited without moving its socket
+    - our WILDCARD on that port, which is what ANY binds and what makes a
+      bind test on any single address fail while we are up
+    - the request being the wildcard while we hold that port on some address,
+      which is a profile moving the other way, off an address onto ANY
+
+    Anything else is somebody else's, and gets a real bind test."""
+    bound = RUNNING.get("bound") or set()
+    if (host, port) in bound or ("0.0.0.0", port) in bound:
+        return True
+    return host == "0.0.0.0" and any(pp == port for _, pp in bound)
 
 
 def local_interfaces():
@@ -6210,7 +6232,7 @@ def main():
                 print("network %-10s port %d NOT bound: %s"
                       % (_n["name"], _bind, exc), flush=True)
                 continue
-            RUNNING.setdefault("net_ports", set()).add(_bind)
+            RUNNING.setdefault("bound", set()).add((_host, _bind))
             if _to is not None:
                 print("HTTP  on %s:%d  → redirects to %d" % (_host, _bind, _p),
                       flush=True)
