@@ -539,14 +539,14 @@
      outlined. Those are one per section and have their heading for context;
      this one has to be findable on its own from across the panel, which is
      what "defined" has to mean for a control with a single character on it. */
-  #panelhelp{
+  #panelhelp,.helpmark{
     flex:0 0 auto;width:19px;height:19px;padding:0;line-height:1;
     display:inline-flex;align-items:center;justify-content:center;
     font:inherit;font-size:calc(10px * var(--fs));letter-spacing:0;
     border:1px solid rgba(var(--help-line),.75);border-radius:50%;
     background:rgba(var(--help-line),.16);color:var(--help);cursor:pointer;
   }
-  #panelhelp:hover{border-color:rgba(var(--help-line),1);color:#cfe2f8;
+  #panelhelp:hover,.helpmark:hover{border-color:rgba(var(--help-line),1);color:#cfe2f8;
                    background:rgba(var(--help-line),.30)}
   /* The way around the panel, as LINKS rather than as buttons. They sit in a
      bar whose other occupants are a title, a help mark and your name, and a
@@ -574,7 +574,18 @@
      hairline in both cases: they are doing the same job. */
   #navlinks::before{content:""}
   #navlinks::before,
-  #navlinks button + button{border-left:1px solid rgba(var(--glass),.28)}
+  #navlinks button + button,
+  #navlinks .navtitle{border-left:1px solid rgba(var(--glass),.28)}
+  /* A large space and then a rule: the space is what separates two subjects,
+     and the rule is what stops the space reading as the bar having run out. */
+  #navlinks .navgap{width:34px}
+  #navlinks .navtitle{
+    display:flex;align-items:center;padding:2px 10px 2px 14px;
+    color:rgba(var(--paper),.75);
+  }
+  /* The mark belongs to the title beside it, not to the link after it. */
+  #navlinks .navtitle + .helpmark{margin-right:8px}
+  #navlinks .helpmark + button{border-left:0}
   #panelbar .right{margin-left:auto}
   #whobox{display:flex;align-items:center;gap:8px;min-width:0}
   #mine{
@@ -1506,18 +1517,25 @@
          one side is where you are going, the other is who you are. -->
     <span id="navlinks">
       <button id="tab_app" data-tab="app">ADMIN SETTINGS</button>
-      <!-- Accounts before devices: a group is made here and named over there,
-           so the order follows the order you do them in. -->
       <button id="tab_accounts" data-tab="accounts">ADMIN USERS</button>
-      <!-- USER ACCESS: people, and only people. The device half of arriving
-           is its own tab under CONNECTIONS, because the two populations arrive
-           by different routes with different buttons and neither wants to read
-           the other's queue while doing it. -->
-      <button id="tab_displays" data-tab="displays">USER ACCESS</button>
       <!-- How the server itself is defended, which is administration rather
-           than a connection: ACCESS answers "which device, which endpoint",
-           and this answers what the server is exposed as. -->
+           than a connection: who gets in, on what terms, and into which
+           group. -->
       <button id="tab_security" data-tab="security">SECURITY</button>
+      <!-- Two subjects in one bar, and the gap is what says so. Everything
+           left of it configures the server; everything right of it is how
+           something comes to be here. A second title rather than a fourth and
+           fifth link, because they are not more of the same thing — and it
+           carries its own ? for the same reason SETTINGS does. -->
+      <span class="navgap"></span>
+      <span class="navtitle">ENROLLMENTS</span>
+      <button id="enrolhelp" class="helpmark" type="button"
+              title="open the documentation">?</button>
+      <!-- People, and only people: the two populations arrive by different
+           routes with different buttons, and neither wants to read the
+           other's queue while doing it. -->
+      <button id="tab_displays" data-tab="displays">USER</button>
+      <button id="tab_enrol" data-tab="enrol">DEVICE</button>
     </span>
     <span class="right" id="whobox">
       <button id="whoname" title="your account">—</button>
@@ -2156,7 +2174,7 @@ limit)</label>
   <div class="note help">How long a code is worth anything for after you press
 GET A CODE. Ten minutes by default, because the usual case is somebody walking
 across a building with six characters in their head — and the clock beside each
-one on DEVICE ENROLMENT is counting this down.
+one under ENROLLMENTS ▸ DEVICE is counting this down.
 
 <b>Zero switches the clock off</b>, and that is a real answer rather than a way
 of being careless: a code is <b>one use</b>, and the row it enrols was approved
@@ -2672,7 +2690,7 @@ is the last time one asked this server anything, so a screen unplugged for a
 week says so here before anybody notices the wall.
 
 Anything that has NOT finished arriving is on the tab it is arriving through —
-USER ACCESS for a person waiting on a decision, DEVICE ENROLMENT for a screen
+ENROLLMENTS ▸ USER for a person waiting on a decision, ▸ DEVICE for a screen
 that has not taken its code yet. A row moves here on its own the moment it is
 working.
 
@@ -2902,9 +2920,6 @@ button to download it as a PDF.</div>
         <!-- The register: every device this server knows about. Not in
              UI_TABS or SETTINGS_TABS — like AI, nothing here writes the shared
              settings document. -->
-        <!-- Where a screen is set up, from naming it to the moment it takes
-             its code and leaves for the register beside it. -->
-        <button id="tab_enrol" data-tab="enrol">DEVICE ENROLMENT</button>
         <button id="tab_devices" data-tab="devices">CONNECTED DEVICES</button>
         <!-- An embed is another application connecting to this one, which is
              the same question the two beside it answer — what this server is
@@ -7978,6 +7993,8 @@ function panelNav(){
   tabButtons.forEach(b=> b.addEventListener('click', ()=> selectTab(b)));
   const phelp = $('panelhelp');
   if (phelp) phelp.addEventListener('click', ()=> selectTab('docs'));
+  const ehelp = $('enrolhelp');
+  if (ehelp) ehelp.addEventListener('click', ()=> selectTab('docs'));
   /* Opening a section from somewhere other than its own heading: ADD has to
      take you to the block it just created. Assigned out to module scope
      because this closure is where the collapse state lives. */

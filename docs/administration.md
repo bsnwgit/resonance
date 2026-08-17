@@ -39,18 +39,26 @@ controls you are editing, they change the subject entirely:
   is a network profile, not here; signing in and session lifetime are on
   SECURITY, with the rest of who-gets-in.
 - **ADMIN USERS** — the accounts that can sign in to this panel.
-- **USER ACCESS** — the request form, and everybody who has asked to be here
-  and not yet been decided about.
 - **SECURITY** — who gets in and on what terms: **signing in** and how long an
   admin session lasts, how long an **enrolment code** is worth anything for,
   **AI Requires Permission** — whether a general user needs approval at all,
   how long a grant lasts, how many devices and waiting requests there may be —
-  and the **groups** access is granted to. USER ACCESS answers who is waiting;
+  and the **groups** access is granted to. ENROLLMENTS ▸ USER answers who is waiting;
   this is whether anybody is asked in the first place.
 - **?** — these documents. It is blue, and it is the same blue as every ?
   beside a topic heading, so help is one colour wherever you meet it.
 - At the right: your own name, your role, and **SIGN OUT**. One side of that
   bar is where you are going, the other is who you are.
+
+**ENROLLMENTS**, after a gap and a rule in the same bar, is how something comes
+to be here — as opposed to everything left of it, which configures the server:
+
+- **USER** — the request form, and everybody who has asked to be here and not
+  yet been decided about.
+- **DEVICE** — where a screen is set up: named, given a code, and watched until
+  it takes it.
+- **?** — these documents again. It belongs to that title the way the first one
+  belongs to SETTINGS.
 
 Below it:
 
@@ -68,8 +76,6 @@ you administer about it:
 
 - **AI** — the endpoints, each naming a speech profile, a model profile and a
   network profile.
-- **DEVICE ENROLMENT** — where a screen is set up: named, given a code, and
-  watched until it takes it.
 - **CONNECTED DEVICES** — everything currently working, in two areas: the
   people you approved, and the devices that took a code.
 - **EMBEDS** — keys that let another application frame this interface.
@@ -124,7 +130,7 @@ Each of these writes a different document, so each has its own button:
 | SAVE, on SECURITY | who has to be approved, what a grant is worth, how long a code lasts | immediately |
 | SAVE, inside Sign in | how you get in | only after a restart |
 | SAVE, inside Sessions | how long an admin session lasts | only after a restart |
-| SAVE, on ADMIN SETTINGS | the admin port, binding, session lifetime | only after a restart |
+| SAVE, on ADMIN SETTINGS | the admin port, binding, maintenance | only after a restart, except maintenance |
 
 Offering one button that meant all of them is how somebody presses the wrong
 one. The AI tab has no tab-wide save because each endpoint saves itself from
@@ -171,14 +177,14 @@ through.** A person opens the display page and asks; a device is named here
 and takes a code to the screen. They have almost nothing in common except
 that both end up connected, so neither has to read the other's queue.
 
-**USER ACCESS** — people, and only people:
+**USER** (under ENROLLMENTS) — people, and only people:
 
 | | |
 |---|---|
 | **The request form** | what a request asks for |
 | **Waiting for approval** | everybody who has asked and not been decided about |
 
-**DEVICE ENROLMENT** — a screen, from naming it to the moment it works:
+**DEVICE** (under ENROLLMENTS) — a screen, from naming it to the moment it works:
 
 | | |
 |---|---|
@@ -191,7 +197,7 @@ leaves the tab it arrived through.
 
 Whether anybody is asked at all is on **SECURITY**, under **AI Requires
 Permission** — that is the door rather than the key, and it decides what a
-grant is worth once given. USER ACCESS answers who is waiting; SECURITY
+grant is worth once given. ENROLLMENTS ▸ USER answers who is waiting; SECURITY
 answers whether anybody has to.
 
 Each profile list has a tab of its own in the profile settings group — what a
