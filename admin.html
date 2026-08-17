@@ -1186,6 +1186,13 @@
      spacer holding the destructive actions apart. Right-aligning SAVE there
      would park it against DELETE. */
   .actrow{justify-content:flex-end;margin-top:10px}
+  /* A commit on SECURITY is the same act as the commit in an APPEARANCE
+     profile row, so it is the same size: `.erow button`'s 8.5px on 3/6,
+     rather than `.seg button`'s 9.5px on 5/8 which it would otherwise take
+     from the row it sits in. */
+  #panel .grp[data-tab="security"] .actrow button{
+    font-size:calc(8.5px * var(--fs));padding:3px 6px;
+  }
   /* Where a row carries both, ADD sits hard left and the commits hard right:
      making another profile is not the same kind of act as publishing the ones
      already there, and the gap between them says so. */
@@ -1999,7 +2006,7 @@ by noise.</div>
 
   <div class="note" id="dpnote"></div>
   <div class="seg actrow">
-    <button id="b_dpsave" class="act-save">SAVE GUEST ACCESS</button>
+    <button id="b_dpsave" class="act-save">SAVE</button>
   </div>
     </div>
   </section>
