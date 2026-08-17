@@ -5341,7 +5341,20 @@ PROFILE_KINDS.forEach(kind=>{
     const arr = PROFILES[kind.key];
     if (arr.length >= 8) return;
     /* Captured from the tab as it is RIGHT NOW, which is the whole idea: you
-       set it up, you look at it, you name it. */
+       set it up, you look at it, you name it.
+
+       The wake word is the exception, and it is cleared on the TAB rather
+       than only in the captured values — SAVE re-reads the tab, so blanking
+       the copy alone would put the old word straight back. A second speech
+       profile carrying the first one's word is the one thing that cannot be
+       right: the word is what tells two assistants apart, and one profile may
+       be named by only one endpoint. Empty, and you type the name this one
+       answers to. */
+    if (kind.key === 'speeches' && 'wakeword' in S){
+      S.wakeword = '';
+      repaintControls();
+      push();
+    }
     arr.push({id: profileId(kind.pre), _new: true, name: '',
               values: tabKeys(kind.tab)});
     OPENPR[kind.key] = arr.length - 1;
