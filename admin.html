@@ -1904,10 +1904,11 @@ lets a screen notice on its own that the server has come back — without it, an
 outage would end and the screen would stay broken until somebody walked up and
 spoke to it.
 
-A kiosk that has run out of attempts <b>says so aloud, once</b>, and shows a
-line high on the screen that clears itself when the server answers again. A
-screen that is not a kiosk stays quiet and fails at the moment somebody
-actually uses it, rather than making them wait out the retries.
+A display that has run out of attempts shows a line high on the screen, which
+clears itself when the server answers again. A <b>kiosk also says it aloud,
+once</b> — it has no transcript and nobody sitting at it. Nothing else speaks:
+a screen with somebody in front of it fails at the moment they actually use it,
+rather than making them wait out the retries.
 
 These take effect at each display's next check-in. No restart.</div>
   <div class="numgrid">
@@ -1944,6 +1945,34 @@ Spread it if the building has more than a handful of screens: twelve tablets
 reconnecting in the same second is a load this server did not previously have.
 Each screen takes its own fixed slot inside the window, so the spread stays
 put instead of re-shuffling every night.</div>
+
+  <label class="bklab">Restart this server</label>
+  <div class="numgrid">
+    <label for="ap_restart">at (HH:MM, empty for none)</label>
+    <input id="ap_restart" class="num" type="text" inputmode="numeric"
+           placeholder="03:00" spellcheck="false" autocomplete="off">
+  </div>
+  <div class="note help">The server itself, once a day. Off by default. Read
+off <b>this machine's</b> clock, not a device's — this one is about one server
+rather than twelve screens.
+
+It hands over rather than stopping: at the appointed minute the server launches
+<b>serve.sh restart</b> in a session of its own and lets that script kill it and
+start a fresh process. Nothing supervises this server, so a setting that merely
+stopped it would be a setting that ended the service at three in the morning.
+
+<b>The one risk worth knowing.</b> If the new process cannot bind — something
+else took the port while it was down — nothing catches that, and the server
+stays down until somebody looks. It is logged to <b>restart.log</b>, which
+survives the handover where server.log does not.
+
+It waits for the server to fall quiet: no question, transcription or spoken
+reply for a minute. If it never falls quiet it gives up after an hour and
+leaves it for tomorrow, rather than cutting somebody off mid-sentence.
+
+Every display sees this as a short outage and reloads itself when the server
+answers again — so if you set this, you rarely also need the nightly refresh
+above.</div>
     </div>
   </section>
 
@@ -3377,7 +3406,7 @@ const APP_FIELDS = {ap_admin:'admin_port',
    rather than special-cased inside it, because everything that loop does —
    parseInt on save, a blank meaning "leave it alone" — is wrong for a time
    somebody is allowed to clear. */
-const APP_TEXT = {ap_refresh:'refresh_at'};
+const APP_TEXT = {ap_refresh:'refresh_at', ap_restart:'restart_at'};
 
 /* The two axes are a segmented control each, so they read as one choice from
    a closed set rather than a value you could mistype. */

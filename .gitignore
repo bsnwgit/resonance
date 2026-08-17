@@ -18,6 +18,7 @@ displays.json.tmp
 groups.json
 groups.json.tmp
 server.log
+restart.log
 voices/
 stt-venv/
 venv/

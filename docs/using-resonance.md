@@ -213,11 +213,11 @@ If you are on `https://` and it still does not work:
 
 ## If it says it has lost its server
 
-A screen mounted on a wall says so aloud once, and shows **NO CONNECTION TO
-THE SERVER** high in the frame. The figure carries on drifting, because it is
-drawn on the device itself and never stopped — which is exactly why the line
-is there. A screen that looks perfectly alive and is reaching nothing would
-otherwise be walked past for a week.
+Any display shows **NO CONNECTION TO THE SERVER** high in the frame, and a
+screen mounted on a wall also says it aloud, once. The figure carries on
+drifting, because it is drawn on the device itself and never stopped — which is
+exactly why the line is there. A screen that looks perfectly alive and is
+reaching nothing would otherwise be walked past for a week.
 
 There is nothing to press. It keeps trying on its own, the line disappears the
 moment the server answers, and the screen reloads itself so it comes back with

@@ -1749,6 +1749,21 @@ it. Each entry below carries its own panel scope.
   around, because a Maintenance page with a restart button that ends the
   service is worse than one without.
 
+  *Built anyway, 2026-08-17, and the third option is the one that was missing:
+  it does not stop, it HANDS OVER.* At the appointed minute the server launches
+  `serve.sh restart` in a session of its own and lets that script kill it —
+  `stop` waits for the sockets, `start` binds a fresh process, and the helper
+  outlives its parent because causing that death is what it was launched for.
+  No supervisor is needed to bring the service back, because the thing bringing
+  it back was started before it went away. Two guards make it safe rather than
+  clever: it waits for the server to fall quiet (and a check-in is not use, or
+  a building of screens would mean it never restarted at all), and a time is
+  only ever acted on if it was already set when that minute arrived — which is
+  what stops the fresh 03:00:04 process restarting itself in a loop and stops
+  an admin typing 14:23 at 14:23 from cutting themselves off. **The residual
+  risk stands and is stated in the panel**: nothing catches a `start` that
+  cannot bind.
+
   *Panel:* a Maintenance section — retry count and interval, the nightly
   refresh window and whether it staggers, and the browser-side device
   behaviour, as a named profile picked per device the way appearance and
@@ -2178,9 +2193,17 @@ something else.
   four in the morning comes back to a lock screen with no browser running, and
   there is nothing left for this server to talk to — so kiosk mode, a launcher
   or screen pinning is a deployment instruction in the manual rather than a
-  field in the panel. And there is no scheduled server restart, because nothing
-  supervises the process: a Maintenance page with a button that ends the
-  service is worse than one without.
+  field in the panel.
+- **The scheduled server restart was built after all**, the day after the phase
+  closed. The entry had recorded it as needing a supervisor, which was true of
+  the two options considered — schedule a stop, or wait for systemd. The third
+  is a handover: the server launches `serve.sh restart` detached and lets it do
+  the killing, so what brings the service back was already running before it
+  went away. It waits for the server to fall quiet first, and will not act on a
+  time that had already passed when it was set — that one rule stops both the
+  restart loop and the admin who schedules a restart for the minute they are
+  in. What it still cannot do is catch a `start` that fails to bind, which is
+  why it is off by default and why the panel says so.
 - **Four ships without its alert.** Raising one when a forced reload fails is
   phase 8's job, and eight did not move up to meet it. A screen the server
   cannot reach at all is visible in the panel as one that stopped checking in;

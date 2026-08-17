@@ -53,7 +53,7 @@ sit on a cached copy of index.html and you end up debugging code that is no
 longer running. This sends no-store on everything instead.
 """
 import base64, functools, hashlib, hmac, http.cookies, inspect, json, os, re, \
-       secrets, ssl, sys, tempfile, threading, time
+       secrets, ssl, subprocess, sys, tempfile, threading, time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 import manual                            # the manual, and its PDF writer
@@ -166,6 +166,14 @@ APP_DEFAULTS = {
     # have; each screen takes its own offset inside the window from its own id,
     # so the spread is stable rather than re-rolled on every reload.
     "refresh_stagger": 0,
+    # And the server's own, "HH:MM" on ITS clock — this one is about one
+    # machine rather than twelve screens, so the machine's clock is the right
+    # one. Empty is off, and off is the default.
+    #
+    # It is a HAND-OVER, not a stop: see do_scheduled_restart. Nothing
+    # supervises this process, so a setting that only stopped the server would
+    # be a setting that ended the service at three in the morning.
+    "restart_at": "",
 }
 #: (low, high) for the numbers above. A poll faster than a couple of seconds is
 #: a denial of service somebody configured by accident; one slower than five
@@ -1180,17 +1188,20 @@ def validate_app(obj, current):
         except (TypeError, ValueError):
             return None, "%s must be a whole number" % k.replace("_", " ")
         cfg[k] = min(hi, max(lo, v))
-    if "refresh_at" in obj:
-        # Refused rather than clamped, unlike the numbers above: there is no
-        # nearest sensible time to a typo, and a field silently corrected to
-        # 00:00 is a building reloading at midnight because somebody mistyped.
-        v = str(obj["refresh_at"] or "").strip()
+    # Refused rather than clamped, unlike the numbers above: there is no
+    # nearest sensible time to a typo, and a field silently corrected to 00:00
+    # is a building reloading at midnight because somebody mistyped.
+    for k, what in (("refresh_at", "refresh"), ("restart_at", "restart")):
+        if k not in obj:
+            continue
+        v = str(obj[k] or "").strip()
         if v:
             m = re.match(r"^([0-9]{1,2}):([0-9]{2})$", v)
             if not m or int(m.group(1)) > 23 or int(m.group(2)) > 59:
-                return None, "the refresh time reads as HH:MM, or empty for none"
+                return None, ("the %s time reads as HH:MM, or empty for none"
+                              % what)
             v = "%02d:%s" % (int(m.group(1)), m.group(2))
-        cfg["refresh_at"] = v
+        cfg[k] = v
     for k in ("http_port", "https_port", "admin_port"):
         if k not in obj:
             continue
@@ -3008,6 +3019,126 @@ def app_pending(cfg):
             "bind", "bind_address", "auth")
     return sorted(k for k in keys
                   if RUNNING.get(k) is not None and RUNNING[k] != cfg[k])
+
+
+# ------------------------------------------------------- a scheduled restart
+# Nothing supervises this process. `serve.sh` launches it with `setsid nohup`
+# and there is deliberately no systemd unit, because that is what lets the
+# whole thing install and run without elevated rights — so a setting that
+# merely STOPPED the server at three in the morning would be a setting that
+# ended the service, with nothing left to start it again.
+#
+# So it is a HAND-OVER rather than a stop. At the appointed minute this process
+# launches `serve.sh restart` in a session of its own and then lets that script
+# kill it: `stop` waits for the socket to be released, `start` binds a fresh
+# process. The helper is detached, so the death of its parent is exactly what
+# it was launched to cause rather than something that takes it with it.
+#
+# What this cannot do is catch a `start` that fails. That risk is real, it is
+# stated in the panel, and the helper's output goes to a file that survives the
+# handover — `server.log` is truncated by every start, so a failure written
+# there would be overwritten by the next attempt or lost with the process that
+# reported it.
+RESTART_LOG = os.path.join(ROOT, "restart.log")
+#: The value being watched, when it became current, and whether this process
+#: has already handed over.
+#:
+#: ARMING is the whole of the correctness here. A time is only ever acted on if
+#: it was already set when that minute arrived, which settles two cases with
+#: one rule: the fresh process that comes back at 03:00:04 does not restart
+#: itself again in a loop, and an admin who types 14:23 at 14:23 does not take
+#: the server out from under themselves mid-sentence.
+_restart = {"at": None, "armed": 0.0, "fired": False}
+#: When somebody last USED this server, as opposed to a screen checking in.
+#: Polls arrive every few seconds from every display in the building and would
+#: read as continuous activity; a question, a transcription or a spoken reply
+#: is a person, and a restart in the middle of one is a crash as far as they
+#: can tell.
+_last_use = 0.0
+RESTART_QUIET = 60        # seconds of nobody using it before handing over
+RESTART_WINDOW = 3600     # how long to wait for that, before leaving it a day
+
+
+def note_use():
+    global _last_use
+    _last_use = time.time()
+
+
+def clock_at(hhmm, now=None):
+    """Epoch seconds for HH:MM today, on THIS machine's clock.
+
+    The server's own clock and not a device's, which is the opposite of the
+    display refresh and right for the same reason: that one is about a screen's
+    night where it hangs, this one is about one machine."""
+    m = re.match(r"^(\d{1,2}):(\d{2})$", str(hhmm or ""))
+    if not m:
+        return 0
+    lt = time.localtime(now if now is not None else time.time())
+    return time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday,
+                        int(m.group(1)), int(m.group(2)), 0, 0, 0, -1))
+
+
+def restart_due(now=None):
+    """Is it time, and is it safe? Split from the handover so the decision can
+    be reasoned about — and tested — without a process dying at the end of it."""
+    now = now if now is not None else time.time()
+    at = str(read_app().get("restart_at") or "")
+    if at != _restart["at"]:
+        # Newly set, newly cleared, or this process reading it for the first
+        # time. Whichever it is, the clock starts here — see the arming note
+        # above.
+        _restart.update(at=at, armed=now, fired=False)
+    if not at or _restart["fired"]:
+        return False
+    due = clock_at(at, now)
+    if not due or due <= _restart["armed"]:
+        return False                      # already past when it was set
+    if now < due:
+        return False                      # not yet
+    if now - due > RESTART_WINDOW:
+        return False                      # missed it — leave it for tomorrow
+    # Deferred while somebody is using it, and re-asked on the next tick. The
+    # window above is what stops that becoming "never": an hour of waiting for
+    # quiet, and then it is tomorrow's problem rather than something forced
+    # through the middle of a conversation.
+    return now - _last_use >= RESTART_QUIET
+
+
+def do_scheduled_restart():
+    """Hand over to serve.sh and expect to be killed by it."""
+    sh = os.path.join(ROOT, "serve.sh")
+    if not os.access(sh, os.X_OK):
+        print("scheduled restart: %s is not executable — skipped" % sh,
+              flush=True)
+        _restart["fired"] = True          # do not spin on it every tick
+        return
+    try:
+        log = open(RESTART_LOG, "a")
+        log.write("\n=== %s — scheduled restart (%s) ===\n"
+                  % (time.strftime("%Y-%m-%d %H:%M:%S"), _restart["at"]))
+        log.flush()
+        _restart["fired"] = True
+        print("scheduled restart — handing over to serve.sh", flush=True)
+        subprocess.Popen([sh, "restart"], cwd=ROOT, stdout=log, stderr=log,
+                         stdin=subprocess.DEVNULL, start_new_session=True)
+    except Exception as e:
+        # Still marked as fired: a handover that could not be launched will not
+        # launch on the next tick either, and a server retrying it every twenty
+        # seconds until morning is worse than one that says so once.
+        print("scheduled restart could not hand over: %s" % e, flush=True)
+
+
+def restart_watch():
+    """Every twenty seconds, because the whole mechanism is a minute wide and
+    a thread that sleeps until the exact second would have to be woken and
+    recomputed every time somebody changed the setting."""
+    while True:
+        time.sleep(20)
+        try:
+            if restart_due():
+                do_scheduled_restart()
+        except Exception as e:
+            print("scheduled restart check failed: %s" % e, flush=True)
 MIN_PASSWORD = 10
 _users_lock = threading.Lock()
 _sessions = {}                   # token -> {"user","role","expires"}
@@ -5321,6 +5452,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"ok": True, "displays": admin_displays()})
 
         if parsed.path == "/ask":
+            # Somebody is using this, which is not the same as a screen
+            # checking in — see note_use. A scheduled restart waits for these
+            # to stop.
+            note_use()
             # Reachable from the display, which has no sign-in by design.
             emb, refused = self._cap("ask")
             if refused:
@@ -5524,6 +5659,7 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"ok": True, "keys": len(incoming)})
 
         if parsed.path == "/tts":
+            note_use()
             if self._cap("speak")[1]:
                 return
             raw = self._body(64 * 1024)
@@ -5551,6 +5687,7 @@ class Handler(SimpleHTTPRequestHandler):
 
         if parsed.path != "/stt":
             return self._json(404, {"error": "not found"})
+        note_use()
         if self._cap("mic")[1]:
             return
         q = parse_qs(parsed.query)
@@ -5655,6 +5792,12 @@ def main():
     # whole product off the air to enforce a rule it cannot satisfy. There it
     # keeps serving, and says why.
     redirect_plain = have_tls and not personal
+
+    # The scheduled restart, if one is set. A daemon thread, so it never keeps
+    # a dying process alive — and it reads the setting each time round rather
+    # than at startup, so changing the time in the panel takes effect without
+    # the restart this is here to schedule.
+    threading.Thread(target=restart_watch, daemon=True).start()
 
     # warm the model in the background so the first utterance isn't slow
     for _n in (MODEL_NAME, "base.en"):      # warm both sides of the trade

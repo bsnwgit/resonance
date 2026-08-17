@@ -584,20 +584,24 @@ four by default. Three attempts is right for a server being restarted and wrong
 for a cable somebody pulled out, which is why both are fields rather than
 constants.
 
-**How it says so depends on what the screen is.**
+**Every display shows it. Only a kiosk says it aloud.**
 
-A **kiosk** speaks the failure aloud, once, after the last attempt, and shows a
-line high on the screen. It has no transcript and no composer, so speaking is
-the only way it can tell anybody — and saying it twice would make an outage
-worse than the silence it replaced. **That line clears itself** when the server
-answers again: nobody is standing in a hallway to dismiss anything, and an
-alert that has to be acknowledged at the screen is an alert that stays up for a
-month.
+**NO CONNECTION TO THE SERVER** appears high in the frame of any display whose
+check-in has run out of attempts, with a quieter note in the status row at the
+foot of the screen. **It clears itself** when the server answers again: nobody
+is standing in a hallway to dismiss anything, and an alert that has to be
+acknowledged at the screen is an alert that stays up for a month. A line is
+silent, so it interrupts nobody — and somebody sitting at a desk tab learns why
+it stopped answering before they ask it anything.
 
-Anything **not** a kiosk stays quiet. Somebody is sitting in front of it, and
-it fails at the moment they actually try to use it rather than making them wait
-out three attempts first. Somebody who has just spoken is owed an answer now; a
-hallway nobody is standing in is not.
+A **kiosk** also speaks it, once, after the last attempt. It has no transcript
+and no composer, so speech is the only way it can tell anybody — and saying it
+twice would make an outage worse than the silence it replaced.
+
+**Nothing else speaks**, because speech fills a room. A desk tab stays quiet
+and fails at the moment somebody actually tries to use it, rather than making
+them wait out three attempts first. Somebody who has just spoken is owed an
+answer now; a hallway nobody is standing in is not.
 
 **On reconnect the page reloads** rather than picking up where it left off.
 Resuming would preserve a conversation nobody is having any more — the outage
@@ -636,6 +640,50 @@ reconnecting in the same second is a load this server did not previously have.
 Each screen takes its own fixed slot inside the window, worked out from its
 device id, so the spread stays put instead of re-shuffling every night.
 
+### Restarting this server on a schedule
+
+**Restart this server at (HH:MM)** — off by default, and read off *this
+machine's* clock rather than a device's, because this one is about one server
+rather than twelve screens.
+
+There is no supervisor: `serve.sh` launches the process with `setsid nohup` and
+there is deliberately no systemd unit, because that is what lets the whole
+thing install and run without elevated rights. So a setting that merely
+*stopped* the server at three in the morning would be a setting that ended the
+service, with nothing left to start it again.
+
+**It hands over instead.** At the appointed minute the server launches
+`serve.sh restart` in a session of its own and lets that script kill it — `stop`
+waits for the sockets to be released, `start` binds a fresh process. The helper
+is detached, so the death of its parent is the thing it was launched to cause
+rather than something that takes it with it.
+
+**It waits for the server to fall quiet** — no question, transcription or
+spoken reply for a minute. A restart in the middle of one is a crash as far as
+whoever asked can tell. A check-in is not use: every display sends one every
+few seconds, and treating those as activity would mean a building of screens
+that never let the server restart at all. If it never falls quiet, it gives up
+after an hour and leaves it for tomorrow.
+
+**Setting a time that has already passed today leaves it for tomorrow.** That
+is not a special case, it is the whole safety property: a time is only ever
+acted on if it was already set when that minute arrived. It is what stops the
+fresh process that came back at 03:00:04 from restarting itself again in a
+loop, and it is what stops an admin who types `14:23` at `14:23` from taking
+the server out from under themselves.
+
+**The one risk worth knowing.** If the new process cannot bind — something else
+took the port while it was down — nothing catches that, and the server stays
+down until somebody looks. That is the residual cost of having no supervisor,
+and it is why this is a field you set deliberately rather than a default. The
+handover is logged to **`restart.log`**, which survives it; `server.log` is
+truncated by every start, so a failure written there would be lost with the
+process that reported it.
+
+Every display sees the restart as a short outage and reloads itself when the
+server answers again — so with this set you rarely also need the nightly
+refresh above.
+
 ### What this cannot reach
 
 **A device that reboots.** A tablet that restarts at four in the morning after
@@ -653,14 +701,6 @@ reaches it. Relaunching a browser at a URL on boot is the device's job:
 
 Saying that plainly is better than a Maintenance page that quietly fails to
 cover it.
-
-**A scheduled restart of this server.** There is no supervisor. `serve.sh`
-launches the process with `setsid nohup` and there is deliberately no systemd
-unit, because that is what lets the whole thing install and run without
-elevated rights — so a setting that stopped the server at three in the morning
-would have nothing to start it again. A Maintenance page with a restart button
-that ends the service is worse than one without, so there is not one. It waits
-for a supervisor somebody opts into.
 
 ## Groups
 
