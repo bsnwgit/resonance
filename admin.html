@@ -3716,17 +3716,29 @@ function blockNote(blk, m, bad){
 /* Nothing below the provider choice applies to DEMO: there is no connection to
    configure and the built-in replies ignore the prompt. Leaving the fields on
    screen would be a block full of controls wired to nothing. */
+/* A route's provider, base URL and model are the MODEL PROFILE's now. The
+   route keeps a blanked copy — provider 'demo', the rest empty — so that a
+   stale credential cannot sit in routes.json looking live, which means
+   reading r.provider gives 'demo' for every endpoint on the server. Anything
+   that used to branch on it has to resolve the profile instead. */
+function routeModel(r){
+  const pool = (DPCFG && DPCFG.models) || [];
+  return pool.filter(x=> x.id === ((r && r.model_profile) || ''))[0]
+      || pool.filter(x=> x.id === ((DPCFG && DPCFG.model_default) || ''))[0]
+      || null;
+}
+function routeProvider(r){
+  const m = routeModel(r);
+  return (m && m.values && m.values.provider) || 'demo';
+}
+
 function blockSyncProvider(blk){
   /* Read off the model profile this endpoint names, not off a control — the
      provider is the profile's now. Reading a control that no longer exists
      made every endpoint look like DEMO, which hid its limits and its system
      prompt. */
   const sel = blk.querySelector('[data-f="model_profile"]');
-  const want = sel ? sel.value : '';
-  const pool = (DPCFG && DPCFG.models) || [];
-  const prof = pool.filter(x=> x.id === want)[0]
-            || pool.filter(x=> x.id === ((DPCFG && DPCFG.model_default) || ''))[0];
-  const v = (prof && prof.values && prof.values.provider) || 'demo';
+  const v = routeProvider({model_profile: sel ? sel.value : ''});
   const connected = v !== 'demo', anth = v === 'anthropic',
         ha = v === 'homeassistant';
   const show = (name, yes)=>{ const el = R(blk, name); if (el) el.style.display = yes ? '' : 'none'; };
@@ -3775,10 +3787,11 @@ function blockPaint(blk, r){
   blk.classList.toggle('isoff', r.enabled === false);
   blk.querySelector('.rtname').textContent = r.name || (r.id ? '(unnamed)' : 'New endpoint');
   const sum = blk.querySelector('.rtsum');
+  const rp = routeProvider(r), rm = routeModel(r);
   const where = !r.id ? 'unsaved'
-    : r.provider === 'demo' ? 'built-in replies'
-    : r.provider === 'homeassistant' ? 'Home Assistant'
-    : (r.model || 'no model');
+    : rp === 'demo' ? 'built-in replies'
+    : rp === 'homeassistant' ? 'Home Assistant'
+    : (((rm && rm.values) || {}).model || 'no model');
   sum.innerHTML = (r.wakeword ? 'say <b>&ldquo;' + rtEsc(r.wakeword) + '&rdquo;</b> &rarr; ' : '')
                 + rtEsc(where)
                 + (r.is_default ? ' &middot; default' : '')
@@ -3864,7 +3877,7 @@ function blockPaint(blk, r){
        Another house is offered — two of them in one building is a real
        arrangement, and one may know a room the other does not. */
     const opts = [['', 'nothing — it answers for itself']].concat(
-      (RT.routes || []).filter(x=> x.id !== r.id && x.provider !== 'demo')
+      (RT.routes || []).filter(x=> x.id !== r.id && routeProvider(x) !== 'demo')
                        .map(x=> [x.id, x.name]));
     if (want && !opts.some(([v])=> v === want)) opts.push([want, 'an endpoint that is gone']);
     opts.forEach(([v, label])=>{
@@ -3898,12 +3911,12 @@ function blockPaint(blk, r){
              || pool.filter(x=> x.id === ((DPCFG && DPCFG.model_default) || ''))[0];
       return p ? p.name : 'no model profile';
     })(),
-    limits: r.provider === 'homeassistant' ? r.timeout + 's'
+    limits: routeProvider(r) === 'homeassistant' ? r.timeout + 's'
           : r.max_tokens + ' tokens · '
           + (r.history_turns ? r.history_turns + ' turns' : 'no context') + ' · '
           + r.timeout + 's',
-    prompt: r.provider === 'demo' ? 'not used in demo'
-          : r.provider === 'homeassistant' ? 'set in Home Assistant'
+    prompt: routeProvider(r) === 'demo' ? 'not used in demo'
+          : routeProvider(r) === 'homeassistant' ? 'set in Home Assistant'
           : ((r.system || '').trim().split(/\s+/).filter(Boolean).length + ' words'),
   };
   Object.keys(sums).forEach(g=>{
@@ -4200,10 +4213,13 @@ async function blockAction(blk, act, btn){
       const now = document.querySelector('#panel .grp[data-rid="' + j.id + '"]');
       const rec = RT.routes.find(x=> x.id === j.id) || {};
       if (now) blockNote(now, 'saved · say “' + rec.wakeword + '” to reach '
-        + rec.name + ' · ' + (rec.provider === 'demo' ? 'built-in replies'
-                            : rec.provider === 'homeassistant'
-                            ? 'Home Assistant at ' + rec.base_url
-                            : rec.model + ' at ' + rec.base_url));
+        + rec.name + ' · ' + (()=>{
+          const m = routeModel(rec), mv = (m && m.values) || {};
+          return routeProvider(rec) === 'demo' ? 'built-in replies'
+               : routeProvider(rec) === 'homeassistant'
+               ? 'Home Assistant at ' + (mv.base_url || '')
+               : (mv.model || 'no model') + ' at ' + (mv.base_url || '');
+        })());
       return;
     }catch(e){ return blockNote(blk, e.message, true); }
   }
