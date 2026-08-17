@@ -1485,7 +1485,11 @@
       <!-- Accounts before devices: a group is made here and named over there,
            so the order follows the order you do them in. -->
       <button id="tab_accounts" data-tab="accounts">ADMIN USERS</button>
-      <button id="tab_displays" data-tab="displays">ACCESS</button>
+      <!-- USER ACCESS: people, and only people. The device half of arriving
+           is its own tab under CONNECTIONS, because the two populations arrive
+           by different routes with different buttons and neither wants to read
+           the other's queue while doing it. -->
+      <button id="tab_displays" data-tab="displays">USER ACCESS</button>
       <!-- How the server itself is defended, which is administration rather
            than a connection: ACCESS answers "which device, which endpoint",
            and this answers what the server is exposed as. -->
@@ -2176,8 +2180,13 @@ by noise.</div>
     </div>
   </section>
 
-  <section class="grp" data-tab="displays">
-    <h4>Created Access</h4>
+  <!-- The device half of arriving, start to finish: name it, take the code to
+       the screen, and watch it leave this tab the moment it is used. It sat on
+       ACCESS beside the request form, which put two different populations
+       arriving two different ways on one page — and put the code somewhere
+       other than the register it appeared in. -->
+  <section class="grp" data-tab="enrol">
+    <h4>Get a code</h4>
     <div class="grpbody">
   <label class="bklab" style="margin-top:2px">Add a display — name it, then type the code into the screen</label>
   <div class="seg" id="dispadd">
@@ -2536,6 +2545,52 @@ nothing but that id.</div>
        inside it says the same word twice. A bare section has no heading, never
        collapses — there is nothing to collapse it behind — and gets its ? on a
        thin row of its own. -->
+  <!-- Only people, and only those who have not been decided about. This is a
+       QUEUE: it is read when something needs doing, and it is empty when
+       nothing does. -->
+  <section class="grp" data-tab="displays">
+    <h4>Waiting for approval</h4>
+    <div class="grpbody">
+  <div id="asklist"></div>
+  <div class="note" id="asknote"></div>
+  <div class="note help" style="margin-top:10px">Somebody opened the display
+page on their own device and filled in the form above. Nothing they said is
+proof of anything — it is what they told you — but a request that arrives
+saying <b>Sarah, building 4 laptop</b> is one you can act on, where an
+anonymous row is one you can only guess at.
+
+<b>APPROVE</b> grants access and, in the same gesture, whichever endpoints you
+tick. <b>REFUSE</b> gives them a message and you a note for whoever comes back
+to this row in six months, and says whether they may ask again.
+
+They leave this list the moment you decide, and appear under CONNECTIONS ▸
+CONNECTED DEVICES.</div>
+    </div>
+  </section>
+
+  <!-- Devices that have been minted a code and have not used it yet. Same
+       shape as the queue above, for the other population. -->
+  <section class="grp" data-tab="enrol">
+    <h4>Waiting for their code</h4>
+    <div class="grpbody">
+  <div id="enrollist"></div>
+  <div class="note help" style="margin-top:10px">A row exists from the moment
+you press GET A CODE, so its endpoints can be ticked and its profile chosen
+before the screen it is for has ever been switched on.
+
+<b>A code lasts ten minutes and works once.</b> If it runs out, REISSUE gives
+another — the row is the PLACE, so its name and every endpoint that names it
+are kept.
+
+The screen it is for takes the code either way: type
+<b>&lt;this server&gt;/e/CODE</b> into its address bar, or open the display
+page and type the six characters into the box it offers.
+
+It leaves this list the moment the code is used, and appears under
+CONNECTIONS ▸ CONNECTED DEVICES.</div>
+    </div>
+  </section>
+
   <section class="grp bare" data-tab="devices">
     <div class="grpbody">
   <div class="bulkbar" id="bulkbar" hidden>
@@ -2548,22 +2603,36 @@ nothing but that id.</div>
   <!-- On THIS tab. The result used to be written to the Created Access note,
        which is on ACCESS — a message nobody standing here could see. -->
   <div class="note" id="bulknote"></div>
-  <div id="connlist"></div>
-  <div class="note help" style="margin-top:10px">Every device this server knows
-about, in one register. A display is one device — a screen on a wall, a TV, a
-laptop, somebody's phone — and anything with a browser and a microphone counts.
 
-<b>Anything waiting on you sorts to the top</b>, by how much it wants
-attention: asked, expired, holding a code, waiting, refused, then gone quiet.
-Everything that is simply working follows, most recently heard from first.
-<b>last seen</b> is the last time one asked this server anything, so a screen
-unplugged for a week says so here before anybody notices the wall.
+  <!-- Two areas, one page. Both are connections and both are read the same way
+       — what is out there, and when was it last heard from — but "which of my
+       screens is on the wall" and "who have I let in" are different questions,
+       asked by the same admin on different days. A person and a hallway
+       display have almost nothing in common except that both got here. -->
+  <div class="listtitle" style="margin-top:2px">People</div>
+  <div id="connusers"></div>
+  <div class="listtitle" style="margin-top:16px">Devices</div>
+  <div id="conndevices"></div>
+  <div class="note" id="connnote"></div>
 
-A device that has just connected appears here straight away, whether or not
-anybody has approved it yet — which is the moment you are usually looking for
-it.
+  <div class="note help" style="margin-top:10px">Everything currently connected
+to this server. A display is one device — a screen on a wall, a TV, a laptop,
+somebody's phone — and anything with a browser and a microphone counts.
 
-Devices on a granted request carry <b>access runs out</b>; those you issued a
+<b>People</b> arrived by asking: they opened the display page and filled in
+the request form, and you approved them. <b>Devices</b> arrived by code: you
+named one, and somebody typed its six characters into the screen.
+
+Both lists are ordered by what was heard from most recently. <b>last seen</b>
+is the last time one asked this server anything, so a screen unplugged for a
+week says so here before anybody notices the wall.
+
+Anything that has NOT finished arriving is on the tab it is arriving through —
+USER ACCESS for a person waiting on a decision, DEVICE ENROLMENT for a screen
+that has not taken its code yet. A row moves here on its own the moment it is
+working.
+
+People on a granted request carry <b>access runs out</b>; devices you issued a
 code for do not, and never will.
 
 <b>WITHDRAW</b> takes access away; the row stays here, no longer working.
@@ -2789,7 +2858,10 @@ button to download it as a PDF.</div>
         <!-- The register: every device this server knows about. Not in
              UI_TABS or SETTINGS_TABS — like AI, nothing here writes the shared
              settings document. -->
-        <button id="tab_devices" data-tab="devices">DEVICES</button>
+        <!-- Where a screen is set up, from naming it to the moment it takes
+             its code and leaves for the register beside it. -->
+        <button id="tab_enrol" data-tab="enrol">DEVICE ENROLMENT</button>
+        <button id="tab_devices" data-tab="devices">CONNECTED DEVICES</button>
         <!-- An embed is another application connecting to this one, which is
              the same question the two beside it answer — what this server is
              wired to — rather than something you administer about the server
@@ -6355,41 +6427,67 @@ function paintBulk(){
   }
 }
 
+/* Four lists, on three tabs, and every row lands in exactly one of them.
+   Which one is two questions: is this thing WORKING, and is it a person or a
+   machine.
+
+   It was one register holding all of it, which was itself a merge of two —
+   and the merge was right for what it fixed and wrong for what it cost. A row
+   that has not finished arriving is a job somebody has to do; a row that is
+   working is a thing they look up. Those are not the same page. And a person
+   who filled in a form has nothing in common with a screen an admin minted a
+   code for except that both end up connected: the two get there by different
+   routes, with different buttons, and neither wants to read the other's queue
+   while doing it.
+
+   So: WAITING FOR APPROVAL and GET A CODE are the two arrivals halls, one per
+   population, and CONNECTED DEVICES is where both end up — still told apart,
+   because "which of my screens is on the wall" and "who has been let in" are
+   different questions asked by the same admin on different days. */
+const DISP_BUCKETS = ['waiting', 'enrol', 'users', 'devices'];
+function dispBucket(d){
+  const person = d.group_kind === 'user';
+  if (dispState(d) === 'live') return person ? 'users' : 'devices';
+  return person ? 'waiting' : 'enrol';
+}
+
 async function refreshDisplays(){
-  const conn = $('connlist');
-  if (!conn || ME.role !== 'admin'){
-    if (conn) conn.textContent = '';
+  const box = {};
+  DISP_BUCKETS.forEach(k=> box[k] = $({waiting: 'asklist', enrol: 'enrollist',
+                                       users: 'connusers',
+                                       devices: 'conndevices'}[k]));
+  const live = DISP_BUCKETS.filter(k=> box[k]);
+  if (!live.length || ME.role !== 'admin'){
+    live.forEach(k=>{ box[k].textContent = ''; });
     return;
   }
   await loadDisplays();
   // The settings above the list are painted from the same fetch, so the two
   // can never be describing different states of the same document.
   paintDpSettings();
-  conn.innerHTML = '';
-  /* ONE register, not two. It was split — a queue of things wanting a
-     decision, and a list of things simply working — on the reasoning that
-     burying three rows that need attention among fifty that do not is how a
-     request sits unanswered for a week. The ordering below is what actually
-     carried that, and it survives the merge: anything waiting sorts to the
-     top, by how much it wants attention, and everything working follows by
-     what was heard from most recently. What the split cost was somewhere to
-     look: a device you had just plugged in was in one list or the other
-     depending on whether it had been approved yet, which is exactly the moment
-     you are looking for it. */
+  live.forEach(k=>{ box[k].innerHTML = ''; box[k].className = ''; });
+  /* Anything waiting sorts by how much it wants attention; anything working
+     sorts by what was heard from most recently. Both orders survive the split
+     — they were the whole of what the merged register did for you. */
   const rank = {asked: 0, expired: 1, code: 2, waiting: 3, denied: 4, stale: 5};
+  const seen = {};
   const rows = DISPLAYS.slice().sort((a, b)=>
-    (rank[dispState(a)] - rank[dispState(b)]) || (b.created || 0) - (a.created || 0));
-  const pending = rows.filter(d=> dispState(d) !== 'live');
-  const live = DISPLAYS.slice()
-    .filter(d=> dispState(d) === 'live')
-    .sort((a, b)=> (b.last_seen || 0) - (a.last_seen || 0));
-  if (!DISPLAYS.length){
-    conn.className = 'note';
-    conn.textContent = 'No devices yet. Name one under Created Access to get a '
-                     + 'code, or open the display page on any device and it '
-                     + 'appears here.';
-  }else conn.className = '';
-  pending.concat(live).forEach(d=>{
+      (rank[dispState(a)] - rank[dispState(b)])
+      || (b.last_seen || 0) - (a.last_seen || 0)
+      || (b.created || 0) - (a.created || 0));
+  const EMPTY = {
+    waiting: 'Nobody is waiting. A person who opens the display page and asks '
+             + 'for access appears here.',
+    enrol: 'No devices being set up. Name one above to get a code.',
+    users: 'No people connected yet.',
+    devices: 'No devices connected yet. One appears here the moment it takes '
+             + 'its code.',
+  };
+  rows.forEach(d=>{
+    const bucket = dispBucket(d);
+    const conn = box[bucket];
+    if (!conn) return;                  // that tab is not in the document
+    seen[bucket] = true;
     const st = dispState(d);
     const row = document.createElement('div');
     row.className = 'erow' + (st === 'live' ? '' : ' off');
@@ -6429,8 +6527,12 @@ async function refreshDisplays(){
       if (e.target.closest('input, button, select, textarea')) return;
       const opening = row.classList.contains('shut');
       OPENROW = opening ? d.id : '';
-      // One at a time. It used to say "across both lists"; there is one now.
-      document.querySelectorAll('#connlist .erow')
+      /* One at a time, across every one of the four lists — they are on three
+         tabs, so two could never be looked at together anyway, and a row left
+         open on a tab you walked away from is a row you come back to already
+         scrolled past. */
+      document.querySelectorAll('#asklist .erow, #enrollist .erow, '
+                                + '#connusers .erow, #conndevices .erow')
               .forEach(x=> x.classList.add('shut'));
       row.classList.toggle('shut', !opening);
     };
@@ -6668,6 +6770,14 @@ async function refreshDisplays(){
     row.appendChild(kb.said);
     conn.appendChild(row);
   });
+  /* A list with nothing in it says what would put something in it. An empty
+     box under a heading is indistinguishable from one that failed to load,
+     and these four are empty at different times for different reasons. */
+  live.forEach(k=>{
+    if (seen[k]) return;
+    box[k].className = 'note';
+    box[k].textContent = EMPTY[k];
+  });
   /* No summary line. Every row already says what it is, and a count above a
      list you can see the whole of is a sentence describing what is directly
      underneath it. */
@@ -6874,8 +6984,17 @@ function decide(d, approve, name, row){
   if (!approve) reason.focus();
 }
 
+/* The four lists are on three tabs, and every one of them can act on a row.
+   A message written to a fixed element is a message on whichever tab that
+   element happens to live on — which, since GET A CODE moved to its own tab,
+   is not the tab anybody pressing APPROVE is looking at. */
+function dispNoteEl(){
+  return $({displays: 'asknote', enrol: 'dispnote',
+            devices: 'connnote'}[CURRENT_TAB] || 'dispnote') || $('dispnote');
+}
+
 async function displayAction(path, body, said){
-  const note = $('dispnote');
+  const note = dispNoteEl();
   try{
     const j = await api(path, {method:'POST', body: JSON.stringify(body)});
     /* A row that was just given a code is the row you want open — the code is
@@ -7645,8 +7764,8 @@ function panelNav(){
     // Groups moved to ACCOUNT, and it is populated by its own fetch — without
     // this the list would be empty on the tab it now lives on.
     if (tab === 'account') refreshGroups();
-    if (tab === 'displays' || tab === 'devices' || tab === 'security')
-      refreshDisplays();
+    if (tab === 'displays' || tab === 'devices' || tab === 'security'
+        || tab === 'enrol') refreshDisplays();
     /* The three settings tabs ARE profile lists now, and those lists live in
        the displays document — so arriving at one has to fetch it, exactly as
        PROFILES does. Without this the lists were painted only if you happened
@@ -7733,6 +7852,7 @@ function start(){
   // Approving a device is granting it something, which is not a thing a
   // read-only account does — and the server refuses the routes anyway.
   $('tab_displays').style.display = admin ? '' : 'none';
+  $('tab_enrol').style.display = admin ? '' : 'none';
   $('tab_embeds').style.display = admin ? '' : 'none';
   /* The accounts tab stays, because Groups live on it and a group has nothing
      to do with signing in. What goes, where there is no sign-in, is the three

@@ -39,10 +39,11 @@ controls you are editing, they change the subject entirely:
   What the app answers on is a network profile, not here.
 - **ADMIN USERS** — who can sign in. The groups access is granted to have a tab
   of their own, GROUPS, in the profile settings row.
-- **ACCESS** — what may use this server, and what each may reach.
+- **USER ACCESS** — the request form, and everybody who has asked to be here
+  and not yet been decided about.
 - **SECURITY** — **AI Requires Permission**: whether a general user needs
   approval at all, how long a grant lasts, and how many devices and waiting
-  requests there may be. ACCESS answers which device may reach which endpoint;
+  requests there may be. USER ACCESS answers who is waiting;
   this is whether anybody is asked in the first place.
 - **?** — these documents. It is blue, and it is the same blue as every ?
   beside a topic heading, so help is one colour wherever you meet it.
@@ -65,8 +66,10 @@ you administer about it:
 
 - **AI** — the endpoints, each naming a speech profile, a model profile and a
   network profile.
-- **DEVICES** — the register: every device this server knows about, and where
-  each one is set up.
+- **DEVICE ENROLMENT** — where a screen is set up: named, given a code, and
+  watched until it takes it.
+- **CONNECTED DEVICES** — everything currently working, in two areas: the
+  people you approved, and the devices that took a code.
 - **EMBEDS** — keys that let another application frame this interface.
 
 **Your own account is behind your name.** Click it for the box that changes
@@ -159,20 +162,33 @@ A display is one device — a screen on a wall, a TV, a laptop, somebody's phone
 — as distinct from a browser tab somebody opened. Anything with a browser and a
 microphone counts.
 
-The ACCESS tab holds two topics — the rules about who may be here:
+**Two populations arrive by two routes, and each has a tab to arrive
+through.** A person opens the display page and asks; a device is named here
+and takes a code to the screen. They have almost nothing in common except
+that both end up connected, so neither has to read the other's queue.
+
+**USER ACCESS** — people, and only people:
 
 | | |
 |---|---|
-| **The request form** | what a request asks for. Whether anyone is asked at all is on SECURITY |
-| **Created Access** | where you invite a device: name it and take the code to the screen |
+| **The request form** | what a request asks for |
+| **Waiting for approval** | everybody who has asked and not been decided about |
+
+**DEVICE ENROLMENT** — a screen, from naming it to the moment it works:
+
+| | |
+|---|---|
+| **Get a code** | name it, and the code appears with the clock already running |
+| **Waiting for their code** | rows minted and not yet used, with REISSUE for one that ran out |
+
+**CONNECTED DEVICES** — everything that is working, in two areas, **People**
+and **Devices**. A row moves here on its own the moment it is connected, and
+leaves the tab it arrived through.
 
 Whether anybody is asked at all is on **SECURITY**, under **AI Requires
 Permission** — that is the door rather than the key, and it decides what a
-grant is worth once given. ACCESS answers which device may reach which
-endpoint.
-
-The register itself is on its own tab, **DEVICES**, right of the divider
-beside AI and SECURITY — every device this server knows about, in one list.
+grant is worth once given. USER ACCESS answers who is waiting; SECURITY
+answers whether anybody has to.
 
 Each profile list has a tab of its own in the profile settings group — what a
 screen looks like and what it is allowed to do were never the same question:
