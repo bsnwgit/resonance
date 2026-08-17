@@ -1832,12 +1832,25 @@ it. Each entry below carries its own panel scope.
   display-side drop is what keeps an utterance from being anybody's business
   in the first place.
 
-  **People and places are separate namespaces** — `?person=` beside
-  `?display=` — and a URL carrying both is refused rather than merged. One
-  parameter holding both kinds is the list nobody could describe that groups
-  already refused to be, and it would hang everything a place owns — appearance,
-  kiosk mode, route bindings, session length — off a person, who has no place
-  and therefore no defensible answer for any of them.
+  **People and places are separate namespaces**, and neither can be spelled in
+  the other's notation: a place is `?display=<name>`, a person is a minted path,
+  and there is no parameter that could carry either. One that could would be
+  the list nobody could describe that groups already refused to be, and it
+  would hang everything a place owns — appearance, kiosk mode, route bindings,
+  session length — off a person, who has no place to hang any of it on.
+
+  **A device is a device, so spending a person's URL on an approved display is
+  refused** — at the moment it is attempted, with the screen saying so, rather
+  than accepted and then quietly ignored on some later request. A kiosk is
+  precisely the case signing a person in is not for, and until the middle
+  ground below exists the honest answer is no. The URL is not spent by the
+  refusal and still works everywhere it should.
+
+  Below that line a person wins: a browser holding a token nobody approved is
+  somebody who once looked at this page, not a screen on a wall. The precedence
+  in full — a declared place name, then an approved display, then an identity,
+  then an unapproved token, then a guest — is what *the URL decides which*
+  turns into where a request is actually answered.
 
   **The user URL carries a minted, unguessable component** rather than being a
   readable name. A name is guessable, and a guessable URL that grants reach is
