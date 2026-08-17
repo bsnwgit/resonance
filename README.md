@@ -78,9 +78,10 @@ that is still the product, and staying up unattended — a tablet on a wall is a
 browser tab running for a year, and it now checks in, says so when it cannot,
 reloads itself when it can again, and can be reached from the panel.
 
-**Not done, in the order it matters:** identity and memory, so a conversation
-can mean something an hour later — the embed is deliberately memoryless until
-that lands. Then packaging it as a library other projects can install.
+**Next, in the order it matters:** identity and the PIN, which is phase 5 and
+the first thing after four — then memory, so a conversation can mean something
+an hour later; the embed is deliberately memoryless until that lands. Then
+packaging it as a library other projects can install.
 
 The [Roadmap](#roadmap) carries the reasoning for each, including the
 decisions already taken about how identity and memory should work.
@@ -1081,7 +1082,7 @@ two people in one room with three listening microphones between them.
 | 1b | ~~**The Home Assistant adapter**~~ **— done** | saying the house name switches a light on | 1a | none |
 | 2 | ~~**Displays, and binding a route to one**~~ **— done** | only the tablets you approved can actuate the house, whatever anyone's browser is set to | 1b | none |
 | 3 | ~~**What a wall display looks like**~~ **— done** | voice only and speak only, an appearance per place, and a screensaver that is still the product | 2 | none |
-| 4 | ~~**Staying up unattended**~~ **— done** | a tablet nobody touches for a year is still working | 3 | none · the alert waits for 8 |
+| 4 | ~~**Staying up unattended**~~ **— done** | a tablet nobody touches for a year is still working | 3 | none · closed 2026-08-17 · alert and drop test in 8 |
 | 5 | **Identity and the PIN** | a person, as distinct from a place | 2 | **1** · whether an identity carries its own Home Assistant token |
 | 6 | **Personal wake words** | one person addressing a tablet stops triggering another person's device | 5 | none |
 | 7 | **Memory** | conversations that mean something across sessions | 5 | **1** · what the retained unit is — deliberately left to experience |
@@ -1159,10 +1160,13 @@ three faults that had nothing to do with Home Assistant, plus two secret
 disclosures, all of which would otherwise have been debugged through a new
 adapter.
 
-**4 is done**, and it is the first phase whose value is entirely invisible when
-it works — with one thing owed and booked into eight: nothing it built has yet
+**4 is done and closed**, by him, on 2026-08-17 — with one thing owed and
+booked into eight rather than left hanging over it: nothing it built has yet
 faced a real network drop on real hardware, and that test is written up in
-eight's entry rather than left as a good intention. What it turned out to be is a set of small mechanisms that only make
+eight's entry as five things to run rather than as a good intention.
+
+It is the first phase whose value is entirely invisible when it works. What it
+turned out to be is a set of small mechanisms that only make
 sense together, and one of them — the check-in — pays for four of the others:
 last seen, the reload channel, the settings reaching a building of screens, and
 a screen noticing on its own that the server came back. Its position held:
