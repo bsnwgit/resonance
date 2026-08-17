@@ -195,6 +195,15 @@
     font-size:calc(8.5px * var(--fs));letter-spacing:.1em;
     color:rgba(var(--paper),.5);margin:5px 0 0;padding-left:11px;
   }
+  /* Larger than a note usually is, and it earns it: this one answers a
+     question somebody has just asked out loud into the field above it. Set in
+     the smallest type on the page, an answer is something they read only after
+     deciding nothing happened. */
+  #docnote{
+    font-size:calc(11px * var(--fs));letter-spacing:.05em;
+    margin:7px 0 2px;color:rgba(var(--paper),.92);
+  }
+  #docnote.bad{color:#ff8a8a}
 
   #docmodal{
     position:fixed;inset:0;z-index:60;display:none;
@@ -389,6 +398,30 @@
     padding:2px 10px 12px;
     margin-top:10px;
   }
+  /* The panel's opening state: the mark, centred, and nothing that holds
+     anything. Hidden outright the rest of the time rather than left in the
+     flow with no height — a scroll that starts a screen down from the top is
+     the bug this would otherwise be. */
+  #panelhome{display:none}
+  #panel.home #panelhome{
+    display:flex;align-items:center;justify-content:center;
+    /* The panel's own height less what the menus above it take, so the mark
+       centres in what is left rather than in a box of its own. */
+    min-height:60vh;
+  }
+  /* Three quarters of the panel, which is the space between the window's left
+     edge and the preview — the panel IS that column, so a percentage of it is
+     the measurement without having to know what the preview is set to. */
+  #panel.home #panelhome img{
+    width:75%;height:auto;max-width:none;
+    /* Drawn at whatever size the column is, rather than at the 248px the sign-in
+       card asks for. */
+    opacity:.92;
+  }
+  /* Nothing to filter and nothing to save while no tab is open, and a field
+     offering to filter an empty page is a control wired to nothing. */
+  #panel.home #grpbox,
+  #panel.home #panelhead .findrow{display:none}
   /* A register is a table, not a settings column. Where the box tiles its
      topics into 300px columns, this one takes the full width of them — rows
      that read across need the room, and a device row has four things on it
@@ -1703,6 +1736,15 @@
 
   <div class="rule"></div>
   </div><!-- /panelhead -->
+
+  <!-- Where the panel opens: the mark, and nothing else. No box, no topics and
+       no tab lit, because none of them is where you are yet — it used to open
+       on APPEARANCE, which is a choice made on somebody's behalf about what
+       they came here to do. The menus stay, above and in the bar; everything
+       they lead to waits until one of them is pressed. -->
+  <div id="panelhome">
+    <img src="lockup.svg" alt="Resonance">
+  </div>
 
   <div id="grpbox">
   <!-- Which figure it is, and it belongs with how that figure moves rather
@@ -3064,8 +3106,12 @@ Worked examples in DOCUMENTATION → Embedding it elsewhere.</div>
     <input id="docfind" type="search" spellcheck="false" autocomplete="off"
            placeholder="search every document…">
   </div>
-  <div id="doclist"></div>
+  <!-- Directly under the field, above the results. Whether a search found
+       anything, and anything that went wrong reaching for it, is the answer to
+       what somebody has just typed — at the foot of a list it is somewhere
+       they arrive after they have already concluded it did nothing. -->
   <div class="note" id="docnote"></div>
+  <div id="doclist"></div>
   <div class="note help">Each document opens in a window, with a button to save
 it as a PDF.
 
@@ -8613,6 +8659,10 @@ function panelNav(){
   function selectTab(b){
     const btn = (typeof b === 'string')
       ? tabButtons.find(x=> x.dataset.tab === b) : b;
+    /* Anything selected is a departure from the opening state, including the ?
+       — which reaches a tab with no button in the row and would otherwise open
+       the manual behind the mark. */
+    $('panel').classList.remove('home');
     tab = btn ? btn.dataset.tab : b;
     CURRENT_TAB = tab;
     tabButtons.forEach(x=> x.classList.toggle('on', x === btn));
@@ -8654,6 +8704,21 @@ function panelNav(){
     }
     if (tab === 'docs') loadDocs();
   }
+  /* The opening state, and the only way out of it is pressing something. Not a
+     tab of its own: it has no content, nothing to save and nothing to filter,
+     and giving it a data-tab would put it in the row of places you can go —
+     where it is the absence of one of those, not another. */
+  function enterHome(){
+    $('panel').classList.add('home');
+    /* No tab, rather than 'look' with its button unlit: syncSaveRow reads
+       this, and a commit row offering to SAVE FOR EVERYONE over a page
+       showing nothing but the mark is a button with no subject. */
+    tab = '';
+    CURRENT_TAB = '';
+    tabButtons.forEach(x=> x.classList.remove('on'));
+    render();
+    syncSaveRow();
+  }
   tabButtons.forEach(b=> b.addEventListener('click', ()=> selectTab(b)));
   /* One mark now, in the bar's right-hand end. There were two, one per boxed
      label, and both called this — which said the labels had manuals of their
@@ -8680,6 +8745,7 @@ function panelNav(){
   findEl.addEventListener('input', ()=>{ render(); syncSaveRow(); });
   render();
   syncSaveRow();
+  enterHome();
 }
 
 /* ----------------------------------------------------------------- boot */
