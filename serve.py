@@ -267,6 +267,12 @@ def port_free(p, host="0.0.0.0"):
     if p in (RUNNING.get("http_port"), RUNNING.get("https_port"),
              RUNNING.get("admin_port")):
         return True
+    # …and so is every port this process bound for a network profile. Without
+    # this, a profile that is up and answering reports its own port as taken
+    # and cannot be saved — which made editing ANY profile fail on the ports
+    # of all the OTHERS, naming a port the admin had not touched.
+    if p in (RUNNING.get("net_ports") or ()):
+        return True
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         s.bind((host, p))
@@ -2136,7 +2142,19 @@ def validate_display_settings(obj, current):
             # is allowed to use it. A port that passes validation and fails at
             # the next restart is a profile that looks saved and is not, found
             # out at the worst moment.
-            for label, v in (("port", pv), ("plain HTTP port", rv)):
+            #
+            # ONLY WHERE IT MOVED. The panel sends every profile on every save,
+            # so checking all of them means an edit to one row is refused by
+            # the state of another — and a row that has not changed is either
+            # already running or already known to be broken. Neither is this
+            # save's business.
+            was = {p["id"]: (p.get("values") or {})
+                   for p in (current.get("networks") or [])}.get(r["id"])
+            moved = (not was
+                     or str(was.get("address") or "") != addr
+                     or int(was.get("port") or 0) != pv
+                     or int(was.get("redirect") or 0) != rv)
+            for v in ((pv, rv) if moved else ()):
                 if not v:
                     continue
                 if addr:
@@ -6192,6 +6210,7 @@ def main():
                 print("network %-10s port %d NOT bound: %s"
                       % (_n["name"], _bind, exc), flush=True)
                 continue
+            RUNNING.setdefault("net_ports", set()).add(_bind)
             if _to is not None:
                 print("HTTP  on %s:%d  → redirects to %d" % (_host, _bind, _p),
                       flush=True)
