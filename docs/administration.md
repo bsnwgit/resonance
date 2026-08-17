@@ -514,8 +514,10 @@ deleting a display clears it from every endpoint that named that. A setting
 pointing at something nobody can see is a setting nobody can change.
 
 **When a device picks a change up.** Every display checks in on the interval
-set under APP SETTINGS ▸ MAINTENANCE, and reloads itself when anything it draws
-from has moved — so a profile edited here reaches the wall without anybody
+set under APP SETTINGS ▸ MAINTENANCE, and reloads itself when anything **it**
+draws from has moved — its own row, or the settings every screen shares.
+Another device arriving, being approved or being deleted is not that, and does
+not disturb the screens it has nothing to do with — so a profile edited here reaches the wall without anybody
 walking to it. Never while somebody is talking to the screen or typing into it;
 it waits until they have finished. RELOAD on a row under CONNECTIONS asks one
 directly.

@@ -2625,8 +2625,9 @@ def validate_kiosk(obj, rec, kiosks):
 _DISPLAYS_STAMP = {"key": None, "value": "0"}
 
 
-def _displays_stamp():
-    """A digest of the parts of displays.json a screen actually renders from.
+def _displays_stamp(did=None):
+    """A digest of the parts of displays.json a screen actually renders from —
+    ITS OWN row, plus the settings every screen shares.
 
     NOT the file's modification time, and this is the whole reason this
     function exists: `last_seen` is written every few minutes by the very poll
@@ -2636,13 +2637,21 @@ def _displays_stamp():
     `expires` move without an admin (the last one every time a guest renews),
     and are nobody else's business either.
 
+    PER DISPLAY, and it was not to begin with. Digesting every row meant any
+    row appearing or disappearing changed the stamp for everybody: one device
+    opening the display page reloaded every screen in the building, and
+    deleting a row reloaded the very screens that had nothing to do with it —
+    including, immediately, whichever browser had just created the row, which
+    then said hello and made another. A screen reloads when ITS configuration
+    moves. Another device arriving is not that.
+
     Recomputed only when the file has actually been written, so a poll from a
     building full of screens costs one stat each rather than one hash each."""
     try:
         st = os.stat(DISPLAYS_PATH)
     except OSError:
         return "0"                       # absent is a stamp of its own
-    key = (st.st_mtime_ns, st.st_size)
+    key = (st.st_mtime_ns, st.st_size, did or "")
     if _DISPLAYS_STAMP["key"] == key:
         return _DISPLAYS_STAMP["value"]
     try:
@@ -2651,12 +2660,13 @@ def _displays_stamp():
         return _DISPLAYS_STAMP["value"]
     rows = raw.get("displays") or {}
     if isinstance(rows, dict):
-        rows = list(rows.values())
+        rows = [dict(r, id=k) for k, r in rows.items()]
     facts = sorted(
         "%s|%s|%s|%s|%s|%s" % (r.get("id"), bool(r.get("approved")),
                                bool(r.get("denied")), bool(r.get("kiosk")),
                                r.get("kiosk_profile") or "", r.get("name") or "")
-        for r in rows if isinstance(r, dict))
+        for r in rows
+        if isinstance(r, dict) and (did is None or r.get("id") == did))
     facts.append(json.dumps(raw.get("settings") or {}, sort_keys=True))
     val = hashlib.sha256("\n".join(facts).encode()).hexdigest()[:16]
     _DISPLAYS_STAMP["key"] = key
@@ -2664,7 +2674,7 @@ def _displays_stamp():
     return val
 
 
-def config_gen():
+def config_gen(did=None):
     """A stamp that changes whenever anything a display renders from changes.
 
     The display keeps the value it booted with and reloads when it moves,
@@ -2679,7 +2689,7 @@ def config_gen():
             parts.append(str(os.stat(p).st_mtime_ns))
         except OSError:
             parts.append("0")
-    parts.append(_displays_stamp())
+    parts.append(_displays_stamp(did))
     return ".".join(parts)
 
 
@@ -5262,7 +5272,6 @@ class Handler(SimpleHTTPRequestHandler):
                 boot = int(obj.get("boot") or 0)
             except (TypeError, ValueError):
                 boot = 0
-            gen = config_gen()
             # The numbers the display needs to keep itself up, answered here
             # rather than at hello so there is one place that carries them and
             # a change reaches a screen on its next poll. They are operational
@@ -5287,15 +5296,21 @@ class Handler(SimpleHTTPRequestHandler):
             now_ = int(time.time())
             if self.admin_port:
                 cfg["refresh_at"] = ""
-                return self._json(200, {"ok": True, "gen": gen, "reload": False,
-                                        "cfg": cfg, "now": now_})
+                return self._json(200, {"ok": True, "gen": config_gen(),
+                                        "reload": False, "cfg": cfg,
+                                        "now": now_})
             disp = self._display()
             if not disp:
                 # No cookie, or one naming a row that is gone. Still a 200:
                 # an unapproved screen renders, and the poll is how it finds
                 # out it has been approved without anybody touching it.
-                return self._json(200, {"ok": True, "gen": gen, "reload": False,
-                                        "cfg": cfg, "now": now_})
+                return self._json(200, {"ok": True, "gen": config_gen(),
+                                        "reload": False, "cfg": cfg,
+                                        "now": now_})
+            # …and from here the stamp is THIS display's: its own row and the
+            # settings everybody shares, so another device arriving or being
+            # deleted is not a reason for this one to reload.
+            gen = config_gen(disp["id"])
             cfg["refresh_offset"] = refresh_offset(disp["id"],
                                                    cfg["refresh_stagger"])
             note_display_seen(disp["id"])
