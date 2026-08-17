@@ -206,6 +206,13 @@
   }
   /* Said after a capped run, never left to be inferred: a list that stops
      without saying so reads as everything there was. */
+  /* The kind a custom group is drawn from, and its size. Secondary to the
+     name it qualifies: you are picking the group, and this is what tells you
+     what you just picked. */
+  .cks .gkind{
+    font-size:calc(8px * var(--fs));letter-spacing:.08em;
+    color:rgba(var(--paper),.55);
+  }
   .docmore{
     font-size:calc(8.5px * var(--fs));letter-spacing:.1em;
     color:rgba(var(--paper),.5);margin:5px 0 0;padding-left:11px;
@@ -4873,8 +4880,20 @@ function blockFillWho(blk, r){
         cb.type = 'checkbox'; cb.dataset.g = g.id;
         cb.checked = wantG.indexOf(g.id) >= 0;
         lab.appendChild(cb);
-        lab.appendChild(document.createTextNode(
-          ' ' + g.name + ' (' + g.members.length + ')'));
+        /* The name, then what KIND of group it is. This box is the one place
+           the two populations meet — the boxes under it are already split by
+           them — so a tick reading "Physics" alone says nothing about whether
+           it grants three people or three screens.
+
+           Custom groups only. The two the server keeps are named after their
+           own kind, and "Devices - Devices" is the panel saying it twice. */
+        lab.appendChild(document.createTextNode(' ' + g.name));
+        const q = document.createElement('span');
+        q.className = 'gkind';
+        q.textContent = (g.system ? '' : ' - ' + (g.kind === 'identity' ? 'Users'
+                                                                       : 'Devices'))
+                      + ' (' + g.members.length + ')';
+        lab.appendChild(q);
         gbox.appendChild(lab);
       });
       if (!GROUPS.length){
