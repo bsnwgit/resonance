@@ -3099,10 +3099,14 @@ def subject_may(route, disp=None, ident=None):
     if not route.get("restricted"):
         return True
     if ident:
-        # Named directly. Groups of people are the next phase's work; until
-        # then this is the whole of a person's reach, and an empty list is a
-        # person who reaches only what is open to everybody.
-        return ident["id"] in (route.get("identities") or [])
+        # Named directly, or named by a group of people. Grants add up here
+        # exactly as they do for a display, and only GROUPS OF PEOPLE count: a
+        # group of screens on the same allow-list says nothing about who may
+        # use this, and the two files mint ids independently.
+        if ident["id"] in (route.get("identities") or []):
+            return True
+        return ident["id"] in group_members(route.get("groups"),
+                                            kinds=IDENTITY_GROUP_KINDS)
     if not disp:
         return False
     # The preview is the panel. It is already signed in as an admin, who can
@@ -3117,8 +3121,11 @@ def subject_may(route, disp=None, ident=None):
         return False
     if disp["id"] in (route.get("displays") or []):
         return True
-    # Grants add up: named directly, or named by a group it is in.
-    return disp["id"] in group_members(route.get("groups"))
+    # Grants add up: named directly, or named by a group it is in — and only
+    # by a group of DISPLAYS. Both of those kinds hold display rows; the third
+    # holds people, and a screen is not let through by a grant made to them.
+    return disp["id"] in group_members(route.get("groups"),
+                                       kinds=DISPLAY_GROUP_KINDS)
 
 
 def admin_displays():
@@ -3347,7 +3354,26 @@ def admin_identities():
 # the thing that currently uses them.
 GROUPS_PATH = os.path.join(ROOT, "groups.json")
 _groups_lock = threading.Lock()
-GROUP_KINDS = ("user", "device")
+#: THREE populations now, and the third is the only one that is not a display.
+#: `user` and `device` both hold DISPLAY rows — one arrived by asking, the
+#: other by taking a code — which is what "people" meant here while a refusal
+#: was per device and nothing issued a person anything. `identity` holds people
+#: proper: rows from identities.json, reached by their own URL from whatever
+#: machine they open it on.
+#:
+#: The obvious move was to repurpose `user` and it is the one to refuse. A
+#: group's kind is fixed at creation BECAUSE changing it silently empties it,
+#: and repurposing the kind does that to every existing group of it at once, on
+#: upgrade, with nothing to migrate into — the identities those laptops belong
+#: to do not exist. So the third kind is added beside them and nothing empties.
+GROUP_KINDS = ("user", "device", "identity")
+#: Whose members are display rows, and whose are people. A route names groups
+#: without caring what is in them, so the answer depends on who is asking: a
+#: device must not be let through by a group of people that happens to sit on
+#: the same allow-list, and a person must not be let through by a group of
+#: screens.
+DISPLAY_GROUP_KINDS = ("user", "device")
+IDENTITY_GROUP_KINDS = ("identity",)
 MAX_GROUPS = 200
 
 
@@ -3412,7 +3438,14 @@ def group_kind_of(rec):
 #: What the group each population lands in is called when this server has to
 #: make one. Named for what is in them rather than for how they arrived, since
 #: an admin will rename them long before they remember which is which.
-DEFAULT_GROUP_NAME = {"user": "People", "device": "Devices"}
+#: The auto-created group per kind. `user` is named for what it has always
+#: actually held — the personal machines that asked to be here — now that
+#: "People" means people. Renaming the constant does NOT rename a group that
+#: already exists: those are somebody's data, and an upgrade that renamed them
+#: would be editing a list an admin wrote. The kind's LABEL in the panel is
+#: what changes for them.
+DEFAULT_GROUP_NAME = {"user": "Personal devices", "device": "Devices",
+                      "identity": "People"}
 
 
 def default_group(kind, by="the server"):
@@ -3489,9 +3522,22 @@ def clean_members(ids, kind):
     """Only rows that exist, and only of this group's own kind. A member that
     is neither is dropped rather than refused — the panel sends the list it was
     shown, and a display deleted in another tab between the two is not a
-    mistake worth making somebody retype a form over."""
-    displays = read_displays()
+    mistake worth making somebody retype a form over.
+
+    A group of people draws from a different file than the other two, which is
+    the whole reason its kind is fixed: the ids are not interchangeable, so a
+    kind that changed under an existing group would not filter its members, it
+    would fail to find any of them."""
     seen, out = set(), []
+    if kind in IDENTITY_GROUP_KINDS:
+        known = read_identities()
+        for pid in (ids or []):
+            pid = str(pid)[:32]
+            if pid in known and pid not in seen:
+                seen.add(pid)
+                out.append(pid)
+        return out[:MAX_ALLOW]
+    displays = read_displays()
     for did in (ids or []):
         did = str(did)[:32]
         rec = displays.get(did)
@@ -3501,15 +3547,20 @@ def clean_members(ids, kind):
     return out[:MAX_ALLOW]
 
 
-def group_members(gids, groups=None):
-    """Every display id named by these groups, flattened. Grants ADD UP: this
-    is unioned with an endpoint's individually named displays, and being in a
-    group never takes an individual grant away."""
+def group_members(gids, groups=None, kinds=None):
+    """Every member id named by these groups, flattened. Grants ADD UP: this
+    is unioned with an endpoint's individually named rows, and being in a group
+    never takes an individual grant away.
+
+    `kinds` narrows it to one population. Without it a route naming both a
+    group of screens and a group of people would answer for either — and since
+    the two files mint ids independently, that is not merely wrong, it is
+    wrong in a way nobody would see until two ids happened to collide."""
     groups = read_groups() if groups is None else groups
     out = set()
     for gid in (gids or []):
         rec = groups.get(gid)
-        if rec:
+        if rec and (kinds is None or rec["kind"] in kinds):
             out.update(rec["members"])
     return out
 
@@ -3523,7 +3574,8 @@ def validate_group(obj, current):
     if "kind" in obj:
         k = str(obj["kind"] or "").strip()
         if k not in GROUP_KINDS:
-            return None, "a group is either people or devices"
+            return None, ("a group is people, devices, or the personal devices "
+                          "that asked to be here")
         rec["kind"] = k
     if "members" in obj:
         rec["members"] = clean_members(obj["members"], rec["kind"])
@@ -3533,15 +3585,21 @@ def validate_group(obj, current):
 def admin_groups():
     groups = read_groups()
     displays = read_displays()
+    idents = read_identities()
     out = []
     for gid, rec in sorted(groups.items(),
                            key=lambda kv: (kv[1]["kind"], kv[1]["name"].lower())):
-        # Named rows only. A member whose display was deleted is not shown as a
+        # Named rows only. A member whose row was deleted is not shown as a
         # phantom — it is simply gone, the same way a deleted display leaves an
-        # endpoint's allow-list.
-        live = [m for m in rec["members"] if m in displays]
-        out.append(dict(rec, id=gid, members=live,
-                        labels=[display_label(displays[m]) for m in live]))
+        # endpoint's allow-list. Which FILE the name comes out of is the
+        # group's kind: a group of people is the one that is not displays.
+        if rec["kind"] in IDENTITY_GROUP_KINDS:
+            live = [m for m in rec["members"] if m in idents]
+            labels = [identity_label(idents[m]) for m in live]
+        else:
+            live = [m for m in rec["members"] if m in displays]
+            labels = [display_label(displays[m]) for m in live]
+        out.append(dict(rec, id=gid, members=live, labels=labels))
     return out
 
 
@@ -4994,17 +5052,24 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/groups":
             if not self._require("admin"):
                 return
-            # The two populations a group can be drawn from, so the panel can
-            # offer the right one rather than every row it has ever seen.
+            # The three populations a group can be drawn from, so the panel can
+            # offer the right one rather than every row it has ever seen. Two
+            # of them are display rows and the third is not — `identities` is
+            # the only one that comes out of a different file.
             displays = read_displays()
-            people, devices = [], []
+            owned, devices = [], []
             for did, rec in sorted(displays.items(),
                                    key=lambda kv: display_label(kv[1]).lower()):
                 row = {"id": did, "label": display_label(rec),
                        "approved": bool(rec.get("approved"))}
-                (people if group_kind_of(rec) == "user" else devices).append(row)
+                (owned if group_kind_of(rec) == "user" else devices).append(row)
+            idents = [{"id": p["id"], "label": p["label"], "approved": True}
+                      for p in admin_identities()]
             return self._json(200, {"groups": admin_groups(),
-                                    "people": people, "devices": devices,
+                                    # The key keeps its name so an older panel
+                                    # served from a cache still fills its box.
+                                    "people": owned, "devices": devices,
+                                    "identities": idents,
                                     "kinds": list(GROUP_KINDS),
                                     "max": MAX_GROUPS})
         if path == "/identities":

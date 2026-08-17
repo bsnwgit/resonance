@@ -899,12 +899,34 @@ needed rather than shipped, and an existing group of the right kind is adopted
 before a second is created — so an install that never uses groups never grows
 two it did not ask for.
 
-**Two kinds, and they do not mix.** They answer separate questions — *the
-physics department* and *the screens in the east wing* — so a group holds one
-population or the other, and its kind cannot be changed once it exists.
+**Three kinds, and they do not mix.** They answer separate questions — *the
+physics department*, *the laptops in building four*, *the screens in the east
+wing* — so a group holds one population, and its kind cannot be changed once it
+exists.
 
-**Which population a row is in is set on the row**, wherever that row is
-currently listed: *It is a* — DEVICE, PERSON, or WORK IT OUT. Changing it moves
+- **PEOPLE** holds the people created under ENROLLMENTS ▸ PERSON. A person
+  reaches an endpoint from whatever machine they open their URL on, so a grant
+  made here follows the human rather than the hardware.
+- **PERSONAL** holds the machines that asked for access and were approved —
+  somebody's laptop or phone, a device that happens to belong to a person.
+- **DEVICES** holds the screens you created and sent a code to.
+
+PERSONAL is the kind that used to be called PEOPLE, back when a refusal was per
+device and nothing issued a person anything of their own. It was renamed rather
+than repurposed: a group's kind is fixed at creation *because changing it
+empties the group*, and turning every existing one into a group of identities
+would have done exactly that on upgrade, with nothing to migrate into. **No
+group lost a member, and any you had keeps the name you gave it** — only the
+word the panel uses for its kind changed.
+
+The distinction is not cosmetic. The three draw their members from different
+places, so an endpoint that names a group of screens is saying nothing about
+who may use it, and one that names a group of people is saying nothing about
+which screens may.
+
+**Which population a display row is in is set on the row**, wherever that row is
+currently listed: *It is a* — DEVICE, PERSONAL, or WORK IT OUT. A display row is
+never a person: people are not display rows at all. Changing it moves
 the row into that population's group, and where you have more than one group of
 that kind a picker appears beside the control to say which. It is hidden where
 there is one, because one is not a choice.
@@ -933,10 +955,14 @@ member.
 its own is reachable by everyone in the group plus that device. Being in a
 group never takes away a grant made individually.
 
-**A group is not approval.** Somebody in a group who has not been approved is
-still refused, and so is somebody whose access has run out. The group says
-*which* endpoints they may reach; approval says whether they may reach anything
-at all.
+**A group is not approval** — for a display. A device in a group that has not
+been approved is still refused, and so is one whose access has run out. The
+group says *which* endpoints it may reach; approval says whether it may reach
+anything at all.
+
+**A person has no equivalent test.** An identity exists only because you made
+it, so creating one *is* the approval and there is no way to turn up asking to
+be one. Withdrawing it is deleting the person, or reissuing their URL.
 
 **Deleting a group** removes it from every endpoint that named it. Nothing in
 it is deleted — a group is a way of referring to people and devices, not a

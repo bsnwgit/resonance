@@ -2552,19 +2552,34 @@ Short by default — this session configures what everyone else is looking at.
   <div class="labrow" id="gr_addrow" style="margin-top:10px">
     <input id="gr_name" type="text" spellcheck="false" autocomplete="off"
            placeholder="Physics department">
+    <!-- Three populations. PEOPLE is the new kind and holds identities;
+         PERSONAL is what the old one has always actually held — the machines
+         somebody asked for access on — and it kept its stored kind so no
+         existing group was emptied to free the word. -->
     <div class="seg" id="gr_kind">
-      <button data-v="user" class="on">PEOPLE</button>
+      <button data-v="identity" class="on">PEOPLE</button>
+      <button data-v="user">PERSONAL</button>
       <button data-v="device">DEVICES</button>
     </div>
   </div>
   <div class="note" id="groupnote"></div>
   <div class="seg actrow"><button id="b_addgroup" class="act-add">CREATE</button></div>
-  <div class="note help" style="margin-top:10px">A group of <b>people</b> holds
-those who asked for access and were approved. A group of <b>devices</b> holds
-the screens you created and sent a code to. They are separate populations
-answering separate questions — <i>the physics department</i> and <i>the screens
-in the east wing</i> — so a group holds one or the other, and its kind cannot
-be changed once it exists.
+  <div class="note help" style="margin-top:10px">Three populations, and a group
+holds one of them.
+
+<b>PEOPLE</b> holds the people you created under ENROLLMENTS ▸ PERSON. A person
+reaches an endpoint from whatever machine they open their URL on, so a grant
+here follows the human rather than the hardware.
+
+<b>PERSONAL</b> holds the machines that asked for access and were approved —
+somebody's laptop or phone, which is a device that happens to belong to a
+person. <b>DEVICES</b> holds the screens you created and sent a code to.
+
+They answer separate questions — <i>the physics department</i>, <i>the laptops
+in building four</i>, <i>the screens in the east wing</i> — so a group holds one
+population, and <b>its kind cannot be changed once it exists</b>: the three draw
+their members from different places, so a kind that changed under a group would
+not filter its members, it would fail to find any of them.
 
 Name a group under an endpoint's <b>who may use it</b> and everyone in it may
 reach that endpoint. <b>Grants add up:</b> a group never takes away a grant
@@ -5458,7 +5473,7 @@ $('id_name').addEventListener('keydown', e=>{
 /* ----------------------------------------------------------- groups
    A name for a set of displays, so a grant is made once instead of ticked
    twelve times. Two kinds, two populations, and a group holds one of them. */
-let GROUPS = [], GRPEOPLE = [], GRDEVICES = [];
+let GROUPS = [], GRPEOPLE = [], GRDEVICES = [], GRIDENT = [];
 
 async function loadGroups(){
   try{
@@ -5466,6 +5481,7 @@ async function loadGroups(){
     GROUPS = j.groups || [];
     GRPEOPLE = j.people || [];
     GRDEVICES = j.devices || [];
+    GRIDENT = j.identities || [];
   }catch(e){ GROUPS = []; }
   return GROUPS;
 }
@@ -5512,7 +5528,8 @@ async function refreshGroups(){
     top.appendChild(nmt);
     const b = document.createElement('span');
     b.className = 'badge';
-    b.textContent = g.kind === 'user' ? 'PEOPLE' : 'DEVICES';
+    b.textContent = g.kind === 'identity' ? 'PEOPLE'
+                  : g.kind === 'user' ? 'PERSONAL' : 'DEVICES';
     top.appendChild(b);
     const cnt = document.createElement('span');
     cnt.className = 'badge';
@@ -5557,12 +5574,16 @@ async function refreshGroups(){
     /* Membership is the group. Ticked in place rather than behind an EDIT,
        because the list is short and the whole reason to open a group is to
        change who is in it. */
-    const pool = g.kind === 'user' ? GRPEOPLE : GRDEVICES;
+    const pool = g.kind === 'identity' ? GRIDENT
+               : g.kind === 'user' ? GRPEOPLE : GRDEVICES;
     const cks = document.createElement('div');
     cks.className = 'cks';
     if (!pool.length){
       const em = document.createElement('span');
-      em.textContent = g.kind === 'user'
+      em.textContent = g.kind === 'identity'
+        ? 'nobody has been created yet — people are made under '
+          + 'ENROLLMENTS ▸ PERSON'
+        : g.kind === 'user'
         ? 'nobody has asked for access yet'
         : 'no devices have been created yet';
       cks.appendChild(em);
@@ -7020,7 +7041,7 @@ function kioskBlock(d){
   const kseg = document.createElement('div');
   kseg.className = 'seg';
   const kindNow = d.kind || '';
-  [['device', 'DEVICE'], ['user', 'PERSON'], ['', 'WORK IT OUT']].forEach(([v, txt])=>{
+  [['device', 'DEVICE'], ['user', 'PERSONAL'], ['', 'WORK IT OUT']].forEach(([v, txt])=>{
     const b = document.createElement('button');
     b.dataset.v = v; b.textContent = txt;
     b.classList.toggle('on', v === kindNow);
