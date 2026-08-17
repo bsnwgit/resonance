@@ -71,12 +71,12 @@ Below it:
   the two halves of an endpoint that are not the endpoint: what it speaks to,
   and what it answers on.
 
-**At the foot, CONNECTIONS** — what this server is wired to, as opposed to what
-you administer about it:
+**At the foot**, what this server is wired to, as opposed to what you
+administer about it:
 
 - **AI** — the endpoints, each naming a speech profile, a model profile and a
   network profile.
-- **CONNECTED DEVICES** — everything currently working, in two areas: the
+- **CONNECTIONS** — everything currently connected, in two areas: the
   people you approved, and the devices that took a code.
 - **EMBEDS** — keys that let another application frame this interface.
 
@@ -191,7 +191,7 @@ that both end up connected, so neither has to read the other's queue.
 | **Get a code** | name it, and the code appears with the clock already running |
 | **Waiting for their code** | rows minted and not yet used, with REISSUE for one that ran out |
 
-**CONNECTED DEVICES** — everything that is working, in two areas, **People**
+**CONNECTIONS** — everything that is working, in two areas, **People**
 and **Devices**. A row moves here on its own the moment it is connected, and
 leaves the tab it arrived through.
 
@@ -235,7 +235,7 @@ neither wants to read the other's queue while doing it.
 
 So an arrival is under **ENROLLMENTS** — ▸ USER while a person waits on a
 decision, ▸ DEVICE while a screen has not taken its code — and everything
-working is under **CONNECTIONS ▸ CONNECTED DEVICES**, in its own area. A row
+working is under **CONNECTIONS**, in its own area. A row
 moves itself the moment it starts working.
 
 Ordering survives inside each list: anything waiting sorts by how much it wants
@@ -500,8 +500,8 @@ pointing at something nobody can see is a setting nobody can change.
 set under APP SETTINGS ▸ MAINTENANCE, and reloads itself when anything it draws
 from has moved — so a profile edited here reaches the wall without anybody
 walking to it. Never while somebody is talking to the screen or typing into it;
-it waits until they have finished. RELOAD on a row under CONNECTED DEVICES
-asks one directly.
+it waits until they have finished. RELOAD on a row under CONNECTIONS asks one
+directly.
 
 
 ### The settings above the list
@@ -664,8 +664,8 @@ is held and carried out as part of coming back.
 
 ### Asking a screen to reload
 
-**RELOAD**, on a device's row under CONNECTED DEVICES, asks that screen to
-reload itself
+**RELOAD**, on a device's row under CONNECTIONS, asks that screen to reload
+itself
 at its next check-in. What it actually repairs is a display that is alive but
 stuck: it is still checking in, so it is still listening, and a reload is the
 whole fix. It defers while somebody is talking to the screen.

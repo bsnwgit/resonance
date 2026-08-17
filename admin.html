@@ -2624,7 +2624,7 @@ tick. <b>REFUSE</b> gives them a message and you a note for whoever comes back
 to this row in six months, and says whether they may ask again.
 
 They leave this list the moment you decide and appear under CONNECTIONS ▸
-CONNECTED DEVICES, filed with the other people.</div>
+CONNECTIONS, filed with the other people.</div>
     </div>
   </section>
 
@@ -2665,13 +2665,13 @@ characters into the box it offers. Case and dashes do not matter —
 <b>k7qp4m</b> is the same as <b>K7QP-4M</b>.
 
 A row leaves this list the moment its code is used and appears under
-CONNECTIONS ▸ CONNECTED DEVICES, filed with the other devices so a grant to all
+CONNECTIONS ▸ CONNECTIONS, filed with the other devices so a grant to all
 of them is one tick.</div>
     </div>
   </section>
 
   <section class="grp bare proflist" data-tab="devices">
-    <div class="barehead"><span class="listtitle">Connected devices</span></div>
+    <div class="barehead"><span class="listtitle">Connections</span></div>
     <div class="grpbody">
   <div class="bulkbar" id="bulkbar" hidden>
     <label><input type="checkbox" id="bulkall"> ALL</label>
@@ -2932,13 +2932,15 @@ button to download it as a PDF.</div>
     <div class="tabrow">
     <!-- What this server is wired to, and which machines are here. -->
     <div class="tabside connside">
-      <div class="tabgroup">Connections</div>
+      <!-- No caption. One of the three below is now called CONNECTIONS, and a
+           caption saying the same word over it is the panel saying it twice —
+           the rule that keeps a bare list from repeating the tab it sits on. -->
       <div class="tabs">
         <button id="tab_ai" data-tab="ai">AI</button>
         <!-- The register: every device this server knows about. Not in
              UI_TABS or SETTINGS_TABS — like AI, nothing here writes the shared
              settings document. -->
-        <button id="tab_devices" data-tab="devices">CONNECTED DEVICES</button>
+        <button id="tab_devices" data-tab="devices">CONNECTIONS</button>
         <!-- An embed is another application connecting to this one, which is
              the same question the two beside it answer — what this server is
              wired to — rather than something you administer about the server
@@ -6644,7 +6646,7 @@ function paintBulk(){
    while doing it.
 
    So: WAITING FOR APPROVAL and GET A CODE are the two arrivals halls, one per
-   population, and CONNECTED DEVICES is where both end up — still told apart,
+   population, and CONNECTIONS is where both end up — still told apart,
    because "which of my screens is on the wall" and "who has been let in" are
    different questions asked by the same admin on different days. */
 const DISP_BUCKETS = ['waiting', 'enrol', 'users', 'devices'];
