@@ -592,23 +592,32 @@
      are one per section and have their heading right there for context, where
      these two have to be findable on their own from across the panel.
 
-     Inside the box, after the word it belongs to. Said at this weight because
-     the mark in the right-hand title sits inside #navlinks, where the rule for
-     the links is an id plus an element and would otherwise hand it the links'
-     grey, their padding and their divider. */
-  #panelbar .bartitle .helpmark{
-    width:17px;height:17px;padding:0;margin-left:9px;flex:0 0 auto;
+     ONE of them, at the far end of the bar, past the way out. There were two
+     — one inside each boxed label — and both opened the same page: a mark per
+     label says the labels have separate manuals, which was never true and got
+     less true as a third label arrived. The manual is the panel's, so it sits
+     with the things that belong to you rather than to a section of it.
+
+     Said at this weight because it sits in a bar whose other rules are an id
+     plus an element, which would otherwise hand it their grey, their padding
+     and their divider. */
+  #panelbar .helpmark{
+    width:17px;height:17px;padding:0;flex:0 0 auto;
     font:inherit;font-size:calc(9px * var(--fs));letter-spacing:0;line-height:1;
     display:inline-flex;align-items:center;justify-content:center;
     border:1px solid rgba(var(--help-line),.75);border-radius:50%;
     background:rgba(var(--help-line),.16);color:var(--help);cursor:pointer;
   }
-  #panelbar .bartitle .helpmark:hover{
+  #panelbar .helpmark:hover{
     border-color:rgba(var(--help-line),1);color:#cfe2f8;
     background:rgba(var(--help-line),.30);
   }
   #panelbar .right{margin-left:auto}
   #whobox{display:flex;align-items:center;gap:8px;min-width:0}
+  /* Double the row's own gap, and it is doing a job: the manual is not a third
+     thing you do to your session, so it should not sit in the run of them as
+     though SIGN OUT and it were a pair. */
+  #whobox .helpmark{margin-left:8px}
   #mine{
     display:none;position:fixed;inset:0;z-index:60;
     align-items:center;justify-content:center;padding:24px;
@@ -1554,13 +1563,6 @@
        you are signed in as, and the way out, should not scroll away under a
        tab's worth of settings. -->
   <div id="panelbar">
-    <!-- The way into the manual, INSIDE the title rather than beside it:
-         documentation is not a topic you configure, it is the thing you reach
-         for when a topic will not explain itself — so it belongs to the title
-         it explains rather than sitting in the row of places you can go. Blue,
-         and the same blue as every ? beside a section heading; one colour
-         meaning one thing is what lets somebody find help without reading
-         labels. -->
     <!-- Administering the server, as links in the bar rather than as a row of
          tabs at the foot. They were never the same kind of thing as the tabs
          above the settings: those switch which set of controls you are
@@ -1586,16 +1588,7 @@
       <span class="navtitle bartitle">IDENTITY</span>
       <button id="tab_accounts" data-tab="accounts">ADMIN USERS</button>
       <span class="navgap"></span>
-      <!-- The way into the manual, INSIDE the title rather than beside it:
-           documentation is not a topic you configure, it is the thing you reach
-           for when a topic will not explain itself — so it belongs to the title
-           it explains rather than sitting in the row of places you can go.
-           Blue, and the same blue as every ? beside a section heading; one
-           colour meaning one thing is what lets somebody find help without
-           reading labels. -->
-      <span class="navtitle bartitle">SETTINGS<button id="panelhelp"
-              class="helpmark" type="button"
-              title="open the documentation">?</button></span>
+      <span class="navtitle bartitle">SETTINGS</span>
       <button id="tab_app" data-tab="app">ADMIN</button>
       <!-- How the server itself is defended, which is administration rather
            than a connection: who gets in, on what terms, and into which
@@ -1605,9 +1598,7 @@
            of it is the server; everything right of it is how something comes
            to be here. -->
       <span class="navgap"></span>
-      <span class="navtitle bartitle">ENROLLMENTS<button id="enrolhelp"
-              class="helpmark" type="button"
-              title="open the documentation">?</button></span>
+      <span class="navtitle bartitle">ENROLLMENTS</span>
       <!-- PERSON and DEVICE, in the same words the rest of the product uses
            for the two populations: they arrive by different routes with
            different buttons, and neither wants to read the other's queue
@@ -1619,6 +1610,12 @@
       <button id="whoname" title="your account">—</button>
       <span id="whorole"></span>
       <button id="b_signout" title="end this session">SIGN OUT</button>
+      <!-- The way into the manual: one mark, at the end of the bar, past the
+           way out. Blue, and the same blue as every ? beside a section
+           heading — one colour meaning one thing is what lets somebody find
+           help without reading labels. -->
+      <button id="panelhelp" class="helpmark" type="button"
+              title="open the documentation">?</button>
     </span>
   </div>
   <div id="panelscroll">
@@ -3053,9 +3050,9 @@ button to download it as a PDF.</div>
          divided the two subjects has gone with the second subject — a boundary
          with nothing on the far side of it is a line, not a division.
 
-         DOCUMENTATION is not here either. It is reached from the ? beside the
-         panel title, because it is not something you configure and it was
-         taking a slot in a row of things that are. -->
+         DOCUMENTATION is not here either. It is reached from the ? at the far
+         end of the bar, past the way out, because it is not something you
+         configure and it was taking a slot in a row of things that are. -->
     <div class="tabrow">
     <!-- What this server is wired to, and which machines are here. -->
     <div class="tabside connside">
@@ -8384,9 +8381,9 @@ function panelNav(){
        add a second endpoint is to first collapse the first. */
   }
   /* Takes a tab button, or a tab's NAME for a tab that no longer has one.
-     Documentation is reached from the ? beside the panel title now, so there
-     is no button in the row to light up — and nothing lighting up is the
-     honest answer there, because none of the tabs in the row is where you
+     Documentation is reached from the ? at the far end of the bar now, so
+     there is no button in the row to light up — and nothing lighting up is
+     the honest answer there, because none of the tabs in the row is where you
      are. */
   function selectTab(b){
     const btn = (typeof b === 'string')
@@ -8433,10 +8430,11 @@ function panelNav(){
     if (tab === 'docs') loadDocs();
   }
   tabButtons.forEach(b=> b.addEventListener('click', ()=> selectTab(b)));
+  /* One mark now, in the bar's right-hand end. There were two, one per boxed
+     label, and both called this — which said the labels had manuals of their
+     own when there has only ever been the one. */
   const phelp = $('panelhelp');
   if (phelp) phelp.addEventListener('click', ()=> selectTab('docs'));
-  const ehelp = $('enrolhelp');
-  if (ehelp) ehelp.addEventListener('click', ()=> selectTab('docs'));
   /* Opening a section from somewhere other than its own heading: ADD has to
      take you to the block it just created. Assigned out to module scope
      because this closure is where the collapse state lives. */
