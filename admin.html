@@ -936,18 +936,26 @@
      one thing on this tab that gets read at a distance — and selectable in one
      click for the screens that do have a keyboard. It takes the panel's "this
      is the live thing" green, the same as the commit buttons. */
-  .erow .dcode{
+  /* …and the same box where the code is ASKED for, which is not on the same
+     tab as the register it appears in. Pressing GET A CODE and being shown
+     nothing, because the answer landed somewhere you were not looking, is not
+     a flow anybody can follow. */
+  .erow .dcode,
+  #dispcode{
     margin:6px 0 2px;padding:6px 8px;user-select:all;
     background:rgba(122,201,160,.07);
     border:1px solid rgba(122,201,160,.5);
     font-size:calc(12px * var(--fs));letter-spacing:.1em;
     color:#d2f2e2;word-break:break-all;
   }
-  .erow .dcode span{
+  .erow .dcode span,
+  #dispcode span{
     display:block;margin-top:3px;user-select:none;
     font-size:calc(8.5px * var(--fs));letter-spacing:.06em;
     color:rgba(var(--paper),.62);
   }
+  #dispcode{display:none}
+  #dispcode.on{display:block}
   .erow .r{margin-left:auto;display:flex;gap:4px}
   .erow button{font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.1em;padding:3px 6px;
                cursor:pointer;background:none;color:rgba(var(--paper),.87);
@@ -2170,10 +2178,16 @@ by noise.</div>
            placeholder="kitchen wall">
     <button id="b_adddisp" class="act-add">GET A CODE</button>
   </div>
+  <!-- The answer, where the question was asked. The row this creates lands in
+       the register under CONNECTIONS ▸ DEVICES and carries its code there too,
+       but that is a different tab: pressing a button and being shown nothing
+       reads as a button that did not work, which is exactly what happened. -->
+  <div id="dispcode"></div>
   <div class="note" id="dispnote"></div>
   <div class="note help" style="margin-top:10px">How a device comes to exist.
-The register itself is under <b>Devices</b> below; this is the half where you
-invite one.
+This is the half where you invite one; the register itself is under
+<b>CONNECTIONS ▸ DEVICES</b>, and the row appears there the moment you press
+GET A CODE.
 
 <b>Two ways one gets there.</b> Name it above and you are given a six-character
 code: type <b>&lt;this server&gt;/e/CODE</b> into that screen once and it is
@@ -6696,10 +6710,18 @@ $('b_bulkapply').addEventListener('click', async ()=>{
 /* Name it, get a code. The row exists from this moment, so its endpoints can
    be ticked before the screen it is for has ever been switched on. */
 $('b_adddisp').addEventListener('click', async ()=>{
-  const el = $('dp_name');
+  const el = $('dp_name'), note = $('dispnote'), out = $('dispcode');
   const name = (el.value || '').trim();
+  /* Cleared on the way in, every time. It used to be written on the way out
+     and never taken back, so the complaint about a missing name was still on
+     screen after a name had been given and a code issued — which reads as the
+     press having failed, and is why there are rows sitting in the register
+     that nobody knew they had made. */
+  note.className = 'note';
+  note.textContent = '';
+  out.classList.remove('on');
+  out.textContent = '';
   if (!name){
-    const note = $('dispnote');
     note.className = 'note bad';
     note.textContent = 'give it a name first — it is what the row is called '
                      + 'and what you will look for when you restrict an endpoint';
@@ -6707,7 +6729,17 @@ $('b_adddisp').addEventListener('click', async ()=>{
     return;
   }
   el.value = '';
-  await displayAction('/displays/new', {name});
+  const j = await displayAction('/displays/new', {name});
+  if (!j || !j.code) return;              // displayAction has said why
+  /* The whole thing somebody has to type, on its own line and big enough to
+     read from across a room while typing it into a television with a remote.
+     The address as well as the code: nobody is typing half a URL. */
+  out.textContent = ENROL_BASE + dispCode(j.code);
+  const sub = document.createElement('span');
+  sub.textContent = '“' + name + '” · 10 minutes · works once · case and dashes '
+                  + 'do not matter · the row is under CONNECTIONS ▸ DEVICES';
+  out.appendChild(sub);
+  out.classList.add('on');
 });
 $('dp_name').addEventListener('keydown', e=>{
   if (e.key === 'Enter') $('b_adddisp').click();
@@ -6815,8 +6847,14 @@ async function displayAction(path, body, said){
        something, and those have to say so in words or they read as a button
        that did nothing. */
     if (said && note){ note.className = 'note'; note.textContent = said; }
+    /* Handed back, because one caller needs what came with it: the enrolment
+       code is issued here and shown nowhere else on the tab that asked for
+       it. Null on failure, so a caller can tell the difference without
+       repeating the message this already wrote. */
+    return j;
   }catch(e){
     if (note){ note.className = 'note bad'; note.textContent = e.message; }
+    return null;
   }
 }
 
