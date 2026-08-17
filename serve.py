@@ -2858,10 +2858,16 @@ def enrol_base_for(rec, host, secure):
 
 def invite_display(name, by, setup=None):
     """A row created from the panel, before the device it is for has ever been
-    switched on. Approved from the moment it exists — an admin naming a screen
-    and ticking the endpoints it may use IS the approval — but holding no
-    token, so nothing can BE it until somebody types the code into the screen
-    itself."""
+    switched on. It holds a code and NOTHING ELSE: no token, and not approved.
+
+    It used to be approved from the moment it existed, on the reasoning that an
+    admin naming a screen and ticking its endpoints IS the approval. That reads
+    well and it is wrong in the one place it matters — the row then sits
+    `approved` with no device behind it, so anything asking "is this a display
+    that works" is told yes about a television nobody has switched on. It gets
+    offered as a member of a group, and it would be counted as a grant that had
+    landed. Enrolment is what completes it, so enrolment is what approves it:
+    see redeem_code."""
     displays = read_displays()
     limit = display_settings()["max_displays"]
     if len(displays) >= limit:
@@ -2870,7 +2876,9 @@ def invite_display(name, by, setup=None):
     did = "d" + secrets.token_hex(6)
     now_ = int(time.time())
     rec = dict(DISPLAY_DEFAULTS)
-    rec.update(name=name, approved=True, approved_by=by, approved_at=now_,
+    # `approved_by` is who INVITED it, recorded now because that is when it is
+    # known; `approved_at` waits for the moment it is true.
+    rec.update(name=name, approved=False, approved_by=by, approved_at=0,
                created=now_, code=new_code(), code_expires=code_deadline(now_),
                origin="code")
     # What the admin already knows about the screen, set while creating it
@@ -2900,7 +2908,10 @@ def reissue_display(did):
     if not rec:
         return None, "no such display"
     now_ = int(time.time())
-    rec.update(salt="", hash="", approved=True,
+    # Back to an invitation: no token, and not approved until the new code is
+    # used. The row is the place and keeps its name and its grants, but it is
+    # not a working display again until a device is behind it.
+    rec.update(salt="", hash="", approved=False, approved_at=0,
                code=new_code(), code_expires=code_deadline(now_))
     write_displays(displays)
     return dict(rec, id=did), None
@@ -2939,8 +2950,10 @@ def redeem_code(raw):
         # Spent. The code is gone from the record before the token exists
         # anywhere else, so the same six characters cannot enrol a second
         # device however quickly somebody types them.
+        # Approved HERE, because this is the moment the row becomes a device.
+        # Before it, the code was an invitation nobody had taken up.
         rec.update(salt=salt, hash=dk, code="", code_expires=0,
-                   last_seen=now_, approved=True)
+                   last_seen=now_, approved=True, approved_at=now_)
         write_displays(displays)
         return did + "." + secret, dict(rec, id=did)
     return None, "unknown"
@@ -3473,6 +3486,29 @@ def system_group(kind):
         if rec["kind"] == kind and rec["system"]:
             return gid
     return ""
+
+
+def migrate_unenrolled_invites():
+    """Rows invited before enrolment was what approved them.
+
+    They sit `approved` with no token and a code still waiting, which is a
+    screen nobody has switched on being counted as one that works. Corrected
+    once, here, because the alternative is every reader of `approved` carrying
+    an "…and does it have a token" clause forever.
+
+    Only that exact shape. A row with a token is working and is left alone; a
+    row with neither is one whose code ran out, and its approval is not this
+    function's business."""
+    displays = read_displays()
+    fixed = [d for d, r in displays.items()
+             if r.get("approved") and not r.get("hash") and r.get("code")]
+    for did in fixed:
+        displays[did]["approved"] = False
+        displays[did]["approved_at"] = 0
+    if fixed:
+        write_displays(displays)
+        print("corrected %d invited row(s) that were approved before enrolling: %s"
+              % (len(fixed), ", ".join(fixed)), flush=True)
 
 
 def ensure_system_groups(by="the server"):
@@ -6802,6 +6838,7 @@ def main():
     # need, so they are there before anything can enrol into them and there is
     # no moment where a population has nowhere to land.
     ensure_system_groups()
+    migrate_unenrolled_invites()
     app = read_app()
     # Environment still wins, so a one-off run on a different port needs no
     # edit to the stored configuration. Setting PORT alone moves all three,
