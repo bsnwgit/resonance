@@ -157,11 +157,31 @@ right and answers to nothing; the line above the box says so, and gives the id
 an administrator needs. Approving it takes one click over in the panel, and the
 screen picks it up on its own within a few seconds — nobody needs to touch it.
 
+## Setting a screen up with a code
+
+If somebody has given you a **six-character code** — for a screen going on a
+wall, a television, a tablet — open the display page on that device and type
+the code into the box at the top: *Setting this screen up?*
+
+Case and dashes do not matter: `k7q-p4m` and `K7QP4M` are the same code. It
+works once, and it is only good for ten minutes, so get it as you walk to the
+screen rather than an hour before.
+
+The screen restarts itself when it takes the code, and comes back as the
+display it was named as — with whatever appearance and assistants were set up
+for it before you ever switched it on.
+
+You can also type `<this server>/e/CODE` straight into the address bar, which
+is easier on a television with a remote and does the same thing.
+
 ## Asking for access
 
 On some installations, opening the page on your own laptop or phone gives you
 the figure and a short form instead of the transcript and the input box. That
 means this device has not been given access to anything yet.
+
+If you were given a code, use the box above the form — that is a different
+thing from asking, and it needs no decision from anybody.
 
 Fill the form in — an administrator chose what it asks for — and press REQUEST
 ACCESS. Nothing else is needed from you: leave the page open, or come back to
@@ -210,6 +230,29 @@ If you are on `https://` and it still does not work:
   most browsers this is the padlock or shield in the address bar.
 - Check no other application has the microphone open.
 - On a shared machine, check the operating system's own microphone permission.
+
+## If it says it has lost its server
+
+Any display shows **NO CONNECTION TO THE SERVER** high in the frame, and a
+screen mounted on a wall also says it aloud, once. The figure carries on
+drifting, because it is drawn on the device itself and never stopped — which is
+exactly why the line is there. A screen that looks perfectly alive and is
+reaching nothing would otherwise be walked past for a week.
+
+There is nothing to press. It keeps trying on its own, the line disappears the
+moment the server answers, and the screen reloads itself so it comes back with
+anything that changed while it was down. If it is still saying it after a few
+minutes, the server or the network between you and it needs somebody — tell
+your administrator.
+
+A screen you opened yourself in a browser does not say any of this out loud. It
+stays quiet and tells you at the moment you actually ask it something, rather
+than interrupting you about a server you were not using.
+
+**Any display reloads itself when the server comes back**, and when a setting
+it draws from changes — that is how a screen nobody is standing at stays
+current. It waits until you have finished: nothing reloads while you are
+talking to it or typing into the box.
 
 ## If it mishears you
 

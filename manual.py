@@ -31,8 +31,8 @@ DOCS = [
     {"id": "admin",   "file": "administration.md",
      "title": "Administration",        "audience": "admin",
      "summary": "Signing in, how the panel is laid out, saving and reverting, "
-                "the live preview, and approving the displays that may use "
-                "each assistant."},
+                "the live preview, approving the displays that may use each "
+                "assistant, and keeping a screen nobody touches working."},
     {"id": "look",    "file": "appearance.md",
      "title": "Appearance & geometry", "audience": "admin",
      "summary": "The palette, layout and glass, the figure and how it "
@@ -49,7 +49,8 @@ DOCS = [
                 "behind them — models, hosted providers, and Home Assistant."},
     {"id": "app",     "file": "app-settings.md",
      "title": "Admin settings & accounts", "audience": "admin",
-     "summary": "Ports, restarts, session lifetime, and the two roles."},
+     "summary": "Ports, restarts, session lifetime, keeping unattended screens "
+                "up, and the two roles."},
     {"id": "embed",   "file": "embedding.md",
      "title": "Embedding it elsewhere", "audience": "admin",
      "summary": "Embed keys, the two axes an integrator has to keep apart, "

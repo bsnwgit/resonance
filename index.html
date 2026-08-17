@@ -154,6 +154,20 @@
     color:rgba(var(--paper),.42);
     text-shadow:0 0 18px rgba(0,0,0,.75);
   }
+  /* ---------- the screen has lost the server ----------
+     Sized off the shorter side like the prompt, for the same reason: it is
+     read from across a hallway or not at all. High in the frame rather than
+     low, so it never lands on top of the invitation — and dimmer than a
+     warning would be on a workstation, because this hangs on a wall in a
+     house and the failure it reports is usually a router. */
+  #offline{
+    display:none;align-items:flex-start;justify-content:center;
+    padding:6% 6% 0;z-index:6;
+    font-size:clamp(12px, 2.4vmin, 24px);letter-spacing:.16em;
+    text-align:center;line-height:1.5;
+    color:rgba(224,113,107,.72);
+    text-shadow:0 0 18px rgba(0,0,0,.75);
+  }
   #milk{background:radial-gradient(ellipse at 50% 45%,
           rgba(var(--glass),.055) 0%,
           rgba(var(--glass),.022) 42%,
@@ -306,6 +320,40 @@
     padding:22px 26px 18px;
     width:100%;max-width:560px;margin-inline:auto;
   }
+  /* ---- the code box ----
+     Set apart from the request beneath it by a rule, because they are two
+     different conversations: one is finishing a setup somebody already
+     decided on, the other is asking to be let in. The code is typed at the
+     size of the thing it is — six characters read off another screen — rather
+     than at form-field size. */
+  #enrol{display:none;flex-direction:column;gap:8px;
+         padding-bottom:14px;border-bottom:1px solid rgba(var(--glass),.18)}
+  body[data-enrol] #enrol{display:flex}
+  #enrolhead{
+    font-size:calc(12px * var(--fs));line-height:1.6;color:rgba(var(--paper),.88);
+  }
+  #enrolrow{display:flex;gap:8px;flex-wrap:wrap}
+  #enrolcode{
+    flex:1 1 180px;min-width:0;font:inherit;
+    font-size:calc(17px * var(--fs));letter-spacing:.28em;text-transform:uppercase;
+    padding:8px 10px;background:rgba(0,0,0,.45);color:var(--text);
+    border:1px solid rgba(var(--glass),.3);outline:0;border-radius:0;
+  }
+  #enrolcode:focus{border-color:rgba(var(--glass),.62)}
+  #enrolcode::placeholder{color:rgba(var(--paper),.28);letter-spacing:.28em}
+  #enrolgo{
+    font:inherit;font-size:calc(10px * var(--fs));letter-spacing:.18em;
+    padding:8px 14px;cursor:pointer;
+    background:none;color:rgba(var(--paper),.9);
+    border:1px solid rgba(var(--glass),.4);
+  }
+  #enrolgo:hover{border-color:rgba(var(--glass),.75)}
+  #enrolgo[disabled]{opacity:.5;cursor:default}
+  #enrolnote{
+    font-size:calc(9.5px * var(--fs));line-height:1.6;
+    color:rgba(var(--paper),.55);
+  }
+  #enrolnote.bad{color:#e0716b}
   #reqhead{
     font-size:calc(12px * var(--fs));line-height:1.6;
     color:rgba(var(--paper),.88);
@@ -499,6 +547,13 @@
      and taking it away entirely would lose it for exactly the person it is
      for, who walks up to a screen that has been idle for hours. */
   body[data-prompt]:not([data-saver]) #prompt{display:flex}
+  /* …and the same arrangement for the lost server, which a drifting screen
+     needs MORE than the invitation rather than less: still moving, still
+     looking perfect, reaching nothing. It stands down here and is painted
+     into the canvas for the duration, because an outage lasts hours and a
+     stationary line held that long on a screen whose whole purpose at that
+     moment is that nothing stays still is the one thing left to burn in. */
+  body[data-offline]:not([data-saver]) #offline{display:flex}
 </style>
 </head>
 <body data-layout="hero">
@@ -514,6 +569,17 @@
          any kind. Only ever drawn on a wall: a browser tab was opened
          deliberately by somebody who already knows what it is. -->
     <div class="ov" id="prompt"></div>
+    <!-- The screen has lost the server and has said so once. High in the
+         frame, where the invitation is low, so the two never argue over the
+         same line — and it CLEARS ITSELF when the server comes back rather
+         than waiting to be dismissed. Nobody is standing in front of a
+         hallway screen to press anything, and an alert that needs a press is
+         an alert that stays up for a month.
+
+         Hidden while the screensaver drifts, and painted into the canvas
+         instead — the same as the invitation, for the same burn-in reason.
+         See render(). -->
+    <div class="ov" id="offline"></div>
     <div class="ov" id="milk"></div>
     <div class="ov" id="scan"></div>
     <div class="ov" id="vign"></div>
@@ -528,6 +594,26 @@
        two controls wired to a refusal. Built from the fields an admin defined —
        this server has no opinion about what a request should ask. -->
   <div id="request">
+    <!-- Somebody commissioning this screen, holding six characters an admin
+         read out. FIRST, above the request form, because a person with a code
+         has already been decided about — they are finishing a setup, not
+         asking to be let in — and because the form was the only thing on this
+         page, so a code had nowhere to go and no sign that it was wanted.
+
+         Its own path to the end: the URL form, /e/CODE, is a fine thing to
+         type into a television with a remote and a poor thing to ask for from
+         somebody already looking at this screen. -->
+    <div id="enrol">
+      <div id="enrolhead">Setting this screen up?</div>
+      <div id="enrolrow">
+        <input id="enrolcode" type="text" spellcheck="false" autocomplete="off"
+               autocapitalize="characters" maxlength="7" placeholder="K7Q-P4M"
+               aria-label="setup code">
+        <button id="enrolgo" type="button">USE CODE</button>
+      </div>
+      <div id="enrolnote">Type the six-character code from the admin panel.
+Case and dashes do not matter.</div>
+    </div>
     <div id="reqhead"></div>
     <form id="reqform" autocomplete="off"></form>
     <div class="seg"><button id="reqsend" type="button">REQUEST ACCESS</button></div>
@@ -833,6 +919,7 @@ const Kiosk = {
   on: false,
   voiceOnly: false,
   fullscreen: true,
+  keepAwake: true,
   prompt: true,
   promptText: '',
   /* The buttons a wall takes away, and where each came from, so removing them
@@ -867,6 +954,7 @@ const Kiosk = {
        read as a kiosk that has had its full screen and its prompt switched
        off. */
     this.fullscreen = w.fullscreen !== false;
+    this.keepAwake = w.keep_awake !== false;
     this.prompt = w.prompt !== false;
     this.promptText = w.prompt_text || '';
     Saver.configure(w.saver);
@@ -934,9 +1022,25 @@ function paintRequest(){
   const box = $('request');
   if (!box || EMBED || PREVIEW) return;
   const D = Display;
-  const show = D.known && D.canRequest && D.state !== 'approved';
-  document.body.toggleAttribute('data-request', show);
-  if (!show) return;
+  /* A code works whatever this device's state is and whether or not anybody
+     may ask for access — so the panel appears for ANY screen that is not
+     approved, where it used to appear only for one that could request.
+     With guest requests switched off, an unapproved screen showed nothing at
+     all: no form, because none was allowed, and no way to use a code, because
+     there had never been one. A device an admin had just made a code for had
+     nowhere to type it and no sign that a code was a thing. */
+  const canEnrol = D.known && D.state !== 'approved';
+  const canAsk = canEnrol && D.canRequest;
+  document.body.toggleAttribute('data-enrol', canEnrol);
+  document.body.toggleAttribute('data-request', canEnrol);
+  if (!canEnrol) return;
+  /* The three request elements go away when nobody may ask, leaving the code
+     box as the whole of the page — which is what it is for a screen being
+     commissioned in a deployment that takes no requests. */
+  $('reqhead').style.display = canAsk ? '' : 'none';
+  $('reqsend').style.display = canAsk ? '' : 'none';
+  $('reqnote').style.display = canAsk ? '' : 'none';
+  if (!canAsk){ $('reqform').style.display = 'none'; return; }
 
   const head = $('reqhead'), form = $('reqform'), btn = $('reqsend');
   /* Three ways to arrive here, and they are not the same conversation: never
@@ -1032,6 +1136,51 @@ async function sendRequest(){
   }catch(e){
     btn.disabled = false;
     reqNote(e.message, true);
+  }
+}
+
+function enrolNote(m, bad){
+  const el = $('enrolnote');
+  if (el){ el.textContent = m; el.classList.toggle('bad', !!bad); }
+}
+
+/* Six characters, redeemed in place. The URL form still works and still has
+   its place — a television with a remote and no browser open yet — but a
+   screen already showing this page should not send somebody back to the
+   address bar to finish setting it up. */
+async function useCode(){
+  const el = $('enrolcode'), btn = $('enrolgo');
+  const code = (el.value || '').replace(/[^A-Za-z0-9]/g, '');
+  if (!code){ enrolNote('type the code first', true); el.focus(); return; }
+  btn.disabled = true;
+  enrolNote('checking…');
+  try{
+    const r = await fetch('display/enrol', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({code})
+    });
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok || !j.display){
+      /* The server's own three reasons, in words. A code typed off another
+         screen is mistyped often enough that "no" is not a useful answer. */
+      const why = (j && j.state) || '';
+      throw new Error(
+          why === 'expired' ? 'that code had expired — ask for a new one'
+        : why === 'blocked' ? 'too many wrong codes — wait a minute and try again'
+        : 'that code was not recognised — check it and try again');
+    }
+    /* Reloaded rather than continued in place. This device has just become a
+       different display: a new token, a name, its own appearance and whatever
+       endpoints were ticked for it before the screen was ever switched on. A
+       reload picks all of that up in the order the page already knows how to
+       do it, instead of a second path through the same setup that would have
+       to be kept in step with the first. */
+    enrolNote('enrolled — starting up…');
+    location.replace('?enrol=ok');
+  }catch(e){
+    btn.disabled = false;
+    enrolNote(e.message, true);
+    el.select();
   }
 }
 
@@ -1882,6 +2031,27 @@ function render(){
     ctx.restore();
   }
 
+  /* --- and the lost server, the same way ---
+     For the same reason and with more of it: an outage lasts hours, where the
+     invitation is only ever up while nobody is talking. A stationary red line
+     held for a night on the one screen whose entire purpose at that moment is
+     that nothing stays still would burn in exactly the shape of a complaint
+     about a router. Above the figure rather than below it, so the two never
+     land on each other. */
+  if (OFFLINE && Saver.amount > 0.01){
+    const short = Math.min(W, H);
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 0.45 * Saver.amount;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = Math.round(Math.max(11*DPR, short*0.024*Saver.scale)) + 'px '
+             + getComputedStyle(document.body).fontFamily;
+    ctx.fillStyle = '#e0716b';
+    ctx.fillText(OFFLINE, cx, cy - short * 0.22 * Saver.scale);
+    ctx.restore();
+  }
+
   /* …and the dim, last, over everything including the grain. Black rather
      than the palette's own ink: it is the panel's light output that burns and
      that a hallway at two in the morning is too bright with, and blending
@@ -2066,6 +2236,12 @@ const Saver = {
    left on a panel for a year. */
 const promptEl = $('prompt');
 let PROMPT = '';
+
+/* The other line render() draws for itself while the screensaver has the
+   screen. Declared beside the invitation because they are the same mechanism
+   — a string the canvas reads, with a DOM copy that stands down for the
+   duration — and set by the watchdog at the foot of this file. */
+let OFFLINE = '';
 function paintPrompt(){
   const names = (typeof Routes !== 'undefined' && Routes.spoken) ? Routes.spoken() : '';
   /* Awake means a conversation is happening, and a display with no wake gate
@@ -2130,6 +2306,12 @@ const FullScreen = {
          in front of a hallway tablet to read a complaint about it. */
       if (p && p.catch) p.catch(()=>{});
     }catch(e){}
+    /* The same gesture is the best moment to take the wake lock as well. It
+       does not require user activation the way this does, but a browser that
+       refused it at load — an unfocused tab, a page not yet interacted with —
+       will grant it here, and a commissioning touch is the one gesture a wall
+       screen is guaranteed to get. */
+    Watch.relock();
   },
 
   init(){
@@ -4339,6 +4521,19 @@ if (PREVIEW){
       // the panel saved a route; take the new document rather than waiting
       // for a reload to notice
       Routes.load().then(()=>{ syncWake(); repaintNames(); });
+    } else if (m.kind === 'hello'){
+      /* The panel asking to be told again. The handshake below is announced
+         once, unprompted, and a single announcement is a race the panel
+         cannot win reliably: this page can finish loading before the parent
+         has attached its listener, or before the parent knows who is signed
+         in — and either way the message is gone and the panel sits empty
+         until somebody reloads it. Asking is idempotent, so the panel can ask
+         whenever it finds itself without an answer.
+
+         Ignored before the settings have settled: replying with a half-loaded
+         document would replace one wrong answer with another. The unprompted
+         announcement is still coming. */
+      if (previewReady) announcePreview();
     } else if (m.kind === 'cmd' && typeof CMD[m.cmd] === 'function'){
       try { CMD[m.cmd](m.arg); }
       catch(err){ relay('ttsnote', m.cmd + ' failed: ' + err.message); }
@@ -4355,6 +4550,246 @@ if (PREVIEW){
    them overwrites S wholesale — including ptt, which is a viewer control
    living in an admin document. A preview deliberately skips all of it: the
    admin is looking at what a fresh viewer gets, not at their own habits. */
+/* ======================================================= STAYING UP ALONE
+   Everything above assumes a page somebody opened and will close. A tablet on
+   a wall is a browser tab running for a year: through server restarts, network
+   drops, endpoint reboots, certificate renewals and its own operating system's
+   ideas about backgrounding, with nobody standing in front of it to notice or
+   reload.
+
+   The failure mode this is written against is specific: A SCREEN THAT LOOKS
+   PERFECT AND DOES NOTHING. The geometry is driven locally, so it keeps
+   drifting and breathing with no server involvement at all — somebody walks
+   past, sees it moving, and assumes it is fine while nothing has reached the
+   server in a week. That is worse than a blank screen, which at least gets
+   reported within the hour.
+
+   IT POLLS, and that one decision pays for four others. A screen at rest
+   issues no requests, so without a poll an outage would end and the screen
+   would stay broken until somebody walked up and spoke to it. The same poll
+   keeps `last_seen` fresh in the panel, gives the server somewhere to answer
+   *reload yourself*, and carries the settings below so a change to them
+   reaches a building of screens without anybody visiting one.
+
+   WHAT RELOADS: everything, on every display. A configuration that moved, a
+   server that came back, an admin's request, the nightly refresh — a screen
+   showing settings somebody replaced an hour ago is stale whether or not it
+   hangs on a wall, and one rule is also a rule somebody can predict. What
+   keeps that from being an interruption is `busy()` below rather than a class
+   of device: nothing reloads while somebody is talking to the screen or
+   typing into it.
+
+   WHAT DIFFERS BY DEVICE is what it SAYS. A kiosk speaks the outage aloud,
+   because it has no transcript and nobody sitting at it; anything else stays
+   quiet and fails at the moment somebody actually uses it. */
+const Watch = {
+  /* The server's clock, not this device's, taken from the first poll that
+     answered. A reload request is a moment in server time, and comparing it
+     against a tablet whose clock is a year out would either fire for ever or
+     never fire at all. Zero until the first answer, which reads on the server
+     as "this screen has just started" — and a request made before it started
+     has already been satisfied by the load that is running this line. */
+  boot: 0,
+  gen: '',
+  cfg: {poll_seconds: 20, retry_attempts: 3, retry_seconds: 4,
+        refresh_at: '', refresh_stagger: 0, refresh_offset: 0},
+  fails: 0, down: false, said: false,
+  want: '',            // a reload that is owed, and why, or empty
+  refreshAt: 0,        // ms on the DEVICE's clock, 0 for none
+  lock: null,          // the screen wake lock, while it is held
+  _t: 0, _inflight: false,
+
+  start(){
+    if (EMBED) return;          // an embed is a frame in somebody's page
+    document.addEventListener('visibilitychange', ()=>{
+      if (document.hidden) return;
+      /* A backgrounded tab has its timers throttled to minutes and a
+         suspended one has them stopped altogether, so the first thing a
+         screen does on coming back is ask rather than wait out the rest of an
+         interval that may have been running since yesterday. */
+      this.relock();
+      this.tick();
+    });
+    this.tick();
+  },
+
+  /* Not now, if somebody is mid-sentence with it. A reload that lands between
+     a question and its answer is indistinguishable from a crash to the person
+     who asked, and every reason for reloading here keeps until they have
+     finished — the outage case included, because a screen that is talking is
+     a screen somebody is standing at. */
+  busy(){
+    return Wake.awake || Listen.busy || Play.playing || Speech.active
+           || typingInComposer();
+  },
+
+  wantReload(why){
+    this.want = this.want || why;
+    this.maybeReload();
+  },
+
+  maybeReload(){
+    if (!this.want) return;
+    /* Never the panel's own preview. It frames this same page, so everything
+       here runs inside it — and the one thing it must never do is reload
+       itself out from under the admin who is editing the very settings it is
+       showing. The server blanks the two reasons it can see; this covers the
+       third, which is that saving anything at all moves the stamp. The guard
+       is here rather than at each caller because this is the only line in the
+       object that actually reloads anything. */
+    if (PREVIEW) return;
+    /* NEVER while the server is unreachable. A reload into an outage replaces
+       a working screen with the browser's own error page, and that page has no
+       poll, no timer and no way back — the display would be gone until
+       somebody walked over to it, which is the exact outcome all of this
+       exists to prevent. The request keeps, and the reconnect below carries it
+       out as part of coming back. */
+    if (this.down || this.busy()) return;
+    ev('reload: ' + this.want);
+    location.reload();
+  },
+
+  offline(on){
+    OFFLINE = on ? 'NO CONNECTION TO THE SERVER' : '';
+    document.body.toggleAttribute('data-offline', !!OFFLINE);
+    const el = $('offline');
+    if (el) el.textContent = OFFLINE;
+  },
+
+  /* Said once, and only where there is nobody to read anything. A kiosk has no
+     transcript and no composer, so speaking is the only way it can tell
+     anybody — and saying it more than once would make an outage worse than the
+     silence it replaced. Anything else stays quiet until somebody tries to use
+     it, and then fails immediately at the request itself rather than making
+     them sit out three attempts first. */
+  announce(){
+    if (this.said || PREVIEW || !Kiosk.on || this.busy()) return;
+    this.said = true;
+    respond('I have lost the connection to my server. I will keep trying.');
+  },
+
+  fail(){
+    this.fails++;
+    if (this.fails < Math.max(1, this.cfg.retry_attempts|0)) return;
+    if (!this.down) ev('server unreachable');
+    this.down = true;
+    this.offline(true);
+    this.announce();
+  },
+
+  took(j){
+    const cfg = j.cfg || {};
+    let moved = false;
+    for (const k in this.cfg)
+      if (k in cfg && this.cfg[k] !== cfg[k]){ this.cfg[k] = cfg[k]; moved = true; }
+    /* Only when the setting actually changed, or when there is no time on the
+       books. Re-planning on every poll would erase the refresh instead of
+       carrying it out: the poll that runs at the appointed minute would move
+       the appointment to tomorrow a line before anything checked whether it
+       was due, and it would do that again every night for ever. */
+    if (moved || !this.refreshAt) this.planRefresh();
+    /* Back after being away. The page is reloaded rather than resumed: the
+       conversation it was holding belongs to somebody who left minutes ago,
+       and a reload is what picks up a deploy, a route corrected during the
+       outage, and an appearance an admin fixed without walking over. */
+    if (this.down) this.want = this.want || 'reconnected';
+    this.down = false; this.said = false; this.fails = 0;
+    this.offline(false);
+    if (j.reload) this.want = this.want || 'asked by an admin';
+    /* A stamp that moved: something a screen renders from was edited. Not
+       while this one is still waiting to be approved, though — the approval
+       itself moves the stamp, and Display.watch() is already handling that
+       case in place, with the words for it. Reloading here would replace those
+       words with a page that came back silently approved. */
+    else if (this.gen && j.gen !== this.gen && Display.state === 'approved')
+      this.want = 'settings changed';
+    this.gen = j.gen || this.gen;
+    if (!this.boot) this.boot = j.now || 0;
+    this.maybeReload();
+  },
+
+  async tick(){
+    /* One chain, always. A tab coming back into view asks straight away, and
+       without this that request would run alongside whichever one the timer
+       already had in flight — leaving two timers armed, then four, each
+       poll doubling the load on a server that is very likely already
+       struggling if the polls are slow enough for this to happen at all. */
+    if (this._inflight) return;
+    this._inflight = true;
+    clearTimeout(this._t);
+    /* A request that never comes back is the shape a dropped route takes:
+       not a refusal, not an error, just silence. Without a deadline the chain
+       stops here for as long as the browser is prepared to wait — which is
+       minutes — and a screen that has lost its network would sit looking
+       perfect for all of them rather than saying so. */
+    const cut = new AbortController();
+    const bell = setTimeout(()=> cut.abort(), 15000);
+    try{
+      const r = await fetch('display/poll', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        cache: 'no-store', signal: cut.signal,
+        body: JSON.stringify({boot: this.boot})
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      this.took(j);
+    }catch(e){
+      this.fail();
+    }
+    clearTimeout(bell);
+    this._inflight = false;
+    this.checkRefresh();
+    /* Faster while it is failing, because the interval between attempts is
+       what the retry setting means — and back to the ordinary poll once it is
+       answering, because a screen that is fine has nothing to say. */
+    const secs = this.down || this.fails
+      ? Math.max(1, this.cfg.retry_seconds|0)
+      : Math.max(2, this.cfg.poll_seconds|0);
+    this._t = setTimeout(()=> this.tick(), secs * 1000);
+  },
+
+  /* ---- the nightly refresh ----
+     A tab that never reloads accumulates, and this is a net under work not yet
+     done rather than a substitute for doing it. Read off the DEVICE's clock,
+     for the same reason a screensaver's dark hours are: a screen's night is
+     the night outside it. */
+  planRefresh(){
+    const at = String(this.cfg.refresh_at || '');
+    const m = at.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m){ this.refreshAt = 0; return; }
+    const d = new Date();
+    d.setHours(+m[1], +m[2], 0, 0);
+    /* Each screen takes its own offset inside the stagger window, computed on
+       the server from this display's id: twelve tablets reconnecting in the
+       same second is a load this server did not previously have. */
+    let t = d.getTime() + (this.cfg.refresh_offset|0) * 1000;
+    if (t <= Date.now()) t += 86400000;
+    this.refreshAt = t;
+  },
+
+  checkRefresh(){
+    if (!this.refreshAt || Date.now() < this.refreshAt) return;
+    this.refreshAt = 0;
+    this.planRefresh();                       // the same time tomorrow
+    this.wantReload('nightly refresh');
+  },
+
+  /* ---- keeping the backlight on ----
+     The device's own idea of when to sleep is the one thing between a wall
+     screen and a black rectangle, and a screen that has gone dark cannot be
+     walked up to and spoken to: the microphone is behind a page nobody can
+     see. The lock is dropped by the browser whenever the tab is hidden, so it
+     is taken again on every return rather than once at startup. */
+  async relock(){
+    if (!Kiosk.on || !Kiosk.keepAwake || PREVIEW) return;
+    if (!navigator.wakeLock || this.lock || document.hidden) return;
+    try{
+      this.lock = await navigator.wakeLock.request('screen');
+      this.lock.addEventListener('release', ()=>{ this.lock = null; });
+    }catch(e){ this.lock = null; }           // refused, or not a secure origin
+  },
+};
+
 function applyPrefs(){
   if (PREVIEW) return;
   if (Prefs.has('ptt'))   setPtt(Prefs.get('ptt'));
@@ -4402,15 +4837,39 @@ Promise.all([Settings.load(), Display.hello().then(()=> Routes.load())]).then(()
     micNote('waiting to be approved — ' + Display.name + ' (' + Display.id + ')');
   paintRequest();
   Display.watch();
+  /* After hello, always: what this screen is decides whether it reloads
+     itself, keeps its backlight on, or says anything aloud when the server
+     goes away — and none of that is known until the display record is. */
+  Watch.relock();
+  Watch.start();
   /* After the prefs, always: the grant decides what this surface is, and a
      preference stored against another page on the same site does not get to
      argue with it. */
   loadEmbed();
-  if (PREVIEW && window.parent !== window)
-    window.parent.postMessage({rsn:1, kind:'ready', settings:S}, '*');
+  announcePreview();
 });
 
+/* The settled document, handed to the admin page — and it can be handed over
+   more than once, because the panel is allowed to ask for it again. See the
+   `hello` branch above for why once was not enough. */
+let previewReady = false;
+function announcePreview(){
+  if (!PREVIEW || window.parent === window) return;
+  previewReady = true;
+  window.parent.postMessage({rsn:1, kind:'ready', settings:S}, '*');
+}
+
 on('reqsend', 'click', sendRequest);
+on('enrolgo', 'click', useCode);
+on('enrolcode', 'keydown', e=>{ if (e.key === 'Enter') useCode(); });
+/* Typed off another screen, so it arrives with whatever spacing and case the
+   person reading it out used. The server ignores both; this makes the field
+   agree with it instead of looking like it is refusing what was typed. */
+on('enrolcode', 'input', e=>{
+  const el = e.target, at = el.selectionStart, was = el.value;
+  el.value = was.toUpperCase();
+  if (el.value !== was) el.setSelectionRange(at, at);
+});
 on('verdictok', 'click', ()=> $('verdict').classList.remove('on'));
 
 setPalette('blue');

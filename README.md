@@ -74,13 +74,14 @@ display, displays the server knows about, so a name can be restricted to the
 tablets you approved, the embed API that lets another application put this
 interface inside its own page, and what a wall display looks like — voice only
 and speak only, an appearance a place can have of its own, and a screensaver
-that is still the product.
+that is still the product, and staying up unattended — a tablet on a wall is a
+browser tab running for a year, and it now checks in, says so when it cannot,
+reloads itself when it can again, and can be reached from the panel.
 
-**Not done, in the order it matters:** staying up unattended, because a tablet
-on a wall is a browser tab running for a year. Then identity and memory, so a
-conversation can mean something an hour later — the embed is deliberately
-memoryless until that lands. Then packaging it as a library other projects can
-install.
+**Next, in the order it matters:** identity and the PIN, which is phase 5 and
+the first thing after four — then memory, so a conversation can mean something
+an hour later; the embed is deliberately memoryless until that lands. Then
+packaging it as a library other projects can install.
 
 The [Roadmap](#roadmap) carries the reasoning for each, including the
 decisions already taken about how identity and memory should work.
@@ -827,7 +828,9 @@ On every listener:
 | `POST` | `/ask` | a question — `{"route": …}` picks one, absent means the default. `{"conversation_id": …}` continues one the endpoint is keeping, and the reply carries that id back. `403 {"refused": "display"}` where this display may not use that route |
 | `POST` | `/display/hello` | a display announcing itself: declared name in, its identity out, and a token in an `HttpOnly` cookie if it had none. Same-origin only |
 | `POST` | `/display/request` | a device asking for access, answering the form the admin built — or `{"renew": true}`, which asks again on the answers already held. Same-origin only |
-| `GET` | `/e/<code>` | an enrolment code, typed into the device being enrolled. Spends the code, sets the cookie, and redirects to the display with `?enrol=` saying how it went. Display listeners only |
+| `POST` | `/display/poll` | a display saying it is still here and asking whether anything has moved: the stamp of ITS OWN configuration, whether an admin has asked it to reload, this server's clock, and the numbers it keeps itself up with. Same-origin only |
+| `POST` | `/display/enrol` | an enrolment code redeemed in place, from the box the display page offers. Spends the code and sets the cookie, without sending anybody back to the address bar. Same-origin only, same back-off as the URL form |
+| `GET` | `/e/<code>` | the same code, typed as a URL instead — the right shape for a television with a remote and no browser open yet. Spends the code, sets the cookie, and redirects to the display with `?enrol=` saying how it went. Display listeners only |
 
 Display listeners only — the embed does not exist on the admin port:
 
@@ -1081,32 +1084,27 @@ two people in one room with three listening microphones between them.
 | 1b | ~~**The Home Assistant adapter**~~ **— done** | saying the house name switches a light on | 1a | none |
 | 2 | ~~**Displays, and binding a route to one**~~ **— done** | only the tablets you approved can actuate the house, whatever anyone's browser is set to | 1b | none |
 | 3 | ~~**What a wall display looks like**~~ **— done** | voice only and speak only, an appearance per place, and a screensaver that is still the product | 2 | none |
-| 4 | **Staying up unattended** | a tablet nobody touches for a year is still working | 3, and 8 for the alert | none · designed, not built |
+| 4 | ~~**Staying up unattended**~~ **— done** | a tablet nobody touches for a year is still working | 3 | none · closed 2026-08-17 · alert and drop test in 8 |
 | 5 | **Identity and the PIN** | a person, as distinct from a place | 2 | **1** · whether an identity carries its own Home Assistant token |
 | 6 | **Personal wake words** | one person addressing a tablet stops triggering another person's device | 5 | none |
 | 7 | **Memory** | conversations that mean something across sessions | 5 | **1** · what the retained unit is — deliberately left to experience |
-| 8 | **Diagnostics and alerting** | a failing screen comes and finds you, rather than the other way round | 2 | **1** · the retention default |
+| 8 | **Diagnostics and alerting** | a failing screen comes and finds you, rather than the other way round | 2 | **1** · the retention default · also carries 4's network-drop test |
 
 The last column counts decisions that need **you**, not implementation choices
 made while building and shown afterwards. A phase reading *none* is ready to
 start.
 
-**Nothing outstanding blocks starting.** Four is designed and not started. It
-was a design problem rather than a question to answer, and working through it
-turned five open questions into a build: the display polls, reconnects by
-reloading, retries three times and then says so — spoken aloud on a wall,
-where there is nothing to read — refreshes itself nightly on its own clock, and
-gains a Maintenance section to configure all of that.
+**Nothing outstanding blocks starting.**
 
 **Alerting merged into eight rather than becoming a ninth phase**, because
 eight already collects the events an alert would fire on, and building the
 watcher separately would be a second pass over the same code. The consequence
-lands on four: the server can tell a stuck display to reload itself, and when
+landed on four: the server can tell a stuck display to reload itself, and when
 that fails there is nothing left for it to do but tell somebody, which is
-eight's job. So **either eight moves up beside four, or four ships with the
-reload and gains its alert when eight lands** — an ordering call rather than a
-design one, and both answers work. Four is buildable either way; only its last
-paragraph waits.
+eight's job. **Four shipped without that alert** rather than eight moving up
+beside it — decided 2026-08-16. Everything four is for works today; a display
+the server cannot reach at all is visible in the panel as one that stopped
+checking in, and what it does not yet do is come and find you.
 
 The three remaining decisions are each answerable when their own phase comes
 up, and one of them is deliberately waiting on experience rather than on a
@@ -1164,10 +1162,33 @@ three faults that had nothing to do with Home Assistant, plus two secret
 disclosures, all of which would otherwise have been debugged through a new
 adapter.
 
-**Four stopped being a placeholder** — see its entry. What it turned out to be
-is a set of small mechanisms that only make sense together, and one of them,
-the poll, pays for four of the others. Its position held: designing it moved
-nothing, and turned up two real leaks in code that already shipped.
+**4 is done and closed**, by him, on 2026-08-17 — with one thing owed and
+booked into eight rather than left hanging over it: nothing it built has yet
+faced a real network drop on real hardware, and that test is written up in
+eight's entry as five things to run rather than as a good intention.
+
+It is the first phase whose value is entirely invisible when it works. What it
+turned out to be is a set of small mechanisms that only make
+sense together, and one of them — the check-in — pays for four of the others:
+last seen, the reload channel, the settings reaching a building of screens, and
+a screen noticing on its own that the server came back. Its position held:
+designing it moved nothing, and turned up two real leaks in code that had
+already shipped, both since fixed.
+
+The one thing worth having here rather than in its entry is **what reloads, and
+for whom**. It was built kiosks-only — a desk tab has somebody in front of it,
+and taking one out from under them to apply a colour changed upstairs looked
+like the worse interruption — and that was overruled the same day: **every
+display reloads**, for every reason. A screen showing settings somebody
+replaced an hour ago is stale whether or not it hangs on a wall, and one rule
+is a rule somebody can predict. What keeps it from interrupting anybody is that
+nothing reloads while a person is talking to the screen or typing into it,
+which is a test about the moment rather than a class of device — and it was
+already there, guarding the nightly refresh.
+
+What does still differ by device is what a screen *says*: a kiosk speaks the
+outage aloud because it has no transcript and nobody sitting at it, and
+everything else stays quiet and fails when somebody actually uses it.
 
 Two and three were one phase until the wall-mounted side outgrew it. They
 share a substrate — a display the server knows about — but nothing else:
@@ -1688,8 +1709,9 @@ it. Each entry below carries its own panel scope.
 
   **The refresh runs alongside fixing the leaks rather than instead of them.**
   It is a net under work not yet done, and treating it as the fix would mean
-  shipping a leak and a nightly workaround for it in the same release. Two are
-  known:
+  shipping a leak and a nightly workaround for it in the same release. Two were
+  known, and **both were fixed on their own branch before this was built**,
+  which is the order that made the refresh a net rather than a patch:
 
   - **Every spoken reply leaves an analyser behind.** Speech builds a fresh
     `AnalyserNode` and `BufferSourceNode` per utterance and wires them to the
@@ -1735,11 +1757,33 @@ it. Each entry below carries its own panel scope.
   around, because a Maintenance page with a restart button that ends the
   service is worse than one without.
 
+  *Built anyway, 2026-08-17, and the third option is the one that was missing:
+  it does not stop, it HANDS OVER.* At the appointed minute the server launches
+  `serve.sh restart` in a session of its own and lets that script kill it —
+  `stop` waits for the sockets, `start` binds a fresh process, and the helper
+  outlives its parent because causing that death is what it was launched for.
+  No supervisor is needed to bring the service back, because the thing bringing
+  it back was started before it went away. Two guards make it safe rather than
+  clever: it waits for the server to fall quiet (and a check-in is not use, or
+  a building of screens would mean it never restarted at all), and a time is
+  only ever acted on if it was already set when that minute arrived — which is
+  what stops the fresh 03:00:04 process restarting itself in a loop and stops
+  an admin typing 14:23 at 14:23 from cutting themselves off. **The residual
+  risk stands and is stated in the panel**: nothing catches a `start` that
+  cannot bind.
+
   *Panel:* a Maintenance section — retry count and interval, the nightly
   refresh window and whether it staggers, and the browser-side device
   behaviour, as a named profile picked per device the way appearance and
   screensaver already are. The server half sits with the other server settings,
   since a restart applies to one server rather than to twelve screens.
+
+  *As built:* the profile that behaviour belongs on already existed by the time
+  this was written — the kiosk profile, which is exactly "a named profile
+  picked per device" and is already where full screen and the prompt line live.
+  So keeping the screen awake is a tick on it rather than a fifth list, and the
+  Maintenance section holds the four numbers, all of which are one server's
+  business rather than one screen's.
 
 - **Identity, in three strengths.** How a device or person identifies itself
   decides what may be kept, because the strength of the claim and the
@@ -1974,6 +2018,32 @@ it. Each entry below carries its own panel scope.
   person attached to it — somebody is standing at a screen waiting to be let
   in.
 
+  **Phase 4's outage behaviour is verified here, against a real network drop.**
+  Everything four built for an unreachable server was exercised from the server
+  side — the poll, the stamp, the reload channel, the handover restart, both
+  states of the code clock — but the half that only a pulled cable can prove
+  has never been run: a tablet losing its network, showing the line, speaking
+  it once, holding a reload it must not perform while down, and reloading when
+  the server answers again.
+
+  It belongs to this phase rather than to four for the reason four shipped
+  without its alert: this is where a screen that has gone quiet becomes
+  something the server notices and reports, so the rig that proves the
+  detection works is the same rig that proves the reporting does. Testing it
+  twice, once with nothing watching, is the pass that gets skipped.
+
+  What to run, on real hardware rather than a throttled devtools tab:
+
+  - unplug the network at the screen — the line appears, a kiosk says it once,
+    nothing else speaks
+  - leave it down past a scheduled nightly refresh — no reload happens while
+    it is unreachable
+  - plug it back in — the line clears itself and the page reloads
+  - change an appearance profile while it is down — the reload comes back
+    carrying it
+  - press RELOAD in the panel while it is down — it is obeyed on reconnect,
+    once, and not again on the next restart
+
   **What already exists makes this cheaper than the entry looks.** There is no
   diagnostics, health or event endpoint in `serve.py` at all, so that part
   starts from nothing. But `last_seen` per device is already kept and already
@@ -2098,6 +2168,147 @@ on a desk. A tablet bolted to a wall, answering a household, moves them:
 ## Progress log
 
 Newest first.
+
+### 2026-08-17 — the panel stopped being a filing cabinet
+
+Not a phase. A day of using the thing and finding that the administration side
+had been arranged by what was built when, rather than by what somebody does.
+
+- **The enrolment flow had a half missing.** An admin could mint a code; the
+  screen it was for offered no way to use one. The only path was typing
+  `/e/CODE` into an address bar — fine for a television with a remote, and the
+  long way round for a screen already showing this page. Worse where guest
+  requests are off: an unapproved screen drew nothing at all, so a device
+  somebody had just made a code for had no path forward of any kind.
+- **The code was minted on one tab and displayed on another.** Pressing GET A
+  CODE showed nothing where you were standing, and the complaint about a
+  missing name was written on the way out and never taken back — so a press
+  that worked looked exactly like a press that failed. Rows accumulated in the
+  register that nobody knew they had made, holding live codes, on a page
+  nobody had been sent to.
+- **"9 min left" was a lie for nine minutes.** A code is the one thing on a row
+  that spends itself while you read it, so it is a clock now rather than a
+  sentence — and how long it runs for is a setting, which can be switched off.
+- **One register became four lists on three tabs.** Two questions decide which:
+  is it working, and is it a person or a machine. An arrival is a job somebody
+  has to do; a working row is a thing they look up; and a person who filled in
+  a form has nothing in common with a screen an admin minted a code for except
+  where they both end up.
+- **Everything that starts working is filed with its own population.** A row in
+  no group is a row an allow-list cannot name, so every grant had to be made
+  one device at a time — which is the data entry a group exists to remove.
+- **The bar says which of two subjects you are in.** Configuring the server,
+  and how something comes to be here. Two titles, boxed, each with its own way
+  into the manual, and a gap between them doing the work a fifth link would
+  have done badly.
+- **A network profile is an address and a port**, not just a port. The picker
+  offers what the machine actually has, each with the interface carrying it,
+  read from the kernel rather than by shelling out or taking a dependency for
+  a list of addresses. The port is tried before anything is allowed to use it:
+  on one address it must be free there, on ANY it is allowed if even one
+  address can carry it. Two profiles may share a port on different addresses,
+  because the machine can.
+- **Which came with two bugs of its own, in one afternoon.** The check ran over
+  every profile the panel sent, so editing one row was refused by the state of
+  another — naming a port nobody had touched. And a port this process had
+  bound reported itself as taken, because the guard for that covered the three
+  app ports and not the profile listeners, which are every port the app
+  actually answers on. Fixing that opened a third: "9701 is mine" was true of
+  every address on the machine, so moving a profile onto an address somebody
+  else held would have been allowed and then failed to bind. The guard asks
+  about the address now.
+- **A row is a person or a device by how it arrived**, recorded when it is made.
+  It used to be inferred from whether the row had ever pressed REQUEST ACCESS —
+  a field kept for deciding whether a grant expires, borrowed because it was
+  there. Somebody looking at the request form has not pressed it yet, so they
+  were filed under the code process, on the one page that had nothing to do
+  with them.
+- **A screen reloads when ITS configuration moves.** The stamp digested every
+  row, so one device opening the display page reloaded every screen in the
+  building — and deleting a row reloaded the browser that had just made it,
+  which said hello and made another. Delete, watch it return, delete again.
+- **Three bugs of my own worth recording**, because they are the same shape: a
+  commit row added as a bare div appeared on every page in the panel, since the
+  machinery hides sections by an attribute a bare div does not carry; the panel
+  is a GRID, so a section without `wide` or `bare` tiles into a narrow column
+  beside its neighbours; and ALL on the bulk bar ticked every row this server
+  knew about, including rows two tabs away with no APPLY under them. Matching a
+  list's markup is not matching a tab, and a control's scope is the page it is
+  drawn on.
+
+### 2026-08-16 — a screen that looks perfect and does nothing
+
+Phase 4: staying up unattended. The whole of it is invisible while it works,
+which is why it needed its own phase — nobody ever gets to it as part of
+something else.
+
+- **The display checks in, and that one decision pays for four others.** A
+  screen at rest issues no requests, so without it an outage would end and the
+  wall would stay broken until somebody walked up and spoke to it. The same
+  check-in keeps `last_seen` honest, gives the server somewhere to answer
+  *reload yourself*, carries the maintenance settings out to every screen, and
+  is how a screen notices on its own that the server came back.
+- **The stamp is a digest, not a modification time.** `last_seen` is written by
+  the very check-in that reads it, so a stamp based on the file's mtime would
+  change on its own and order every screen in the building to reload itself for
+  ever. Only the fields an admin can change are in the digest, and it is
+  recomputed only when the file has actually been written — a building full of
+  screens costs one `stat` each rather than one hash each.
+- **The boot moment is the server's clock, not the device's.** A reload request
+  is a moment in server time, and a tablet whose own clock is a year out would
+  either obey it for ever or never. The display is told the time at its first
+  check-in and hands that value back; a request older than it has already been
+  satisfied by the load that is running. Nothing to acknowledge, nothing left
+  set to fire again at the next restart.
+- **Everything reloads, on every display** — and this went the other way first.
+  It was built with the automatic reloads gated to kiosks, on the argument that
+  a desk tab has somebody in front of it; that was overruled the same day. A
+  screen is stale whether or not it hangs on a wall, and the guard that matters
+  is the one already there for the nightly refresh: nothing reloads while
+  somebody is talking to the screen or typing into it. A test about the moment,
+  not about the kind of device.
+- **It never reloads into an outage.** A reload while the server is unreachable
+  swaps a working screen for the browser's error page, which has no check-in,
+  no timer and no way back — the display would be gone until somebody walked
+  over, which is the exact outcome the phase exists to prevent. A reload that
+  falls due while it is down is held, and coming back carries it out.
+- **A kiosk says it once, aloud, and the line clears itself.** It has no
+  transcript and no composer, so speech is the only channel it has; saying it
+  twice would make the outage worse than the silence it replaced. Nobody is
+  standing in a hallway to dismiss anything, so an alert that needed
+  acknowledging at the screen would be an alert that stayed up for a month.
+  Anything not a kiosk stays quiet and fails at the moment somebody actually
+  uses it.
+- **Two bugs found while writing it, both in the new code.** Re-planning the
+  nightly refresh on every check-in erased it instead of carrying it out — the
+  check-in at the appointed minute moved the appointment to tomorrow a line
+  before anything asked whether it was due, every night, for ever. And a tab
+  coming back into view asked straight away while the timer's request was still
+  in flight, leaving two chains armed, then four, each one doubling the load on
+  a server already slow enough for that to happen.
+- **A poll with no deadline is not a poll.** A dropped route does not refuse or
+  error, it goes silent, and `fetch` will wait minutes — during which a screen
+  that has lost its network sits looking perfect. Fifteen seconds and it counts
+  as a failure.
+- **What no setting here can reach, said plainly.** A tablet that reboots at
+  four in the morning comes back to a lock screen with no browser running, and
+  there is nothing left for this server to talk to — so kiosk mode, a launcher
+  or screen pinning is a deployment instruction in the manual rather than a
+  field in the panel.
+- **The scheduled server restart was built after all**, the day after the phase
+  closed. The entry had recorded it as needing a supervisor, which was true of
+  the two options considered — schedule a stop, or wait for systemd. The third
+  is a handover: the server launches `serve.sh restart` detached and lets it do
+  the killing, so what brings the service back was already running before it
+  went away. It waits for the server to fall quiet first, and will not act on a
+  time that had already passed when it was set — that one rule stops both the
+  restart loop and the admin who schedules a restart for the minute they are
+  in. What it still cannot do is catch a `start` that fails to bind, which is
+  why it is off by default and why the panel says so.
+- **Four ships without its alert.** Raising one when a forced reload fails is
+  phase 8's job, and eight did not move up to meet it. A screen the server
+  cannot reach at all is visible in the panel as one that stopped checking in;
+  what it does not yet do is come and find you.
 
 ### 2026-08-15 — the screensaver is still the product
 

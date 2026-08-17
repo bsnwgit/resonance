@@ -277,17 +277,14 @@
   .tabrow{display:flex;align-items:stretch;gap:14px;margin-bottom:2px}
   .tabside{display:flex;flex-direction:column;min-width:0}
   .tabside .tabs{margin-bottom:0}
-  /* Equal halves, so the rule lands in the middle of the row. Connections sits
-     at the LEFT of its half, hard against the rule, so the two groups read as
-     a pair either side of it rather than as two things at opposite ends of a
-     wide row with nothing between them. */
+  /* Connections is on its own down here now — the admin tabs it used to share
+     the row with are links in the bar at the top. So it takes the left edge
+     and only the width it needs, rather than half of a row with nothing in
+     the other half. The rule that divided the two subjects went with the
+     second subject: a boundary with nothing on the far side of it is a line,
+     not a division. */
   .tabside{flex:2 1 0}
-  .connside{flex:1 1 0;align-items:flex-start}
-
-  /* Heavy on purpose: this is a boundary between subjects, not a gap between
-     controls, and the panel's hairlines read as the latter. */
-  .tabsplit{flex:0 0 2px;align-self:stretch;
-            background:rgba(var(--glass),.34);margin-bottom:10px}
+  .connside{flex:0 1 auto;align-items:flex-start}
 
   /* The app tab's own commit row, at the foot of the box. Hidden outright
      on every other tab: a save button that belongs to settings you cannot
@@ -295,6 +292,7 @@
   #approw,.uirow{display:none;margin-top:14px;padding-top:10px;
           border-top:1px solid rgba(var(--glass),.30)}
   #approw.on,.uirow.on{display:block}
+
   #approw .seg,.uirow .seg{justify-content:flex-end;margin-top:8px}
   #approw .seg button,
   .uirow .seg button{border-width:2px;border-style:solid;padding:6px 10px}
@@ -379,23 +377,32 @@
   /* An endpoint's subsections are .subgrp rather than .grp, so they need
      saying separately — but they are the same thing to the eye: a caret, a
      name, and a body that opens. */
-  .erow[data-rid] .subgrp{border:0;margin:0}
-  .erow[data-rid] .subgrp + .subgrp{margin-top:9px}
+  /* …and the embed draft is one of these too: it is a row in a list of named
+     things, made the same way an endpoint is, so it reads the same way down
+     its own row. */
+  .erow[data-rid] .subgrp,
+  #em_draft .subgrp{border:0;margin:0}
+  .erow[data-rid] .subgrp + .subgrp,
+  #em_draft .subgrp + .subgrp{margin-top:9px}
   /* One per line, full width, the way a profile's sections stack — rather than
      tiling into 215px columns. An endpoint reads down its own row instead of
      across it, and the two lists look like the same kind of thing. */
-  .erow[data-rid] .subwrap{
+  .erow[data-rid] .subwrap,
+  #em_draft .subwrap{
     display:block;margin:8px 0 2px;padding-left:9px;
     border-left:2px solid rgba(var(--glass),.22);
   }
   /* No box of its own either: a profile's sections are separated by a hairline
      under the name, not by a frame each. */
-  .erow[data-rid] .subgrp{
+  .erow[data-rid] .subgrp,
+  #em_draft .subgrp{
     border:0;border-top:1px solid rgba(var(--glass),.10);
     background:none;margin:0;
   }
-  .erow[data-rid] .subgrp:first-child{border-top:0}
-  .erow[data-rid] .subgrp > h5{padding-left:20px}
+  .erow[data-rid] .subgrp:first-child,
+  #em_draft .subgrp:first-child{border-top:0}
+  .erow[data-rid] .subgrp > h5,
+  #em_draft .subgrp > h5{padding-left:20px}
 
   /* the first topic's own top rule would double up with the box edge */
   #grpbox .grp:first-of-type{border-top:0;margin-top:6px}
@@ -483,41 +490,36 @@
      or it would override them from a more specific selector. */
 
   #saverule{margin:10px 0 2px}
-  /* AI sits in the tab row itself now, and the four pinned entries are a row
-     of their own in the foot. Both are `.tabs`, so the hover and selected
-     treatments come from there and none of them needs a rule of its own —
-     the width arithmetic that used to place AI under the third tab, and the
-     full-width stacked entries in the foot, both went with the 425px column
-     they were sized for. */
-  #foottabs{margin-bottom:0}
-  /* Grow from their own label rather than from a zero basis, so on a panel
-     too narrow to hold four they wrap to a second line instead of squeezing
-     DOCUMENTATION out through its own border. */
-  #foottabs button{flex:1 1 auto;white-space:nowrap}
+  /* Grow from their own label rather than from a zero basis, so a panel too
+     narrow to hold them wraps to a second line instead of squeezing a label
+     out through its own border. */
+  .connside .tabs button{white-space:nowrap}
   /* a change here does nothing until the process restarts, so say so loudly */
   .pending{
     border-left:2px solid #e8b04a;padding-left:8px;margin-top:10px;
     font-size:calc(9px * var(--fs));letter-spacing:.06em;line-height:1.6;color:#f0cf94;
     white-space:pre-line;
   }
-  #portgrid{display:grid;grid-template-columns:1fr auto;gap:6px 10px;
+  #portgrid,.numgrid{display:grid;grid-template-columns:1fr auto;gap:6px 10px;
             align-items:center;margin-top:8px}
-  #portgrid label{font-size:calc(9.5px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.9)}
+  #portgrid label,.numgrid label{font-size:calc(9.5px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.9)}
   /* the session field is the same kind of thing as a port — a small number
      you type, not prose — so it takes the same treatment */
-  #portgrid input,#ap_session,#em_ttl{
+  #portgrid input,#ap_session,#em_ttl,.num{
     width:88px;font:inherit;font-size:calc(10px * var(--fs));padding:4px 6px;
     background:rgba(0,0,0,.6);color:var(--text);
     border:1px solid rgba(var(--glass),.16);outline:0;text-align:right;
   }
-  #portgrid input:focus,#ap_session:focus,#em_ttl:focus{border-color:var(--hue-dim)}
+  #portgrid input:focus,#ap_session:focus,#em_ttl:focus,.num:focus{border-color:var(--hue-dim)}
   #ap_session,#em_ttl{display:block;margin:4px 0}
   /* the spinner arrows are the operating system's, and look it */
   #portgrid input::-webkit-outer-spin-button,
   #portgrid input::-webkit-inner-spin-button,
   #ap_session::-webkit-outer-spin-button,
-  #ap_session::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
-  #portgrid input,#ap_session,#em_ttl{-moz-appearance:textfield;appearance:textfield}
+  #ap_session::-webkit-inner-spin-button,
+  .num::-webkit-outer-spin-button,
+  .num::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  #portgrid input,#ap_session,#em_ttl,.num{-moz-appearance:textfield;appearance:textfield}
   #em_ttl::-webkit-outer-spin-button,
   #em_ttl::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   #pw_cur:focus,#pw_new:focus,#nu_name:focus,#nu_pw:focus,
@@ -533,19 +535,74 @@
     border-bottom:1px solid rgba(var(--glass),.1);
     font-size:calc(9px * var(--fs));letter-spacing:.16em;color:rgba(var(--paper),.75);
   }
-  /* Bigger than the ? beside a section heading, and filled rather than
-     outlined. Those are one per section and have their heading for context;
-     this one has to be findable on its own from across the panel, which is
-     what "defined" has to mean for a control with a single character on it. */
-  #panelhelp{
-    flex:0 0 auto;width:19px;height:19px;padding:0;line-height:1;
+  /* The way around the panel, as LINKS rather than as buttons. They sit in a
+     bar whose other occupants are a title, a help mark and your name, and a
+     row of bordered buttons in among those would read as four controls that
+     do something rather than four places you can go.
+
+     Marked by weight and colour alone: where you are is the brightest thing
+     in the row, and the rule under it is the only ornament — anything more
+     turns navigation back into buttons. */
+  /* Stretched rather than centred, so the dividers below run the full height
+     of the row and read as one rule broken by words rather than as ticks
+     floating between them. */
+  #navlinks{display:flex;align-items:stretch;gap:0;min-width:0;flex-wrap:wrap}
+  #navlinks button{
+    display:flex;align-items:center;
+    font:inherit;font-size:inherit;letter-spacing:inherit;
+    padding:2px 14px;background:none;border:0;cursor:pointer;
+    color:rgba(var(--paper),.62);
+    border-bottom:1px solid transparent;
+  }
+  #navlinks button:hover{color:rgba(var(--paper),.95)}
+  #navlinks button.on{color:var(--hue);border-bottom-color:var(--hue-dim)}
+  /* One between each pair, and one before the first — which separates the
+     places you can go from the title of the page you are on. The same
+     hairline in both cases: they are doing the same job. */
+  #navlinks::before{content:""}
+  #navlinks::before,
+  #navlinks button + button{border-left:1px solid rgba(var(--glass),.28)}
+  /* A large space, and nothing in it. It is what separates the two subjects;
+     the boxed title after it is what stops the space reading as the bar
+     having run out, so no rule is needed and a rule against the box would be
+     a line drawn beside a line. */
+  #navlinks .navgap{width:34px}
+  #navlinks .navtitle{display:flex;align-items:center}
+  /* ---- the two titles ----
+     Neither is a place you can go: SETTINGS names the page you are on, and
+     ENROLLMENTS names the pair beside it. Sitting in a row of links in the
+     same type at the same weight, they read as two more links that do
+     nothing when pressed — so they are boxed. A rule around a word is the
+     cheapest way to say "this is a label", and it doubles as the division
+     between the two groups, which is why the group divider came off the
+     second one. */
+  #panelbar .bartitle{
+    display:flex;align-items:center;align-self:center;
+    padding:3px 9px 3px 11px;letter-spacing:.2em;
+    color:rgba(var(--paper),.92);
+    border:1px solid rgba(var(--glass),.40);
+    background:rgba(var(--glass),.07);
+  }
+  #navlinks .bartitle{margin-left:10px}
+  /* Filled rather than outlined, unlike the ? beside a section heading: those
+     are one per section and have their heading right there for context, where
+     these two have to be findable on their own from across the panel.
+
+     Inside the box, after the word it belongs to. Said at this weight because
+     the mark in the right-hand title sits inside #navlinks, where the rule for
+     the links is an id plus an element and would otherwise hand it the links'
+     grey, their padding and their divider. */
+  #panelbar .bartitle .helpmark{
+    width:17px;height:17px;padding:0;margin-left:9px;flex:0 0 auto;
+    font:inherit;font-size:calc(9px * var(--fs));letter-spacing:0;line-height:1;
     display:inline-flex;align-items:center;justify-content:center;
-    font:inherit;font-size:calc(10px * var(--fs));letter-spacing:0;
     border:1px solid rgba(var(--help-line),.75);border-radius:50%;
     background:rgba(var(--help-line),.16);color:var(--help);cursor:pointer;
   }
-  #panelhelp:hover{border-color:rgba(var(--help-line),1);color:#cfe2f8;
-                   background:rgba(var(--help-line),.30)}
+  #panelbar .bartitle .helpmark:hover{
+    border-color:rgba(var(--help-line),1);color:#cfe2f8;
+    background:rgba(var(--help-line),.30);
+  }
   #panelbar .right{margin-left:auto}
   #whobox{display:flex;align-items:center;gap:8px;min-width:0}
   #mine{
@@ -635,6 +692,10 @@
      them as one teaches the operator the wrong model. */
   .erow{display:block;padding:8px 0;
         border-bottom:1px solid rgba(var(--glass),.08)}
+  /* `display:block` above is a class selector and beats the browser's own
+     rule for [hidden], so a hidden row would go on showing. The embed draft is
+     hidden until somebody adds one, and this is what makes that work. */
+  .erow[hidden]{display:none}
   .erow .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .erow .nm{font-size:calc(10px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.96)}
   /* An endpoint row wears the same title and badge as every other row in the
@@ -823,6 +884,13 @@
   .erow > .top.drow .dpick{margin:0;flex:0 0 auto;accent-color:var(--hue)}
   /* Wide enough and the actions sit on the same line as the name; narrow and
      they take one of their own rather than pushing the row off the edge. */
+  /* The bar's own name, at the weight a section heading has: it is the only
+     thing on the page that says what APPLY TO SELECTED applies. */
+  .bulktitle{
+    font-size:calc(9px * var(--fs));letter-spacing:.16em;
+    text-transform:uppercase;color:rgba(var(--paper),.95);
+    margin-right:4px;
+  }
   .bulkbar{
     display:flex;align-items:center;gap:8px;flex-wrap:wrap;
     margin:2px 0 8px;padding:6px 8px;
@@ -891,7 +959,40 @@
     background:rgba(0,0,0,.6);color:var(--text);
     border:1px solid rgba(var(--glass),.16);outline:0;
   }
-  #dispadd{display:flex;gap:4px;margin:4px 0 10px}
+  /* It is an addrow now, like ADD A PROFILE — so it keeps that row's rule
+     above it and only sets what is particular to it: a field beside the
+     button, because naming the thing IS the act of adding it here. */
+  #dispadd .seg{gap:4px}
+  /* The two things you set before you press it, on a line under the name.
+     Wrapping rather than shrinking: these are choices, and a picker squeezed
+     to nothing is a choice you cannot read. */
+  .setuprow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+            margin-top:8px}
+  /* Stacked, so the two read as two decisions rather than one long line —
+     and tighter between themselves than either is from the field above. */
+  .setuprow + .setuprow{margin-top:6px}
+  .setuprow .vo{margin:0}
+  .setuprow .ppick{max-width:230px}
+  .setuprow .bklab{margin:0}
+  /* The same row, at the head of a list rather than the foot: its rule goes
+     under it, because a rule above the first thing on a page is a line under
+     the title it already has. */
+  /* No rule of its own: the code it produces belongs with the act of making
+     one, so the divider goes UNDER that rather than between the field and its
+     own answer. */
+  .addrow.addtop{
+    margin-top:2px;margin-bottom:11px;padding-top:0;padding-bottom:2px;
+    border-top:0;border-bottom:0;
+  }
+  /* The one heavy rule on the page, between making a code and the screens
+     waiting to be given one. Those are two different jobs — one you came here
+     to do, one you came here to watch — and a hairline says "next control"
+     where this has to say "different subject". Same weight as the rule that
+     used to divide the two halves of the tab row, for the same reason. */
+  #enrollist{
+    margin-top:14px;padding-top:14px;
+    border-top:3px solid rgba(var(--glass),.55);
+  }
   #dispadd input{
     flex:1;min-width:0;padding:5px 6px;font:inherit;
     font-size:calc(9.5px * var(--fs));
@@ -904,17 +1005,45 @@
      one thing on this tab that gets read at a distance — and selectable in one
      click for the screens that do have a keyboard. It takes the panel's "this
      is the live thing" green, the same as the commit buttons. */
-  .erow .dcode{
+  /* The one thing on a row that is spending itself while you look at it, so
+     the one thing on a row that is not grey. Bigger than the facts under it
+     and set in the panel's live green, dropping to amber in the last minute
+     and to the refusal red once it is gone — colour doing the work of a
+     sentence, on a row read at a glance. */
+  .codeclock{
+    margin:6px 0 2px;font-size:calc(11px * var(--fs));letter-spacing:.14em;
+    color:#7ac9a0;
+  }
+  .codeclock.soon{color:#e8b04a}
+  .codeclock.spent{color:#e0716b}
+  .codeclock.forever{color:rgba(var(--paper),.75);letter-spacing:.1em}
+
+  /* …and the same box where the code is ASKED for, which is not on the same
+     tab as the register it appears in. Pressing GET A CODE and being shown
+     nothing, because the answer landed somewhere you were not looking, is not
+     a flow anybody can follow. */
+  .erow .dcode,
+  #dispcode{
     margin:6px 0 2px;padding:6px 8px;user-select:all;
     background:rgba(122,201,160,.07);
     border:1px solid rgba(122,201,160,.5);
     font-size:calc(12px * var(--fs));letter-spacing:.1em;
     color:#d2f2e2;word-break:break-all;
   }
-  .erow .dcode span{
+  .erow .dcode span,
+  #dispcode span{
     display:block;margin-top:3px;user-select:none;
     font-size:calc(8.5px * var(--fs));letter-spacing:.06em;
     color:rgba(var(--paper),.62);
+  }
+  #dispcode{display:none}
+  #dispcode.on{display:block}
+  /* Spent. Kept on screen rather than removed, because a box that vanishes
+     while you are walking back to the keyboard is indistinguishable from one
+     that was never there — and this one has to say what to do next. */
+  #dispcode.dead{
+    background:rgba(224,113,107,.06);border-color:rgba(224,113,107,.45);
+    color:rgba(var(--paper),.6);user-select:none;
   }
   .erow .r{margin-left:auto;display:flex;gap:4px}
   .erow button{font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.1em;padding:3px 6px;
@@ -1103,12 +1232,11 @@
     flex:1;font:inherit;font-size:calc(9px * var(--fs));letter-spacing:.18em;padding:6px 4px;cursor:pointer;
     background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.85);
   }
-  /* Five in the foot now, and the widest of them is DOCUMENTATION. A row with
-     no room for all five wraps to a second line rather than squeezing the
-     letter-spacing out of the labels: these are the navigation, and navigation
-     you have to squint at is worse than navigation on two lines. */
-  #foottabs{flex-wrap:wrap}
-  #foottabs button{min-width:86px}
+  /* The three left in the foot keep a tab's width rather than shrinking to
+     their labels. AI is two characters, and a two-character tab beside a
+     seven-character one reads as a mistake rather than as a short word. */
+  .connside .tabs{flex-wrap:wrap}
+  .connside .tabs button{flex:0 0 auto;min-width:96px}
   .tabs button.on{border-color:var(--hue-dim);color:var(--hue);background:rgba(var(--glass),.08)}
   .findrow{display:flex;margin:0 0 4px}
   #rigfind{
@@ -1416,14 +1544,47 @@
        you are signed in as, and the way out, should not scroll away under a
        tab's worth of settings. -->
   <div id="panelbar">
-    <span>SETTINGS</span>
-    <!-- The way into the manual, beside the title rather than at the end of a
-         tab row: documentation is not a topic you configure, it is the thing
-         you reach for when a topic will not explain itself. Blue, and the
-         same blue as every ? beside a section heading — one colour meaning
-         one thing is what lets somebody find help without reading labels. -->
-    <button id="panelhelp" type="button"
-            title="open the documentation">?</button>
+    <!-- The way into the manual, INSIDE the title rather than beside it:
+         documentation is not a topic you configure, it is the thing you reach
+         for when a topic will not explain itself — so it belongs to the title
+         it explains rather than sitting in the row of places you can go. Blue,
+         and the same blue as every ? beside a section heading; one colour
+         meaning one thing is what lets somebody find help without reading
+         labels. -->
+    <span class="bartitle">SETTINGS<button id="panelhelp" class="helpmark"
+            type="button" title="open the documentation">?</button></span>
+    <!-- Administering the server, as links in the bar rather than as a row of
+         tabs at the foot. They were never the same kind of thing as the tabs
+         above the settings: those switch which set of controls you are
+         editing, these take you somewhere else entirely — who may sign in, who
+         may connect, what the server itself is. A row that looks like the
+         settings tabs said they were more of them.
+
+         Left, beside the title, because that is where you look for the way
+         around a page. Your name and the way out stay right, where they were:
+         one side is where you are going, the other is who you are. -->
+    <span id="navlinks">
+      <button id="tab_app" data-tab="app">ADMIN SETTINGS</button>
+      <button id="tab_accounts" data-tab="accounts">ADMIN USERS</button>
+      <!-- How the server itself is defended, which is administration rather
+           than a connection: who gets in, on what terms, and into which
+           group. -->
+      <button id="tab_security" data-tab="security">SECURITY</button>
+      <!-- Two subjects in one bar, and the gap is what says so. Everything
+           left of it configures the server; everything right of it is how
+           something comes to be here. A second title rather than a fourth and
+           fifth link, because they are not more of the same thing — and it
+           carries its own ? for the same reason SETTINGS does. -->
+      <span class="navgap"></span>
+      <span class="navtitle bartitle">ENROLLMENTS<button id="enrolhelp"
+              class="helpmark" type="button"
+              title="open the documentation">?</button></span>
+      <!-- People, and only people: the two populations arrive by different
+           routes with different buttons, and neither wants to read the
+           other's queue while doing it. -->
+      <button id="tab_displays" data-tab="displays">USER</button>
+      <button id="tab_enrol" data-tab="enrol">DEVICE</button>
+    </span>
     <span class="right" id="whobox">
       <button id="whoname" title="your account">—</button>
       <span id="whorole"></span>
@@ -1460,12 +1621,16 @@
     <button data-tab="motion">GEOMETRY</button>
     <button data-tab="speech">SPEECH</button>
     <button data-tab="savers">SCREENSAVER</button>
-    <button id="tab_account" data-tab="account">GROUPS</button>
     <button data-tab="models">MODELS</button>
     <!-- Beside MODELS because they are the two halves of an endpoint that are
          not the endpoint: what it speaks to, and what it answers on. -->
     <button data-tab="network">NETWORK</button>
-    <button data-tab="devprof">DEVICE</button>
+    <!-- DISPLAY rather than DEVICE, and data-tab stays "devprof" for the same
+         reason APPEARANCE keeps "look": it is the storage key, and renaming it
+         would rewrite every stored document for a label. What the profile
+         describes is a display — a screen with a page on it — where DEVICE is
+         the row under ACCESS that a display is granted through. -->
+    <button data-tab="devprof">DISPLAY</button>
   </div>
 
   <div class="rule"></div>
@@ -1807,8 +1972,14 @@ it, which is why it lives beside the microphone and the voices.</div>
        settings: it was sharing a section with the question of what happens
        once somebody has reached it, and those are independent. The posture
        line lives here with it, because what it warns about is exposure. -->
-  <section class="grp" data-tab="app">
-    <h4>EXT Access</h4>
+  <!-- The tab's own title, the same treatment SECURITY and the profile lists
+       get: full width, no caret, nothing to collapse. -->
+  <section class="grp bare titleonly" data-tab="app">
+    <div class="barehead"><span class="listtitle">Admin settings</span></div>
+  </section>
+
+  <section class="grp wide" data-tab="app">
+    <h4>IP Address</h4>
     <div class="grpbody">
   <div class="pending" id="posturewarn" hidden></div>
 
@@ -1834,30 +2005,8 @@ nothing crosses a network. Start it, open localhost, talk to it.</div>
     </div>
   </section>
 
-  <section class="grp" data-tab="app">
-    <h4>Sign in</h4>
-    <div class="grpbody">
-  <label class="bklab">Sign in</label>
-  <div class="seg" id="ap_auth">
-    <button data-v="none">NOTHING</button>
-    <button data-v="pin" disabled title="arrives with identity">A SINGLE PIN</button>
-    <button data-v="accounts">ACCOUNTS &amp; ROLES</button>
-  </div>
-  <div class="note help">What it takes to reach this configuration page.
 
-<b>Nothing</b> is for a machine only you can reach, where the network is
-already the boundary and accounts add nothing — and it is what makes a
-personal install possible without fishing a generated password out of a log.
-<b>Accounts &amp; roles</b> is the default, because the safe default is the one
-that assumes it can be reached.
-
-<b>A single PIN</b> — one number for the whole display, no account management —
-is the middle rung and is not built yet. It is the PIN machinery from identity
-pointed at a display rather than a person, so it lands with that.</div>
-    </div>
-  </section>
-
-  <section class="grp" data-tab="app">
+  <section class="grp wide" data-tab="app">
     <h4>Ports</h4>
     <div class="grpbody">
   <div class="note help">The port this page answers on, and only this one.
@@ -1877,22 +2026,98 @@ using. Below 1024 needs root, and the server runs as an ordinary user.</div>
     </div>
   </section>
 
-  <section class="grp" data-tab="app">
-    <h4>Sessions</h4>
-    <div class="grpbody">
-  <label class="bklab">Sign-in lasts (minutes of inactivity)</label>
-  <input id="ap_session" type="number" inputmode="numeric" min="5" max="480">
-  <div class="note help">Idle minutes before an admin has to sign in again.
-Activity pushes the deadline out; the panel checks every 45 seconds and
-returns you to the sign-in as soon as it lapses.
 
-Short by default — this session configures what everyone else is looking at.
-5 to 480. Full reasoning in DOCUMENTATION → App settings &amp; accounts.</div>
+  <section class="grp wide" data-tab="app">
+    <h4>Maintenance</h4>
+    <div class="grpbody">
+  <div class="note help">What keeps a screen nobody touches working.
+
+Every display checks in on the interval below. That check-in is what keeps
+LAST SEEN honest in DEVICES, what lets RELOAD there reach a screen, and what
+lets a screen notice on its own that the server has come back — without it, an
+outage would end and the screen would stay broken until somebody walked up and
+spoke to it.
+
+A display that has run out of attempts shows a line high on the screen, which
+clears itself when the server answers again. A <b>kiosk also says it aloud,
+once</b> — it has no transcript and nobody sitting at it. Nothing else speaks:
+a screen with somebody in front of it fails at the moment they actually use it,
+rather than making them wait out the retries.
+
+These take effect at each display's next check-in. No restart.</div>
+  <div class="numgrid">
+    <label for="ap_poll">check in every (seconds)</label>
+    <input id="ap_poll" class="num" type="number" inputmode="numeric" min="2" max="300">
+    <label for="ap_retries">attempts before it says so</label>
+    <input id="ap_retries" class="num" type="number" inputmode="numeric" min="1" max="10">
+    <label for="ap_retrywait">seconds between attempts</label>
+    <input id="ap_retrywait" class="num" type="number" inputmode="numeric" min="1" max="60">
+  </div>
+  <div class="note help">2–300, 1–10 and 1–60. Three attempts is right for a
+server being restarted and wrong for a cable somebody pulled out, which is why
+it is a field rather than a constant. Anything outside a range is nudged back
+into it rather than refused.</div>
+
+  <label class="bklab">Nightly refresh</label>
+  <div class="numgrid">
+    <label for="ap_refresh">at (HH:MM, empty for none)</label>
+    <input id="ap_refresh" class="num" type="text" inputmode="numeric"
+           placeholder="04:00" spellcheck="false" autocomplete="off">
+    <label for="ap_stagger">spread over (minutes)</label>
+    <input id="ap_stagger" class="num" type="number" inputmode="numeric" min="0" max="240">
+  </div>
+  <div class="note help">Every display reloads itself once a night, because a
+tab that never reloads accumulates. Off by default.
+
+Read off <b>each device's own clock</b>, not this server's, for the same
+reason a screensaver's dark hours are: a screen's night is the night outside
+it. And deferred while somebody is talking to the screen or typing into it — a
+reload that lands between a question and its answer looks like a crash to
+whoever asked.
+
+Spread it if the building has more than a handful of screens: twelve tablets
+reconnecting in the same second is a load this server did not previously have.
+Each screen takes its own fixed slot inside the window, so the spread stays
+put instead of re-shuffling every night.</div>
+
+  <label class="bklab">Restart this server</label>
+  <div class="numgrid">
+    <label for="ap_restart">at (HH:MM, empty for none)</label>
+    <input id="ap_restart" class="num" type="text" inputmode="numeric"
+           placeholder="03:00" spellcheck="false" autocomplete="off">
+  </div>
+  <div class="note help">The server itself, once a day. Off by default. Read
+off <b>this machine's</b> clock, not a device's — this one is about one server
+rather than twelve screens.
+
+It hands over rather than stopping: at the appointed minute the server launches
+<b>serve.sh restart</b> in a session of its own and lets that script kill it and
+start a fresh process. Nothing supervises this server, so a setting that merely
+stopped it would be a setting that ended the service at three in the morning.
+
+<b>The one risk worth knowing.</b> If the new process cannot bind — something
+else took the port while it was down — nothing catches that, and the server
+stays down until somebody looks. It is logged to <b>restart.log</b>, which
+survives the handover where server.log does not.
+
+It waits for the server to fall quiet: no question, transcription or spoken
+reply for a minute. If it never falls quiet it gives up after an hour and
+leaves it for tomorrow, rather than cutting somebody off mid-sentence.
+
+Every display sees this as a short outage and reloads itself when the server
+answers again — so if you set this, you rarely also need the nightly refresh
+above.</div>
     </div>
   </section>
 
 
-  <section class="grp" data-tab="accounts" data-signin>
+  <!-- Hidden with the rest of it where there is no sign-in: a title over three
+       sections that are not there is a heading for nothing. -->
+  <section class="grp bare titleonly" data-tab="accounts" data-signin>
+    <div class="barehead"><span class="listtitle">Admin users</span></div>
+  </section>
+
+  <section class="grp wide" data-tab="accounts" data-signin>
     <h4>Add an account</h4>
     <div class="grpbody">
   <label class="bklab">Username</label>
@@ -1912,8 +2137,8 @@ Short by default — this session configures what everyone else is looking at.
        worth once given. Its own topic rather than a preamble to the list: the
        list is read when somebody is deciding about a device, and these are
        settled once and then left alone for months. -->
-  <section class="grp" data-tab="accounts" data-signin>
-    <h4>Users</h4>
+  <section class="grp bare proflist" data-tab="accounts" data-signin>
+    <div class="barehead"><span class="listtitle">Accounts</span></div>
     <div class="grpbody">
   <div id="userlist"></div>
   <div class="note help" style="margin-top:10px">
@@ -1929,40 +2154,6 @@ Short by default — this session configures what everyone else is looking at.
        admin put somewhere. Named wherever access is granted — today an
        endpoint's allow-list, and anything later that grants something can name
        them the same way. -->
-  <!-- The tab is called GROUPS; a section called Groups inside it says the
-       word twice. Bare, like the profile lists. -->
-  <section class="grp bare proflist" data-tab="account">
-    <div class="barehead"><span class="listtitle">Groups</span></div>
-    <div class="grpbody">
-  <div id="grouplist"></div>
-  <div class="labrow" id="gr_addrow" style="margin-top:10px">
-    <input id="gr_name" type="text" spellcheck="false" autocomplete="off"
-           placeholder="Physics department">
-    <div class="seg" id="gr_kind">
-      <button data-v="user" class="on">PEOPLE</button>
-      <button data-v="device">DEVICES</button>
-    </div>
-  </div>
-  <div class="note" id="groupnote"></div>
-  <div class="seg actrow"><button id="b_addgroup" class="act-add">CREATE</button></div>
-  <div class="note help" style="margin-top:10px">A group of <b>people</b> holds
-those who asked for access and were approved. A group of <b>devices</b> holds
-the screens you created and sent a code to. They are separate populations
-answering separate questions — <i>the physics department</i> and <i>the screens
-in the east wing</i> — so a group holds one or the other, and its kind cannot
-be changed once it exists.
-
-Name a group under an endpoint's <b>who may use it</b> and everyone in it may
-reach that endpoint. <b>Grants add up:</b> a group never takes away a grant
-made to one device on its own, and somebody whose access has run out is still
-refused whatever group they are in.
-
-Deleting a group removes it from every endpoint that named it. The devices and
-people in it are untouched — a group is a way of referring to them, not a
-thing they belong to.</div>
-    </div>
-  </section>
-
   <!-- Whether the app takes a sign-in at all, and what a grant is worth once
        given. On SECURITY rather than ACCESS: ACCESS answers WHICH device may
        reach which endpoint, and whether anybody has to be approved in the
@@ -2021,54 +2212,123 @@ by noise.</div>
     </div>
   </section>
 
-  <section class="grp" data-tab="displays">
-    <h4>Created Access</h4>
+  <section class="grp wide" data-tab="security">
+    <h4>Enrolment codes</h4>
     <div class="grpbody">
-  <label class="bklab" style="margin-top:2px">Add a display — name it, then type the code into the screen</label>
-  <div class="seg" id="dispadd">
-    <input id="dp_name" type="text" spellcheck="false" autocomplete="off"
-           placeholder="kitchen wall">
-    <button id="b_adddisp" class="act-add">GET A CODE</button>
-  </div>
-  <div class="note" id="dispnote"></div>
-  <div class="note help" style="margin-top:10px">How a device comes to exist.
-The register itself is under <b>Devices</b> below; this is the half where you
-invite one.
+  <label class="bklab" style="margin-top:2px">A code lasts (minutes, 0 for no
+limit)</label>
+  <input id="dp_codemins" class="num" type="number" inputmode="numeric"
+         min="0" max="10080">
+  <div class="note help">How long a code is worth anything for after you press
+GET A CODE. Ten minutes by default, because the usual case is somebody walking
+across a building with six characters in their head — and the clock beside each
+one under ENROLLMENTS ▸ DEVICE is counting this down.
 
-<b>Two ways one gets there.</b> Name it above and you are given a six-character
-code: type <b>&lt;this server&gt;/e/CODE</b> into that screen once and it is
-that display, already named, already holding whatever endpoints you ticked for
-it. The code lasts ten minutes, works once, and case and dashes do not matter —
-<b>k7qp4m</b> is the same as <b>K7QP-4M</b>. Or a device simply opens the
-display page, in which case it turns up under Devices as WAITING and you
-approve it by hand.
+<b>Zero switches the clock off</b>, and that is a real answer rather than a way
+of being careless: a code is <b>one use</b>, and the row it enrols was approved
+the moment you created it. A deployment that mints codes on Friday and hangs the
+screens on Monday is not less safe for it — what a code can do is become one
+screen you already decided to have.
 
-<b>REISSUE</b> is for a screen that lost its cookie, or was replaced by a
-different one in the same place. The row keeps its name and every endpoint that
-names it; you get a new code to type into the new screen. <b>The old device
-stops working the moment you press it</b> — a place is one device, so deciding
-to move it ends the old one there and then.
-
-<b>The name is not the credential.</b> Anybody can type
-<b>?display=kitchen</b> into a URL. The token is what says this really is that
-device, and it lives in a cookie the page itself cannot read. Somebody who
-types a wall screen's URL into their own phone is issued a <i>new</i> token,
-which nobody approved — and turns up under Devices as a row you were not
-expecting.
-
-<b>Approve it and it works; leave it and it still renders.</b> The appearance
-settings are public, so a device that has just arrived looks right immediately
-and simply answers to nothing until you say otherwise.
-
-An endpoint consults this list only where it has been restricted to named
-displays — <b>who may use it</b>, on each endpoint under AI. Until you restrict
-one, every display reaches everything, which is what they all did before this
-existed.
-
-DELETE is the revocation: that token stops matching anything, and the device
-is back to being a browser that has never been here.</div>
+The clock applies from the moment a code is issued, so changing this does not
+extend one already out there. REISSUE gives that row a fresh one on the new
+setting.</div>
     </div>
   </section>
+
+  <!-- Signing in, and how long a session lasts. Moved off ADMIN SETTINGS,
+       which is about how the server is WIRED — ports, addresses, maintenance —
+       where these two are about who gets in and for how long, which is this
+       tab's subject. They still write app.json and still need a restart, so
+       they bring their own commit row with them rather than borrowing the one
+       that saves who may be approved. -->
+  <section class="grp wide" data-tab="security">
+    <h4>Sign in</h4>
+    <div class="grpbody">
+  <label class="bklab">Sign in</label>
+  <div class="seg" id="ap_auth">
+    <button data-v="none">NOTHING</button>
+    <button data-v="pin" disabled title="arrives with identity">A SINGLE PIN</button>
+    <button data-v="accounts">ACCOUNTS &amp; ROLES</button>
+  </div>
+  <div class="note help">What it takes to reach this configuration page.
+
+<b>Nothing</b> is for a machine only you can reach, where the network is
+already the boundary and accounts add nothing — and it is what makes a
+personal install possible without fishing a generated password out of a log.
+<b>Accounts &amp; roles</b> is the default, because the safe default is the one
+that assumes it can be reached.
+
+<b>A single PIN</b> — one number for the whole display, no account management —
+is the middle rung and is not built yet. It is the PIN machinery from identity
+pointed at a display rather than a person, so it lands with that.</div>
+  <div class="note" id="authnote"></div>
+  <div class="pending" id="authpending" hidden></div>
+  <div class="seg actrow">
+    <button id="b_authsave" class="act-save">SAVE</button>
+  </div>
+    </div>
+  </section>
+
+  <section class="grp wide" data-tab="security">
+    <h4>Sessions</h4>
+    <div class="grpbody">
+  <label class="bklab">Sign-in lasts (minutes of inactivity)</label>
+  <input id="ap_session" type="number" inputmode="numeric" min="5" max="480">
+  <div class="note help">Idle minutes before an admin has to sign in again.
+Activity pushes the deadline out; the panel checks every 45 seconds and
+returns you to the sign-in as soon as it lapses.
+
+Short by default — this session configures what everyone else is looking at.
+5 to 480. Full reasoning in DOCUMENTATION → App settings &amp; accounts.</div>
+  <div class="note" id="sessnote"></div>
+  <div class="pending" id="sesspending" hidden></div>
+  <div class="seg actrow">
+    <button id="b_sesssave" class="act-save">SAVE</button>
+  </div>
+    </div>
+  </section>
+
+  <!-- Bare, like the profile lists — and BELOW the security topics, because
+       what the door is set to comes before who is standing behind it. -->
+  <!-- On SECURITY rather than in the profile settings row. A group is not a
+       profile: nothing about it describes what a screen looks like or how it
+       behaves. It is a name for a SET of the things that may be here, made so
+       a grant is given once instead of ticked twelve times — which is the
+       subject of the tab it now sits on. -->
+  <section class="grp bare proflist" data-tab="security">
+    <div class="barehead"><span class="listtitle">Groups</span></div>
+    <div class="grpbody">
+  <div id="grouplist"></div>
+  <div class="labrow" id="gr_addrow" style="margin-top:10px">
+    <input id="gr_name" type="text" spellcheck="false" autocomplete="off"
+           placeholder="Physics department">
+    <div class="seg" id="gr_kind">
+      <button data-v="user" class="on">PEOPLE</button>
+      <button data-v="device">DEVICES</button>
+    </div>
+  </div>
+  <div class="note" id="groupnote"></div>
+  <div class="seg actrow"><button id="b_addgroup" class="act-add">CREATE</button></div>
+  <div class="note help" style="margin-top:10px">A group of <b>people</b> holds
+those who asked for access and were approved. A group of <b>devices</b> holds
+the screens you created and sent a code to. They are separate populations
+answering separate questions — <i>the physics department</i> and <i>the screens
+in the east wing</i> — so a group holds one or the other, and its kind cannot
+be changed once it exists.
+
+Name a group under an endpoint's <b>who may use it</b> and everyone in it may
+reach that endpoint. <b>Grants add up:</b> a group never takes away a grant
+made to one device on its own, and somebody whose access has run out is still
+refused whatever group they are in.
+
+Deleting a group removes it from every endpoint that named it. The devices and
+people in it are untouched — a group is a way of referring to them, not a
+thing they belong to.</div>
+    </div>
+  </section>
+
+
   <!-- The other half of a place: what it looks like when somebody IS there.
        Its own list, because appearance and the screensaver are different axes. -->
   <section class="grp bare proflist" data-tab="look">
@@ -2259,10 +2519,9 @@ Deleting a profile clears it from every device that named it, the same way
 deleting a display clears it from every endpoint. Nothing keeps drifting to
 numbers that are no longer here.
 
-<b>On a device</b>, under Created Access, tick <b>On a wall</b> and three
-controls appear: an appearance profile, a screensaver profile, and whether it
-is <b>voice only</b>. Untick it and the screen goes back to being an ordinary
-page; what you chose is kept, so putting it back up restores it.
+<b>On a device</b>, in DEVICES, tick <b>Kiosk mode</b> and pick which of these
+profiles it is. Untick it and the screen goes back to being an ordinary page;
+what you chose is kept, so putting it back up restores it.
 
 <b>A wall is voice only and speak only the moment you tick it.</b> No text box
 — voice only arrives already ticked, and you untick it for the case that wants
@@ -2289,18 +2548,24 @@ while somebody is talking to it. While the screensaver drifts it is drawn into
 the picture and travels with it, because taking it away would lose it for
 exactly the person it is for.
 
-<b>When a device takes a change.</b> One still waiting on a decision asks this
-server every twenty seconds and takes it within seconds. One that is already
-working has nothing left to ask about, so it takes it the next time its page
-loads — reload it there, or use OPEN DISPLAY. Making a working screen poll for
-a setting that changes twice a year would be the wrong trade.</div>
+<b>It keeps the screen awake.</b> A tablet that has let its backlight go out
+cannot be walked up to and spoken to: the microphone is behind a page nobody
+can see. Untick it on a television, or on a device whose operating system is
+already set never to sleep, where holding the lock gains nothing.
+
+<b>When a device takes a change.</b> Every display checks in on the interval
+under APP SETTINGS ▸ MAINTENANCE, and reloads itself when something it draws
+from changes — so an appearance or a profile edited here reaches the wall
+without anybody walking to it. Never while somebody is talking to the screen or
+typing into it: it waits until they have finished. RELOAD on a device's row in
+DEVICES asks one directly.</div>
 
     </div>
   </section>
   <!-- What a public screen IS, and the only one of the three a device names.
-       The other lists are things a device profile points at. -->
+       The other lists are things a display profile points at. -->
   <section class="grp bare proflist" data-tab="devprof">
-    <div class="barehead"><span class="listtitle">Device profiles</span></div>
+    <div class="barehead"><span class="listtitle">Display profiles</span></div>
     <div class="grpbody">
   <div id="dp_kiosks"></div>
   <div class="note" id="kiosknote"></div>
@@ -2337,7 +2602,7 @@ behaves like the rest of the building rather than like nothing.</div>
   </section>
   <!-- The form itself, which is a different job again: this one is written
        once, in somebody's own words, and read by strangers. -->
-  <section class="grp" data-tab="displays">
+  <section class="grp wide" data-tab="displays">
     <h4>The request form</h4>
     <div class="grpbody">
   <div id="dp_form"></div>
@@ -2370,9 +2635,94 @@ nothing but that id.</div>
        inside it says the same word twice. A bare section has no heading, never
        collapses — there is nothing to collapse it behind — and gets its ? on a
        thin row of its own. -->
-  <section class="grp bare" data-tab="devices">
+  <!-- Only people, and only those who have not been decided about — a bare
+       list like every other, under the topic that decides what it asks them.
+       A QUEUE: read when something needs doing, empty when nothing does. -->
+  <section class="grp bare proflist" data-tab="displays">
+    <div class="barehead"><span class="listtitle">Waiting for approval</span></div>
     <div class="grpbody">
+  <div id="asklist"></div>
+  <div class="note" id="asknote"></div>
+  <div class="note help">Somebody opened the display page on their own device
+and filled in the form above. Nothing they said is proof of anything — it is
+what they told you — but a request that arrives saying <b>Sarah, building 4
+laptop</b> is one you can act on, where an anonymous row is one you can only
+guess at.
+
+<b>APPROVE</b> grants access and, in the same gesture, whichever endpoints you
+tick. <b>REFUSE</b> gives them a message and you a note for whoever comes back
+to this row in six months, and says whether they may ask again.
+
+They leave this list the moment you decide and appear under CONNECTIONS ▸
+CONNECTIONS, filed with the other people.</div>
+    </div>
+  </section>
+
+  <!-- The same shape as APPEARANCE and every other list in this panel: a bare
+       section with the list's name across the top, the rows, and the thing
+       that makes a new one along the foot. It was two headed topics you had to
+       open before you could do the one thing this page is for. -->
+  <section class="grp bare proflist" data-tab="enrol">
+    <div class="barehead"><span class="listtitle">Device enrolment</span></div>
+    <div class="grpbody">
+  <!-- Above the list, not below it. This is the one list whose add row is the
+       first thing you came to do — every other list on this panel is read and
+       occasionally added to, where this one exists to be added to and then
+       watched. So the code you just asked for appears at the top with the
+       screens still waiting for theirs underneath, instead of at the foot of
+       a list you have to scroll past to reach it. -->
+  <!-- What an admin already knows about the screen, set while creating it
+       rather than found and filled in afterwards on a row among fifty. All of
+       it is optional: a code with nothing set is exactly what it was before. -->
+  <div class="addtop" id="dispadd">
+    <div class="seg">
+      <input id="dp_name" type="text" spellcheck="false" autocomplete="off"
+             placeholder="kitchen wall">
+      <button id="b_adddisp" class="act-add">GET A CODE</button>
+    </div>
+    <!-- Network first: it is the one that decides the address in the code you
+         are about to be handed, so it belongs above the pair that only decide
+         what the screen looks like once it has used it. -->
+    <div class="setuprow">
+      <label class="bklab" for="dp_newnet">Network</label>
+      <select id="dp_newnet" class="ppick"></select>
+    </div>
+    <div class="setuprow">
+      <label class="vo"><input type="checkbox" id="dp_newkiosk"> Kiosk mode</label>
+      <select id="dp_newprofile" class="ppick" hidden></select>
+    </div>
+  </div>
+  <div id="dispcode"></div>
+  <div class="note" id="dispnote"></div>
+  <div id="enrollist"></div>
+  <div class="note help">A screen, from naming it to the moment it works. Name
+one and you are given a six-character code; the row exists from that moment, so
+its endpoints can be ticked and its profile chosen before the screen it is for
+has ever been switched on.
+
+<b>A code works once</b>, and the clock on its row is counting down what is
+left of it — set under SECURITY, where it can also be switched off entirely. If
+it runs out, <b>REISSUE</b> gives another on the current setting: the row is the
+PLACE, so its name and every endpoint that names it are kept.
+
+The screen takes the code either way: type <b>&lt;this server&gt;/e/CODE</b>
+into its address bar, or open the display page on it and type the six
+characters into the box it offers. Case and dashes do not matter —
+<b>k7qp4m</b> is the same as <b>K7QP-4M</b>.
+
+A row leaves this list the moment its code is used and appears under
+CONNECTIONS ▸ CONNECTIONS, filed with the other devices so a grant to all
+of them is one tick.</div>
+    </div>
+  </section>
+
+  <section class="grp bare proflist" data-tab="devices">
+    <div class="barehead"><span class="listtitle">Connections</span></div>
+    <div class="grpbody">
+  <!-- Named for what it does. It was a row of controls with no title, so the
+       only way to find out what APPLY TO SELECTED applied was to press it. -->
   <div class="bulkbar" id="bulkbar" hidden>
+    <span class="bulktitle">Kiosk assignment</span>
     <label><input type="checkbox" id="bulkall"> ALL</label>
     <span id="bulkcount">nothing selected</span>
     <span class="spacer"></span>
@@ -2382,22 +2732,36 @@ nothing but that id.</div>
   <!-- On THIS tab. The result used to be written to the Created Access note,
        which is on ACCESS — a message nobody standing here could see. -->
   <div class="note" id="bulknote"></div>
-  <div id="connlist"></div>
-  <div class="note help" style="margin-top:10px">Every device this server knows
-about, in one register. A display is one device — a screen on a wall, a TV, a
-laptop, somebody's phone — and anything with a browser and a microphone counts.
 
-<b>Anything waiting on you sorts to the top</b>, by how much it wants
-attention: asked, expired, holding a code, waiting, refused, then gone quiet.
-Everything that is simply working follows, most recently heard from first.
-<b>last seen</b> is the last time one asked this server anything, so a screen
-unplugged for a week says so here before anybody notices the wall.
+  <!-- Two areas, one page. Both are connections and both are read the same way
+       — what is out there, and when was it last heard from — but "which of my
+       screens is on the wall" and "who have I let in" are different questions,
+       asked by the same admin on different days. A person and a hallway
+       display have almost nothing in common except that both got here. -->
+  <div class="listtitle" style="margin-top:2px">People</div>
+  <div id="connusers"></div>
+  <div class="listtitle" style="margin-top:16px">Devices</div>
+  <div id="conndevices"></div>
+  <div class="note" id="connnote"></div>
 
-A device that has just connected appears here straight away, whether or not
-anybody has approved it yet — which is the moment you are usually looking for
-it.
+  <div class="note help" style="margin-top:10px">Everything currently connected
+to this server. A display is one device — a screen on a wall, a TV, a laptop,
+somebody's phone — and anything with a browser and a microphone counts.
 
-Devices on a granted request carry <b>access runs out</b>; those you issued a
+<b>People</b> arrived by asking: they opened the display page and filled in
+the request form, and you approved them. <b>Devices</b> arrived by code: you
+named one, and somebody typed its six characters into the screen.
+
+Both lists are ordered by what was heard from most recently. <b>last seen</b>
+is the last time one asked this server anything, so a screen unplugged for a
+week says so here before anybody notices the wall.
+
+Anything that has NOT finished arriving is on the tab it is arriving through —
+ENROLLMENTS ▸ USER for a person waiting on a decision, ▸ DEVICE for a screen
+that has not taken its code yet. A row moves here on its own the moment it is
+working.
+
+People on a granted request carry <b>access runs out</b>; devices you issued a
 code for do not, and never will.
 
 <b>WITHDRAW</b> takes access away; the row stays here, no longer working.
@@ -2405,15 +2769,123 @@ code for do not, and never will.
     </div>
   </section>
 
-  <section class="grp" data-tab="embeds">
-    <h4>Embed keys</h4>
+  <!-- Laid out like the endpoints on AI, because it is the same kind of list:
+       a set of named things, each of which is one line until you want it, and
+       a new one made by adding a row rather than by filling in a permanent
+       form underneath. It was two headed sections — a list whose every row was
+       always fully expanded, and a create form always on screen whether or not
+       you were making anything.
+
+       Where it PARTS from AI is behaviour, not shape. An endpoint block is an
+       editing surface; a key is not. What it may do and what it draws are
+       fixed when it is created, because a saved key can already be framed by
+       somebody's page and quietly widening it is not a thing an admin should
+       be able to do by accident. So a saved row opens read-only, and the draft
+       is the only row with fields in it. -->
+  <section class="grp bare proflist" data-tab="embeds">
     <div class="grpbody">
   <div id="emblist"></div>
-  <div class="note help" style="margin-top:10px">A key lets another
-application's <b>server</b> ask this one for a short-lived session and put the
-result in an iframe. The key never reaches a browser. What it may do and what
-it draws are fixed at creation — to change either, make a new key and retire
-this one.
+
+  <!-- Kept in the document rather than built on demand: everything below is
+       addressed by id — by the preset buttons, the coherence check and the
+       create itself — and a form cloned into place would either duplicate
+       those ids or need every one of them rewritten to work by position. -->
+  <!-- Deliberately NOT class `isdraft`: that word belongs to the endpoint
+       being created on AI, which is looked up by it. -->
+  <div class="erow" id="em_draft" hidden>
+    <div class="top">
+      <span class="nm">New embed key</span>
+      <span class="badge">NOT CREATED YET</span>
+    </div>
+    <div class="grpbody">
+  <label class="bklab" style="margin-top:2px">Name</label>
+  <input id="em_name" type="text" spellcheck="false" autocomplete="off"
+         placeholder="lobby kiosk">
+  <div class="note help">Labels the key here and in the server log. It is never
+sent to the host page and never seen by anybody using the embed.</div>
+
+  <div class="subwrap">
+  <div class="subgrp open">
+    <h5>Start from<span class="subsum"></span></h5>
+    <div class="subbody">
+  <div class="seg" id="em_preset">
+    <button data-v="full" class="on">FULL</button>
+    <button data-v="console">CONSOLE</button>
+    <button data-v="voice">VOICE</button>
+    <button data-v="chat">CHAT</button>
+    <button data-v="kiosk">KIOSK</button>
+    <button data-v="signage">SIGNAGE</button>
+  </div>
+  <div class="note help">A starting point, not a mode. Pick the one nearest
+what you want and adjust the two lists below — what is stored is the two
+lists, and the preset is only remembered so the list reads as something you
+chose rather than as fourteen ticks.</div>
+    </div>
+  </div>
+
+  <div class="subgrp">
+    <h5>What it may do<span class="subsum"></span></h5>
+    <div class="subbody">
+  <div class="cks" id="em_cap">
+    <label><input type="checkbox" data-c="ask"> Ask</label>
+    <label><input type="checkbox" data-c="mic"> Microphone</label>
+    <label><input type="checkbox" data-c="speak"> Speak</label>
+  </div>
+  <div class="note help">Permission, not furniture. Hiding the TALK button
+under <b>What it draws</b> does not withdraw the microphone — these are two
+axes on purpose, and the host may narrow either at runtime but never widen
+one.</div>
+    </div>
+  </div>
+
+  <div class="subgrp">
+    <h5>What it draws<span class="subsum"></span></h5>
+    <div class="subbody">
+  <div class="cks" id="em_parts">
+    <label><input type="checkbox" data-p="visual"> Figure</label>
+    <label><input type="checkbox" data-p="transcript"> Transcript</label>
+    <label><input type="checkbox" data-p="input"> Input field</label>
+    <label><input type="checkbox" data-p="mode"> SPACE/AUTO</label>
+    <label><input type="checkbox" data-p="talk"> TALK</label>
+    <label><input type="checkbox" data-p="audio"> AUDIO</label>
+    <label><input type="checkbox" data-p="text"> TEXT</label>
+  </div>
+  <div class="note help">Parts, not combinations. Some arrangements are
+incoherent — a TEXT button with no transcript to toggle — and those are
+refused here in the same words the server uses, rather than discovered after
+the key is in somebody's application.</div>
+    </div>
+  </div>
+
+  <div class="subgrp">
+    <h5>Who may frame it<span class="subsum"></span></h5>
+    <div class="subbody">
+  <label class="bklab" style="margin-top:2px">One origin a line</label>
+  <textarea id="em_origins" rows="3" spellcheck="false"
+            placeholder="https://app.example.com"></textarea>
+  <div class="note help">These become the <b>frame-ancestors</b> this server
+sends, so a page on any other origin cannot frame it at all — a leaked key is
+useless anywhere you did not name.</div>
+    </div>
+  </div>
+
+  <div class="subgrp">
+    <h5>Session<span class="subsum"></span></h5>
+    <div class="subbody">
+  <label class="bklab" style="margin-top:2px">Length, minutes</label>
+  <input id="em_ttl" type="number" min="5" max="1440" value="60">
+  <div class="note help">How long one exchanged session lasts before the host's
+server has to ask for another. The key itself does not expire; this is the
+window a browser holds.</div>
+    </div>
+  </div>
+
+  <div class="subgrp">
+    <h5>How a host uses it<span class="subsum"></span></h5>
+    <div class="subbody">
+  <div class="note help">A key lets another application's <b>server</b> ask
+this one for a short-lived session and put the result in an iframe. The key
+never reaches a browser.
 
 <b>1</b> their server POSTs the key to <b>/embed/session</b>
 <b>2</b> their page frames <b>/embed?t=…</b> with <b>allow="microphone"</b>
@@ -2426,55 +2898,21 @@ nothing to do with this server.
 
 Worked examples in DOCUMENTATION → Embedding it elsewhere.</div>
     </div>
-  </section>
-
-  <section class="grp" data-tab="embeds">
-    <h4>Create an embed key</h4>
-    <div class="grpbody">
-  <label class="bklab">Name</label>
-  <input id="em_name" type="text" spellcheck="false" autocomplete="off"
-         placeholder="lobby kiosk">
-
-  <label class="bklab">Start from</label>
-  <div class="seg" id="em_preset">
-    <button data-v="full" class="on">FULL</button>
-    <button data-v="console">CONSOLE</button>
-    <button data-v="voice">VOICE</button>
-    <button data-v="chat">CHAT</button>
-    <button data-v="kiosk">KIOSK</button>
-    <button data-v="signage">SIGNAGE</button>
+  </div>
   </div>
 
-  <label class="bklab">What it may do</label>
-  <div class="cks" id="em_cap">
-    <label><input type="checkbox" data-c="ask"> Ask</label>
-    <label><input type="checkbox" data-c="mic"> Microphone</label>
-    <label><input type="checkbox" data-c="speak"> Speak</label>
+  <div class="rtacts">
+    <button id="b_addembed" class="act-save">CREATE</button>
+    <button id="b_emcancel" class="act-undo">CANCEL</button>
   </div>
-  <div class="note help">Permission, not furniture. Hiding the TALK button below
-does not withdraw the microphone.</div>
-
-  <label class="bklab">What it draws</label>
-  <div class="cks" id="em_parts">
-    <label><input type="checkbox" data-p="visual"> Figure</label>
-    <label><input type="checkbox" data-p="transcript"> Transcript</label>
-    <label><input type="checkbox" data-p="input"> Input field</label>
-    <label><input type="checkbox" data-p="mode"> SPACE/AUTO</label>
-    <label><input type="checkbox" data-p="talk"> TALK</label>
-    <label><input type="checkbox" data-p="audio"> AUDIO</label>
-    <label><input type="checkbox" data-p="text"> TEXT</label>
+    </div>
   </div>
 
-  <label class="bklab">Allowed to frame it — one origin a line</label>
-  <textarea id="em_origins" rows="3" spellcheck="false"
-            placeholder="https://app.example.com"></textarea>
-
-  <label class="bklab">Session length, minutes</label>
-  <input id="em_ttl" type="number" min="5" max="1440" value="60">
-
-  <div class="seg" style="margin-top:8px"><button id="b_addembed" class="act-add">CREATE</button></div>
   <div class="note" id="embnote"></div>
   <div id="em_key"></div>
+  <div class="seg addrow">
+    <button id="b_newembed" class="act-add">ADD AN EMBED KEY</button>
+  </div>
     </div>
   </section>
 
@@ -2531,46 +2969,32 @@ button to download it as a PDF.</div>
   <div id="profstash" hidden></div>
 
   <div id="panelfoot">
-    <!-- The same row treatment as the tabs at the top. They were full-width
-         stacked entries because a 425px column had no room to put four
-         side by side; it does now, and four buttons that behave like tabs
-         should look like the tabs. -->
+    <!-- CONNECTIONS on its own now: the admin tabs that used to share this row
+         are links in the bar at the top. So it sits at the left edge rather
+         than in the right half of a row it no longer shares, and the rule that
+         divided the two subjects has gone with the second subject — a boundary
+         with nothing on the far side of it is a line, not a division.
+
+         DOCUMENTATION is not here either. It is reached from the ? beside the
+         panel title, because it is not something you configure and it was
+         taking a slot in a row of things that are. -->
     <div class="tabrow">
-    <div class="tabside">
-    <div class="tabgroup">Admin settings</div>
-    <div class="tabs" id="foottabs">
-      <button id="tab_app" data-tab="app">ADMIN SETTINGS</button>
-      <!-- A profile is a kind of place — a hallway, a shop floor — rather than
-           a screen, so it belongs beside the deployment's own settings and not
-           in with who may use the server. Both lists moved off ACCESS: what a
-           screen looks like and what it is allowed to do were never the same
-           question. -->
-      <!-- Accounts before devices: a group is made here and named over there,
-           so the order follows the order you do them in. -->
-      <button id="tab_accounts" data-tab="accounts">ADMIN</button>
-      <button id="tab_displays" data-tab="displays">ACCESS</button>
-      <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
-      <!-- DOCUMENTATION is not here any more. It is reached from the ? beside
-           the panel title, because it is not something you configure and it
-           was taking a slot in a row of things that are. -->
-    </div>
-    </div>
-    <div class="tabsplit"></div>
-    <!-- What this server is wired to, and which machines are here. Beside the
-         admin tabs rather than above them: both rows are things you administer,
-         and the rule says they are different subjects. -->
+    <!-- What this server is wired to, and which machines are here. -->
     <div class="tabside connside">
-      <div class="tabgroup">Connections</div>
+      <!-- No caption. One of the three below is now called CONNECTIONS, and a
+           caption saying the same word over it is the panel saying it twice —
+           the rule that keeps a bare list from repeating the tab it sits on. -->
       <div class="tabs">
         <button id="tab_ai" data-tab="ai">AI</button>
         <!-- The register: every device this server knows about. Not in
              UI_TABS or SETTINGS_TABS — like AI, nothing here writes the shared
              settings document. -->
-        <button id="tab_devices" data-tab="devices">DEVICES</button>
-        <!-- What this deployment is exposed as, as opposed to who may use it:
-             ACCESS answers "which device, which endpoint", and that is a
-             different question from how the server itself is defended. -->
-        <button id="tab_security" data-tab="security">SECURITY</button>
+        <button id="tab_devices" data-tab="devices">CONNECTIONS</button>
+        <!-- An embed is another application connecting to this one, which is
+             the same question the two beside it answer — what this server is
+             wired to — rather than something you administer about the server
+             itself. -->
+        <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
       </div>
     </div>
     </div>
@@ -3307,7 +3731,16 @@ window.addEventListener('beforeunload', e=>{
    can take effect while the process is running, so the page's real job is to
    be honest about what is configured versus what is actually bound. */
 const APP_FIELDS = {ap_admin:'admin_port',
-                    ap_session:'session_idle_minutes'};
+                    ap_session:'session_idle_minutes',
+                    ap_poll:'poll_seconds',
+                    ap_retries:'retry_attempts',
+                    ap_retrywait:'retry_seconds',
+                    ap_stagger:'refresh_stagger'};
+/* …and the one field on this tab that is not a number. Kept out of APP_FIELDS
+   rather than special-cased inside it, because everything that loop does —
+   parseInt on save, a blank meaning "leave it alone" — is wrong for a time
+   somebody is allowed to clear. */
+const APP_TEXT = {ap_refresh:'refresh_at', ap_restart:'restart_at'};
 
 /* The two axes are a segmented control each, so they read as one choice from
    a closed set rather than a value you could mistype. */
@@ -3344,8 +3777,8 @@ function postureSync(){
   } else w.hidden = true;
 }
 
-function showPending(j){
-  const box = $('apppending');
+function showPending(j, into){
+  const box = $(into || 'apppending');
   const names = {http_port:'display · plain HTTP', https_port:'display · HTTPS',
                  admin_port:'administration', session_idle_minutes:'session length',
                  bind:'reachable at', bind_address:'which address',
@@ -3377,6 +3810,9 @@ async function loadApp(){
     Object.keys(APP_FIELDS).forEach(id=>{
       const el = $(id); if (el) el.value = j.app[APP_FIELDS[id]];
     });
+    Object.keys(APP_TEXT).forEach(id=>{
+      const el = $(id); if (el) el.value = j.app[APP_TEXT[id]] || '';
+    });
     /* Offer the addresses this machine actually has. Typing one by hand is a
        way to configure a server that will not start — and the one place you
        cannot recover from is the one that takes the admin page with it. */
@@ -3400,6 +3836,8 @@ async function loadApp(){
     segSet('ap_auth', j.app.auth);
     postureSync();
     showPending(j);
+    showPending(j, 'authpending');
+    showPending(j, 'sesspending');
   }catch(e){ $('appnote').className = 'note bad'; $('appnote').textContent = e.message; }
 }
 
@@ -3430,6 +3868,35 @@ $('b_apprevert').addEventListener('click', async ()=>{
 });
 $('ap_bindaddr').addEventListener('change', postureSync);
 
+/* The two topics that moved to SECURITY still write app.json and still need a
+   restart, so each commits itself from inside its own section — the way every
+   other topic on that tab does, rather than from one button belonging to
+   neither. Its own key only: pressing SAVE under Sign in must not publish a
+   session length somebody was halfway through changing under it. */
+async function saveAppBit(body, noteId, pendId){
+  const note = $(noteId);
+  note.className = 'note';
+  note.textContent = 'saving…';
+  try{
+    const j = await api('/app', {method:'POST', body: JSON.stringify(body)});
+    note.textContent = (j.pending && j.pending.length)
+      ? 'saved — a restart is needed, see below'
+      : 'saved — nothing here is waiting on a restart';
+    showPending(j, pendId);
+    /* The other tab's copy of the same document, so a warning about a pending
+       restart is not stale on whichever of the two you look at next. */
+    loadApp();
+  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+}
+$('b_authsave').addEventListener('click', ()=>
+  saveAppBit({auth: segValue('ap_auth')}, 'authnote', 'authpending'));
+$('b_sesssave').addEventListener('click', ()=>{
+  const el = $('ap_session');
+  if (!el || el.value === '') return;
+  saveAppBit({session_idle_minutes: parseInt(el.value, 10)},
+             'sessnote', 'sesspending');
+});
+
 $('b_appsave').addEventListener('click', async ()=>{
   const note = $('appnote');
   note.className = 'note';
@@ -3438,6 +3905,13 @@ $('b_appsave').addEventListener('click', async ()=>{
   Object.keys(APP_FIELDS).forEach(id=>{
     const el = $(id);
     if (el && el.value !== '') body[APP_FIELDS[id]] = parseInt(el.value, 10);
+  });
+  // Sent even when empty, unlike the numbers above: empty is how the nightly
+  // refresh is switched OFF, and a field that could only ever be set would be
+  // one nobody could take back.
+  Object.keys(APP_TEXT).forEach(id=>{
+    const el = $(id);
+    if (el) body[APP_TEXT[id]] = el.value.trim();
   });
   body.bind = segValue('ap_bind');
   body.bind_address = body.bind === 'address' ? ($('ap_bindaddr').value || '') : '';
@@ -3455,9 +3929,13 @@ $('b_appsave').addEventListener('click', async ()=>{
     if (Object.keys(shared).length)
       await api('/settings', {method:'POST',
                               body: JSON.stringify({settings: shared, merge: true})});
+    /* "nothing differs from what is running" was true when everything on this
+       tab needed a restart. The maintenance settings do not — they reach each
+       screen at its next check-in — so a save that changed one of them would
+       have been told nothing had changed. */
     note.textContent = (j.pending && j.pending.length)
       ? 'saved — a restart is needed, see below'
-      : 'saved — nothing here differs from what is running';
+      : 'saved — nothing here is waiting on a restart';
     showPending(j);
   }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
 });
@@ -3499,6 +3977,11 @@ let openTopic = ()=>{};        // assigned once the panel's sections exist
    thing that knows how to redraw them lives inside the tab machinery. */
 let reRender = ()=>{};
 let rescanGroups = ()=>{};     // ditto — this tab builds sections at runtime
+/* Selecting a tab, from outside the closure that owns the tab machinery.
+   Every tab fetches what it needs when you arrive at it — and until this
+   existed, "arriving" meant clicking, so the tab the panel OPENS on was the
+   one tab whose fetch never ran. */
+let loadTab = ()=>{};
 let RT = {routes: [], default: '', voices: []};
 let LEARNING = '';             // which block asked the display to LEARN
 
@@ -4160,11 +4643,19 @@ function wireBlock(blk){
     }
   });
   blk.addEventListener('click', e=>{
-    /* Independent, unlike the endpoints themselves: these are parts of one
-       thing rather than alternatives to each other, and you are often
-       comparing two of them. */
+    /* One at a time, like every other section in the panel. These were
+       independent — the argument being that they are parts of one thing
+       rather than alternatives, and that you are often comparing two of them
+       — but a rule that holds everywhere else in a panel and not here is a
+       rule somebody has to learn twice. Opening the open one shuts it, which
+       is how a topic behaves. */
     const h5 = e.target.closest('.subgrp > h5');
-    if (h5){ h5.parentNode.classList.toggle('open'); return; }
+    if (h5){
+      const g = h5.parentNode, was = g.classList.contains('open');
+      blk.querySelectorAll('.subgrp').forEach(x=> x.classList.remove('open'));
+      g.classList.toggle('open', !was);
+      return;
+    }
     const b = e.target.closest('button');
     if (!b) return;
     const seg = b.closest('.seg[data-f]');
@@ -4303,9 +4794,15 @@ function paintBlocks(keepOpen){
         blk.classList.toggle('shut', !opening);
         syncAddRoute();
       });
-      // a new endpoint opens on the two boxes you have to fill in
-      if (!rid) blk.querySelectorAll('[data-g="wake"],[data-g="conn"]')
-                   .forEach(x=> x.classList.add('open'));
+      /* A new endpoint opens on the box it cannot do without. It used to open
+         two — the wake word and the connection — and the wake word has not
+         been a box on an endpoint since a speech profile started carrying it,
+         so that half of the selector was already matching nothing. One is also
+         all that may be open at once now. */
+      if (!rid){
+        const first = blk.querySelector('[data-g="conn"]');
+        if (first) first.classList.add('open');
+      }
     }
     blk.classList.toggle('shut', OPENRT !== (rid || '(new)'));
     order.push(blk);
@@ -4351,6 +4848,8 @@ let ENROL_BASE = '';
 //: something does not shut the row you were working in.
 let OPENROW = '';
 let DPCFG = null;                // the displays document's own settings
+let DPADDRS = [];                // the addresses this machine answers on
+let ENROL_BASES = {};            // where each row's code is typed
 let DPEND = [];                  // endpoints, for the grant ticks
 let DPOPEN = '';                 // the default, if it is open to any display
 
@@ -4368,7 +4867,15 @@ async function loadDisplays(){
     const j = await api('/displays');
     DISPLAYS = j.displays || [];
     ENROL_BASE = j.enrol_base || '';
+    /* One per row: a display set up on a network profile is typed at that
+       profile's address and port, so a single base for the list stopped being
+       the truth the moment one could differ. */
+    ENROL_BASES = j.enrol_bases || {};
     DPCFG = j.settings || null;
+    /* What this machine actually has, for the network profiles' address
+       picker. It is not a setting — it is a fact about the box — so it rides
+       with the document rather than being stored in it. */
+    DPADDRS = j.addresses || [];
     DPEND = j.endpoints || [];
     DPOPEN = j.open_default || '';
   }catch(e){ DISPLAYS = []; }
@@ -4559,6 +5066,7 @@ function paintDpSettings(){
   $('dp_days').value = DPCFG.guest_days;
   $('dp_max').value = DPCFG.max_displays;
   $('dp_pending').value = DPCFG.max_pending;
+  $('dp_codemins').value = DPCFG.code_minutes;
   paintDpForm(DPCFG.form || []);
   PROFILE_KINDS.forEach(k=> paintProfiles(k, DPCFG[k.key] || [],
                                           DPCFG[DEF_KEY[k.key]] || ''));
@@ -4566,6 +5074,7 @@ function paintDpSettings(){
   paintKiosks(DPCFG.kiosks || [], DPCFG.kiosk_default || '');
   paintModels(DPCFG.models || [], DPCFG.model_default || '');
   paintNetworks(DPCFG.networks || [], DPCFG.network_default || '');
+  paintNewSetup();
 }
 
 /* The two profile lists live on their own tab now, and they are painted from
@@ -4675,6 +5184,7 @@ $('b_dpsave').addEventListener('click', ()=>{
     guest_days: parseInt($('dp_days').value, 10),
     max_displays: parseInt($('dp_max').value, 10),
     max_pending: parseInt($('dp_pending').value, 10),
+    code_minutes: parseInt($('dp_codemins').value, 10),
   }, 'dpnote');
 });
 
@@ -4868,7 +5378,8 @@ function paintNetworks(list, def){
     top.appendChild(dflag);
     const retitle = ()=>{
       nmt.textContent = (n.name || '').trim() || 'unnamed profile';
-      sum.textContent = (v.port ? 'port ' + v.port : 'no port')
+      sum.textContent = (v.address || 'any') + ' · '
+                      + (v.port ? 'port ' + v.port : 'no port')
                       + (v.redirect ? ' · ' + v.redirect + ' redirects' : '')
                       + (v.shared ? ' · shared' : '')
                       + (v.open ? ' · no approval' : '');
@@ -4903,6 +5414,41 @@ function paintNetworks(list, def){
     nm.spellcheck = false; nm.placeholder = 'Reception';
     nm.oninput = ()=>{ n.name = nm.value; retitle(); };
     field('Name', nm);
+
+    /* WHICH address this port answers on. Offered rather than typed, for the
+       same reason the server's own binding is: an address this machine does
+       not have is a listener that will not start, and there is no way to know
+       that from a box you can type anything into. The interface is beside each
+       one because an address on its own is a number nobody can place —
+       10.0.0.4 means something once it says eth0 next to it.
+
+       ANY is last and is the default: it is where every profile was before
+       this existed, and a list that opened on one particular interface would
+       be this deciding something nobody asked it to. */
+    const ip = document.createElement('select');
+    ip.className = 'ppick';
+    (DPADDRS || []).forEach(a=>{
+      const o = document.createElement('option');
+      o.value = a.addr;
+      o.textContent = a.addr + (a.iface ? '  ·  ' + a.iface : '');
+      ip.appendChild(o);
+    });
+    const anyo = document.createElement('option');
+    anyo.value = ''; anyo.textContent = 'ANY  ·  every interface';
+    ip.appendChild(anyo);
+    /* An address that was chosen and has since gone — a lease that moved, an
+       interface that is down — is kept and flagged rather than silently
+       swapped for another. Being bound to nothing is worth seeing. */
+    const want = v.address || '';
+    if (want && !(DPADDRS || []).some(a=> a.addr === want)){
+      const o = document.createElement('option');
+      o.value = want;
+      o.textContent = want + '  ·  not on this machine now';
+      ip.appendChild(o);
+    }
+    ip.value = want;
+    ip.onchange = ()=>{ v.address = ip.value; retitle(); };
+    field('IP address', ip);
 
     const pt = document.createElement('input');
     pt.type = 'number'; pt.className = 'nmedit portedit';
@@ -5600,7 +6146,7 @@ function paintSavers(list){
     btn.disabled = busy || DPSAVERS.length >= 8;
   }
 }
-/* ---- the device profiles ----
+/* ---- the display profiles ----
    The one list a device names. Same row, same caret, same one-open-at-a-time
    as everything else in this panel, because they are the same kind of thing.
 
@@ -5620,6 +6166,7 @@ function paintKiosks(list, def){
                                     speech: k.speech || '',
                                     saver: k.saver || '',
                                     fullscreen: k.fullscreen !== false,
+                                    keep_awake: k.keep_awake !== false,
                                     prompt: k.prompt !== false,
                                     prompt_text: k.prompt_text || ''}));
   if (def !== undefined) DPKDEF = def || '';
@@ -5665,6 +6212,7 @@ function paintKiosks(list, def){
       const sv = ((DPCFG && DPCFG.savers) || []).filter(x=> x.id === k.saver)[0];
       if (sv) bits.push(sv.name); else bits.push('never drifts');
       if (!k.fullscreen) bits.push('no full screen');
+      if (!k.keep_awake) bits.push('may sleep');
       if (!k.prompt) bits.push('no prompt');
       sum.textContent = bits.join(' · ');
       dflag.style.display = (k.id && k.id === DPKDEF) ? '' : 'none';
@@ -5716,6 +6264,7 @@ function paintKiosks(list, def){
     };
     tick('Voice only', 'voice_only');
     tick('Full screen on first touch', 'fullscreen');
+    tick('Keep the screen awake', 'keep_awake');
 
     /* The text belongs to the tick above it and is meaningless without it, so
        it goes away with it rather than sitting there inert. */
@@ -5797,6 +6346,7 @@ function paintKiosks(list, def){
       saveDp({kiosks: keep.map(x=> ({id:x.id, name:x.name, voice_only:x.voice_only,
                                      look:x.look, motion:x.motion, speech:x.speech,
                                      saver:x.saver, fullscreen:x.fullscreen,
+                                     keep_awake:x.keep_awake,
                                      prompt:x.prompt, prompt_text:x.prompt_text})),
               kiosk_default: DPKDEF}, 'kiosknote');
     };
@@ -5848,7 +6398,7 @@ $('b_addkiosk').addEventListener('click', ()=>{
   if (DPKIOSKS.length >= 8) return;
   DPKIOSKS.push({id:newProfileId(), _new:true, name:'', voice_only:true,
                  look:'', motion:'', speech:'', saver:'',
-                 fullscreen:true, prompt:true, prompt_text:''});
+                 fullscreen:true, keep_awake:true, prompt:true, prompt_text:''});
   OPENKI = DPKIOSKS.length - 1;
   paintKiosks(DPKIOSKS);
 });
@@ -5903,17 +6453,63 @@ function kioskBlock(d){
     b.classList.toggle('on', v === kindNow);
     b.onclick = ()=>{
       kseg.querySelectorAll('button').forEach(x=> x.classList.toggle('on', x === b));
+      syncGroups();
     };
     kseg.appendChild(b);
   });
   krow.appendChild(kseg);
   box.appendChild(krow);
+
+  /* …and WHICH group of that population, where there is a choice to make.
+     Everything that starts working is filed with its own kind, so a grant to
+     all of them is one tick — but an admin who has built three groups of
+     people meant one of the three, and picking it here is the moment they
+     know which. Hidden where there is nothing to decide: one group of a kind
+     is not a choice, it is the answer. */
+  const grow = document.createElement('div');
+  grow.className = 'namerow';
+  const glab = document.createElement('b');
+  glab.textContent = 'In group';
+  grow.appendChild(glab);
+  const gsel = document.createElement('select');
+  gsel.className = 'ppick';
+  grow.appendChild(gsel);
+  box.appendChild(grow);
+
   const kindNote = document.createElement('div');
   kindNote.className = 'note';
   kindNote.textContent = d.kind ? ''
     : 'Not set — currently read as ' + (d.group_kind === 'user' ? 'a person' : 'a device')
       + ' from how it arrived.';
   box.appendChild(kindNote);
+
+  /* Redrawn whenever the population changes, because the list it offers is
+     the groups OF that population — the answer to "which group" is not even
+     the same set of options a moment after somebody presses PERSON. */
+  function syncGroups(){
+    const want = (kseg.querySelector('button.on') || {}).dataset.v
+                 || d.group_kind || 'device';
+    const mine = (GROUPS || []).filter(g=> g.kind === want);
+    const inNow = mine.filter(g=> (g.members || []).indexOf(d.id) >= 0)[0];
+    gsel.innerHTML = '';
+    mine.forEach(g=>{
+      const o = document.createElement('option');
+      o.value = g.id;
+      o.textContent = g.name;
+      gsel.appendChild(o);
+    });
+    if (!mine.length){
+      const o = document.createElement('option');
+      o.value = '';
+      o.textContent = want === 'user' ? 'People — made when you save'
+                                      : 'Devices — made when you save';
+      gsel.appendChild(o);
+    }
+    gsel.value = inNow ? inNow.id : (mine[0] ? mine[0].id : '');
+    /* One group of a kind is not a choice. Two is. */
+    grow.style.display = mine.length > 1 ? '' : 'none';
+  }
+  syncGroups();
 
   const l = document.createElement('label');
   l.className = 'vo';
@@ -5957,6 +6553,7 @@ function kioskBlock(d){
     if (lk) bits.push(lk.name);
     if (sv) bits.push(sv.name);
     if (!k.fullscreen) bits.push('no full screen');
+    if (!k.keep_awake) bits.push('may sleep');
     if (!k.prompt) bits.push('no prompt line');
     o.title = bits.join(', ');
     sel.appendChild(o);
@@ -5989,16 +6586,22 @@ function kioskBlock(d){
          the server says which so this can report it rather than let a group
          quietly lose a member. */
       const wantKind = (kseg.querySelector('button.on') || {}).dataset.v || '';
+      const wantGroup = gsel.value || '';
+      const inNow = (GROUPS || []).filter(
+        g=> (g.members || []).indexOf(d.id) >= 0)[0];
       let extra = '';
-      if (wantKind !== (d.kind || '')){
+      if (wantKind !== (d.kind || '') || (wantGroup && wantGroup !== (inNow || {}).id)){
         const k = await api('/displays/kind', {method:'POST', body: JSON.stringify(
-          {id: d.id, kind: wantKind})});
+          {id: d.id, kind: wantKind, group: wantGroup})});
         if (k.displays) DISPLAYS = k.displays;
+        if (k.groups) GROUPS = k.groups;
         d.kind = wantKind;
         kindNote.textContent = '';
         if ((k.dropped || []).length)
           extra = ' · removed from ' + k.dropped.join(', ')
                 + ' — a group takes one population';
+        if (k.joined) extra += ' · in ' + k.joined;
+        syncGroups();
         if (typeof refreshGroups === 'function') refreshGroups();
       }
       said.textContent = 'saved' + extra;
@@ -6055,16 +6658,20 @@ const PICKED = new Set();
 function paintBulk(){
   const bar = $('bulkbar');
   if (!bar) return;
-  [...PICKED].forEach(id=>{ if (!DISPLAYS.some(d=> d.id === id)) PICKED.delete(id); });
+  const here = onThisScreen();
+  /* Pruned against what is ON THIS SCREEN, not against every row: a selection
+     that survived a row moving to another tab would be applied to something
+     nobody could see. */
+  [...PICKED].forEach(id=>{ if (!here.some(d=> d.id === id)) PICKED.delete(id); });
   const n = PICKED.size;
-  bar.hidden = !DISPLAYS.length;
+  bar.hidden = !here.length;
   const cnt = $('bulkcount');
   if (cnt) cnt.textContent = n ? n + (n === 1 ? ' selected' : ' selected')
                                : 'nothing selected';
   const all = $('bulkall');
   if (all){
-    all.checked = n > 0 && n === DISPLAYS.length;
-    all.indeterminate = n > 0 && n < DISPLAYS.length;
+    all.checked = n > 0 && n === here.length;
+    all.indeterminate = n > 0 && n < here.length;
   }
   const btn = $('b_bulkapply');
   if (btn) btn.disabled = !n;
@@ -6084,44 +6691,115 @@ function paintBulk(){
   }
 }
 
+/* Four lists, on three tabs, and every row lands in exactly one of them.
+   Which one is two questions: is this thing WORKING, and is it a person or a
+   machine.
+
+   It was one register holding all of it, which was itself a merge of two —
+   and the merge was right for what it fixed and wrong for what it cost. A row
+   that has not finished arriving is a job somebody has to do; a row that is
+   working is a thing they look up. Those are not the same page. And a person
+   who filled in a form has nothing in common with a screen an admin minted a
+   code for except that both end up connected: the two get there by different
+   routes, with different buttons, and neither wants to read the other's queue
+   while doing it.
+
+   So: WAITING FOR APPROVAL and GET A CODE are the two arrivals halls, one per
+   population, and CONNECTIONS is where both end up — still told apart,
+   because "which of my screens is on the wall" and "who has been let in" are
+   different questions asked by the same admin on different days. */
+const DISP_BUCKETS = ['waiting', 'enrol', 'users', 'devices'];
+function dispBucket(d){
+  const person = d.group_kind === 'user';
+  if (dispState(d) === 'live') return person ? 'users' : 'devices';
+  return person ? 'waiting' : 'enrol';
+}
+
+/* Every running row clock. The list is rebuilt on every action, and an
+   interval whose element is no longer in the document is a timer that runs
+   until the tab is closed — a dozen of them after a busy morning. */
+let CODE_CLOCKS = [];
+function stopClocks(){
+  CODE_CLOCKS.forEach(t=> clearInterval(t));
+  CODE_CLOCKS = [];
+}
+
+function startClock(el, d){
+  /* No deadline at all: the admin turned the clock off, and the row says so
+     rather than showing 0:00 and looking spent. */
+  if (d.code_forever){
+    el.textContent = 'CODE DOES NOT EXPIRE';
+    el.classList.add('forever');
+    return;
+  }
+  const until = Date.now() + (d.code_left || 0) * 1000;
+  const paint = ()=>{
+    const left = Math.max(0, Math.round((until - Date.now()) / 1000));
+    if (!left){
+      el.textContent = 'CODE EXPIRED — REISSUE FOR ANOTHER';
+      el.classList.add('spent');
+      return true;                      // done
+    }
+    el.textContent = Math.floor(left / 60) + ':'
+                   + String(left % 60).padStart(2, '0') + ' LEFT TO ENROL';
+    /* The last minute earns a different colour. A clock that looks the same
+       at nine minutes and at forty seconds is a clock you have to read. */
+    el.classList.toggle('soon', left <= 60);
+    return false;
+  };
+  if (paint()) return;
+  const t = setInterval(()=>{ if (paint()) clearInterval(t); }, 1000);
+  CODE_CLOCKS.push(t);
+}
+
 async function refreshDisplays(){
-  const conn = $('connlist');
-  if (!conn || ME.role !== 'admin'){
-    if (conn) conn.textContent = '';
+  const box = {};
+  DISP_BUCKETS.forEach(k=> box[k] = $({waiting: 'asklist', enrol: 'enrollist',
+                                       users: 'connusers',
+                                       devices: 'conndevices'}[k]));
+  const live = DISP_BUCKETS.filter(k=> box[k]);
+  if (!live.length || ME.role !== 'admin'){
+    live.forEach(k=>{ box[k].textContent = ''; });
     return;
   }
   await loadDisplays();
+  /* The groups as well, because every row now offers the one it is in — and a
+     picker drawn before they arrive is a picker with nothing in it, on the
+     one control where "nothing" and "not loaded yet" look identical. */
+  await loadGroups();
   // The settings above the list are painted from the same fetch, so the two
   // can never be describing different states of the same document.
   paintDpSettings();
-  conn.innerHTML = '';
-  /* ONE register, not two. It was split — a queue of things wanting a
-     decision, and a list of things simply working — on the reasoning that
-     burying three rows that need attention among fifty that do not is how a
-     request sits unanswered for a week. The ordering below is what actually
-     carried that, and it survives the merge: anything waiting sorts to the
-     top, by how much it wants attention, and everything working follows by
-     what was heard from most recently. What the split cost was somewhere to
-     look: a device you had just plugged in was in one list or the other
-     depending on whether it had been approved yet, which is exactly the moment
-     you are looking for it. */
+  stopClocks();
+  live.forEach(k=>{ box[k].innerHTML = ''; box[k].className = ''; });
+  /* Anything waiting sorts by how much it wants attention; anything working
+     sorts by what was heard from most recently. Both orders survive the split
+     — they were the whole of what the merged register did for you. */
   const rank = {asked: 0, expired: 1, code: 2, waiting: 3, denied: 4, stale: 5};
+  const seen = {};
   const rows = DISPLAYS.slice().sort((a, b)=>
-    (rank[dispState(a)] - rank[dispState(b)]) || (b.created || 0) - (a.created || 0));
-  const pending = rows.filter(d=> dispState(d) !== 'live');
-  const live = DISPLAYS.slice()
-    .filter(d=> dispState(d) === 'live')
-    .sort((a, b)=> (b.last_seen || 0) - (a.last_seen || 0));
-  if (!DISPLAYS.length){
-    conn.className = 'note';
-    conn.textContent = 'No devices yet. Name one under Created Access to get a '
-                     + 'code, or open the display page on any device and it '
-                     + 'appears here.';
-  }else conn.className = '';
-  pending.concat(live).forEach(d=>{
+      (rank[dispState(a)] - rank[dispState(b)])
+      || (b.last_seen || 0) - (a.last_seen || 0)
+      || (b.created || 0) - (a.created || 0));
+  const EMPTY = {
+    waiting: 'Nobody is waiting. A person who opens the display page and asks '
+             + 'for access appears here.',
+    enrol: 'No devices being set up. Name one above to get a code.',
+    users: 'No people connected yet.',
+    devices: 'No devices connected yet. One appears here the moment it takes '
+             + 'its code.',
+  };
+  rows.forEach(d=>{
+    const bucket = dispBucket(d);
+    const conn = box[bucket];
+    if (!conn) return;                  // that tab is not in the document
+    seen[bucket] = true;
     const st = dispState(d);
     const row = document.createElement('div');
-    row.className = 'erow' + (st === 'live' ? '' : ' off');
+    /* Greyed where nothing is happening — but a row holding a LIVE CODE is
+       not that. It is mid-enrolment, which on this tab is the state everything
+       else is waiting for, and dimming it said the opposite of what is true. */
+    row.className = 'erow' + (st === 'live' || st === 'code' ? '' : ' off');
 
     /* Shut unless it is the one being looked at. A list of fifty devices is a
        register, and a register you scroll through is a register nobody reads —
@@ -6131,16 +6809,20 @@ async function refreshDisplays(){
     const top = document.createElement('div'); top.className = 'top drow';
     /* Left of everything, because it is not about this device — it is about
        which devices the next action applies to. */
-    const pick = document.createElement('input');
-    pick.type = 'checkbox'; pick.className = 'dpick';
-    pick.checked = PICKED.has(d.id);
-    pick.title = 'select for a bulk change';
-    pick.onclick = (e)=>{
-      e.stopPropagation();               // selecting must not open the row
-      if (pick.checked) PICKED.add(d.id); else PICKED.delete(d.id);
-      paintBulk();
-    };
-    top.appendChild(pick);
+    /* Only where the bar that acts on it is drawn. A tick on a row two tabs
+       away is a selection nobody can see, on a screen with no APPLY on it. */
+    if (bucket === 'users' || bucket === 'devices'){
+      const pick = document.createElement('input');
+      pick.type = 'checkbox'; pick.className = 'dpick';
+      pick.checked = PICKED.has(d.id);
+      pick.title = 'select for a kiosk assignment';
+      pick.onclick = (e)=>{
+        e.stopPropagation();             // selecting must not open the row
+        if (pick.checked) PICKED.add(d.id); else PICKED.delete(d.id);
+        paintBulk();
+      };
+      top.appendChild(pick);
+    }
     const namecell = document.createElement('div'); namecell.className = 'dname';
     /* The name, and the thing you press to open the row. It reads as the row's
        title because that is what it is; renaming happens inside, where there
@@ -6158,8 +6840,12 @@ async function refreshDisplays(){
       if (e.target.closest('input, button, select, textarea')) return;
       const opening = row.classList.contains('shut');
       OPENROW = opening ? d.id : '';
-      // One at a time. It used to say "across both lists"; there is one now.
-      document.querySelectorAll('#connlist .erow')
+      /* One at a time, across every one of the four lists — they are on three
+         tabs, so two could never be looked at together anyway, and a row left
+         open on a tab you walked away from is a row you come back to already
+         scrolled past. */
+      document.querySelectorAll('#asklist .erow, #enrollist .erow, '
+                                + '#connusers .erow, #conndevices .erow')
               .forEach(x=> x.classList.add('shut'));
       row.classList.toggle('shut', !opening);
     };
@@ -6178,8 +6864,14 @@ async function refreshDisplays(){
       b.className = 'badge'; b.textContent = t;
       namecell.appendChild(b);
     };
-    if (st === 'code')    badge('WAITING FOR ITS CODE');
-    if (st === 'stale')   badge('CODE EXPIRED');
+    /* What is true, and when it stops being true. It read WAITING FOR ITS
+       CODE, which says the opposite of what this state is: the code exists,
+       it is live, and it is waiting for somebody to TYPE it — with a clock on
+       it that nothing on the row admitted to. */
+    /* No number here: the clock inside the row carries it, and a badge saying
+       7 MIN LEFT is wrong sixty seconds after it is painted. */
+    if (st === 'code') badge(d.code_forever ? 'CODE LIVE' : 'CODE LIVE · TIMED');
+    if (st === 'stale')   badge('CODE EXPIRED — REISSUE FOR ANOTHER');
     if (st === 'waiting') badge('WAITING');
     if (st === 'asked')   badge(d.renewals ? 'ASKING AGAIN' : 'ASKED FOR ACCESS');
     if (st === 'expired') badge('ACCESS EXPIRED');
@@ -6187,7 +6879,13 @@ async function refreshDisplays(){
     if (d.renewals) badge('RENEWED ' + d.renewals + '×');
     if (d.refused) badge(d.refused + (d.refused === 1 ? ' REFUSAL' : ' REFUSALS'));
 
-    const kb = kioskBlock(d);
+    /* A row waiting for its code carries the code and nothing else. What the
+       screen will BE was chosen when the code was made, one line above this
+       list — so restating it here is a second place to set the same thing, on
+       a row about to stop existing in this list anyway. Everything a device
+       has to say about itself it says once it is connected. */
+    const waiting = st === 'code' || st === 'stale';
+    const kb = waiting ? null : kioskBlock(d);
     /* What they told you, on the shut row. The labels are the admin's own, so
        there is nothing to hard-code here: everything except the message field
        — the long one, which is the reason and is kept for the open row — is
@@ -6206,7 +6904,7 @@ async function refreshDisplays(){
     top.appendChild(cell);
     const kcell = document.createElement('div');
     kcell.className = 'dcell dkstate';
-    kcell.textContent = kb.label;
+    kcell.textContent = kb ? kb.label : '';
     top.appendChild(kcell);
     const r = document.createElement('div'); r.className = 'acts';
     /* Deciding is for a device that turned up on its own. A row created here
@@ -6251,9 +6949,27 @@ async function refreshDisplays(){
               + 'using it now stops working immediately, and the row waits for '
               + 'somebody to type the new code into a screen. Its name and every '
               + 'endpoint that names it are kept.'))
+          /* No box needed here: displayAction opens the row it just changed,
+             and a row in this state draws the whole address and code across
+             it with the minutes left beside them. The box on ACCESS exists
+             because the button there is on a different tab from this list. */
           displayAction('/displays/reissue', {id: d.id});
       };
       r.appendChild(again);
+    }
+    /* Reaching a screen without walking to it, and what it actually fixes is
+       a display that is alive but stuck: it is still checking in, so it is
+       still listening, and a reload is the whole repair. Only offered where
+       there is a device checking in to hear it — a row waiting for its code
+       has nothing on the other end, and a button that could not possibly work
+       is worse than no button. */
+    if (st === 'live'){
+      const rl = document.createElement('button');
+      rl.textContent = 'RELOAD';
+      rl.onclick = ()=> displayAction('/displays/reload', {id: d.id},
+        '"' + d.label + '" reloads at its next check-in — or when whoever is '
+        + 'talking to it stops, if somebody is.');
+      r.appendChild(rl);
     }
     /* Everything above is about whether this device may be here — granting,
        refusing, withdrawing, reissuing — and it stays left. What follows is
@@ -6262,8 +6978,7 @@ async function refreshDisplays(){
     const gap = document.createElement('span');
     gap.className = 'spacer';
     r.appendChild(gap);
-    r.appendChild(kb.save);
-    r.appendChild(kb.undo);
+    if (kb){ r.appendChild(kb.save); r.appendChild(kb.undo); }
     const del = document.createElement('button');
     del.textContent = 'DELETE';
     del.className = 'act-danger';
@@ -6280,20 +6995,30 @@ async function refreshDisplays(){
        read from across a room while typing it into a television with a
        remote. The address as well as the code: nobody is typing half a URL. */
     if (st === 'code'){
+      /* The clock first, above everything this row says about itself, and in
+         the one colour on the row that is not grey. Every other fact here
+         keeps; this one is spending itself while you read it, and a number
+         somebody has to work out from "issued at" is a number nobody works
+         out. It counts in real time rather than saying "9 min left" and then
+         lying about it for the next nine minutes. */
+      const clock = document.createElement('div');
+      clock.className = 'codeclock';
+      row.appendChild(top);
+      row.appendChild(clock);
       const c = document.createElement('div');
       c.className = 'dcode';
-      c.textContent = ENROL_BASE + dispCode(d.code);
-      const mins = Math.max(1, Math.round((d.code_left || 0) / 60));
+      c.textContent = (ENROL_BASES[d.id] || ENROL_BASE) + dispCode(d.code);
       const sub = document.createElement('span');
-      sub.textContent = ' · ' + mins + ' min left · case and dashes do not matter';
+      sub.textContent = ' · case and dashes do not matter';
       c.appendChild(sub);
-      row.appendChild(top); row.appendChild(c);
+      row.appendChild(c);
+      startClock(clock, d);
     }else{
       row.appendChild(top);
     }
     /* Directly under the name: what this screen IS comes before what somebody
        said to get it here and before the machine detail. */
-    row.appendChild(kb.box);
+    if (kb) row.appendChild(kb.box);
 
     /* What they told you, in your own words — the labels are the ones you put
        on the form. This is the whole of what an admin who cannot see the
@@ -6363,15 +7088,23 @@ async function refreshDisplays(){
       meta.appendChild(el);
     });
 
-    row.appendChild(meta);
+    if (!waiting) row.appendChild(meta);
     /* Under the facts and above the buttons that end the row's life. A screen
        can be told what it will look like before it has ever been switched on,
        the same way its endpoints can be ticked before it arrives. */
     /* Last in the row: whether it may be here on the left, what it is and
        whether that is saved on the right. */
     row.appendChild(r);
-    row.appendChild(kb.said);
+    if (kb) row.appendChild(kb.said);
     conn.appendChild(row);
+  });
+  /* A list with nothing in it says what would put something in it. An empty
+     box under a heading is indistinguishable from one that failed to load,
+     and these four are empty at different times for different reasons. */
+  live.forEach(k=>{
+    if (seen[k]) return;
+    box[k].className = 'note';
+    box[k].textContent = EMPTY[k];
   });
   /* No summary line. Every row already says what it is, and a count above a
      list you can see the whole of is a sentence describing what is directly
@@ -6384,10 +7117,18 @@ async function refreshDisplays(){
    row at a time and says which one it refused, and inventing a second path
    into the same write would mean two places that have to agree about what a
    valid change is. A building's worth of screens is tens, not thousands. */
+/* Everything on the CONNECTIONS screen, which is the two lists this bar sits
+   under — not every row this server knows about. ALL ticked things that were
+   not on the page, on tabs the bar is not even drawn on, and then applied a
+   kiosk profile to them. */
+const onThisScreen = ()=> DISPLAYS.filter(d=> {
+  const b = dispBucket(d);
+  return b === 'users' || b === 'devices';
+});
 $('bulkall').addEventListener('click', ()=>{
   const on = $('bulkall').checked;
   PICKED.clear();
-  if (on) DISPLAYS.forEach(d=> PICKED.add(d.id));
+  if (on) onThisScreen().forEach(d=> PICKED.add(d.id));
   refreshDisplays();
 });
 $('b_bulkapply').addEventListener('click', async ()=>{
@@ -6431,11 +7172,54 @@ $('b_bulkapply').addEventListener('click', async ()=>{
 
 /* Name it, get a code. The row exists from this moment, so its endpoints can
    be ticked before the screen it is for has ever been switched on. */
+/* The two pickers on GET A CODE, filled from the same document the profile
+   lists are drawn from. Repainted with it, so a profile added on another tab
+   is offered here without a reload. */
+function paintNewSetup(){
+  const tick = $('dp_newkiosk'), prof = $('dp_newprofile'), net = $('dp_newnet');
+  if (!tick || !prof || !net) return;
+  const fill = (sel, rows, blank)=>{
+    const had = sel.value;
+    sel.innerHTML = '';
+    const none = document.createElement('option');
+    none.value = ''; none.textContent = blank;
+    sel.appendChild(none);
+    (rows || []).forEach(r=>{
+      const o = document.createElement('option');
+      o.value = r.id; o.textContent = r.name;
+      sel.appendChild(o);
+    });
+    sel.value = had;
+  };
+  const kd = ((DPCFG && DPCFG.kiosks) || [])
+             .filter(k=> k.id === (DPCFG && DPCFG.kiosk_default))[0];
+  fill(prof, (DPCFG && DPCFG.kiosks) || [],
+       kd ? 'DEFAULT — ' + kd.name : 'DEFAULT — none set yet');
+  const nd = ((DPCFG && DPCFG.networks) || [])
+             .filter(n=> n.id === (DPCFG && DPCFG.network_default))[0];
+  fill(net, (DPCFG && DPCFG.networks) || [],
+       nd ? 'DEFAULT — ' + nd.name : 'DEFAULT');
+  /* The profile picker belongs to the tick above it and means nothing without
+     it, so it goes away with it rather than sitting there inert. */
+  prof.hidden = !tick.checked;
+}
+$('dp_newkiosk').addEventListener('change', ()=>{
+  $('dp_newprofile').hidden = !$('dp_newkiosk').checked;
+});
+
 $('b_adddisp').addEventListener('click', async ()=>{
-  const el = $('dp_name');
+  const el = $('dp_name'), note = $('dispnote'), out = $('dispcode');
   const name = (el.value || '').trim();
+  /* Cleared on the way in, every time. It used to be written on the way out
+     and never taken back, so the complaint about a missing name was still on
+     screen after a name had been given and a code issued — which reads as the
+     press having failed, and is why there are rows sitting in the register
+     that nobody knew they had made. */
+  note.className = 'note';
+  note.textContent = '';
+  out.classList.remove('on');
+  out.textContent = '';
   if (!name){
-    const note = $('dispnote');
     note.className = 'note bad';
     note.textContent = 'give it a name first — it is what the row is called '
                      + 'and what you will look for when you restrict an endpoint';
@@ -6443,8 +7227,57 @@ $('b_adddisp').addEventListener('click', async ()=>{
     return;
   }
   el.value = '';
-  await displayAction('/displays/new', {name});
+  const j = await displayAction('/displays/new', {
+    name,
+    kiosk: $('dp_newkiosk').checked,
+    kiosk_profile: $('dp_newkiosk').checked ? $('dp_newprofile').value : '',
+    network: $('dp_newnet').value,
+  });
+  if (!j || !j.code) return;              // displayAction has said why
+  /* The whole thing somebody has to type, on its own line and big enough to
+     read from across a room while typing it into a television with a remote.
+     The address as well as the code: nobody is typing half a URL. */
+  showCode(name, j.code, j.code_forever ? 0 : (j.code_left || 0));
 });
+
+/* A code is only worth anything for ten minutes, so the ten minutes are on
+   screen and moving. It was a sentence saying "the code lasts ten minutes",
+   which tells you the rule and not the answer — and the answer changes every
+   second you spend walking to the screen. */
+let codeTick = 0;
+function showCode(name, code, left){
+  const out = $('dispcode');
+  clearInterval(codeTick);
+  const until = Date.now() + left * 1000;
+  const line = document.createElement('div');
+  line.textContent = ENROL_BASE + dispCode(code);
+  const sub = document.createElement('span');
+  out.innerHTML = '';
+  out.appendChild(line);
+  out.appendChild(sub);
+  out.classList.add('on');
+  if (!left){                           // the clock is switched off entirely
+    sub.textContent = '“' + name + '” · does not expire · works once · type it '
+                    + 'into the screen, or into the box on its page';
+    return;
+  }
+  const paint = ()=>{
+    const s = Math.max(0, Math.round((until - Date.now()) / 1000));
+    if (!s){
+      clearInterval(codeTick);
+      out.classList.add('dead');
+      sub.textContent = '“' + name + '” · this code has expired — REISSUE the '
+                      + 'row under CONNECTIONS ▸ DEVICES for another';
+      return;
+    }
+    out.classList.remove('dead');
+    sub.textContent = '“' + name + '” · ' + Math.floor(s / 60) + ':'
+                    + String(s % 60).padStart(2, '0') + ' left · works once · '
+                    + 'type it into the screen, or into the box on its page';
+  };
+  paint();
+  codeTick = setInterval(paint, 1000);
+}
 $('dp_name').addEventListener('keydown', e=>{
   if (e.key === 'Enter') $('b_adddisp').click();
 });
@@ -6532,8 +7365,17 @@ function decide(d, approve, name, row){
   if (!approve) reason.focus();
 }
 
-async function displayAction(path, body){
-  const note = $('dispnote');
+/* The four lists are on three tabs, and every one of them can act on a row.
+   A message written to a fixed element is a message on whichever tab that
+   element happens to live on — which, since GET A CODE moved to its own tab,
+   is not the tab anybody pressing APPROVE is looking at. */
+function dispNoteEl(){
+  return $({displays: 'asknote', enrol: 'dispnote',
+            devices: 'connnote'}[CURRENT_TAB] || 'dispnote') || $('dispnote');
+}
+
+async function displayAction(path, body, said){
+  const note = dispNoteEl();
   try{
     const j = await api(path, {method:'POST', body: JSON.stringify(body)});
     /* A row that was just given a code is the row you want open — the code is
@@ -6545,8 +7387,20 @@ async function displayAction(path, body){
        permission nobody can see. The endpoint blocks are rebuilt from the
        fresh list — harmless when the AI tab is not the one on screen. */
     paintBlocks();
+    /* Most of these actions say what they did by changing the row in front of
+       you — a badge appears, a code turns up, a device leaves the list. The
+       ones that do not are the ones that ask a screen somewhere else to do
+       something, and those have to say so in words or they read as a button
+       that did nothing. */
+    if (said && note){ note.className = 'note'; note.textContent = said; }
+    /* Handed back, because one caller needs what came with it: the enrolment
+       code is issued here and shown nowhere else on the tab that asked for
+       it. Null on failure, so a caller can tell the difference without
+       repeating the message this already wrote. */
+    return j;
   }catch(e){
     if (note){ note.className = 'note bad'; note.textContent = e.message; }
+    return null;
   }
 }
 
@@ -6573,7 +7427,10 @@ function routesChanged(){
 $('b_addroute').addEventListener('click', ()=>{
   DRAFT = newInstance();
   paintBlocks('');
-  const blk = document.querySelector('#panel .erow.isdraft');
+  /* Scoped to the endpoint list rather than to the whole panel: there is more
+     than one list of rows in here now, and "the draft" only ever means the one
+     in this list. */
+  const blk = document.querySelector('#rtlist .erow.isdraft');
   if (blk){
     const n = F(blk, 'name');
     if (n) n.focus();
@@ -6721,6 +7578,10 @@ function emCheck(){
   return !err;
 }
 
+/* Which key is open, by id — the list is rebuilt on every change and an index
+   would move under it. The same reason OPENRT holds an endpoint's id. */
+let OPENEM = '';
+
 async function refreshEmbeds(){
   const box = $('emblist');
   if (!box || ME.role !== 'admin'){ if (box) box.textContent = ''; return; }
@@ -6736,11 +7597,26 @@ async function refreshEmbeds(){
     j.embeds.forEach(e=>{
       const row = document.createElement('div');
       row.className = 'erow' + (e.enabled === false ? ' off' : '');
+      row.dataset.emb = e.id;
+      const cap = ['ask','mic','speak'].filter(k=> e.cap && e.cap[k]);
 
       const top = document.createElement('div'); top.className = 'top';
       const nm = document.createElement('span');
       nm.className = 'nm'; nm.textContent = e.name;
       top.appendChild(nm);
+      /* What it is, on the line you can read without opening it — the same
+         job the summary does on an endpoint. Everything that used to be five
+         permanently visible lines is now behind the row. */
+      const sum = document.createElement('span');
+      sum.className = 'badge';
+      sum.textContent = [cap.length ? cap.join(', ') : 'nothing',
+                         (e.parts || []).length + ' drawn',
+                         (e.origins || []).length === 1 ? '1 origin'
+                           : (e.origins || []).length + ' origins',
+                         e.ttl_minutes + ' min'].join(' · ');
+      top.appendChild(sum);
+      /* The two that are not a summary: one is a state you set, the other is
+         live traffic. Both are worth seeing without opening the row. */
       if (e.enabled === false){
         const b = document.createElement('span');
         b.className = 'badge'; b.textContent = 'DISABLED';
@@ -6752,25 +7628,22 @@ async function refreshEmbeds(){
         b.textContent = e.sessions + (e.sessions === 1 ? ' SESSION' : ' SESSIONS');
         top.appendChild(b);
       }
-      const r = document.createElement('span'); r.className = 'r';
-      const flip = document.createElement('button');
-      flip.textContent = e.enabled === false ? 'ENABLE' : 'DISABLE';
-      flip.onclick = ()=> embedAction('/embeds/enable',
-                                      {id:e.id, enabled: e.enabled === false});
-      const del = document.createElement('button');
-      del.textContent = 'DELETE';
-      del.className = 'act-danger';   // destroys something already saved
-      del.onclick = ()=>{
-        if (confirm('Delete the embed key "' + e.name + '"? Any page using it '
-                    + 'stops working immediately.'))
-          embedAction('/embeds/delete', {id:e.id});
-      };
-      r.appendChild(flip); r.appendChild(del);
-      top.appendChild(r);
+      /* One open at a time, and clicking the open one shuts it — the same
+         contract as an endpoint block and a device row. */
+      top.addEventListener('click', ev=>{
+        if (ev.target.closest('input, button, select, textarea')) return;
+        const opening = row.classList.contains('shut');
+        OPENEM = opening ? e.id : '';
+        box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+        row.classList.toggle('shut', !opening);
+      });
+      row.appendChild(top);
+      if (OPENEM !== e.id) row.classList.add('shut');
 
+      const body = document.createElement('div');
+      body.className = 'grpbody';
       const meta = document.createElement('div');
       meta.className = 'meta';
-      const cap = ['ask','mic','speak'].filter(k=> e.cap && e.cap[k]);
       const lines = [
         ['May', cap.length ? cap.join(', ') : 'nothing'],
         ['Draws', (e.parts || []).join(', ') || 'nothing'],
@@ -6788,11 +7661,65 @@ async function refreshEmbeds(){
         d.appendChild(document.createTextNode(v));
         meta.appendChild(d);
       });
+      body.appendChild(meta);
+      /* Read-only, deliberately, where an endpoint's block is an editing
+         surface: what a key may do and what it draws are fixed when it is
+         created. A page somewhere is already framing this, and widening it
+         from here would change what that page can do without anybody at that
+         end knowing. To change either, make a new key and delete this one. */
+      const why = document.createElement('div');
+      why.className = 'note help';
+      why.textContent = 'What a key may do and what it draws are fixed at '
+        + 'creation. To change either, add a key and delete this one — a page '
+        + 'is already framing this one, and widening it from here would change '
+        + 'what that page can do without anybody at that end knowing.';
+      body.appendChild(why);
 
-      row.appendChild(top); row.appendChild(meta);
+      const acts = document.createElement('div');
+      acts.className = 'rtacts';
+      const flip = document.createElement('button');
+      flip.textContent = e.enabled === false ? 'ENABLE' : 'DISABLE';
+      flip.onclick = ()=> embedAction('/embeds/enable',
+                                      {id:e.id, enabled: e.enabled === false});
+      const del = document.createElement('button');
+      del.textContent = 'DELETE';
+      del.className = 'act-danger';   // destroys something already saved
+      del.onclick = ()=>{
+        if (confirm('Delete the embed key "' + e.name + '"? Any page using it '
+                    + 'stops working immediately.'))
+          embedAction('/embeds/delete', {id:e.id});
+      };
+      acts.appendChild(flip); acts.appendChild(del);
+      body.appendChild(acts);
+      row.appendChild(body);
       box.appendChild(row);
     });
   }catch(e){ box.className = 'note bad'; box.textContent = e.message; }
+}
+
+/* ---- the draft row ----
+   ADD opens a row rather than revealing a form that was always there. The
+   fields are the same ones, in the same document — see the markup for why
+   they are not built on demand — but they are only on screen while somebody
+   is actually making a key. */
+function emDraft(on){
+  const d = $('em_draft');
+  if (!d) return;
+  d.hidden = !on;
+  d.classList.remove('shut');
+  const add = $('b_newembed');
+  if (add){ add.hidden = on; add.disabled = on; }
+  if (on){
+    /* Nothing else open while you are making one: the draft is the thing you
+       are looking at, and a saved row open underneath it is a second subject
+       on screen. */
+    OPENEM = '';
+    const box = $('emblist');
+    if (box) box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+    const nm = $('em_name');
+    if (nm) nm.focus();
+    d.scrollIntoView({block:'nearest'});
+  }
 }
 
 async function embedAction(path, body){
@@ -6804,6 +7731,22 @@ async function embedAction(path, body){
     refreshEmbeds();
   }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
 }
+
+$('b_newembed').addEventListener('click', ()=> emDraft(true));
+$('b_emcancel').addEventListener('click', ()=>{
+  emDraft(false);
+  const note = $('embnote');
+  if (note){ note.className = 'note'; note.textContent = ''; }
+});
+/* One at a time, the same as an endpoint's and the same as every other
+   section in the panel. */
+$('em_draft').addEventListener('click', e=>{
+  const h5 = e.target.closest('.subgrp > h5');
+  if (!h5) return;
+  const g = h5.parentNode, was = g.classList.contains('open');
+  $('em_draft').querySelectorAll('.subgrp').forEach(x=> x.classList.remove('open'));
+  g.classList.toggle('open', !was);
+});
 
 document.querySelector('#em_preset').addEventListener('click', e=>{
   const b = e.target.closest('button'); if (!b) return;
@@ -6857,6 +7800,10 @@ $('b_addembed').addEventListener('click', async ()=>{
     note.textContent = 'Created. Copy the key now — it is stored hashed and '
                      + 'this server cannot show it again.';
     $('em_name').value = ''; $('em_origins').value = '';
+    /* The draft has done its job and goes away, the way a saved endpoint's
+       draft block does. The key itself stays on screen underneath: it is the
+       one thing here that cannot be looked up again. */
+    emDraft(false);
     refreshEmbeds();
   }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
 });
@@ -7195,11 +8142,11 @@ function panelNav(){
     syncSaveRow();
     $('panelscroll').scrollTop = 0;
     if (tab === 'accounts') refreshUsers();
-    // Groups moved to ACCOUNT, and it is populated by its own fetch — without
-    // this the list would be empty on the tab it now lives on.
-    if (tab === 'account') refreshGroups();
-    if (tab === 'displays' || tab === 'devices' || tab === 'security')
-      refreshDisplays();
+    // Groups live on SECURITY now, and the list is populated by its own fetch
+    // — without this it would be empty on the tab it lives on.
+    if (tab === 'security'){ refreshGroups(); loadApp(); }
+    if (tab === 'displays' || tab === 'devices' || tab === 'security'
+        || tab === 'enrol') refreshDisplays();
     /* The three settings tabs ARE profile lists now, and those lists live in
        the displays document — so arriving at one has to fetch it, exactly as
        PROFILES does. Without this the lists were painted only if you happened
@@ -7226,6 +8173,8 @@ function panelNav(){
   tabButtons.forEach(b=> b.addEventListener('click', ()=> selectTab(b)));
   const phelp = $('panelhelp');
   if (phelp) phelp.addEventListener('click', ()=> selectTab('docs'));
+  const ehelp = $('enrolhelp');
+  if (ehelp) ehelp.addEventListener('click', ()=> selectTab('docs'));
   /* Opening a section from somewhere other than its own heading: ADD has to
      take you to the block it just created. Assigned out to module scope
      because this closure is where the collapse state lives. */
@@ -7239,6 +8188,7 @@ function panelNav(){
     g.scrollIntoView({block:'nearest'});
   };
   rescanGroups = ()=>{ rescan(); render(); };
+  loadTab = selectTab;
   rescan();
   // the commit row depends on the filter as well as the tab, so both paths
   // have to re-run it
@@ -7285,6 +8235,7 @@ function start(){
   // Approving a device is granting it something, which is not a thing a
   // read-only account does — and the server refuses the routes anyway.
   $('tab_displays').style.display = admin ? '' : 'none';
+  $('tab_enrol').style.display = admin ? '' : 'none';
   $('tab_embeds').style.display = admin ? '' : 'none';
   /* The accounts tab stays, because Groups live on it and a group has nothing
      to do with signing in. What goes, where there is no sign-in, is the three
@@ -7303,9 +8254,37 @@ function start(){
   // the create form opens on the preset its first button is already lit for
   if (ME.role === 'admin') emApplyPreset('full');
   panelNav();
-  // controls are built when the preview announces itself and hands over the
-  // settings; nothing to do here but wait for that message
+  /* The tab this panel opens on, loaded the same way every other tab is. Its
+     fetch used to run only on a click, so the one tab you did not have to
+     click for was the one that arrived empty — and the only thing that
+     covered it was the preview's handshake, which is a race (see askPreview
+     below). Two different reasons for the same blank list; this is one of
+     them. */
+  loadTab(CURRENT_TAB);
+  /* The controls themselves are built from the settings the preview hands
+     over. If that already happened while this page was still working out who
+     was signed in, the message is gone — so ask for it rather than wait for
+     something that may have been and gone. */
+  askPreview();
 }
+
+/* Ask the preview to hand over the settings document again. Safe to call at
+   any time and safe to call twice: the display ignores it until its own load
+   has settled, and answering is the same message it sends unprompted.
+
+   Called once when this page knows who is signed in, and again whenever the
+   frame loads — which covers the two ways the one-shot announcement was
+   missed: the frame finishing before this page attached its listener, and the
+   frame finishing before ME was known. */
+function askPreview(){
+  if (ready) return;
+  try{ frame.contentWindow.postMessage({rsn:1, kind:'hello'}, location.origin); }
+  catch(e){}                            // not loaded yet — its own load will
+}
+
+/* …and every time the frame lands, including the RELOAD button's reload and
+   the very first load if it finished after this page had already asked. */
+frame.addEventListener('load', ()=>{ if (ME) askPreview(); });
 
 whoami().then(me=>{
   if (me){ ME = me; start(); }

@@ -30,38 +30,55 @@ so the column stays short enough to take in at a glance rather than becoming a
 wall to scroll through. Clicking the open one closes it, which is a legitimate
 state to leave it in.
 
-At the top:
+**In the bar across the top**, beside the SETTINGS title, are the places this
+panel can take you — links rather than tabs, because they do not switch which
+controls you are editing, they change the subject entirely:
+
+- **ADMIN SETTINGS** — how the server itself is wired: where it can be reached
+  from, maintenance, and the admin portal's own port. What the app answers on
+  is a network profile, not here; signing in and session lifetime are on
+  SECURITY, with the rest of who-gets-in.
+- **ADMIN USERS** — the accounts that can sign in to this panel.
+- **SECURITY** — who gets in and on what terms: **signing in** and how long an
+  admin session lasts, how long an **enrolment code** is worth anything for,
+  **AI Requires Permission** — whether a general user needs approval at all,
+  how long a grant lasts, how many devices and waiting requests there may be —
+  and the **groups** access is granted to. ENROLLMENTS ▸ USER answers who is waiting;
+  this is whether anybody is asked in the first place.
+- **?** — these documents. It is blue, and it is the same blue as every ?
+  beside a topic heading, so help is one colour wherever you meet it.
+- At the right: your own name, your role, and **SIGN OUT**. One side of that
+  bar is where you are going, the other is who you are.
+
+**ENROLLMENTS**, after a gap and a rule in the same bar, is how something comes
+to be here — as opposed to everything left of it, which configures the server:
+
+- **USER** — the request form, and everybody who has asked to be here and not
+  yet been decided about.
+- **DEVICE** — where a screen is set up: named, given a code, and watched until
+  it takes it.
+- **?** — these documents again. It belongs to that title the way the first one
+  belongs to SETTINGS.
+
+Below it:
 
 - **filter settings** — type to search across every topic in every tab at
   once. This is the fastest way to find a control when you know roughly what
   it is called but not which tab it lives under.
-- **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER / GROUPS / MODELS / NETWORK /
-  DEVICE** — the profile settings group. Each is a list of profiles, and the
+- **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER / MODELS / NETWORK /
+  DISPLAY** — the profile settings group. Each is a list of profiles, and the
   controls for one appear inside it when you open it. MODELS and NETWORK are
   the two halves of an endpoint that are not the endpoint: what it speaks to,
   and what it answers on.
-- **AI**, **DEVICES** and **SECURITY** — the group to the right of a rule. AI
-  holds the endpoints, each naming a speech profile, a model profile and a
-  network profile. DEVICES is the register: every device this server knows
-  about, and where each one is set up. SECURITY holds **AI Requires
-  Permission** — whether a general user needs approval at all, how long a
-  grant lasts, and how many devices and waiting requests there may be. ACCESS
-  answers which device may reach which endpoint; this is whether anybody is
-  asked in the first place.
-- **?**, beside the SETTINGS title — these documents. It is blue, and it is the
-  same blue as every ? beside a topic heading, so help is one colour wherever
-  you meet it.
 
-At the foot, pinned so they are always reachable:
+**At the foot**, what this server is wired to, as opposed to what you
+administer about it:
 
-- **ADMIN SETTINGS** — how the server itself is wired: where it can be reached
-  from, signing in, sessions, and the admin portal's own port. What the app
-  answers on is a network profile, not here.
-- **ADMIN** — who can sign in. The groups access is granted to have a tab of
-  their own, GROUPS, in the profile settings row.
-- **ACCESS** — what may use this server, and what each may reach.
+- **AI** — the endpoints, each naming a speech profile, a model profile and a
+  network profile.
+- **CONNECTIONS** — everything currently connected, in two areas: the
+  people you approved, and the devices that took a code.
 - **EMBEDS** — keys that let another application frame this interface.
-- Your own name, your role, and **SIGN OUT**.
 
 **Your own account is behind your name.** Click it for the box that changes
 your password. It is the one thing on this page you do to yourself, so it sits
@@ -110,8 +127,10 @@ Each of these writes a different document, so each has its own button:
 |---|---|---|
 | SAVE, inside a profile row | that profile alone; every display naming it, and every display at all if it is the default | immediately |
 | SAVE, inside an AI endpoint's box | that endpoint alone | immediately, next question |
-| SAVE, on SECURITY | who has to be approved, and what a grant is worth | immediately |
-| SAVE, on ADMIN SETTINGS | the admin port, binding, session lifetime | only after a restart |
+| SAVE, on SECURITY | who has to be approved, what a grant is worth, how long a code lasts | immediately |
+| SAVE, inside Sign in | how you get in | only after a restart |
+| SAVE, inside Sessions | how long an admin session lasts | only after a restart |
+| SAVE, on ADMIN SETTINGS | the admin port, binding, maintenance | only after a restart, except maintenance |
 
 Offering one button that meant all of them is how somebody presses the wrong
 one. The AI tab has no tab-wide save because each endpoint saves itself from
@@ -153,20 +172,33 @@ A display is one device — a screen on a wall, a TV, a laptop, somebody's phone
 — as distinct from a browser tab somebody opened. Anything with a browser and a
 microphone counts.
 
-The ACCESS tab holds two topics — the rules about who may be here:
+**Two populations arrive by two routes, and each has a tab to arrive
+through.** A person opens the display page and asks; a device is named here
+and takes a code to the screen. They have almost nothing in common except
+that both end up connected, so neither has to read the other's queue.
+
+**USER** (under ENROLLMENTS) — people, and only people:
 
 | | |
 |---|---|
-| **The request form** | what a request asks for. Whether anyone is asked at all is on SECURITY |
-| **Created Access** | where you invite a device: name it and take the code to the screen |
+| **The request form** | what a request asks for |
+| **Waiting for approval** | everybody who has asked and not been decided about |
+
+**DEVICE** (under ENROLLMENTS) — a screen, from naming it to the moment it works:
+
+| | |
+|---|---|
+| **Get a code** | name it, and the code appears with the clock already running |
+| **Waiting for their code** | rows minted and not yet used, with REISSUE for one that ran out |
+
+**CONNECTIONS** — everything that is working, in two areas, **People**
+and **Devices**. A row moves here on its own the moment it is connected, and
+leaves the tab it arrived through.
 
 Whether anybody is asked at all is on **SECURITY**, under **AI Requires
 Permission** — that is the door rather than the key, and it decides what a
-grant is worth once given. ACCESS answers which device may reach which
-endpoint.
-
-The register itself is on its own tab, **DEVICES**, right of the divider
-beside AI and SECURITY — every device this server knows about, in one list.
+grant is worth once given. ENROLLMENTS ▸ USER answers who is waiting; SECURITY
+answers whether anybody has to.
 
 Each profile list has a tab of its own in the profile settings group — what a
 screen looks like and what it is allowed to do were never the same question:
@@ -175,12 +207,12 @@ screen looks like and what it is allowed to do were never the same question:
 |---|---|
 | **Appearance profiles** | what a place looks like, for the handful of values that cannot be shared |
 | **Screensaver profiles** | what a kiosk does when nobody is there |
-| **Device profiles** | what a public screen is: voice only, full screen, the prompt line, and which of the lists above it uses |
+| **Display profiles** | what a public screen is: voice only, full screen, the prompt line, and which of the lists above it uses |
 
 They are in that order on the tab because it is the order you build in: the two
 pieces first, then the thing that names them.
 
-**A device profile is composed, not self-contained.** It names an appearance and
+**A display profile is composed, not self-contained.** It names an appearance and
 a screensaver rather than carrying copies of their values, so changing what a
 hallway looks like once still reaches every kiosk using it. Day and night in
 one hallway share an appearance and differ only in the dim — that case is the
@@ -192,39 +224,72 @@ the building rather than like nothing. It is stored by name rather than being
 "the first in the list", so reordering the panel cannot quietly change what
 every unconfigured screen is doing.
 
-**Devices is one register, and it used to be two.** The split — a queue of
-things wanting a decision, and a list of things simply working — was there so
-that three rows needing attention were not buried among fifty that did not.
-What actually carried that is the ordering, and the ordering survived the
-merge: anything waiting sorts to the top by how much it wants attention, and
-everything working follows by what was heard from most recently.
+**One register became four lists, and every row is in exactly one.** Which one
+is two questions: is this thing working, and is it a person or a machine.
 
-What the split cost was somewhere to look. A device you had just plugged in was
-in one list or the other depending on whether it had been approved yet, which
-is precisely the moment you are hunting for it. Now it appears under Devices
-either way.
+A row that has not finished arriving is a job somebody has to do; a row that is
+working is a thing they look up. Those are not the same page, and neither is a
+person who filled in a form the same as a screen an admin minted a code for.
+The two populations arrive by different routes with different buttons, and
+neither wants to read the other's queue while doing it.
 
-**There are two ways one gets into the list**, and which you use depends on
-whether you knew it was coming.
+So an arrival is under **ENROLLMENTS** — ▸ USER while a person waits on a
+decision, ▸ DEVICE while a screen has not taken its code — and everything
+working is under **CONNECTIONS**, in its own area. A row
+moves itself the moment it starts working.
 
-**You are installing it — name it here first.** Type a name into the box, press
-GET A CODE, and you are given an address to type into that screen:
+Ordering survives inside each list: anything waiting sorts by how much it wants
+attention, and anything working by what was heard from most recently.
+
+**There are two ways one gets in**, and which you use depends on whether you
+knew it was coming.
+
+**You are installing it — name it here first.** Type a name into the box and,
+if you already know them, set the two things you would otherwise come back and
+fill in on the row afterwards:
+
+- **Kiosk mode**, and which display profile it is — what the screen will look
+  like and behave as, chosen before it has ever been switched on
+- **Network** — which profile it answers on, which also decides the address and
+  port in the code you are about to be given. A building with several ports has
+  several right answers to *what do I type into this screen*, and the right one
+  is the one for the network the screen is on
+
+Both are optional; leaving them alone gives exactly the code it always did.
+Press GET A CODE, and you are given an address to type into that screen:
 
 ```
 https://<host>:9701/e/K7QP-4M
 ```
 
-Type it once, on the device itself, and it *is* that display — named, and
-already holding whatever endpoints you ticked for it, because the row existed
-before the screen was switched on. The code lasts ten minutes, works once, and
-is forgiving about how it is typed: case does not matter, dashes and spaces are
-ignored, and the characters people misread on a remote — `O` and `0`, `I` and
-`1`, `l` — are not in it at all. `k7qp4m` is the same code as `K7QP-4M`.
+**Or open the display page on that screen and type the six characters into the
+box it offers** — *Setting this screen up?*, above the request form and on any
+screen that is not approved, whether or not anybody may ask for access. The URL
+is the better one for a television with a remote and no browser open yet; the
+box is the better one for a screen already showing this page, where being sent
+back to the address bar to finish is the long way round.
 
-This is the one to use for anything without a keyboard. You are typing with a
-remote or an on-screen keyboard, so the whole address is six characters longer
-than the one you would have typed anyway, and there is no second trip back to
-the panel afterwards.
+Either way it *is* that display — named, and already holding whatever endpoints
+you ticked for it, because the row existed before the screen was switched on.
+
+The code **works once** and is forgiving about how it is typed: case does not
+matter, dashes and spaces are ignored, and the characters people misread on a
+remote — `O` and `0`, `I` and `1`, `l` — are not in it at all. `k7qp4m` is the
+same code as `K7QP-4M`.
+
+**A row waiting for its code shows its name and that address, and nothing
+else.** What the screen will be was chosen a line above the list, so restating
+it on a row that is about to leave the list would be a second place to set the
+same thing. Everything a device has to say about itself, it says once it is
+connected.
+
+**A clock runs on the row**, above everything else it says and in the one
+colour on it that is not grey: green while there is time, amber in the last
+minute, red once it is spent and telling you to REISSUE. How long it starts at
+is yours, under SECURITY ▸ Enrolment codes, and **zero switches it off** — a
+code is one use, and the row it enrols was approved the moment you created it,
+so a deployment that mints codes on Friday and hangs the screens on Monday is
+not less safe for it.
 
 **It turned up by itself — approve it.** Somebody opens the display page on a
 laptop or a phone, and it appears in the list as WAITING within seconds. Give it
@@ -269,7 +334,7 @@ for them.
 
 Most rows in a real deployment are not kiosks — a guest's laptop, somebody's
 phone — so it is one tick. Tick **Kiosk mode** on a device and one control
-appears: **which kiosk it is**, chosen from the DEVICE profiles.
+appears: **which kiosk it is**, chosen from the DISPLAY profiles.
 Untick it and the screen goes back to being an ordinary page, with the choice
 kept: putting the device back up restores what you had.
 
@@ -308,6 +373,19 @@ somebody leaving full screen is nearly always the person installing the screen
 wanting the address bar back — and asking again on their next tap would make it
 unusable exactly while they are working on it. After that minute a wall goes
 back to being a wall.
+
+**And it keeps the screen awake**, unless the profile says otherwise. A tablet
+that has let its backlight go out cannot be walked up to and spoken to: the
+microphone is behind a page nobody can see, and the person standing in front of
+it has no way of knowing the screen is anything but off. The page asks the
+browser to hold the display on for as long as it is showing.
+
+The browser drops that request whenever the tab is hidden, so it is taken again
+every time the tab comes back — and some browsers will not grant it at all
+until somebody has touched the page, which the same first touch that asks for
+full screen takes care of. Untick it on a television, or on a device whose
+operating system is already set never to sleep, where holding it gains nothing
+and costs the battery.
 
 Neither changes what this server will answer. This is entirely what the screen
 looks like.
@@ -435,13 +513,32 @@ live preview on the right; SAVE is what gives it to the devices that name it.
 deleting a display clears it from every endpoint that named that. A setting
 pointing at something nobody can see is a setting nobody can change.
 
-**When a device picks a change up.** One still waiting on a decision is asking
-this server every twenty seconds and takes it within seconds. One that is
-already working has nothing left to ask about, so it takes it the next time its
-page loads — reload it on the screen, or use OPEN DISPLAY here. Making a working
-screen poll continuously for a setting that changes twice a year would be the
-wrong trade.
+**When a device picks a change up.** Every display checks in on the interval
+set under APP SETTINGS ▸ MAINTENANCE, and reloads itself when anything **it**
+draws from has moved — its own row, or the settings every screen shares.
+Another device arriving, being approved or being deleted is not that, and does
+not disturb the screens it has nothing to do with — so a profile edited here reaches the wall without anybody
+walking to it. Never while somebody is talking to the screen or typing into it;
+it waits until they have finished. RELOAD on a row under CONNECTIONS asks one
+directly.
 
+
+### Kiosk assignment — changing several at once
+
+The bar above the two lists on **CONNECTIONS**. Tick the rows you want, choose
+a display profile, and APPLY TO SELECTED gives all of them that profile in one
+gesture — which is what a building of identical hallway screens wants after a
+profile is renamed or a new one is made.
+
+**ALL means all of this screen**, which is the two lists the bar sits under —
+People and Devices. It does not reach the rows still arriving under
+ENROLLMENTS: those are on a page this bar is not drawn on, and a screen still
+waiting for its code has nothing yet for a profile to apply to. Rows outside
+those two lists do not draw a tick at all.
+
+A selection is dropped as soon as the row leaves the screen — a person you
+approve, or a device that takes its code — so nothing is applied to something
+you can no longer see.
 
 ### The settings above the list
 
@@ -531,26 +628,204 @@ A display's token has no expiry. A wall display is commissioned once, and one
 that stopped working a year later for a reason nobody standing in front of it
 could see would be worse than anything the expiry bought.
 
+## Staying up unattended
+
+Everything above assumes a page somebody opened and will close. A tablet on a
+wall is a browser tab running for a year: through server restarts, network
+drops, endpoint reboots, certificate renewals and its own operating system's
+ideas about backgrounding, with nobody standing in front of it to notice or
+reload.
+
+The failure this is written against is specific, and it is not a blank screen.
+It is **a screen that looks perfect and does nothing.** The figure is drawn on
+the device, so it keeps drifting and breathing with no server involvement at
+all — somebody walks past, sees it moving, and assumes it is fine while nothing
+has reached this server in a week. A blank screen at least gets reported within
+the hour.
+
+The settings are under **APP SETTINGS ▸ MAINTENANCE**, and none of them needs a
+restart: each display takes them at its next check-in.
+
+### Every display checks in
+
+A screen at rest issues no requests at all. Without a check-in an outage would
+end and the screen would stay broken until somebody walked up and spoke to it —
+the server would be back, and the wall would not know.
+
+That one check-in pays for four things: it keeps **Last seen** honest in the
+device list, it gives RELOAD somewhere to be answered, it carries the settings
+on this page out to every screen, and it is how a screen notices on its own
+that the server has returned.
+
+**Check in every (seconds)** — 20 by default, 2 to 300. Faster than a couple of
+seconds is a denial of service somebody configured by accident; slower than five
+minutes is a screen that stays dead through a lunch break.
+
+### When a check-in fails
+
+**Attempts before it says so** and **seconds between attempts** — three and
+four by default. Three attempts is right for a server being restarted and wrong
+for a cable somebody pulled out, which is why both are fields rather than
+constants.
+
+**Every display shows it. Only a kiosk says it aloud.**
+
+**NO CONNECTION TO THE SERVER** appears high in the frame of any display whose
+check-in has run out of attempts, with a quieter note in the status row at the
+foot of the screen. **It clears itself** when the server answers again: nobody
+is standing in a hallway to dismiss anything, and an alert that has to be
+acknowledged at the screen is an alert that stays up for a month. A line is
+silent, so it interrupts nobody — and somebody sitting at a desk tab learns why
+it stopped answering before they ask it anything.
+
+A **kiosk** also speaks it, once, after the last attempt. It has no transcript
+and no composer, so speech is the only way it can tell anybody — and saying it
+twice would make an outage worse than the silence it replaced.
+
+**Nothing else speaks**, because speech fills a room. A desk tab stays quiet
+and fails at the moment somebody actually tries to use it, rather than making
+them wait out three attempts first. Somebody who has just spoken is owed an
+answer now; a hallway nobody is standing in is not.
+
+**On reconnect the page reloads** rather than picking up where it left off.
+Resuming would preserve a conversation nobody is having any more — the outage
+was minutes and the person left — while a reload picks up a deploy and anything
+changed while the screen was down, including a route or an appearance an admin
+corrected during the outage.
+
+**It never reloads while the server is unreachable.** A reload into an outage
+replaces a working screen with the browser's own error page, and that page has
+no check-in, no timer and no way back. A reload that falls due during an outage
+is held and carried out as part of coming back.
+
+### Asking a screen to reload
+
+**RELOAD**, on a device's row under CONNECTIONS, asks that screen to reload
+itself
+at its next check-in. What it actually repairs is a display that is alive but
+stuck: it is still checking in, so it is still listening, and a reload is the
+whole fix. It defers while somebody is talking to the screen.
+
+A display that does not come back from that is one this server has no channel
+to at all — nothing here reaches it, and no amount of server-side work will.
+
+### The nightly refresh
+
+**At (HH:MM)** and **spread over (minutes)** — off by default. Every display
+reloads itself once a night, because a tab that never reloads accumulates.
+
+It is read off **each device's own clock**, not this server's, for the same
+reason a screensaver's dark hours are: a screen's night is the night outside
+it. And it is deferred while somebody is talking to the screen or typing into
+it — a reload that lands between a question and its answer looks like a crash
+to whoever asked.
+
+Spread it if the building has more than a handful of screens: twelve tablets
+reconnecting in the same second is a load this server did not previously have.
+Each screen takes its own fixed slot inside the window, worked out from its
+device id, so the spread stays put instead of re-shuffling every night.
+
+### Restarting this server on a schedule
+
+**Restart this server at (HH:MM)** — off by default, and read off *this
+machine's* clock rather than a device's, because this one is about one server
+rather than twelve screens.
+
+There is no supervisor: `serve.sh` launches the process with `setsid nohup` and
+there is deliberately no systemd unit, because that is what lets the whole
+thing install and run without elevated rights. So a setting that merely
+*stopped* the server at three in the morning would be a setting that ended the
+service, with nothing left to start it again.
+
+**It hands over instead.** At the appointed minute the server launches
+`serve.sh restart` in a session of its own and lets that script kill it — `stop`
+waits for the sockets to be released, `start` binds a fresh process. The helper
+is detached, so the death of its parent is the thing it was launched to cause
+rather than something that takes it with it.
+
+**It waits for the server to fall quiet** — no question, transcription or
+spoken reply for a minute. A restart in the middle of one is a crash as far as
+whoever asked can tell. A check-in is not use: every display sends one every
+few seconds, and treating those as activity would mean a building of screens
+that never let the server restart at all. If it never falls quiet, it gives up
+after an hour and leaves it for tomorrow.
+
+**Setting a time that has already passed today leaves it for tomorrow.** That
+is not a special case, it is the whole safety property: a time is only ever
+acted on if it was already set when that minute arrived. It is what stops the
+fresh process that came back at 03:00:04 from restarting itself again in a
+loop, and it is what stops an admin who types `14:23` at `14:23` from taking
+the server out from under themselves.
+
+**The one risk worth knowing.** If the new process cannot bind — something else
+took the port while it was down — nothing catches that, and the server stays
+down until somebody looks. That is the residual cost of having no supervisor,
+and it is why this is a field you set deliberately rather than a default. The
+handover is logged to **`restart.log`**, which survives it; `server.log` is
+truncated by every start, so a failure written there would be lost with the
+process that reported it.
+
+Every display sees the restart as a short outage and reloads itself when the
+server answers again — so with this set you rarely also need the nightly
+refresh above.
+
+### What this cannot reach
+
+**A device that reboots.** A tablet that restarts at four in the morning after
+an operating system update comes back to a lock screen with no browser running.
+There is nothing left for this server to talk to, and no setting on this page
+reaches it. Relaunching a browser at a URL on boot is the device's job:
+
+- **Android** — a kiosk launcher, or *screen pinning* plus a home-screen
+  shortcut to the display URL.
+- **iPad** — *Guided Access*, with the page added to the home screen so it
+  opens without Safari's chrome.
+- **A desktop or a mini PC** — the browser's own kiosk mode
+  (`--kiosk <url>`), started by whatever the machine uses to start things at
+  login.
+
+Saying that plainly is better than a Maintenance page that quietly fails to
+cover it.
+
 ## Groups
 
 A name for a set of them, so a grant is made once instead of ticked twelve
 times and re-ticked every time somebody gets a new phone. Groups are made on
-the **GROUPS** tab and named wherever access is granted — today that is an
-endpoint's *who may use it*, and anything added later that grants something can
-name them the same way.
+**SECURITY**, under the settings that decide who has to be approved at all, and
+named wherever access is granted — today that is an endpoint's *who may use
+it*, and anything added later that grants something can name them the same way.
+
+**Everything that starts working is filed with its own population** without
+anybody doing it: a code redeemed puts a screen with the devices, an approved
+request puts a person with the people. The group is made the first time one is
+needed rather than shipped, and an existing group of the right kind is adopted
+before a second is created — so an install that never uses groups never grows
+two it did not ask for.
 
 **Two kinds, and they do not mix.** They answer separate questions — *the
 physics department* and *the screens in the east wing* — so a group holds one
 population or the other, and its kind cannot be changed once it exists.
 
-**Which population a row is in is set on the row**, under DEVICES: *It is a*
-— DEVICE, PERSON, or WORK IT OUT. Left at WORK IT OUT it is inferred from how
-the row arrived: asked for access reads as a person, issued a code reads as a
-device. That inference answers the wrong question and is only there so every
-existing row has an answer — asking for access happens in a browser on one
-machine, which describes a device. A **person** is an identity that carries
-from a phone to a laptop, and nothing here issues one yet, so today almost
-everything is honestly a device.
+**Which population a row is in is set on the row**, wherever that row is
+currently listed: *It is a* — DEVICE, PERSON, or WORK IT OUT. Changing it moves
+the row into that population's group, and where you have more than one group of
+that kind a picker appears beside the control to say which. It is hidden where
+there is one, because one is not a choice.
+
+**Left at WORK IT OUT it follows how the row arrived** — recorded when the row
+was made and never changed after. A code you minted is a **device**; a browser
+that opened the display page is a **person**.
+
+It used to ask instead whether the row had ever pressed REQUEST ACCESS, which
+is a different question with a different answer: somebody looking at your
+request form has not pressed it yet, and that filed them under DEVICE
+ENROLMENT — the one page that has nothing to do with them, since nobody ever
+minted them a code. Rows made before this was recorded fall back to the old
+guess, so nothing moves under you.
+
+A **person** is still, strictly, an identity that carries from a phone to a
+laptop, and nothing here issues one yet — so "person" today means the browser
+somebody walked up with rather than the human holding it.
 
 **Changing it can drop the row from a group.** A group takes one population,
 so moving a row to the other one removes it from any group of the kind it

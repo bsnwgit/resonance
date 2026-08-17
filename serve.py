@@ -53,7 +53,7 @@ sit on a cached copy of index.html and you end up debugging code that is no
 longer running. This sends no-store on everything instead.
 """
 import base64, functools, hashlib, hmac, http.cookies, inspect, json, os, re, \
-       secrets, ssl, sys, tempfile, threading, time
+       secrets, ssl, subprocess, sys, tempfile, threading, time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 import manual                            # the manual, and its PDF writer
@@ -139,7 +139,47 @@ APP_DEFAULTS = {
     "bind": "everything",            # loopback | address | everything
     "bind_address": "",              # the one address, when bind == "address"
     "auth": "accounts",              # none | accounts
+    # ---- staying up unattended ----
+    # A display at rest issues no requests at all, so without a poll an outage
+    # would end and the screen would stay broken until somebody walked up and
+    # spoke to it. The same poll keeps "last seen" fresh, gives the server
+    # somewhere to answer "reload yourself", and is what makes a dead screen
+    # noticeable from the panel rather than from the hallway.
+    "poll_seconds": 20,
+    # How many times a request tries before the display says so, and how long
+    # it waits between attempts. Three is right for a restart and wrong for a
+    # severed cable, so both are settings rather than constants.
+    "retry_attempts": 3,
+    "retry_seconds": 4,
+    # A forced refresh, because a tab that never reloads accumulates. "HH:MM"
+    # on the DEVICE's own clock, for the same reason a screensaver's dark hours
+    # are read there: a building can span time zones and a screen's night is
+    # the night outside it, not the server's.
+    #
+    # EMPTY IS OFF, and off is the default. A nightly reload is a net under
+    # work not yet done rather than something every install needs, and an
+    # upgrade that silently started reloading every screen in a building at
+    # four in the morning would be this deciding something nobody asked for.
+    "refresh_at": "",
+    # …spread over this many minutes, or zero for all at once. Twelve tablets
+    # reconnecting in the same second is a load this server did not previously
+    # have; each screen takes its own offset inside the window from its own id,
+    # so the spread is stable rather than re-rolled on every reload.
+    "refresh_stagger": 0,
+    # And the server's own, "HH:MM" on ITS clock — this one is about one
+    # machine rather than twelve screens, so the machine's clock is the right
+    # one. Empty is off, and off is the default.
+    #
+    # It is a HAND-OVER, not a stop: see do_scheduled_restart. Nothing
+    # supervises this process, so a setting that only stopped the server would
+    # be a setting that ended the service at three in the morning.
+    "restart_at": "",
 }
+#: (low, high) for the numbers above. A poll faster than a couple of seconds is
+#: a denial of service somebody configured by accident; one slower than five
+#: minutes is a screen that stays dead through a lunch break.
+UNATTENDED_LIMITS = {"poll_seconds": (2, 300), "retry_attempts": (1, 10),
+                     "retry_seconds": (1, 60), "refresh_stagger": (0, 240)}
 PORT_MIN, PORT_MAX = 1024, 65535     # below 1024 needs root; this runs as you
 SESSION_MIN, SESSION_MAX = 5, 480    # minutes: below 5 is unusable, above 8h absurd
 BIND_MODES = ("loopback", "address", "everything")
@@ -227,6 +267,13 @@ def port_free(p, host="0.0.0.0"):
     if p in (RUNNING.get("http_port"), RUNNING.get("https_port"),
              RUNNING.get("admin_port")):
         return True
+    # …and so is a socket this process is already holding — but only the same
+    # socket. Asked WITHOUT the address, this said "9701 is mine" about every
+    # address on the machine, so moving a profile onto an address where some
+    # OTHER process holds that port would have been allowed and then failed to
+    # bind at the next restart. See holding_it.
+    if holding_it(host, p):
+        return True
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         s.bind((host, p))
@@ -262,6 +309,83 @@ def local_addresses():
     finally:
         s.close()
     return sorted(found)
+
+
+def holding_it(host, port):
+    """Is this exact listening socket one this process already has?
+
+    The question a profile's save has to ask is not "is this port free" but
+    "will this port be free once I have restarted", and the difference is
+    entirely the sockets this process is holding right now. Three ways one of
+    ours covers the address being asked about:
+
+    - the same pair, which is a profile being edited without moving its socket
+    - our WILDCARD on that port, which is what ANY binds and what makes a
+      bind test on any single address fail while we are up
+    - the request being the wildcard while we hold that port on some address,
+      which is a profile moving the other way, off an address onto ANY
+
+    Anything else is somebody else's, and gets a real bind test."""
+    bound = RUNNING.get("bound") or set()
+    if (host, port) in bound or ("0.0.0.0", port) in bound:
+        return True
+    return host == "0.0.0.0" and any(pp == port for _, pp in bound)
+
+
+def local_interfaces():
+    """Every IPv4 address this machine has, with the interface carrying it, as
+    [(address, interface)] — so the panel can offer *10.0.0.4 · eth0* rather
+    than a bare number nobody can place.
+
+    Read straight from the kernel with an ioctl rather than by shelling out to
+    `ip` or taking a dependency: this server has none, and one for a list of
+    addresses would be a poor first. Anything it cannot answer for falls back
+    to the addresses alone, which is what was offered before this existed."""
+    import socket
+    out, seen = [], set()
+    try:
+        import fcntl, struct
+        SIOCGIFADDR = 0x8915
+        for _, name in socket.if_nameindex():
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                packed = fcntl.ioctl(
+                    s.fileno(), SIOCGIFADDR,
+                    struct.pack("256s", name.encode()[:15]))
+                addr = socket.inet_ntoa(packed[20:24])
+            except OSError:
+                continue                 # no IPv4 on this interface
+            finally:
+                s.close()
+            if addr not in seen:
+                seen.add(addr)
+                out.append((addr, name))
+    except Exception:
+        pass
+    for addr in local_addresses():       # anything the ioctl route missed
+        if addr not in seen:
+            seen.add(addr)
+            out.append((addr, ""))
+    return out
+
+
+def net_host(vals, fallback):
+    """The address a network profile binds. Empty means ANY, which is this
+    server's own binding — a profile does not get to reach further than the
+    app it belongs to."""
+    addr = str((vals or {}).get("address") or "").strip()
+    return addr or fallback
+
+
+def port_free_anywhere(port, addrs):
+    """Free on at least one of these addresses.
+
+    Deliberately not `port_free(port, "0.0.0.0")`: the kernel refuses a
+    wildcard bind when the port is held on even one address, and the rule
+    asked for here is that ANY may be saved as long as SOMETHING can carry it.
+    Returns (ok, taken) so the caller can say which ones are spoken for."""
+    taken = [a for a in addrs if not port_free(port, a)]
+    return (len(taken) < len(addrs), taken)
 
 
 def address_bindable(addr):
@@ -1136,6 +1260,32 @@ def validate_app(obj, current):
     unable to start, because the only way back would be editing JSON on the
     box by hand."""
     cfg = dict(current)
+    # Clamped rather than refused: these are a screen's own housekeeping, and a
+    # number outside the range is somebody nudging a field rather than a
+    # configuration that would stop the server coming up. The ports below are
+    # the opposite, which is why they refuse.
+    for k, (lo, hi) in UNATTENDED_LIMITS.items():
+        if k not in obj:
+            continue
+        try:
+            v = int(obj[k])
+        except (TypeError, ValueError):
+            return None, "%s must be a whole number" % k.replace("_", " ")
+        cfg[k] = min(hi, max(lo, v))
+    # Refused rather than clamped, unlike the numbers above: there is no
+    # nearest sensible time to a typo, and a field silently corrected to 00:00
+    # is a building reloading at midnight because somebody mistyped.
+    for k, what in (("refresh_at", "refresh"), ("restart_at", "restart")):
+        if k not in obj:
+            continue
+        v = str(obj[k] or "").strip()
+        if v:
+            m = re.match(r"^([0-9]{1,2}):([0-9]{2})$", v)
+            if not m or int(m.group(1)) > 23 or int(m.group(2)) > 59:
+                return None, ("the %s time reads as HH:MM, or empty for none"
+                              % what)
+            v = "%02d:%s" % (int(m.group(1)), m.group(2))
+        cfg[k] = v
     for k in ("http_port", "https_port", "admin_port"):
         if k not in obj:
             continue
@@ -1260,7 +1410,6 @@ SEEN_INTERVAL = 300              # seconds between writes of "last seen"
 #: a different valid code, it is not a code at all.
 CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 CODE_LEN = 6
-CODE_TTL = 10 * 60               # you are standing in front of the screen
 _code_fails = {}                 # client ip -> [count, blocked_until]
 
 
@@ -1362,6 +1511,29 @@ DISPLAY_DEFAULTS = {
     # changes with it, instead of twelve rows drifting out of step with no way
     # to see which had.
     "kiosk_profile": "",
+    # HOW THIS ROW GOT HERE: "code" for one an admin named and minted a code
+    # for, "page" for one that arrived because somebody opened the display
+    # page. Empty on rows that predate the field, which fall back to a guess —
+    # see group_kind_of.
+    #
+    # Recorded at creation because it is the one thing about a row that is
+    # true from the start and never changes. It used to be inferred from
+    # whether the row had ever pressed REQUEST ACCESS, which is a different
+    # question with a different answer: a browser sitting on the request form
+    # has not pressed it yet and is not, for that reason, a screen somebody
+    # bolted to a wall.
+    "origin": "",
+    # Which network profile this device was set up on, by id. Empty is the
+    # deployment's default. It decides the address and port its enrolment URL
+    # names: a building with several ports has several right answers to "what
+    # do I type into this screen", and the one that is right is the one for the
+    # network the screen is on.
+    "network": "",
+    # When an admin last asked this screen to reload itself. The display sends
+    # the moment it booted with every poll and reloads when this is newer, so
+    # the request clears itself by being satisfied — no acknowledgement to
+    # store, and nothing left set to fire a second time on the next boot.
+    "reload_req": 0,
 }
 
 #: How many screensaver profiles may exist. A deployment has a handful of
@@ -1508,11 +1680,27 @@ DISPLAY_SETTINGS = {
     # every unconfigured screen in the building is doing — the same reason a
     # route's default is stored by id.
     "kiosk_default": "",
+    # How long an enrolment code is worth anything for, in minutes. ZERO IS
+    # NEVER, which is a real answer: a deployment that mints a code on Friday
+    # and hangs the screen on Monday is not less secure for it, because a code
+    # is one use and the row it enrols was approved the moment it was created.
+    # Ten minutes is the default because the usual case is somebody walking
+    # across a building with six characters in their head.
+    "code_minutes": 10,
+    # Which group each population lands in when it starts working. Minted on
+    # first need rather than shipped, so an install that never uses groups
+    # never grows two it did not ask for — see default_group.
+    "user_group": "",
+    "device_group": "",
 }
 MAX_FORM_FIELDS = 5
 #: (low, high) for each number the panel can set
 DISPLAY_LIMITS = {"max_displays": (2, 5000), "max_pending": (1, 1000),
-                  "guest_days": (1, 3650)}
+                  "guest_days": (1, 3650),
+                  # 0 is off — see code_minutes. A week is the top because a
+                  # code good for longer than anybody remembers issuing it is
+                  # one nobody will think to revoke.
+                  "code_minutes": (0, 10080)}
 
 #: The admin panel's own preview frames the real display page, so it says
 #: hello like any other. It is not a display: it is the panel, served from the
@@ -1691,6 +1879,14 @@ KIOSK_OFF = {"voice_only": True, "look": "", "motion": "", "speech": "",
              # somebody also browses on wants its address bar, and a television
              # whose operating system already hides the chrome gains nothing.
              "fullscreen": True,
+             # Ask the browser to keep the backlight on. The device's own idea
+             # of when to sleep is the one thing between a wall screen and a
+             # black rectangle, and a screen that sleeps cannot be walked up to
+             # and spoken to — the microphone is behind a page nobody can see.
+             # Off is a real answer on a television or a tablet whose operating
+             # system is already set never to sleep, where holding the lock
+             # gains nothing and costs the battery.
+             "keep_awake": True,
              # The line low in the frame that tells a passer-by this listens.
              "prompt": True,
              # …and what it says. EMPTY MEANS the automatic one, built from the
@@ -1730,6 +1926,7 @@ def clean_kiosks(raw):
                     "speech": str(k.get("speech") or "")[:16],
                     "saver": str(k.get("saver") or "")[:16],
                     "fullscreen": bool(k.get("fullscreen", KIOSK_OFF["fullscreen"])),
+                    "keep_awake": bool(k.get("keep_awake", KIOSK_OFF["keep_awake"])),
                     "prompt": bool(k.get("prompt", KIOSK_OFF["prompt"])),
                     "prompt_text": str(k.get("prompt_text") or "")
                                    .strip()[:MAX_PROMPT_TEXT]})
@@ -1958,10 +2155,59 @@ def validate_display_settings(obj, current):
                                   "one stays under ADMIN SETTINGS, and it is "
                                   "the way back in when something here is "
                                   "wrong" % (r["name"], v))
-                if v in seen:
-                    return None, ("%s and %s are both on port %d"
-                                  % (seen[v], r["name"], v))
-                seen[v] = r["name"]
+                # Keyed by address AND port: two profiles on one port do not
+                # collide when they answer on different addresses, and
+                # refusing that would reject a configuration the machine can
+                # carry. ANY collides with everything on that port, because
+                # that is what ANY means.
+                akey = str(r["values"].get("address") or "").strip()
+                for k in ({(akey, v), ("", v)} if akey else
+                          {(a, v) for a in [x for x, _ in local_interfaces()]} | {("", v)}):
+                    if k in seen:
+                        return None, ("%s and %s are both on port %d%s"
+                                      % (seen[k], r["name"], v,
+                                         " on " + k[0] if k[0] else ""))
+                seen[(akey, v)] = r["name"]
+            # WHICH ADDRESS it answers on. Empty is ANY. Checked against what
+            # this machine actually has, for the same reason the binding under
+            # ADMIN SETTINGS is chosen rather than typed: an address this
+            # machine does not have is a listener that will not start.
+            addr = str(r["values"].get("address") or "").strip()
+            here = local_interfaces()
+            have = [a for a, _ in here]
+            if addr and addr not in have:
+                return None, ("%s: this machine has no address %s — pick one "
+                              "of its own, or ANY" % (r["name"], addr))
+            # …and whether the port can actually be had there, BEFORE anything
+            # is allowed to use it. A port that passes validation and fails at
+            # the next restart is a profile that looks saved and is not, found
+            # out at the worst moment.
+            #
+            # ONLY WHERE IT MOVED. The panel sends every profile on every save,
+            # so checking all of them means an edit to one row is refused by
+            # the state of another — and a row that has not changed is either
+            # already running or already known to be broken. Neither is this
+            # save's business.
+            was = {p["id"]: (p.get("values") or {})
+                   for p in (current.get("networks") or [])}.get(r["id"])
+            moved = (not was
+                     or str(was.get("address") or "") != addr
+                     or int(was.get("port") or 0) != pv
+                     or int(was.get("redirect") or 0) != rv)
+            for v in ((pv, rv) if moved else ()):
+                if not v:
+                    continue
+                if addr:
+                    if not port_free(v, addr):
+                        return None, ("%s: %d is already in use on %s"
+                                      % (r["name"], v, addr))
+                else:
+                    ok, taken = port_free_anywhere(v, have or [LOOPBACK])
+                    if not ok:
+                        return None, ("%s: %d is already in use on every "
+                                      "address this machine has (%s)"
+                                      % (r["name"], v, ", ".join(taken)))
+            r["values"]["address"] = addr
             r["values"]["port"] = pv
             r["values"]["redirect"] = rv
             r["values"]["shared"] = bool(r["values"].get("shared"))
@@ -2349,6 +2595,7 @@ def kiosk_of(rec, savers=None, looks=None, kiosks=None, default_id=None,
             "look": merged or None,
             "saver": find_saver(str(prof.get("saver") or ""), savers),
             "fullscreen": bool(prof.get("fullscreen", KIOSK_OFF["fullscreen"])),
+            "keep_awake": bool(prof.get("keep_awake", KIOSK_OFF["keep_awake"])),
             "prompt": bool(prof.get("prompt", KIOSK_OFF["prompt"])),
             # The admin's words where there are any, and the empty string where
             # there are not — the display builds the automatic line itself,
@@ -2382,6 +2629,100 @@ def validate_kiosk(obj, rec, kiosks):
                           "panel to see the current list")
         out["kiosk_profile"] = pid
     return out, None
+
+
+#: Last computed displays stamp, keyed by the file's modification time in
+#: nanoseconds. Seconds are too coarse — two writes inside one second would
+#: read as no change at all.
+_DISPLAYS_STAMP = {"key": None, "value": "0"}
+
+
+def _displays_stamp(did=None):
+    """A digest of the parts of displays.json a screen actually renders from —
+    ITS OWN row, plus the settings every screen shares.
+
+    NOT the file's modification time, and this is the whole reason this
+    function exists: `last_seen` is written every few minutes by the very poll
+    that reads this, so a stamp based on mtime would change on its own and
+    order every display in the building to reload itself for ever. Only the
+    fields an admin can change are in the digest — `asked`, `hint` and
+    `expires` move without an admin (the last one every time a guest renews),
+    and are nobody else's business either.
+
+    PER DISPLAY, and it was not to begin with. Digesting every row meant any
+    row appearing or disappearing changed the stamp for everybody: one device
+    opening the display page reloaded every screen in the building, and
+    deleting a row reloaded the very screens that had nothing to do with it —
+    including, immediately, whichever browser had just created the row, which
+    then said hello and made another. A screen reloads when ITS configuration
+    moves. Another device arriving is not that.
+
+    Recomputed only when the file has actually been written, so a poll from a
+    building full of screens costs one stat each rather than one hash each."""
+    try:
+        st = os.stat(DISPLAYS_PATH)
+    except OSError:
+        return "0"                       # absent is a stamp of its own
+    key = (st.st_mtime_ns, st.st_size, did or "")
+    if _DISPLAYS_STAMP["key"] == key:
+        return _DISPLAYS_STAMP["value"]
+    try:
+        raw = read_displays_doc()
+    except Exception:
+        return _DISPLAYS_STAMP["value"]
+    rows = raw.get("displays") or {}
+    if isinstance(rows, dict):
+        rows = [dict(r, id=k) for k, r in rows.items()]
+    facts = sorted(
+        "%s|%s|%s|%s|%s|%s" % (r.get("id"), bool(r.get("approved")),
+                               bool(r.get("denied")), bool(r.get("kiosk")),
+                               r.get("kiosk_profile") or "", r.get("name") or "")
+        for r in rows
+        if isinstance(r, dict) and (did is None or r.get("id") == did))
+    facts.append(json.dumps(raw.get("settings") or {}, sort_keys=True))
+    val = hashlib.sha256("\n".join(facts).encode()).hexdigest()[:16]
+    _DISPLAYS_STAMP["key"] = key
+    _DISPLAYS_STAMP["value"] = val
+    return val
+
+
+def config_gen(did=None):
+    """A stamp that changes whenever anything a display renders from changes.
+
+    The display keeps the value it booted with and reloads when it moves,
+    which is how a route or an appearance edited during an outage reaches a
+    screen nobody is standing at.
+
+    Coarse on purpose. It cannot say WHAT changed and does not need to — the
+    answer to all of them is the same reload."""
+    parts = []
+    for p in (ROUTES_PATH, SETTINGS_PATH, APP_PATH):
+        try:
+            parts.append(str(os.stat(p).st_mtime_ns))
+        except OSError:
+            parts.append("0")
+    parts.append(_displays_stamp(did))
+    return ".".join(parts)
+
+
+def refresh_offset(did, stagger_minutes):
+    """How many seconds after the refresh time THIS screen reloads.
+
+    Derived from the display's id rather than rolled at random, so a screen
+    keeps the same slot across reloads and restarts — twelve tablets spread
+    over the window stay spread, instead of re-shuffling every night until two
+    of them land on the same second anyway.
+
+    Computed here rather than in the browser because the id is the one stable
+    thing a display has, and it is deliberately not readable from page script:
+    the cookie carrying it is HttpOnly."""
+    try:
+        span = int(stagger_minutes) * 60
+    except (TypeError, ValueError):
+        return 0
+    if span <= 0:
+        return 0
+    return int(hashlib.sha256(str(did).encode()).hexdigest()[:8], 16) % span
 
 
 def find_display(token):
@@ -2427,14 +2768,34 @@ def new_display(asked, hint):
     secret = secrets.token_urlsafe(32)
     salt, dk = hash_key(secret)
     rec = dict(DISPLAY_DEFAULTS)
-    rec.update(asked=asked, hint=hint, salt=salt, hash=dk,
+    rec.update(origin="page", asked=asked, hint=hint, salt=salt, hash=dk,
                created=int(time.time()), last_seen=int(time.time()))
     displays[did] = rec
     write_displays(displays)
     return did + "." + secret, dict(rec, id=did)
 
 
-def invite_display(name, by):
+def enrol_base_for(rec, host, secure):
+    """Where the code for this row is typed. The network profile it names, or
+    the server's own listener where it names none — an address and a port,
+    because a code without them is six characters and no idea where to put
+    them."""
+    nid = str((rec or {}).get("network") or "")
+    if nid:
+        prof = net_profile(nid)
+        vals = (prof or {}).get("values") or {}
+        try:
+            port = int(vals.get("port"))
+        except (TypeError, ValueError):
+            port = 0
+        if port:
+            addr = str(vals.get("address") or "").strip() or host
+            return "https://%s:%d/e/" % (addr, port)
+    return "%s://%s:%d/e/" % ("https" if secure else "http", host,
+                              secure or RUNNING.get("http_port") or 0)
+
+
+def invite_display(name, by, setup=None):
     """A row created from the panel, before the device it is for has ever been
     switched on. Approved from the moment it exists — an admin naming a screen
     and ticking the endpoints it may use IS the approval — but holding no
@@ -2449,7 +2810,14 @@ def invite_display(name, by):
     now_ = int(time.time())
     rec = dict(DISPLAY_DEFAULTS)
     rec.update(name=name, approved=True, approved_by=by, approved_at=now_,
-               created=now_, code=new_code(), code_expires=now_ + CODE_TTL)
+               created=now_, code=new_code(), code_expires=code_deadline(now_),
+               origin="code")
+    # What the admin already knows about the screen, set while creating it
+    # rather than found and filled in afterwards on a row among fifty.
+    if isinstance(setup, dict):
+        rec["kiosk"] = bool(setup.get("kiosk"))
+        rec["kiosk_profile"] = str(setup.get("kiosk_profile") or "")[:16]
+        rec["network"] = str(setup.get("network") or "")[:16]
     displays[did] = rec
     write_displays(displays)
     return dict(rec, id=did), None
@@ -2472,9 +2840,19 @@ def reissue_display(did):
         return None, "no such display"
     now_ = int(time.time())
     rec.update(salt="", hash="", approved=True,
-               code=new_code(), code_expires=now_ + CODE_TTL)
+               code=new_code(), code_expires=code_deadline(now_))
     write_displays(displays)
     return dict(rec, id=did), None
+
+
+def code_deadline(now_):
+    """When a code minted now stops working, or 0 for never.
+
+    Zero rather than a far-future stamp, so "never" is a state the panel can
+    read rather than a number it has to recognise as absurd — and it is the
+    same convention `expires` already uses for a grant that does not run out."""
+    mins = display_settings()["code_minutes"]
+    return now_ + mins * 60 if mins else 0
 
 
 def redeem_code(raw):
@@ -2490,7 +2868,10 @@ def redeem_code(raw):
     for did, rec in displays.items():
         if not rec.get("code") or not hmac.compare_digest(rec["code"], code):
             continue
-        if (rec.get("code_expires") or 0) < now_:
+        # Zero is never — a deployment that turned the clock off. Anything
+        # else is a deadline.
+        deadline = rec.get("code_expires") or 0
+        if deadline and deadline < now_:
             return None, "expired"
         secret = secrets.token_urlsafe(32)
         salt, dk = hash_key(secret)
@@ -2686,8 +3067,13 @@ def admin_displays():
         # on the profile where they can be changed once for every screen.
         row.update({k: rec.get(k, DISPLAY_DEFAULTS[k]) for k in KIOSK_FIELDS})
         ref = _display_refusals.get(did)
-        live = bool(rec.get("code")) and (rec.get("code_expires") or 0) > now_
+        # A code with no deadline is live; one whose deadline has passed is
+        # not. Both have to be tellable apart from "there is no code", which
+        # is what the panel used to read a zero as.
+        deadline = rec.get("code_expires") or 0
+        live = bool(rec.get("code")) and (not deadline or deadline > now_)
         row.update(id=did, label=display_label(rec),
+                   network=str(rec.get("network") or ""),
                    guest=is_guest(rec), expired=display_expired(rec),
                    # What it was SET to, and what it resolves to. The panel
                    # needs both: one is the control's value, the other is the
@@ -2699,7 +3085,8 @@ def admin_displays():
                    # own, and the rest are working.
                    enrolled=bool(rec.get("hash")),
                    code=rec["code"] if live else "",
-                   code_left=max(0, (rec.get("code_expires") or 0) - now_) if live else 0,
+                   code_left=max(0, deadline - now_) if live and deadline else 0,
+                   code_forever=bool(live and not deadline),
                    refused=ref[0] if ref else 0,
                    refused_at=ref[1] if ref else 0,
                    refused_from=ref[2] if ref else "")
@@ -2759,15 +3146,106 @@ def write_groups(groups):
 def group_kind_of(rec):
     """Which population a display row belongs to.
 
-    What an admin said it is, where they have said. Otherwise it is inferred
-    from how the row arrived — asked for access, or issued a code — which is a
-    guess about the wrong question: both of those happen in a browser on one
-    machine. The inference is kept only so that every existing row has an
-    answer without anybody visiting it."""
+    What an admin said it is, where they have said. Otherwise HOW IT ARRIVED,
+    which is recorded when the row is made and never changes: a code an admin
+    minted is a device, and a browser that opened the display page is a person
+    until somebody says otherwise.
+
+    It used to ask whether the row had ever pressed REQUEST ACCESS — a field
+    kept for deciding whether a grant expires, borrowed for this because it
+    was there. That is a different question: somebody looking at the request
+    form has not pressed it yet, and filing them under the code process until
+    they do put them on the one page that has nothing to do with them.
+
+    Rows that predate `origin` are read from what only an admin's invitation
+    leaves behind: an approver's name on a row that never asked for anything.
+    A guess, but the same guess the row's own history supports, and it costs
+    no migration."""
     k = str(rec.get("kind") or "")
     if k in GROUP_KINDS:
         return k
-    return "user" if is_guest(rec) else "device"
+    origin = str(rec.get("origin") or "")
+    if origin in ("code", "page"):
+        return "device" if origin == "code" else "user"
+    if is_guest(rec):
+        return "user"
+    return "device" if rec.get("approved_by") else "user"
+
+
+#: What the group each population lands in is called when this server has to
+#: make one. Named for what is in them rather than for how they arrived, since
+#: an admin will rename them long before they remember which is which.
+DEFAULT_GROUP_NAME = {"user": "People", "device": "Devices"}
+
+
+def default_group(kind, by="the server"):
+    """The group a row joins the moment it starts working, minting one if there
+    is not one yet.
+
+    A row that belongs to no group is a row an endpoint's allow-list cannot
+    name, so every grant has to be made device by device — which is the data
+    entry a group exists to remove. Landing somewhere by default means the
+    first grant to a whole population is one tick rather than twelve.
+
+    Stored by id, not "the first group of this kind": reordering a list, or
+    somebody adding a second group of people, must not silently change where
+    everything arriving tomorrow ends up."""
+    if kind not in GROUP_KINDS:
+        return ""
+    cfg = display_settings()
+    key = kind + "_group"
+    gid = str(cfg.get(key) or "")
+    groups = read_groups()
+    if gid and gid in groups and groups[gid]["kind"] == kind:
+        return gid
+    # Blank, or naming one that was deleted. Adopt an existing group of this
+    # kind before making a second one — an admin who has already made "Staff"
+    # and nothing else meant that one.
+    for g, rec in sorted(groups.items()):
+        if rec["kind"] == kind:
+            gid = g
+            break
+    else:
+        gid = "g" + secrets.token_hex(4)
+        groups[gid] = {"name": DEFAULT_GROUP_NAME[kind], "kind": kind,
+                       "members": [], "created": int(time.time()),
+                       "created_by": by}
+        write_groups(groups)
+        print("group %s (%s) created for arriving %ss"
+              % (gid, DEFAULT_GROUP_NAME[kind], kind), flush=True)
+    cfg[key] = gid
+    write_display_settings(cfg)
+    return gid
+
+
+def join_group(did, gid):
+    """Put a display in a group, once. Silent where it is already there, and
+    where the group has gone — this runs on the back of somebody enrolling a
+    screen, and a failure to file it is not a reason to refuse the screen."""
+    if not gid:
+        return
+    groups = read_groups()
+    rec = groups.get(gid)
+    if not rec or did in rec["members"]:
+        return
+    rec["members"] = (rec["members"] + [did])[:MAX_ALLOW]
+    write_groups(groups)
+
+
+def file_display(rec_or_id, kind=None, by="the server"):
+    """A row that has just started working, filed with its own population.
+
+    Called at the two moments something becomes usable — a code redeemed, a
+    request approved — because those are the two ways in, and neither of them
+    used to leave the row anywhere an allow-list could find it."""
+    did = rec_or_id if isinstance(rec_or_id, str) else rec_or_id["id"]
+    if kind is None:
+        displays = read_displays()
+        rec = displays.get(did)
+        if not rec:
+            return
+        kind = group_kind_of(rec)
+    join_group(did, default_group(kind, by))
 
 
 def clean_members(ids, kind):
@@ -2854,6 +3332,126 @@ def app_pending(cfg):
             "bind", "bind_address", "auth")
     return sorted(k for k in keys
                   if RUNNING.get(k) is not None and RUNNING[k] != cfg[k])
+
+
+# ------------------------------------------------------- a scheduled restart
+# Nothing supervises this process. `serve.sh` launches it with `setsid nohup`
+# and there is deliberately no systemd unit, because that is what lets the
+# whole thing install and run without elevated rights — so a setting that
+# merely STOPPED the server at three in the morning would be a setting that
+# ended the service, with nothing left to start it again.
+#
+# So it is a HAND-OVER rather than a stop. At the appointed minute this process
+# launches `serve.sh restart` in a session of its own and then lets that script
+# kill it: `stop` waits for the socket to be released, `start` binds a fresh
+# process. The helper is detached, so the death of its parent is exactly what
+# it was launched to cause rather than something that takes it with it.
+#
+# What this cannot do is catch a `start` that fails. That risk is real, it is
+# stated in the panel, and the helper's output goes to a file that survives the
+# handover — `server.log` is truncated by every start, so a failure written
+# there would be overwritten by the next attempt or lost with the process that
+# reported it.
+RESTART_LOG = os.path.join(ROOT, "restart.log")
+#: The value being watched, when it became current, and whether this process
+#: has already handed over.
+#:
+#: ARMING is the whole of the correctness here. A time is only ever acted on if
+#: it was already set when that minute arrived, which settles two cases with
+#: one rule: the fresh process that comes back at 03:00:04 does not restart
+#: itself again in a loop, and an admin who types 14:23 at 14:23 does not take
+#: the server out from under themselves mid-sentence.
+_restart = {"at": None, "armed": 0.0, "fired": False}
+#: When somebody last USED this server, as opposed to a screen checking in.
+#: Polls arrive every few seconds from every display in the building and would
+#: read as continuous activity; a question, a transcription or a spoken reply
+#: is a person, and a restart in the middle of one is a crash as far as they
+#: can tell.
+_last_use = 0.0
+RESTART_QUIET = 60        # seconds of nobody using it before handing over
+RESTART_WINDOW = 3600     # how long to wait for that, before leaving it a day
+
+
+def note_use():
+    global _last_use
+    _last_use = time.time()
+
+
+def clock_at(hhmm, now=None):
+    """Epoch seconds for HH:MM today, on THIS machine's clock.
+
+    The server's own clock and not a device's, which is the opposite of the
+    display refresh and right for the same reason: that one is about a screen's
+    night where it hangs, this one is about one machine."""
+    m = re.match(r"^(\d{1,2}):(\d{2})$", str(hhmm or ""))
+    if not m:
+        return 0
+    lt = time.localtime(now if now is not None else time.time())
+    return time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday,
+                        int(m.group(1)), int(m.group(2)), 0, 0, 0, -1))
+
+
+def restart_due(now=None):
+    """Is it time, and is it safe? Split from the handover so the decision can
+    be reasoned about — and tested — without a process dying at the end of it."""
+    now = now if now is not None else time.time()
+    at = str(read_app().get("restart_at") or "")
+    if at != _restart["at"]:
+        # Newly set, newly cleared, or this process reading it for the first
+        # time. Whichever it is, the clock starts here — see the arming note
+        # above.
+        _restart.update(at=at, armed=now, fired=False)
+    if not at or _restart["fired"]:
+        return False
+    due = clock_at(at, now)
+    if not due or due <= _restart["armed"]:
+        return False                      # already past when it was set
+    if now < due:
+        return False                      # not yet
+    if now - due > RESTART_WINDOW:
+        return False                      # missed it — leave it for tomorrow
+    # Deferred while somebody is using it, and re-asked on the next tick. The
+    # window above is what stops that becoming "never": an hour of waiting for
+    # quiet, and then it is tomorrow's problem rather than something forced
+    # through the middle of a conversation.
+    return now - _last_use >= RESTART_QUIET
+
+
+def do_scheduled_restart():
+    """Hand over to serve.sh and expect to be killed by it."""
+    sh = os.path.join(ROOT, "serve.sh")
+    if not os.access(sh, os.X_OK):
+        print("scheduled restart: %s is not executable — skipped" % sh,
+              flush=True)
+        _restart["fired"] = True          # do not spin on it every tick
+        return
+    try:
+        log = open(RESTART_LOG, "a")
+        log.write("\n=== %s — scheduled restart (%s) ===\n"
+                  % (time.strftime("%Y-%m-%d %H:%M:%S"), _restart["at"]))
+        log.flush()
+        _restart["fired"] = True
+        print("scheduled restart — handing over to serve.sh", flush=True)
+        subprocess.Popen([sh, "restart"], cwd=ROOT, stdout=log, stderr=log,
+                         stdin=subprocess.DEVNULL, start_new_session=True)
+    except Exception as e:
+        # Still marked as fired: a handover that could not be launched will not
+        # launch on the next tick either, and a server retrying it every twenty
+        # seconds until morning is worse than one that says so once.
+        print("scheduled restart could not hand over: %s" % e, flush=True)
+
+
+def restart_watch():
+    """Every twenty seconds, because the whole mechanism is a minute wide and
+    a thread that sleeps until the exact second would have to be woken and
+    recomputed every time somebody changed the setting."""
+    while True:
+        time.sleep(20)
+        try:
+            if restart_due():
+                do_scheduled_restart()
+        except Exception as e:
+            print("scheduled restart check failed: %s" % e, flush=True)
 MIN_PASSWORD = 10
 _users_lock = threading.Lock()
 _sessions = {}                   # token -> {"user","role","expires"}
@@ -3896,6 +4494,7 @@ class Handler(SimpleHTTPRequestHandler):
                 self.end_headers()
                 return
             _code_fails.pop(ip, None)
+            file_display(out["id"])
             print("display %s (%s) enrolled by code" % (out["id"], display_label(out)),
                   flush=True)
             _back("ok")
@@ -4016,6 +4615,19 @@ class Handler(SimpleHTTPRequestHandler):
                                                    "is_default": r == doc["default"]}
                                                   for r in route_order(doc)],
                                     "open_default": open_default(doc),
+                                    # Offered rather than typed, and with the
+                                    # interface beside each so an address can
+                                    # be placed without going to the box.
+                                    "addresses": [{"addr": a, "iface": i}
+                                                  for a, i in local_interfaces()],
+                                    # One base per row now: a display set up on
+                                    # a network profile is typed at that
+                                    # profile's address and port, so a single
+                                    # base for the whole list stopped being
+                                    # the truth the moment one could differ.
+                                    "enrol_bases": {d["id"]: enrol_base_for(
+                                        read_displays().get(d["id"]), host, secure)
+                                        for d in admin_displays()},
                                     "enrol_base": "%s://%s:%d/e/"
                                                   % ("https" if secure else "http", host,
                                                      secure or RUNNING.get("http_port") or 0)})
@@ -4671,6 +5283,118 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             return self.wfile.write(body)
 
+        if parsed.path == "/display/poll":
+            # A display saying it is still here, and asking whether anything
+            # has moved. The smallest answer that lets a screen decide to
+            # reload itself: a stamp, and whether an admin has asked it to.
+            #
+            # Same-origin for the reason hello is — with SameSite=Strict a
+            # cross-site POST arrives without the cookie and would be taken for
+            # a device nobody has seen before.
+            if not self._same_origin():
+                return self._json(403, {"error": "cross-origin request refused"})
+            obj = self._json_body()
+            if obj is None:
+                return
+            try:
+                boot = int(obj.get("boot") or 0)
+            except (TypeError, ValueError):
+                boot = 0
+            # The numbers the display needs to keep itself up, answered here
+            # rather than at hello so there is one place that carries them and
+            # a change reaches a screen on its next poll. They are operational
+            # rather than secret — how often a screen checks in and how many
+            # times it tries says nothing about what it is connected to.
+            app = read_app()
+            cfg = {k: app.get(k, APP_DEFAULTS[k])
+                   for k in ("poll_seconds", "retry_attempts", "retry_seconds",
+                             "refresh_at", "refresh_stagger")}
+            cfg["refresh_offset"] = 0
+            # The panel's preview frames the display page and polls like
+            # anything else that does. It is not a device: it must not enrol,
+            # and it must never be told to reload itself out from under the
+            # admin who is editing the very settings it is previewing — by an
+            # admin's request or by the clock, which is why the nightly refresh
+            # is blanked here as well.
+            # THIS server's clock, which is the clock a reload request is
+            # stamped with. The display keeps the value it was given at its
+            # first poll and hands it back as `boot`, so the comparison below
+            # is server time against server time — a tablet whose own clock is
+            # a year out would otherwise obey a request for ever or never.
+            now_ = int(time.time())
+            if self.admin_port:
+                cfg["refresh_at"] = ""
+                return self._json(200, {"ok": True, "gen": config_gen(),
+                                        "reload": False, "cfg": cfg,
+                                        "now": now_})
+            disp = self._display()
+            if not disp:
+                # No cookie, or one naming a row that is gone. Still a 200:
+                # an unapproved screen renders, and the poll is how it finds
+                # out it has been approved without anybody touching it.
+                return self._json(200, {"ok": True, "gen": config_gen(),
+                                        "reload": False, "cfg": cfg,
+                                        "now": now_})
+            # …and from here the stamp is THIS display's: its own row and the
+            # settings everybody shares, so another device arriving or being
+            # deleted is not a reason for this one to reload.
+            gen = config_gen(disp["id"])
+            cfg["refresh_offset"] = refresh_offset(disp["id"],
+                                                   cfg["refresh_stagger"])
+            note_display_seen(disp["id"])
+            try:
+                req = int(disp.get("reload_req") or 0)
+            except (TypeError, ValueError):
+                req = 0
+            # Satisfied by being obeyed: the display reports when it booted, so
+            # a request older than this boot has already been carried out. No
+            # acknowledgement to store, and nothing left set to fire again on
+            # the next restart.
+            return self._json(200, {"ok": True, "gen": gen, "cfg": cfg,
+                                    "now": now_,
+                                    "reload": bool(boot and req > boot)})
+
+        if parsed.path == "/display/enrol":
+            # The same redemption as /e/CODE, from a box on the screen itself.
+            #
+            # The URL form was the only way in, and it is the wrong shape for
+            # the thing it is for: somebody standing at a screen that is
+            # already showing this interface, holding six characters, being
+            # asked to type an address instead of the code. Worse where guest
+            # requests are off — that screen offered nothing at all, so a
+            # device with a code had no way to use it and no way to find out
+            # there was one.
+            if self.admin_port:
+                return self._json(404, {"error": "not found"})
+            if not self._same_origin():
+                return self._json(403, {"error": "cross-origin request refused"})
+            obj = self._json_body()
+            if obj is None:
+                return
+            ip = self.address_string()
+            # The same back-off ledger the URL form uses, which is what makes
+            # six characters enough: a billion possibilities only matters if
+            # guessing is cheap.
+            if code_blocked(ip):
+                return self._json(429, {"error": "blocked", "state": "blocked"})
+            token, out = redeem_code(str(obj.get("code") or ""))
+            if not token:                        # `out` is the reason
+                note_code_failure(ip)
+                print("enrolment code refused (%s) from %s" % (out, ip), flush=True)
+                return self._json(400, {"error": out, "state": out})
+            _code_fails.pop(ip, None)
+            file_display(out["id"])
+            print("display %s (%s) enrolled by code, in page"
+                  % (out["id"], display_label(out)), flush=True)
+            body = json.dumps({"ok": True,
+                               "display": self._display_state(out)}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self._set_display_cookie(token)
+            self.end_headers()
+            return self.wfile.write(body)
+
         if parsed.path == "/display/request":
             # A device asking for access, in the admin's own words. Same-origin
             # for the same reason hello is: nothing here should be reachable
@@ -4884,6 +5608,13 @@ class Handler(SimpleHTTPRequestHandler):
                            deny_note=str(obj.get("note") or "").strip()[:500],
                            deny_repeat=bool(obj.get("repeat", True)))
             write_displays(displays)
+            # …and filed with its own population, so the next grant to all of
+            # them is one tick rather than one per row. Only on the way in: a
+            # refusal leaves whatever group it was already in alone, because
+            # groups are how you address a set of things and not a record of
+            # who is currently allowed.
+            if approve:
+                file_display(did, by=s["user"])
             # The allow-lists, whichever way it went: a refusal has to take
             # back anything a previous approval gave, or "denied" is a word on
             # a row rather than a thing that happened.
@@ -4903,14 +5634,39 @@ class Handler(SimpleHTTPRequestHandler):
             obj = self._json_body()
             if obj is None:
                 return
+            # Validated here rather than trusted: a profile id that does not
+            # exist would leave a screen naming nothing, which reads on the row
+            # as a setting somebody chose.
+            cfg = display_settings()
+            kp = str(obj.get("kiosk_profile") or "")[:16]
+            nw = str(obj.get("network") or "")[:16]
+            if kp and not any(k["id"] == kp for k in cfg["kiosks"]):
+                return self._json(400, {"error": "that display profile no "
+                                                 "longer exists — reload the "
+                                                 "panel to see the list"})
+            if nw and not any(n["id"] == nw for n in cfg["networks"]):
+                return self._json(400, {"error": "that network profile no "
+                                                 "longer exists — reload the "
+                                                 "panel to see the list"})
             rec, err = invite_display(str(obj.get("name") or "").strip()[:40],
-                                      s["user"])
+                                      s["user"],
+                                      {"kiosk": obj.get("kiosk"),
+                                       "kiosk_profile": kp, "network": nw})
             if err:
                 return self._json(400, {"error": err})
             print("display %s (%s) invited by %s — code issued"
                   % (rec["id"], display_label(rec), s["user"]), flush=True)
+            # …and how long it is worth anything for, so the panel can count
+            # it down rather than restate the rule. Read off the record rather
+            # than recomputed from the setting: an admin who changes the
+            # lifetime between minting and reading must not be shown a number
+            # the code itself does not agree with.
             return self._json(200, {"ok": True, "id": rec["id"],
                                     "code": rec["code"],
+                                    "code_left": max(0, rec["code_expires"]
+                                                     - int(time.time()))
+                                                 if rec["code_expires"] else 0,
+                                    "code_forever": not rec["code_expires"],
                                     "displays": admin_displays()})
 
         if parsed.path == "/displays/reissue":
@@ -4927,8 +5683,17 @@ class Handler(SimpleHTTPRequestHandler):
             # deliberately and somebody may be standing in front of it.
             print("display %s (%s) reissued by %s — its old token is dead"
                   % (rec["id"], display_label(rec), s["user"]), flush=True)
+            # …and how long it is worth anything for, so the panel can count
+            # it down rather than restate the rule. Read off the record rather
+            # than recomputed from the setting: an admin who changes the
+            # lifetime between minting and reading must not be shown a number
+            # the code itself does not agree with.
             return self._json(200, {"ok": True, "id": rec["id"],
                                     "code": rec["code"],
+                                    "code_left": max(0, rec["code_expires"]
+                                                     - int(time.time()))
+                                                 if rec["code_expires"] else 0,
+                                    "code_forever": not rec["code_expires"],
                                     "displays": admin_displays()})
 
         if parsed.path == "/displays/approve":
@@ -5019,12 +5784,61 @@ class Handler(SimpleHTTPRequestHandler):
                         touched = True
                 if touched:
                     write_groups(groups)
-            print("display %s kind=%s by %s%s"
+            # …and into one of the right population, so changing what a row IS
+            # never leaves it belonging to nothing. The panel names which,
+            # where an admin has more than one to choose from; where it names
+            # none, or names one that has gone, the population's own group
+            # takes it — minted here if this is the first of its kind.
+            joined = ""
+            if now != was or obj.get("group"):
+                want_gid = str(obj.get("group") or "")
+                groups = read_groups()
+                if want_gid not in groups or groups[want_gid]["kind"] != now:
+                    want_gid = default_group(now, s["user"])
+                # Out of every other group of this kind first: "which group is
+                # it in" has one answer on this control, and a row silently in
+                # two of them is a grant somebody cannot account for.
+                groups = read_groups()
+                touched = False
+                for gid, g in groups.items():
+                    if gid != want_gid and did in (g.get("members") or []):
+                        g["members"] = [m for m in g["members"] if m != did]
+                        touched = True
+                if touched:
+                    write_groups(groups)
+                join_group(did, want_gid)
+                joined = (read_groups().get(want_gid) or {}).get("name", "")
+            print("display %s kind=%s by %s%s%s"
                   % (did, want or "(inferred: %s)" % now, s["user"],
-                     "; dropped from " + ", ".join(dropped) if dropped else ""),
+                     "; dropped from " + ", ".join(dropped) if dropped else "",
+                     "; joined " + joined if joined else ""),
                   flush=True)
             return self._json(200, {"ok": True, "displays": admin_displays(),
-                                    "dropped": dropped})
+                                    "dropped": dropped, "joined": joined,
+                                    "groups": admin_groups()})
+
+        if parsed.path == "/displays/reload":
+            # Ask a screen to reload itself, without walking to it. What this
+            # actually fixes is a display that is alive but stuck: it is still
+            # polling, so it is still listening, and a reload is the whole
+            # repair. A display that does NOT come back from this is one the
+            # server has no channel to at all — nothing here reaches it, and
+            # that is the condition worth raising an alert about rather than
+            # retrying into.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            did = str(obj.get("id") or "")
+            displays = read_displays()
+            if did not in displays:
+                return self._json(404, {"error": "no such display"})
+            displays[did]["reload_req"] = int(time.time())
+            write_displays(displays)
+            return self._json(200, {"ok": True, "id": did,
+                                    "displays": admin_displays()})
 
         if parsed.path == "/displays/rename":
             s = self._require("admin")
@@ -5078,6 +5892,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"ok": True, "displays": admin_displays()})
 
         if parsed.path == "/ask":
+            # Somebody is using this, which is not the same as a screen
+            # checking in — see note_use. A scheduled restart waits for these
+            # to stop.
+            note_use()
             # Reachable from the display, which has no sign-in by design.
             emb, refused = self._cap("ask")
             if refused:
@@ -5281,6 +6099,7 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"ok": True, "keys": len(incoming)})
 
         if parsed.path == "/tts":
+            note_use()
             if self._cap("speak")[1]:
                 return
             raw = self._body(64 * 1024)
@@ -5308,6 +6127,7 @@ class Handler(SimpleHTTPRequestHandler):
 
         if parsed.path != "/stt":
             return self._json(404, {"error": "not found"})
+        note_use()
         if self._cap("mic")[1]:
             return
         q = parse_qs(parsed.query)
@@ -5413,6 +6233,12 @@ def main():
     # keeps serving, and says why.
     redirect_plain = have_tls and not personal
 
+    # The scheduled restart, if one is set. A daemon thread, so it never keeps
+    # a dying process alive — and it reads the setting each time round rather
+    # than at startup, so changing the time in the panel takes effect without
+    # the restart this is here to schedule.
+    threading.Thread(target=restart_watch, daemon=True).start()
+
     # warm the model in the background so the first utterance isn't slow
     for _n in (MODEL_NAME, "base.en"):      # warm both sides of the trade
         threading.Thread(target=get_model, args=(_n,), daemon=True).start()
@@ -5484,14 +6310,18 @@ def main():
             _p = int(_vals.get("port"))
         except (TypeError, ValueError):
             continue
+        # The address this profile answers on, or the server's own where it
+        # says ANY. A profile does not get to reach further than the app it
+        # belongs to: bound to loopback, ANY is loopback.
+        _host = net_host(_vals, host)
         for _bind, _to in ((_p, None), (int(_vals.get("redirect") or 0), _p)):
             if not _bind:
                 continue
             try:
                 if have_tls and _to is None:
-                    start_tls(_bind, cert, key, host=host, pinned_net=_n["id"])
+                    start_tls(_bind, cert, key, host=_host, pinned_net=_n["id"])
                 else:
-                    _srv = make_server(_bind, host=host, pinned_net=_n["id"],
+                    _srv = make_server(_bind, host=_host, pinned_net=_n["id"],
                                        redirect_to=_to if have_tls else None)
                     threading.Thread(target=_srv.serve_forever,
                                      daemon=True).start()
@@ -5502,12 +6332,13 @@ def main():
                 print("network %-10s port %d NOT bound: %s"
                       % (_n["name"], _bind, exc), flush=True)
                 continue
+            RUNNING.setdefault("bound", set()).add((_host, _bind))
             if _to is not None:
-                print("HTTP  on %s:%d  → redirects to %d" % (host, _bind, _p),
+                print("HTTP  on %s:%d  → redirects to %d" % (_host, _bind, _p),
                       flush=True)
             else:
                 print("%-5s on %s:%d  → %s%s"
-                      % ("HTTPS" if have_tls else "HTTP", host, _bind,
+                      % ("HTTPS" if have_tls else "HTTP", _host, _bind,
                          ", ".join(_doc["routes"][r]["name"] for r in _mine),
                          "  (no approval — the port is the grant)"
                          if _vals.get("open") else ""), flush=True)
