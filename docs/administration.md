@@ -899,37 +899,32 @@ needed rather than shipped, and an existing group of the right kind is adopted
 before a second is created — so an install that never uses groups never grows
 two it did not ask for.
 
-**Three kinds, and they do not mix.** They answer separate questions — *the
-physics department*, *the laptops in building four*, *the screens in the east
-wing* — so a group holds one population, and its kind cannot be changed once it
-exists.
+**Two kinds, and they do not mix.**
 
 - **PEOPLE** holds the people created under ENROLLMENTS ▸ PERSON. A person
   reaches an endpoint from whatever machine they open their URL on, so a grant
   made here follows the human rather than the hardware.
-- **PERSONAL** holds the machines that asked for access and were approved —
-  somebody's laptop or phone, a device that happens to belong to a person.
-- **DEVICES** holds the screens you created and sent a code to.
+- **DEVICES** holds displays — every screen and every laptop, however it got
+  here.
 
-PERSONAL is the kind that used to be called PEOPLE, back when a refusal was per
-device and nothing issued a person anything of their own. It was renamed rather
-than repurposed: a group's kind is fixed at creation *because changing it
-empties the group*, and turning every existing one into a group of identities
-would have done exactly that on upgrade, with nothing to migrate into. **No
-group lost a member, and any you had keeps the name you gave it** — only the
-word the panel uses for its kind changed.
+There was briefly a third, separating the machines that *asked* from the ones
+an admin *invited*. That is how a row enrolled, not which population it is in:
+both are a browser on one machine, so both are displays. It is written on the
+row now, where it describes without sorting — which means a group holding a
+wall screen and somebody's laptop is a perfectly good group, where before it
+could not exist.
 
-The distinction is not cosmetic. The three draw their members from different
-places, so an endpoint that names a group of screens is saying nothing about
-who may use it, and one that names a group of people is saying nothing about
-which screens may.
+**Groups stored under the old kind read back as DEVICES**, keeping their
+members and the names you gave them. Nothing was rewritten on disk.
 
-**Which population a display row is in is set on the row**, wherever that row is
-currently listed: *It is a* — DEVICE, PERSONAL, or WORK IT OUT. A display row is
-never a person: people are not display rows at all. Changing it moves
-the row into that population's group, and where you have more than one group of
-that kind a picker appears beside the control to say which. It is hidden where
-there is one, because one is not a choice.
+The two that remain cannot mix, and the reason is concrete rather than tidy:
+they are different files whose ids are minted independently. That is also why
+**a group's kind cannot change once it exists** — a kind that changed would not
+filter the group's members, it would fail to find any of them.
+
+**How a display got here is shown on the row**, not chosen: *created here and
+enrolled with a code*, or *arrived by opening the display page and asking*. The
+control that used to set it is gone with the distinction it was setting.
 
 **Left at WORK IT OUT it follows how the row arrived** — recorded when the row
 was made and never changed after. A code you minted is a **device**; a browser

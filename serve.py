@@ -1481,12 +1481,11 @@ def note_code_failure(ip):
 
 DISPLAY_DEFAULTS = {
     "name": "",                  # what an admin called it
-    # Which population this row belongs to when a group is drawn from one:
-    # "user", "device", or blank for "work it out". Set by an admin, because
-    # the inference below can only see how the row ARRIVED — and asking for
-    # access is something a browser on one machine does, which describes a
-    # device rather than a person. A person is an identity that carries from a
-    # phone to a laptop, and nothing here issues one yet.
+    # An admin's override of which display population this row was in, back
+    # when there were two of them. There is one now — a display is a display,
+    # and how it enrolled is `origin` below, which describes the row instead of
+    # sorting it. Kept so an existing document round-trips rather than losing a
+    # key on its first save; nothing reads it and nothing writes it.
     "kind": "",
     "asked": "",                 # the ?display= name it announced itself with
     "approved": False,
@@ -1554,7 +1553,7 @@ DISPLAY_DEFAULTS = {
     # HOW THIS ROW GOT HERE: "code" for one an admin named and minted a code
     # for, "page" for one that arrived because somebody opened the display
     # page. Empty on rows that predate the field, which fall back to a guess —
-    # see group_kind_of.
+    # see enrolled_as.
     #
     # Recorded at creation because it is the one thing about a row that is
     # true from the start and never changes. It used to be inferred from
@@ -1730,8 +1729,12 @@ DISPLAY_SETTINGS = {
     # Which group each population lands in when it starts working. Minted on
     # first need rather than shipped, so an install that never uses groups
     # never grows two it did not ask for — see default_group.
-    "user_group": "",
     "device_group": "",
+    "identity_group": "",
+    # Kept so an existing document round-trips rather than losing a key on the
+    # first save. `user` was the second DISPLAY kind and folded into `device`;
+    # nothing reads this now, and nothing writes it either.
+    "user_group": "",
 }
 MAX_FORM_FIELDS = 5
 #: (low, high) for each number the panel can set
@@ -3157,7 +3160,7 @@ def admin_displays():
                    # What it was SET to, and what it resolves to. The panel
                    # needs both: one is the control's value, the other is the
                    # answer a blank control is currently getting.
-                   kind=str(rec.get("kind") or ""), group_kind=group_kind_of(rec),
+                   kind=str(rec.get("kind") or ""), arrived=enrolled_as(rec),
                    # Three states, and the panel needs to tell them apart:
                    # INVITED is a row waiting for somebody to type its code
                    # into a screen, WAITING is a device that turned up on its
@@ -3280,6 +3283,12 @@ def new_identity(name, by):
     rows[pid] = dict(IDENTITY_DEFAULTS, name=name, salt=salt, hash=dk,
                      created=int(time.time()), created_by=str(by or "")[:60])
     write_identities(rows)
+    # Filed with their own population the moment they exist, and the group is
+    # minted if there is not one — the same rule every other kind follows. A
+    # row belonging to no group is one an allow-list cannot name, so the first
+    # grant to everybody would be a tick per person, which is the data entry
+    # groups exist to remove.
+    join_group(pid, default_group("identity", by))
     return pid + "." + secret, dict(rows[pid], id=pid)
 
 
@@ -3366,14 +3375,20 @@ _groups_lock = threading.Lock()
 #: and repurposing the kind does that to every existing group of it at once, on
 #: upgrade, with nothing to migrate into — the identities those laptops belong
 #: to do not exist. So the third kind is added beside them and nothing empties.
-GROUP_KINDS = ("user", "device", "identity")
+GROUP_KINDS = ("device", "identity")
 #: Whose members are display rows, and whose are people. A route names groups
 #: without caring what is in them, so the answer depends on who is asking: a
 #: device must not be let through by a group of people that happens to sit on
 #: the same allow-list, and a person must not be let through by a group of
 #: screens.
-DISPLAY_GROUP_KINDS = ("user", "device")
+DISPLAY_GROUP_KINDS = ("device",)
 IDENTITY_GROUP_KINDS = ("identity",)
+#: Read-time only, and it never rewrites the file. `user` was a second kind of
+#: DISPLAY group — the machines that asked rather than the ones an admin
+#: invited — which is how a row ENROLLED and not which population it is in. It
+#: folds into `device` because both were always display rows, so no group loses
+#: a member and no admin loses a name.
+LEGACY_GROUP_KINDS = {"user": "device"}
 MAX_GROUPS = 200
 
 
@@ -3388,7 +3403,7 @@ def read_groups():
     for gid, rec in stored.items():
         if not isinstance(rec, dict):
             continue
-        kind = rec.get("kind")
+        kind = LEGACY_GROUP_KINDS.get(rec.get("kind"), rec.get("kind"))
         out[str(gid)] = {
             "name": str(rec.get("name") or "")[:60],
             "kind": kind if kind in GROUP_KINDS else "device",
@@ -3406,33 +3421,29 @@ def write_groups(groups):
         os.replace(tmp, GROUPS_PATH)
 
 
-def group_kind_of(rec):
-    """Which population a display row belongs to.
+def enrolled_as(rec):
+    """HOW a display row got here: "asked" or "invited".
 
-    What an admin said it is, where they have said. Otherwise HOW IT ARRIVED,
-    which is recorded when the row is made and never changes: a code an admin
-    minted is a device, and a browser that opened the display page is a person
-    until somebody says otherwise.
+    It was `group_kind_of`, and it decided which of two display populations a
+    row belonged to — which was the wrong question. Both happen in a browser on
+    one machine, so both describe a device; what differed was only the door
+    they came through. A person is an identity that carries from a phone to a
+    laptop, and that is a different FILE rather than a different flavour of
+    this one.
 
-    It used to ask whether the row had ever pressed REQUEST ACCESS — a field
-    kept for deciding whether a grant expires, borrowed for this because it
-    was there. That is a different question: somebody looking at the request
-    form has not pressed it yet, and filing them under the code process until
-    they do put them on the one page that has nothing to do with them.
+    So this is an attribute now. It labels a row and nothing more: it does not
+    pick a group, it cannot keep two rows out of the same group, and there is
+    no control to override it. A screen an admin minted a code for is
+    "invited"; a browser that opened the display page and asked is "asked".
 
     Rows that predate `origin` are read from what only an admin's invitation
-    leaves behind: an approver's name on a row that never asked for anything.
-    A guess, but the same guess the row's own history supports, and it costs
-    no migration."""
-    k = str(rec.get("kind") or "")
-    if k in GROUP_KINDS:
-        return k
+    leaves behind — an approver's name on a row that never asked for anything.
+    A guess, and the same guess the row's own history supports."""
     origin = str(rec.get("origin") or "")
-    if origin in ("code", "page"):
-        return "device" if origin == "code" else "user"
-    if is_guest(rec):
-        return "user"
-    return "device" if rec.get("approved_by") else "user"
+    if origin:
+        return "invited" if origin == "code" else "asked"
+    return "invited" if (rec.get("approved_by") and not rec.get("requested_at")) \
+           else "asked"
 
 
 #: What the group each population lands in is called when this server has to
@@ -3444,8 +3455,7 @@ def group_kind_of(rec):
 #: already exists: those are somebody's data, and an upgrade that renamed them
 #: would be editing a list an admin wrote. The kind's LABEL in the panel is
 #: what changes for them.
-DEFAULT_GROUP_NAME = {"user": "Personal devices", "device": "Devices",
-                      "identity": "People"}
+DEFAULT_GROUP_NAME = {"device": "Devices", "identity": "People"}
 
 
 def default_group(kind, by="the server"):
@@ -3509,25 +3519,29 @@ def file_display(rec_or_id, kind=None, by="the server"):
     request approved — because those are the two ways in, and neither of them
     used to leave the row anywhere an allow-list could find it."""
     did = rec_or_id if isinstance(rec_or_id, str) else rec_or_id["id"]
-    if kind is None:
-        displays = read_displays()
-        rec = displays.get(did)
-        if not rec:
-            return
-        kind = group_kind_of(rec)
-    join_group(did, default_group(kind, by))
+    # One display population now, so there is nothing to work out: every screen
+    # and every laptop is a display. How it enrolled is still on the row, where
+    # it describes the row rather than deciding which list it may be put in.
+    join_group(did, default_group("device", by))
 
 
 def clean_members(ids, kind):
-    """Only rows that exist, and only of this group's own kind. A member that
-    is neither is dropped rather than refused — the panel sends the list it was
-    shown, and a display deleted in another tab between the two is not a
-    mistake worth making somebody retype a form over.
+    """Only rows that exist, out of this kind's own FILE. A member that is not
+    there is dropped rather than refused — the panel sends the list it was
+    shown, and a row deleted in another tab between the two is not a mistake
+    worth making somebody retype a form over.
 
-    A group of people draws from a different file than the other two, which is
-    the whole reason its kind is fixed: the ids are not interchangeable, so a
-    kind that changed under an existing group would not filter its members, it
-    would fail to find any of them."""
+    There is no longer a test on how a display enrolled. That was the second
+    display kind, and enrolment is a property of a row rather than a
+    population: a group holding a wall screen and somebody's laptop is a
+    perfectly good group, and refusing to let one exist was the split saying
+    something about the rows that the rows already said themselves.
+
+    What remains is the one distinction that is real — WHICH FILE the ids come
+    out of. Displays and people are minted independently, so their ids are not
+    interchangeable, and that is why a kind still cannot change under an
+    existing group: it would not filter the members, it would fail to find any
+    of them."""
     seen, out = set(), []
     if kind in IDENTITY_GROUP_KINDS:
         known = read_identities()
@@ -3540,8 +3554,7 @@ def clean_members(ids, kind):
     displays = read_displays()
     for did in (ids or []):
         did = str(did)[:32]
-        rec = displays.get(did)
-        if rec and did not in seen and group_kind_of(rec) == kind:
+        if did in displays and did not in seen:
             seen.add(did)
             out.append(did)
     return out[:MAX_ALLOW]
@@ -4383,7 +4396,7 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/displays", "/displays/approve", "/displays/rename",
                      "/displays/delete", "/displays/new", "/displays/reissue",
                      "/displays/decide", "/displays/settings", "/displays/kiosk",
-                     "/groups", "/groups/save", "/groups/delete",
+                     "/groups", "/groups/save", "/groups/delete", "/groups/move",
                      "/identities", "/identities/new", "/identities/rename",
                      "/identities/delete", "/identities/reissue")
 #: where an enrolment code is typed. On the display listeners only — it hands
@@ -5052,24 +5065,19 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/groups":
             if not self._require("admin"):
                 return
-            # The three populations a group can be drawn from, so the panel can
-            # offer the right one rather than every row it has ever seen. Two
-            # of them are display rows and the third is not — `identities` is
-            # the only one that comes out of a different file.
-            displays = read_displays()
-            owned, devices = [], []
-            for did, rec in sorted(displays.items(),
-                                   key=lambda kv: display_label(kv[1]).lower()):
-                row = {"id": did, "label": display_label(rec),
-                       "approved": bool(rec.get("approved"))}
-                (owned if group_kind_of(rec) == "user" else devices).append(row)
+            # The two populations a group can be drawn from — the two FILES,
+            # which is the only split that is real. Every display is offered
+            # for a group of devices whatever way it enrolled; that fact is on
+            # the row and says nothing about which list it may be put in.
+            devices = [{"id": did, "label": display_label(rec),
+                        "approved": bool(rec.get("approved")),
+                        "arrived": enrolled_as(rec)}
+                       for did, rec in sorted(read_displays().items(),
+                                              key=lambda kv: display_label(kv[1]).lower())]
             idents = [{"id": p["id"], "label": p["label"], "approved": True}
                       for p in admin_identities()]
             return self._json(200, {"groups": admin_groups(),
-                                    # The key keeps its name so an older panel
-                                    # served from a cache still fills its box.
-                                    "people": owned, "devices": devices,
-                                    "identities": idents,
+                                    "devices": devices, "identities": idents,
                                     "kinds": list(GROUP_KINDS),
                                     "max": MAX_GROUPS})
         if path == "/identities":
@@ -6028,6 +6036,45 @@ class Handler(SimpleHTTPRequestHandler):
                      if touched else ""), flush=True)
             return self._json(200, {"ok": True, "identities": admin_identities()})
 
+        if parsed.path == "/groups/move":
+            # Which group a display is in, set from the row rather than from
+            # the group. It replaces the half of /displays/kind that was worth
+            # keeping: that route existed to move a row between POPULATIONS,
+            # which no longer means anything, but "which of my three groups of
+            # screens is this one in" still does.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            did = str(obj.get("id") or "")
+            if did not in read_displays():
+                return self._json(404, {"error": "no such display"})
+            gid = str(obj.get("group") or "")
+            groups = read_groups()
+            if gid and (gid not in groups
+                        or groups[gid]["kind"] not in DISPLAY_GROUP_KINDS):
+                return self._json(400, {"error": "not a group of displays"})
+            # Out of every other one first: "which group is it in" has one
+            # answer on that control, and a row quietly in two of them is a
+            # grant nobody can account for.
+            touched = False
+            for g, rec in groups.items():
+                if g != gid and did in (rec.get("members") or []):
+                    rec["members"] = [m for m in rec["members"] if m != did]
+                    touched = True
+            if gid and did not in groups[gid]["members"]:
+                groups[gid]["members"] = (groups[gid]["members"] + [did])[:MAX_ALLOW]
+                touched = True
+            if touched:
+                write_groups(groups)
+            joined = (groups.get(gid) or {}).get("name", "")
+            print("display %s moved to group %s by %s"
+                  % (did, joined or "(none)", s["user"]), flush=True)
+            return self._json(200, {"ok": True, "groups": admin_groups(),
+                                    "joined": joined})
+
         if parsed.path == "/groups/delete":
             s = self._require("admin")
             if not s:
@@ -6296,73 +6343,11 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"ok": True, "id": did,
                                     "displays": admin_displays()})
 
-        if parsed.path == "/displays/kind":
-            s = self._require("admin")
-            if not s:
-                return
-            obj = self._json_body()
-            if obj is None:
-                return
-            did = str(obj.get("id") or "")
-            displays = read_displays()
-            if did not in displays:
-                return self._json(404, {"error": "no such display"})
-            want = str(obj.get("kind") or "")
-            if want and want not in GROUP_KINDS:
-                return self._json(400, {"error": "kind must be one of: "
-                                                 + ", ".join(GROUP_KINDS)})
-            was = group_kind_of(displays[did])
-            displays[did]["kind"] = want
-            now = group_kind_of(displays[did])
-            write_displays(displays)
-            # A group is drawn from one population, and clean_members drops a
-            # member of the wrong one — silently, at the next save of that
-            # group. Done here instead, and counted, so moving a row between
-            # populations says what it cost rather than emptying a group
-            # somebody built weeks ago with nothing on screen about it.
-            dropped = []
-            if now != was:
-                groups = read_groups()
-                touched = False
-                for gid, g in groups.items():
-                    if g["kind"] != now and did in (g.get("members") or []):
-                        g["members"] = [m for m in g["members"] if m != did]
-                        dropped.append(g["name"])
-                        touched = True
-                if touched:
-                    write_groups(groups)
-            # …and into one of the right population, so changing what a row IS
-            # never leaves it belonging to nothing. The panel names which,
-            # where an admin has more than one to choose from; where it names
-            # none, or names one that has gone, the population's own group
-            # takes it — minted here if this is the first of its kind.
-            joined = ""
-            if now != was or obj.get("group"):
-                want_gid = str(obj.get("group") or "")
-                groups = read_groups()
-                if want_gid not in groups or groups[want_gid]["kind"] != now:
-                    want_gid = default_group(now, s["user"])
-                # Out of every other group of this kind first: "which group is
-                # it in" has one answer on this control, and a row silently in
-                # two of them is a grant somebody cannot account for.
-                groups = read_groups()
-                touched = False
-                for gid, g in groups.items():
-                    if gid != want_gid and did in (g.get("members") or []):
-                        g["members"] = [m for m in g["members"] if m != did]
-                        touched = True
-                if touched:
-                    write_groups(groups)
-                join_group(did, want_gid)
-                joined = (read_groups().get(want_gid) or {}).get("name", "")
-            print("display %s kind=%s by %s%s%s"
-                  % (did, want or "(inferred: %s)" % now, s["user"],
-                     "; dropped from " + ", ".join(dropped) if dropped else "",
-                     "; joined " + joined if joined else ""),
-                  flush=True)
-            return self._json(200, {"ok": True, "displays": admin_displays(),
-                                    "dropped": dropped, "joined": joined,
-                                    "groups": admin_groups()})
+        # /displays/kind is GONE. It moved a display row between two display
+        # populations, and there is one — how a row enrolled describes the row
+        # rather than deciding which list it may be put in. The panel control
+        # went with it; a control whose only two answers are the same answer
+        # is a control wired to nothing.
 
         if parsed.path == "/displays/reload":
             # Ask a screen to reload itself, without walking to it. What this
