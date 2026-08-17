@@ -1531,7 +1531,6 @@
     <button data-tab="motion">GEOMETRY</button>
     <button data-tab="speech">SPEECH</button>
     <button data-tab="savers">SCREENSAVER</button>
-    <button id="tab_account" data-tab="account">GROUPS</button>
     <button data-tab="models">MODELS</button>
     <!-- Beside MODELS because they are the two halves of an endpoint that are
          not the endpoint: what it speaks to, and what it answers on. -->
@@ -2090,7 +2089,12 @@ above.</div>
        them the same way. -->
   <!-- The tab is called GROUPS; a section called Groups inside it says the
        word twice. Bare, like the profile lists. -->
-  <section class="grp bare proflist" data-tab="account">
+  <!-- On SECURITY rather than in the profile settings row. A group is not a
+       profile: nothing about it describes what a screen looks like or how it
+       behaves. It is a name for a SET of the things that may be here, made so
+       a grant is given once instead of ticked twelve times — which is the
+       subject of the tab it now sits on. -->
+  <section class="grp bare proflist" data-tab="security">
     <div class="barehead"><span class="listtitle">Groups</span></div>
     <div class="grpbody">
   <div id="grouplist"></div>
@@ -6245,17 +6249,63 @@ function kioskBlock(d){
     b.classList.toggle('on', v === kindNow);
     b.onclick = ()=>{
       kseg.querySelectorAll('button').forEach(x=> x.classList.toggle('on', x === b));
+      syncGroups();
     };
     kseg.appendChild(b);
   });
   krow.appendChild(kseg);
   box.appendChild(krow);
+
+  /* …and WHICH group of that population, where there is a choice to make.
+     Everything that starts working is filed with its own kind, so a grant to
+     all of them is one tick — but an admin who has built three groups of
+     people meant one of the three, and picking it here is the moment they
+     know which. Hidden where there is nothing to decide: one group of a kind
+     is not a choice, it is the answer. */
+  const grow = document.createElement('div');
+  grow.className = 'namerow';
+  const glab = document.createElement('b');
+  glab.textContent = 'In group';
+  grow.appendChild(glab);
+  const gsel = document.createElement('select');
+  gsel.className = 'ppick';
+  grow.appendChild(gsel);
+  box.appendChild(grow);
+
   const kindNote = document.createElement('div');
   kindNote.className = 'note';
   kindNote.textContent = d.kind ? ''
     : 'Not set — currently read as ' + (d.group_kind === 'user' ? 'a person' : 'a device')
       + ' from how it arrived.';
   box.appendChild(kindNote);
+
+  /* Redrawn whenever the population changes, because the list it offers is
+     the groups OF that population — the answer to "which group" is not even
+     the same set of options a moment after somebody presses PERSON. */
+  function syncGroups(){
+    const want = (kseg.querySelector('button.on') || {}).dataset.v
+                 || d.group_kind || 'device';
+    const mine = (GROUPS || []).filter(g=> g.kind === want);
+    const inNow = mine.filter(g=> (g.members || []).indexOf(d.id) >= 0)[0];
+    gsel.innerHTML = '';
+    mine.forEach(g=>{
+      const o = document.createElement('option');
+      o.value = g.id;
+      o.textContent = g.name;
+      gsel.appendChild(o);
+    });
+    if (!mine.length){
+      const o = document.createElement('option');
+      o.value = '';
+      o.textContent = want === 'user' ? 'People — made when you save'
+                                      : 'Devices — made when you save';
+      gsel.appendChild(o);
+    }
+    gsel.value = inNow ? inNow.id : (mine[0] ? mine[0].id : '');
+    /* One group of a kind is not a choice. Two is. */
+    grow.style.display = mine.length > 1 ? '' : 'none';
+  }
+  syncGroups();
 
   const l = document.createElement('label');
   l.className = 'vo';
@@ -6332,16 +6382,22 @@ function kioskBlock(d){
          the server says which so this can report it rather than let a group
          quietly lose a member. */
       const wantKind = (kseg.querySelector('button.on') || {}).dataset.v || '';
+      const wantGroup = gsel.value || '';
+      const inNow = (GROUPS || []).filter(
+        g=> (g.members || []).indexOf(d.id) >= 0)[0];
       let extra = '';
-      if (wantKind !== (d.kind || '')){
+      if (wantKind !== (d.kind || '') || (wantGroup && wantGroup !== (inNow || {}).id)){
         const k = await api('/displays/kind', {method:'POST', body: JSON.stringify(
-          {id: d.id, kind: wantKind})});
+          {id: d.id, kind: wantKind, group: wantGroup})});
         if (k.displays) DISPLAYS = k.displays;
+        if (k.groups) GROUPS = k.groups;
         d.kind = wantKind;
         kindNote.textContent = '';
         if ((k.dropped || []).length)
           extra = ' · removed from ' + k.dropped.join(', ')
                 + ' — a group takes one population';
+        if (k.joined) extra += ' · in ' + k.joined;
+        syncGroups();
         if (typeof refreshGroups === 'function') refreshGroups();
       }
       said.textContent = 'saved' + extra;
@@ -6462,6 +6518,10 @@ async function refreshDisplays(){
     return;
   }
   await loadDisplays();
+  /* The groups as well, because every row now offers the one it is in — and a
+     picker drawn before they arrive is a picker with nothing in it, on the
+     one control where "nothing" and "not loaded yet" look identical. */
+  await loadGroups();
   // The settings above the list are painted from the same fetch, so the two
   // can never be describing different states of the same document.
   paintDpSettings();
@@ -7761,9 +7821,9 @@ function panelNav(){
     syncSaveRow();
     $('panelscroll').scrollTop = 0;
     if (tab === 'accounts') refreshUsers();
-    // Groups moved to ACCOUNT, and it is populated by its own fetch — without
-    // this the list would be empty on the tab it now lives on.
-    if (tab === 'account') refreshGroups();
+    // Groups live on SECURITY now, and the list is populated by its own fetch
+    // — without this it would be empty on the tab it lives on.
+    if (tab === 'security') refreshGroups();
     if (tab === 'displays' || tab === 'devices' || tab === 'security'
         || tab === 'enrol') refreshDisplays();
     /* The three settings tabs ARE profile lists now, and those lists live in

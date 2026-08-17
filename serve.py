@@ -1579,6 +1579,11 @@ DISPLAY_SETTINGS = {
     # every unconfigured screen in the building is doing — the same reason a
     # route's default is stored by id.
     "kiosk_default": "",
+    # Which group each population lands in when it starts working. Minted on
+    # first need rather than shipped, so an install that never uses groups
+    # never grows two it did not ask for — see default_group.
+    "user_group": "",
+    "device_group": "",
 }
 MAX_FORM_FIELDS = 5
 #: (low, high) for each number the panel can set
@@ -2935,6 +2940,82 @@ def group_kind_of(rec):
     return "user" if is_guest(rec) else "device"
 
 
+#: What the group each population lands in is called when this server has to
+#: make one. Named for what is in them rather than for how they arrived, since
+#: an admin will rename them long before they remember which is which.
+DEFAULT_GROUP_NAME = {"user": "People", "device": "Devices"}
+
+
+def default_group(kind, by="the server"):
+    """The group a row joins the moment it starts working, minting one if there
+    is not one yet.
+
+    A row that belongs to no group is a row an endpoint's allow-list cannot
+    name, so every grant has to be made device by device — which is the data
+    entry a group exists to remove. Landing somewhere by default means the
+    first grant to a whole population is one tick rather than twelve.
+
+    Stored by id, not "the first group of this kind": reordering a list, or
+    somebody adding a second group of people, must not silently change where
+    everything arriving tomorrow ends up."""
+    if kind not in GROUP_KINDS:
+        return ""
+    cfg = display_settings()
+    key = kind + "_group"
+    gid = str(cfg.get(key) or "")
+    groups = read_groups()
+    if gid and gid in groups and groups[gid]["kind"] == kind:
+        return gid
+    # Blank, or naming one that was deleted. Adopt an existing group of this
+    # kind before making a second one — an admin who has already made "Staff"
+    # and nothing else meant that one.
+    for g, rec in sorted(groups.items()):
+        if rec["kind"] == kind:
+            gid = g
+            break
+    else:
+        gid = "g" + secrets.token_hex(4)
+        groups[gid] = {"name": DEFAULT_GROUP_NAME[kind], "kind": kind,
+                       "members": [], "created": int(time.time()),
+                       "created_by": by}
+        write_groups(groups)
+        print("group %s (%s) created for arriving %ss"
+              % (gid, DEFAULT_GROUP_NAME[kind], kind), flush=True)
+    cfg[key] = gid
+    write_display_settings(cfg)
+    return gid
+
+
+def join_group(did, gid):
+    """Put a display in a group, once. Silent where it is already there, and
+    where the group has gone — this runs on the back of somebody enrolling a
+    screen, and a failure to file it is not a reason to refuse the screen."""
+    if not gid:
+        return
+    groups = read_groups()
+    rec = groups.get(gid)
+    if not rec or did in rec["members"]:
+        return
+    rec["members"] = (rec["members"] + [did])[:MAX_ALLOW]
+    write_groups(groups)
+
+
+def file_display(rec_or_id, kind=None, by="the server"):
+    """A row that has just started working, filed with its own population.
+
+    Called at the two moments something becomes usable — a code redeemed, a
+    request approved — because those are the two ways in, and neither of them
+    used to leave the row anywhere an allow-list could find it."""
+    did = rec_or_id if isinstance(rec_or_id, str) else rec_or_id["id"]
+    if kind is None:
+        displays = read_displays()
+        rec = displays.get(did)
+        if not rec:
+            return
+        kind = group_kind_of(rec)
+    join_group(did, default_group(kind, by))
+
+
 def clean_members(ids, kind):
     """Only rows that exist, and only of this group's own kind. A member that
     is neither is dropped rather than refused — the panel sends the list it was
@@ -4181,6 +4262,7 @@ class Handler(SimpleHTTPRequestHandler):
                 self.end_headers()
                 return
             _code_fails.pop(ip, None)
+            file_display(out["id"])
             print("display %s (%s) enrolled by code" % (out["id"], display_label(out)),
                   flush=True)
             _back("ok")
@@ -5051,6 +5133,7 @@ class Handler(SimpleHTTPRequestHandler):
                 print("enrolment code refused (%s) from %s" % (out, ip), flush=True)
                 return self._json(400, {"error": out, "state": out})
             _code_fails.pop(ip, None)
+            file_display(out["id"])
             print("display %s (%s) enrolled by code, in page"
                   % (out["id"], display_label(out)), flush=True)
             body = json.dumps({"ok": True,
@@ -5275,6 +5358,13 @@ class Handler(SimpleHTTPRequestHandler):
                            deny_note=str(obj.get("note") or "").strip()[:500],
                            deny_repeat=bool(obj.get("repeat", True)))
             write_displays(displays)
+            # …and filed with its own population, so the next grant to all of
+            # them is one tick rather than one per row. Only on the way in: a
+            # refusal leaves whatever group it was already in alone, because
+            # groups are how you address a set of things and not a record of
+            # who is currently allowed.
+            if approve:
+                file_display(did, by=s["user"])
             # The allow-lists, whichever way it went: a refusal has to take
             # back anything a previous approval gave, or "denied" is a word on
             # a row rather than a thing that happened.
@@ -5424,12 +5514,38 @@ class Handler(SimpleHTTPRequestHandler):
                         touched = True
                 if touched:
                     write_groups(groups)
-            print("display %s kind=%s by %s%s"
+            # …and into one of the right population, so changing what a row IS
+            # never leaves it belonging to nothing. The panel names which,
+            # where an admin has more than one to choose from; where it names
+            # none, or names one that has gone, the population's own group
+            # takes it — minted here if this is the first of its kind.
+            joined = ""
+            if now != was or obj.get("group"):
+                want_gid = str(obj.get("group") or "")
+                groups = read_groups()
+                if want_gid not in groups or groups[want_gid]["kind"] != now:
+                    want_gid = default_group(now, s["user"])
+                # Out of every other group of this kind first: "which group is
+                # it in" has one answer on this control, and a row silently in
+                # two of them is a grant somebody cannot account for.
+                groups = read_groups()
+                touched = False
+                for gid, g in groups.items():
+                    if gid != want_gid and did in (g.get("members") or []):
+                        g["members"] = [m for m in g["members"] if m != did]
+                        touched = True
+                if touched:
+                    write_groups(groups)
+                join_group(did, want_gid)
+                joined = (read_groups().get(want_gid) or {}).get("name", "")
+            print("display %s kind=%s by %s%s%s"
                   % (did, want or "(inferred: %s)" % now, s["user"],
-                     "; dropped from " + ", ".join(dropped) if dropped else ""),
+                     "; dropped from " + ", ".join(dropped) if dropped else "",
+                     "; joined " + joined if joined else ""),
                   flush=True)
             return self._json(200, {"ok": True, "displays": admin_displays(),
-                                    "dropped": dropped})
+                                    "dropped": dropped, "joined": joined,
+                                    "groups": admin_groups()})
 
         if parsed.path == "/displays/reload":
             # Ask a screen to reload itself, without walking to it. What this
