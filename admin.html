@@ -28,12 +28,20 @@
        button that was technically present and practically invisible. */
     --help:#8fb6e8;
     --help-line:122,166,224;
-    /* Rust, and one control uses it: SIGN OUT. The panel spends green on "this
-       is the live thing", red on "this destroys something" and blue on "this
-       explains itself" — ending your session is none of those, and putting it
-       in the same grey as the way back to the start left the one control that
-       takes something away looking like the ones that take you somewhere. Warm
-       rather than red, because leaving is not a warning. */
+    /* THE DISPLAY'S OWN PALETTE, used as the panel's accents. These are the
+       same five triples the swatches on APPEARANCE are drawn from, so a label
+       shaded ICE here and a display set to ICE are the same colour rather than
+       two people's idea of one. Named after the palette rather than after what
+       they are used for, because what they are used for will move. */
+    --pal-blue:120,186,255;
+    --pal-milk:236,244,252;
+    --pal-ice:169,220,242;
+    --pal-amber:242,196,137;
+    --pal-rust:242,168,150;
+    /* SIGN OUT's own, and deeper than the palette's rust swatch. That one is a
+       light salmon meant to be read as a tint at eight per cent; this is a
+       FILLED control that has to hold white letters and read as warm against a
+       cold panel, which a pale wash cannot do. */
     --rust:176,84,44;
 
     /* Typography — the same three faces and three sizes the display has,
@@ -698,6 +706,23 @@
   /* The tab rows are set smaller than the bar, so their labels come down with
      them rather than sitting a size above the links they name. */
   .tablabel{font-size:calc(9px * var(--fs))}
+  /* Shaded from the display's palette, a colour per subject. A label is not
+     pressable, so it takes the quieter half of the treatment the swatches use
+     — a tinted edge and a wash under it — with the text left at the panel's
+     own near-white. The colour is what tells three rows apart at a glance; it
+     is not saying anything a reader has to decode. */
+  #panelbar .bartitle{
+    border-color:rgba(var(--pal-blue),.45);
+    background:rgba(var(--pal-blue),.12);
+  }
+  .tablabel{
+    border-color:rgba(var(--pal-ice),.45);
+    background:rgba(var(--pal-ice),.12);
+  }
+  .findside .tablabel{
+    border-color:rgba(var(--pal-milk),.45);
+    background:rgba(var(--pal-milk),.12);
+  }
   #navlinks .bartitle{margin-left:10px}
   /* …except the one that opens the bar. That margin is what holds a label off
      the link before it, and there is no link before the first — left in, it
@@ -765,12 +790,20 @@
      dash rather than a border. */
   #whorole{font-size:calc(8.5px * var(--fs));letter-spacing:.12em;white-space:nowrap;
            color:rgba(var(--paper),.72)}
+  /* The pair at the ends of the bar are the two things that move the WHOLE
+     panel, so both are filled rather than outlined — and they are filled in
+     different colours because they are opposites. Ice takes you back to the
+     start; rust ends the session. */
   #b_home{
     font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.12em;white-space:nowrap;
-    padding:3px 7px;cursor:pointer;background:none;
-    color:rgba(var(--paper),.8);border:1px solid rgba(var(--glass),.22);
+    padding:3px 7px;cursor:pointer;
+    color:#fff;
+    border:1px solid rgba(var(--pal-ice),.85);
+    background:rgba(var(--pal-ice),.22);
   }
-  #b_home:hover{border-color:var(--hue);color:var(--hue)}
+  #b_home:hover{
+    border-color:rgb(var(--pal-ice));background:rgba(var(--pal-ice),.38);color:#fff;
+  }
   /* The one control on this bar that ENDS something. Everything else here goes
      somewhere; this one takes the session away, and it should not be telling
      you that in the same grey as the way back to the start. Rust, outlined and
