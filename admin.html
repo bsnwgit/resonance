@@ -574,15 +574,29 @@
      hairline in both cases: they are doing the same job. */
   #navlinks::before{content:""}
   #navlinks::before,
-  #navlinks button + button,
-  #navlinks .navtitle{border-left:1px solid rgba(var(--glass),.28)}
-  /* A large space and then a rule: the space is what separates two subjects,
-     and the rule is what stops the space reading as the bar having run out. */
+  #navlinks button + button{border-left:1px solid rgba(var(--glass),.28)}
+  /* A large space, and nothing in it. It is what separates the two subjects;
+     the boxed title after it is what stops the space reading as the bar
+     having run out, so no rule is needed and a rule against the box would be
+     a line drawn beside a line. */
   #navlinks .navgap{width:34px}
-  #navlinks .navtitle{
-    display:flex;align-items:center;padding:2px 10px 2px 14px;
-    color:rgba(var(--paper),.75);
+  #navlinks .navtitle{display:flex;align-items:center}
+  /* ---- the two titles ----
+     Neither is a place you can go: SETTINGS names the page you are on, and
+     ENROLLMENTS names the pair beside it. Sitting in a row of links in the
+     same type at the same weight, they read as two more links that do
+     nothing when pressed — so they are boxed. A rule around a word is the
+     cheapest way to say "this is a label", and it doubles as the division
+     between the two groups, which is why the group divider came off the
+     second one. */
+  #panelbar .bartitle{
+    display:flex;align-items:center;align-self:center;
+    padding:3px 11px;letter-spacing:.2em;
+    color:rgba(var(--paper),.92);
+    border:1px solid rgba(var(--glass),.40);
+    background:rgba(var(--glass),.07);
   }
+  #navlinks .bartitle{margin-left:10px}
   /* The mark belongs to the title beside it, not to the link after it. */
   #navlinks .navtitle + .helpmark{margin-right:8px}
   #navlinks .helpmark + button{border-left:0}
@@ -1512,7 +1526,7 @@
        you are signed in as, and the way out, should not scroll away under a
        tab's worth of settings. -->
   <div id="panelbar">
-    <span>SETTINGS</span>
+    <span class="bartitle">SETTINGS</span>
     <!-- The way into the manual, beside the title rather than at the end of a
          tab row: documentation is not a topic you configure, it is the thing
          you reach for when a topic will not explain itself. Blue, and the
@@ -1543,7 +1557,7 @@
            fifth link, because they are not more of the same thing — and it
            carries its own ? for the same reason SETTINGS does. -->
       <span class="navgap"></span>
-      <span class="navtitle">ENROLLMENTS</span>
+      <span class="navtitle bartitle">ENROLLMENTS</span>
       <button id="enrolhelp" class="helpmark" type="button"
               title="open the documentation">?</button>
       <!-- People, and only people: the two populations arrive by different
