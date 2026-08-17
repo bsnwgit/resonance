@@ -946,6 +946,19 @@
      one thing on this tab that gets read at a distance — and selectable in one
      click for the screens that do have a keyboard. It takes the panel's "this
      is the live thing" green, the same as the commit buttons. */
+  /* The one thing on a row that is spending itself while you look at it, so
+     the one thing on a row that is not grey. Bigger than the facts under it
+     and set in the panel's live green, dropping to amber in the last minute
+     and to the refusal red once it is gone — colour doing the work of a
+     sentence, on a row read at a glance. */
+  .codeclock{
+    margin:6px 0 2px;font-size:calc(11px * var(--fs));letter-spacing:.14em;
+    color:#7ac9a0;
+  }
+  .codeclock.soon{color:#e8b04a}
+  .codeclock.spent{color:#e0716b}
+  .codeclock.forever{color:rgba(var(--paper),.75);letter-spacing:.1em}
+
   /* …and the same box where the code is ASKED for, which is not on the same
      tab as the register it appears in. Pressing GET A CODE and being shown
      nothing, because the answer landed somewhere you were not looking, is not
@@ -2155,6 +2168,30 @@ by noise.</div>
     </div>
   </section>
 
+  <section class="grp" data-tab="security">
+    <h4>Enrolment codes</h4>
+    <div class="grpbody">
+  <label class="bklab" style="margin-top:2px">A code lasts (minutes, 0 for no
+limit)</label>
+  <input id="dp_codemins" class="num" type="number" inputmode="numeric"
+         min="0" max="10080">
+  <div class="note help">How long a code is worth anything for after you press
+GET A CODE. Ten minutes by default, because the usual case is somebody walking
+across a building with six characters in their head — and the clock beside each
+one on DEVICE ENROLMENT is counting this down.
+
+<b>Zero switches the clock off</b>, and that is a real answer rather than a way
+of being careless: a code is <b>one use</b>, and the row it enrols was approved
+the moment you created it. A deployment that mints codes on Friday and hangs the
+screens on Monday is not less safe for it — what a code can do is become one
+screen you already decided to have.
+
+The clock applies from the moment a code is issued, so changing this does not
+extend one already out there. REISSUE gives that row a fresh one on the new
+setting.</div>
+    </div>
+  </section>
+
   <!-- Bare, like the profile lists — and BELOW the security topics, because
        what the door is set to comes before who is standing behind it. -->
   <!-- On SECURITY rather than in the profile settings row. A group is not a
@@ -2550,9 +2587,10 @@ one and you are given a six-character code; the row exists from that moment, so
 its endpoints can be ticked and its profile chosen before the screen it is for
 has ever been switched on.
 
-<b>A code lasts ten minutes and works once</b>, and the clock beside it is
-running. If it runs out, <b>REISSUE</b> gives another — the row is the PLACE,
-so its name and every endpoint that names it are kept.
+<b>A code works once</b>, and the clock on its row is counting down what is
+left of it — set under SECURITY, where it can also be switched off entirely. If
+it runs out, <b>REISSUE</b> gives another on the current setting: the row is the
+PLACE, so its name and every endpoint that names it are kept.
 
 The screen takes the code either way: type <b>&lt;this server&gt;/e/CODE</b>
 into its address bar, or open the display page on it and type the six
@@ -4871,6 +4909,7 @@ function paintDpSettings(){
   $('dp_days').value = DPCFG.guest_days;
   $('dp_max').value = DPCFG.max_displays;
   $('dp_pending').value = DPCFG.max_pending;
+  $('dp_codemins').value = DPCFG.code_minutes;
   paintDpForm(DPCFG.form || []);
   PROFILE_KINDS.forEach(k=> paintProfiles(k, DPCFG[k.key] || [],
                                           DPCFG[DEF_KEY[k.key]] || ''));
@@ -4987,6 +5026,7 @@ $('b_dpsave').addEventListener('click', ()=>{
     guest_days: parseInt($('dp_days').value, 10),
     max_displays: parseInt($('dp_max').value, 10),
     max_pending: parseInt($('dp_pending').value, 10),
+    code_minutes: parseInt($('dp_codemins').value, 10),
   }, 'dpnote');
 });
 
@@ -6477,6 +6517,43 @@ function dispBucket(d){
   return person ? 'waiting' : 'enrol';
 }
 
+/* Every running row clock. The list is rebuilt on every action, and an
+   interval whose element is no longer in the document is a timer that runs
+   until the tab is closed — a dozen of them after a busy morning. */
+let CODE_CLOCKS = [];
+function stopClocks(){
+  CODE_CLOCKS.forEach(t=> clearInterval(t));
+  CODE_CLOCKS = [];
+}
+
+function startClock(el, d){
+  /* No deadline at all: the admin turned the clock off, and the row says so
+     rather than showing 0:00 and looking spent. */
+  if (d.code_forever){
+    el.textContent = 'CODE DOES NOT EXPIRE';
+    el.classList.add('forever');
+    return;
+  }
+  const until = Date.now() + (d.code_left || 0) * 1000;
+  const paint = ()=>{
+    const left = Math.max(0, Math.round((until - Date.now()) / 1000));
+    if (!left){
+      el.textContent = 'CODE EXPIRED — REISSUE FOR ANOTHER';
+      el.classList.add('spent');
+      return true;                      // done
+    }
+    el.textContent = Math.floor(left / 60) + ':'
+                   + String(left % 60).padStart(2, '0') + ' LEFT TO ENROL';
+    /* The last minute earns a different colour. A clock that looks the same
+       at nine minutes and at forty seconds is a clock you have to read. */
+    el.classList.toggle('soon', left <= 60);
+    return false;
+  };
+  if (paint()) return;
+  const t = setInterval(()=>{ if (paint()) clearInterval(t); }, 1000);
+  CODE_CLOCKS.push(t);
+}
+
 async function refreshDisplays(){
   const box = {};
   DISP_BUCKETS.forEach(k=> box[k] = $({waiting: 'asklist', enrol: 'enrollist',
@@ -6495,6 +6572,7 @@ async function refreshDisplays(){
   // The settings above the list are painted from the same fetch, so the two
   // can never be describing different states of the same document.
   paintDpSettings();
+  stopClocks();
   live.forEach(k=>{ box[k].innerHTML = ''; box[k].className = ''; });
   /* Anything waiting sorts by how much it wants attention; anything working
      sorts by what was heard from most recently. Both orders survive the split
@@ -6585,9 +6663,9 @@ async function refreshDisplays(){
        CODE, which says the opposite of what this state is: the code exists,
        it is live, and it is waiting for somebody to TYPE it — with a clock on
        it that nothing on the row admitted to. */
-    if (st === 'code')
-      badge('CODE LIVE · ' + Math.max(1, Math.round((d.code_left || 0) / 60))
-            + ' MIN LEFT');
+    /* No number here: the clock inside the row carries it, and a badge saying
+       7 MIN LEFT is wrong sixty seconds after it is painted. */
+    if (st === 'code') badge(d.code_forever ? 'CODE LIVE' : 'CODE LIVE · TIMED');
     if (st === 'stale')   badge('CODE EXPIRED — REISSUE FOR ANOTHER');
     if (st === 'waiting') badge('WAITING');
     if (st === 'asked')   badge(d.renewals ? 'ASKING AGAIN' : 'ASKED FOR ACCESS');
@@ -6707,14 +6785,24 @@ async function refreshDisplays(){
        read from across a room while typing it into a television with a
        remote. The address as well as the code: nobody is typing half a URL. */
     if (st === 'code'){
+      /* The clock first, above everything this row says about itself, and in
+         the one colour on the row that is not grey. Every other fact here
+         keeps; this one is spending itself while you read it, and a number
+         somebody has to work out from "issued at" is a number nobody works
+         out. It counts in real time rather than saying "9 min left" and then
+         lying about it for the next nine minutes. */
+      const clock = document.createElement('div');
+      clock.className = 'codeclock';
+      row.appendChild(top);
+      row.appendChild(clock);
       const c = document.createElement('div');
       c.className = 'dcode';
       c.textContent = ENROL_BASE + dispCode(d.code);
-      const mins = Math.max(1, Math.round((d.code_left || 0) / 60));
       const sub = document.createElement('span');
-      sub.textContent = ' · ' + mins + ' min left · case and dashes do not matter';
+      sub.textContent = ' · case and dashes do not matter';
       c.appendChild(sub);
-      row.appendChild(top); row.appendChild(c);
+      row.appendChild(c);
+      startClock(clock, d);
     }else{
       row.appendChild(top);
     }
@@ -6891,7 +6979,7 @@ $('b_adddisp').addEventListener('click', async ()=>{
   /* The whole thing somebody has to type, on its own line and big enough to
      read from across a room while typing it into a television with a remote.
      The address as well as the code: nobody is typing half a URL. */
-  showCode(name, j.code, j.code_left || 600);
+  showCode(name, j.code, j.code_forever ? 0 : (j.code_left || 0));
 });
 
 /* A code is only worth anything for ten minutes, so the ten minutes are on
@@ -6910,6 +6998,11 @@ function showCode(name, code, left){
   out.appendChild(line);
   out.appendChild(sub);
   out.classList.add('on');
+  if (!left){                           // the clock is switched off entirely
+    sub.textContent = '“' + name + '” · does not expire · works once · type it '
+                    + 'into the screen, or into the box on its page';
+    return;
+  }
   const paint = ()=>{
     const s = Math.max(0, Math.round((until - Date.now()) / 1000));
     if (!s){

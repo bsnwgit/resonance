@@ -1326,7 +1326,6 @@ SEEN_INTERVAL = 300              # seconds between writes of "last seen"
 #: a different valid code, it is not a code at all.
 CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 CODE_LEN = 6
-CODE_TTL = 10 * 60               # you are standing in front of the screen
 _code_fails = {}                 # client ip -> [count, blocked_until]
 
 
@@ -1579,6 +1578,13 @@ DISPLAY_SETTINGS = {
     # every unconfigured screen in the building is doing — the same reason a
     # route's default is stored by id.
     "kiosk_default": "",
+    # How long an enrolment code is worth anything for, in minutes. ZERO IS
+    # NEVER, which is a real answer: a deployment that mints a code on Friday
+    # and hangs the screen on Monday is not less secure for it, because a code
+    # is one use and the row it enrols was approved the moment it was created.
+    # Ten minutes is the default because the usual case is somebody walking
+    # across a building with six characters in their head.
+    "code_minutes": 10,
     # Which group each population lands in when it starts working. Minted on
     # first need rather than shipped, so an install that never uses groups
     # never grows two it did not ask for — see default_group.
@@ -1588,7 +1594,11 @@ DISPLAY_SETTINGS = {
 MAX_FORM_FIELDS = 5
 #: (low, high) for each number the panel can set
 DISPLAY_LIMITS = {"max_displays": (2, 5000), "max_pending": (1, 1000),
-                  "guest_days": (1, 3650)}
+                  "guest_days": (1, 3650),
+                  # 0 is off — see code_minutes. A week is the top because a
+                  # code good for longer than anybody remembers issuing it is
+                  # one nobody will think to revoke.
+                  "code_minutes": (0, 10080)}
 
 #: The admin panel's own preview frames the real display page, so it says
 #: hello like any other. It is not a display: it is the panel, served from the
@@ -2619,7 +2629,7 @@ def invite_display(name, by):
     now_ = int(time.time())
     rec = dict(DISPLAY_DEFAULTS)
     rec.update(name=name, approved=True, approved_by=by, approved_at=now_,
-               created=now_, code=new_code(), code_expires=now_ + CODE_TTL)
+               created=now_, code=new_code(), code_expires=code_deadline(now_))
     displays[did] = rec
     write_displays(displays)
     return dict(rec, id=did), None
@@ -2642,9 +2652,19 @@ def reissue_display(did):
         return None, "no such display"
     now_ = int(time.time())
     rec.update(salt="", hash="", approved=True,
-               code=new_code(), code_expires=now_ + CODE_TTL)
+               code=new_code(), code_expires=code_deadline(now_))
     write_displays(displays)
     return dict(rec, id=did), None
+
+
+def code_deadline(now_):
+    """When a code minted now stops working, or 0 for never.
+
+    Zero rather than a far-future stamp, so "never" is a state the panel can
+    read rather than a number it has to recognise as absurd — and it is the
+    same convention `expires` already uses for a grant that does not run out."""
+    mins = display_settings()["code_minutes"]
+    return now_ + mins * 60 if mins else 0
 
 
 def redeem_code(raw):
@@ -2660,7 +2680,10 @@ def redeem_code(raw):
     for did, rec in displays.items():
         if not rec.get("code") or not hmac.compare_digest(rec["code"], code):
             continue
-        if (rec.get("code_expires") or 0) < now_:
+        # Zero is never — a deployment that turned the clock off. Anything
+        # else is a deadline.
+        deadline = rec.get("code_expires") or 0
+        if deadline and deadline < now_:
             return None, "expired"
         secret = secrets.token_urlsafe(32)
         salt, dk = hash_key(secret)
@@ -2856,7 +2879,11 @@ def admin_displays():
         # on the profile where they can be changed once for every screen.
         row.update({k: rec.get(k, DISPLAY_DEFAULTS[k]) for k in KIOSK_FIELDS})
         ref = _display_refusals.get(did)
-        live = bool(rec.get("code")) and (rec.get("code_expires") or 0) > now_
+        # A code with no deadline is live; one whose deadline has passed is
+        # not. Both have to be tellable apart from "there is no code", which
+        # is what the panel used to read a zero as.
+        deadline = rec.get("code_expires") or 0
+        live = bool(rec.get("code")) and (not deadline or deadline > now_)
         row.update(id=did, label=display_label(rec),
                    guest=is_guest(rec), expired=display_expired(rec),
                    # What it was SET to, and what it resolves to. The panel
@@ -2869,7 +2896,8 @@ def admin_displays():
                    # own, and the rest are working.
                    enrolled=bool(rec.get("hash")),
                    code=rec["code"] if live else "",
-                   code_left=max(0, (rec.get("code_expires") or 0) - now_) if live else 0,
+                   code_left=max(0, deadline - now_) if live and deadline else 0,
+                   code_forever=bool(live and not deadline),
                    refused=ref[0] if ref else 0,
                    refused_at=ref[1] if ref else 0,
                    refused_from=ref[2] if ref else "")
@@ -5392,13 +5420,15 @@ class Handler(SimpleHTTPRequestHandler):
                   % (rec["id"], display_label(rec), s["user"]), flush=True)
             # …and how long it is worth anything for, so the panel can count
             # it down rather than restate the rule. Read off the record rather
-            # than assumed to be CODE_TTL: the two agree today, and a panel
-            # that assumes they always will is a panel that lies the day they
-            # do not.
+            # than recomputed from the setting: an admin who changes the
+            # lifetime between minting and reading must not be shown a number
+            # the code itself does not agree with.
             return self._json(200, {"ok": True, "id": rec["id"],
                                     "code": rec["code"],
                                     "code_left": max(0, rec["code_expires"]
-                                                     - int(time.time())),
+                                                     - int(time.time()))
+                                                 if rec["code_expires"] else 0,
+                                    "code_forever": not rec["code_expires"],
                                     "displays": admin_displays()})
 
         if parsed.path == "/displays/reissue":
@@ -5417,13 +5447,15 @@ class Handler(SimpleHTTPRequestHandler):
                   % (rec["id"], display_label(rec), s["user"]), flush=True)
             # …and how long it is worth anything for, so the panel can count
             # it down rather than restate the rule. Read off the record rather
-            # than assumed to be CODE_TTL: the two agree today, and a panel
-            # that assumes they always will is a panel that lies the day they
-            # do not.
+            # than recomputed from the setting: an admin who changes the
+            # lifetime between minting and reading must not be shown a number
+            # the code itself does not agree with.
             return self._json(200, {"ok": True, "id": rec["id"],
                                     "code": rec["code"],
                                     "code_left": max(0, rec["code_expires"]
-                                                     - int(time.time())),
+                                                     - int(time.time()))
+                                                 if rec["code_expires"] else 0,
+                                    "code_forever": not rec["code_expires"],
                                     "displays": admin_displays()})
 
         if parsed.path == "/displays/approve":
