@@ -1517,7 +1517,12 @@
     <!-- Beside MODELS because they are the two halves of an endpoint that are
          not the endpoint: what it speaks to, and what it answers on. -->
     <button data-tab="network">NETWORK</button>
-    <button data-tab="devprof">DEVICE</button>
+    <!-- DISPLAY rather than DEVICE, and data-tab stays "devprof" for the same
+         reason APPEARANCE keeps "look": it is the storage key, and renaming it
+         would rewrite every stored document for a label. What the profile
+         describes is a display — a screen with a page on it — where DEVICE is
+         the row under ACCESS that a display is granted through. -->
+    <button data-tab="devprof">DISPLAY</button>
   </div>
 
   <div class="rule"></div>
@@ -2438,9 +2443,9 @@ DEVICES asks one directly.</div>
     </div>
   </section>
   <!-- What a public screen IS, and the only one of the three a device names.
-       The other lists are things a device profile points at. -->
+       The other lists are things a display profile points at. -->
   <section class="grp bare proflist" data-tab="devprof">
-    <div class="barehead"><span class="listtitle">Device profiles</span></div>
+    <div class="barehead"><span class="listtitle">Display profiles</span></div>
     <div class="grpbody">
   <div id="dp_kiosks"></div>
   <div class="note" id="kiosknote"></div>
@@ -5840,7 +5845,7 @@ function paintSavers(list){
     btn.disabled = busy || DPSAVERS.length >= 8;
   }
 }
-/* ---- the device profiles ----
+/* ---- the display profiles ----
    The one list a device names. Same row, same caret, same one-open-at-a-time
    as everything else in this panel, because they are the same kind of thing.
 

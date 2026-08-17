@@ -30,38 +30,44 @@ so the column stays short enough to take in at a glance rather than becoming a
 wall to scroll through. Clicking the open one closes it, which is a legitimate
 state to leave it in.
 
-At the top:
+**In the bar across the top**, beside the SETTINGS title, are the places this
+panel can take you — links rather than tabs, because they do not switch which
+controls you are editing, they change the subject entirely:
+
+- **ADMIN SETTINGS** — how the server itself is wired: where it can be reached
+  from, signing in, sessions, maintenance, and the admin portal's own port.
+  What the app answers on is a network profile, not here.
+- **ADMIN USERS** — who can sign in. The groups access is granted to have a tab
+  of their own, GROUPS, in the profile settings row.
+- **ACCESS** — what may use this server, and what each may reach.
+- **SECURITY** — **AI Requires Permission**: whether a general user needs
+  approval at all, how long a grant lasts, and how many devices and waiting
+  requests there may be. ACCESS answers which device may reach which endpoint;
+  this is whether anybody is asked in the first place.
+- **?** — these documents. It is blue, and it is the same blue as every ?
+  beside a topic heading, so help is one colour wherever you meet it.
+- At the right: your own name, your role, and **SIGN OUT**. One side of that
+  bar is where you are going, the other is who you are.
+
+Below it:
 
 - **filter settings** — type to search across every topic in every tab at
   once. This is the fastest way to find a control when you know roughly what
   it is called but not which tab it lives under.
 - **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER / GROUPS / MODELS / NETWORK /
-  DEVICE** — the profile settings group. Each is a list of profiles, and the
+  DISPLAY** — the profile settings group. Each is a list of profiles, and the
   controls for one appear inside it when you open it. MODELS and NETWORK are
   the two halves of an endpoint that are not the endpoint: what it speaks to,
   and what it answers on.
-- **AI**, **DEVICES** and **SECURITY** — the group to the right of a rule. AI
-  holds the endpoints, each naming a speech profile, a model profile and a
-  network profile. DEVICES is the register: every device this server knows
-  about, and where each one is set up. SECURITY holds **AI Requires
-  Permission** — whether a general user needs approval at all, how long a
-  grant lasts, and how many devices and waiting requests there may be. ACCESS
-  answers which device may reach which endpoint; this is whether anybody is
-  asked in the first place.
-- **?**, beside the SETTINGS title — these documents. It is blue, and it is the
-  same blue as every ? beside a topic heading, so help is one colour wherever
-  you meet it.
 
-At the foot, pinned so they are always reachable:
+**At the foot, CONNECTIONS** — what this server is wired to, as opposed to what
+you administer about it:
 
-- **ADMIN SETTINGS** — how the server itself is wired: where it can be reached
-  from, signing in, sessions, and the admin portal's own port. What the app
-  answers on is a network profile, not here.
-- **ADMIN** — who can sign in. The groups access is granted to have a tab of
-  their own, GROUPS, in the profile settings row.
-- **ACCESS** — what may use this server, and what each may reach.
+- **AI** — the endpoints, each naming a speech profile, a model profile and a
+  network profile.
+- **DEVICES** — the register: every device this server knows about, and where
+  each one is set up.
 - **EMBEDS** — keys that let another application frame this interface.
-- Your own name, your role, and **SIGN OUT**.
 
 **Your own account is behind your name.** Click it for the box that changes
 your password. It is the one thing on this page you do to yourself, so it sits
@@ -175,12 +181,12 @@ screen looks like and what it is allowed to do were never the same question:
 |---|---|
 | **Appearance profiles** | what a place looks like, for the handful of values that cannot be shared |
 | **Screensaver profiles** | what a kiosk does when nobody is there |
-| **Device profiles** | what a public screen is: voice only, full screen, the prompt line, and which of the lists above it uses |
+| **Display profiles** | what a public screen is: voice only, full screen, the prompt line, and which of the lists above it uses |
 
 They are in that order on the tab because it is the order you build in: the two
 pieces first, then the thing that names them.
 
-**A device profile is composed, not self-contained.** It names an appearance and
+**A display profile is composed, not self-contained.** It names an appearance and
 a screensaver rather than carrying copies of their values, so changing what a
 hallway looks like once still reaches every kiosk using it. Day and night in
 one hallway share an appearance and differ only in the dim — that case is the
@@ -269,7 +275,7 @@ for them.
 
 Most rows in a real deployment are not kiosks — a guest's laptop, somebody's
 phone — so it is one tick. Tick **Kiosk mode** on a device and one control
-appears: **which kiosk it is**, chosen from the DEVICE profiles.
+appears: **which kiosk it is**, chosen from the DISPLAY profiles.
 Untick it and the screen goes back to being an ordinary page, with the choice
 kept: putting the device back up restores what you had.
 
