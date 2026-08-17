@@ -25,6 +25,18 @@ it stays awake, and the greeting. An endpoint names a profile and takes all of
 it, and one profile may be named by only one endpoint, so with several
 assistants each still has a word of its own.
 
+**A new profile starts with the word empty.** Everything else it inherits from
+the tab as you have it set up, which is the point of capturing a profile
+there — but a second profile carrying the first one's word is a clash by
+construction, since the word is what tells two assistants apart.
+
+**It is stored as you type it, capitals and all**, so a display can say
+*Resonance* rather than *resonance*. What it answers to is unaffected: the
+matcher lowercases both the stored word and what it heard before comparing
+them. Anything that is not a letter, a digit or a space is dropped, because
+the matcher drops it too — a hyphen kept here would print a word that is not
+the word being matched.
+
 | Mode | Behaviour |
 |---|---|
 | OFF | no gate; anything heard is a question, and goes to the one marked DEFAULT |
