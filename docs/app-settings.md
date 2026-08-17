@@ -82,7 +82,7 @@ and disabled so the omission is visible rather than silent.
 
 The default, because the safe default is the one that assumes it can be
 reached. With sign-in set to nothing there are no accounts to manage: the
-sections under ADMIN USERS are not offered, and the account routes refuse
+sections under IDENTITY ▸ ADMIN are not offered, and the account routes refuse
 rather than quietly writing to a file nothing consults.
 
 ## Ports

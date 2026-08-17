@@ -28,6 +28,13 @@
        button that was technically present and practically invisible. */
     --help:#8fb6e8;
     --help-line:122,166,224;
+    /* Rust, and one control uses it: SIGN OUT. The panel spends green on "this
+       is the live thing", red on "this destroys something" and blue on "this
+       explains itself" — ending your session is none of those, and putting it
+       in the same grey as the way back to the start left the one control that
+       takes something away looking like the ones that take you somewhere. Warm
+       rather than red, because leaving is not a warning. */
+    --rust:176,84,44;
 
     /* Typography — the same three faces and three sizes the display has,
        kept identical to the block in index.html on purpose: the panel is
@@ -552,8 +559,11 @@
   .urow button:hover:not(:disabled),
   #stagebar button:hover:not(:disabled),
   /* the five that used to be listed here individually are all `.tabs`
-     buttons now, covered by the first selector */
-  #b_signout:hover:not(:disabled),
+     buttons now, covered by the first selector.
+
+     SIGN OUT is no longer here either: it carries its own colour, and the
+     shared rule would have handed it the panel's near-white on hover — a
+     control that goes grey the moment you reach for it. */
   #gatebtn:hover:not(:disabled){
     border-color:var(--hue);color:var(--hue);
   }
@@ -730,16 +740,34 @@
     text-underline-offset:3px;
     font-size:calc(10px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.92);
            overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  #whorole{font-size:calc(8px * var(--fs));letter-spacing:.14em;padding:2px 5px;white-space:nowrap;
-           border:1px solid rgba(var(--glass),.25);color:rgba(var(--paper),.8)}
-  #b_home,
-  #b_signout{
+  /* No box. It was outlined like a badge, which put a bordered thing between
+     your name and the way out and made three edges in a row where there is one
+     piece of information: who you are, and at what level. It reads as one
+     phrase now — name, dash, level — so the rule that separates them is a
+     dash rather than a border. */
+  #whorole{font-size:calc(8.5px * var(--fs));letter-spacing:.12em;white-space:nowrap;
+           color:rgba(var(--paper),.72)}
+  #b_home{
     font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.12em;white-space:nowrap;
     padding:3px 7px;cursor:pointer;background:none;
     color:rgba(var(--paper),.8);border:1px solid rgba(var(--glass),.22);
   }
-  #b_home:hover,
-  #b_signout:hover{border-color:var(--hue);color:var(--hue)}
+  #b_home:hover{border-color:var(--hue);color:var(--hue)}
+  /* The one control on this bar that ENDS something. Everything else here goes
+     somewhere; this one takes the session away, and it should not be telling
+     you that in the same grey as the way back to the start. Rust, outlined and
+     shaded, with the letters at full brightness — the only warm thing on a
+     cold panel, which is what makes it findable without being an alarm. */
+  #b_signout{
+    font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.12em;white-space:nowrap;
+    padding:3px 7px;cursor:pointer;
+    color:#fff;
+    border:1px solid rgba(var(--rust),.85);
+    background:rgba(var(--rust),.30);
+  }
+  #b_signout:hover{
+    border-color:rgb(var(--rust));background:rgba(var(--rust),.48);color:#fff;
+  }
   #stage{position:relative;display:flex;flex-direction:column;min-width:0}
   #stagebar{display:flex;align-items:center;gap:12px;padding:8px 14px;
             border-bottom:1px solid rgba(var(--glass),.1);
@@ -8813,7 +8841,10 @@ function start(){
   // Nothing to expire when there is no sign-in, so nothing to poll for.
   if (!ME.no_auth) startBeat();
   $('whoname').textContent = ME.user;
-  $('whorole').textContent = ME.role;
+  /* One phrase — name, dash, level — rather than a name and a badge. The dash
+     is carried here rather than in the markup so an empty role leaves no
+     orphan punctuation sitting beside somebody's name. */
+  $('whorole').textContent = ME.role ? '- ' + ME.role : '';
   /* With no sign-in there is nobody to name, and "Signed in as (no sign-in)"
      is worse than saying plainly what is going on. */
   $('whoami').textContent = ME.no_auth
