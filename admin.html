@@ -277,17 +277,14 @@
   .tabrow{display:flex;align-items:stretch;gap:14px;margin-bottom:2px}
   .tabside{display:flex;flex-direction:column;min-width:0}
   .tabside .tabs{margin-bottom:0}
-  /* Equal halves, so the rule lands in the middle of the row. Connections sits
-     at the LEFT of its half, hard against the rule, so the two groups read as
-     a pair either side of it rather than as two things at opposite ends of a
-     wide row with nothing between them. */
+  /* Connections is on its own down here now — the admin tabs it used to share
+     the row with are links in the bar at the top. So it takes the left edge
+     and only the width it needs, rather than half of a row with nothing in
+     the other half. The rule that divided the two subjects went with the
+     second subject: a boundary with nothing on the far side of it is a line,
+     not a division. */
   .tabside{flex:2 1 0}
-  .connside{flex:1 1 0;align-items:flex-start}
-
-  /* Heavy on purpose: this is a boundary between subjects, not a gap between
-     controls, and the panel's hairlines read as the latter. */
-  .tabsplit{flex:0 0 2px;align-self:stretch;
-            background:rgba(var(--glass),.34);margin-bottom:10px}
+  .connside{flex:0 1 auto;align-items:flex-start}
 
   /* The app tab's own commit row, at the foot of the box. Hidden outright
      on every other tab: a save button that belongs to settings you cannot
@@ -483,17 +480,10 @@
      or it would override them from a more specific selector. */
 
   #saverule{margin:10px 0 2px}
-  /* AI sits in the tab row itself now, and the four pinned entries are a row
-     of their own in the foot. Both are `.tabs`, so the hover and selected
-     treatments come from there and none of them needs a rule of its own —
-     the width arithmetic that used to place AI under the third tab, and the
-     full-width stacked entries in the foot, both went with the 425px column
-     they were sized for. */
-  #foottabs{margin-bottom:0}
-  /* Grow from their own label rather than from a zero basis, so on a panel
-     too narrow to hold four they wrap to a second line instead of squeezing
-     DOCUMENTATION out through its own border. */
-  #foottabs button{flex:1 1 auto;white-space:nowrap}
+  /* Grow from their own label rather than from a zero basis, so a panel too
+     narrow to hold them wraps to a second line instead of squeezing a label
+     out through its own border. */
+  .connside .tabs button{white-space:nowrap}
   /* a change here does nothing until the process restarts, so say so loudly */
   .pending{
     border-left:2px solid #e8b04a;padding-left:8px;margin-top:10px;
@@ -548,6 +538,29 @@
   }
   #panelhelp:hover{border-color:rgba(var(--help-line),1);color:#cfe2f8;
                    background:rgba(var(--help-line),.30)}
+  /* The way around the panel, as LINKS rather than as buttons. They sit in a
+     bar whose other occupants are a title, a help mark and your name, and a
+     row of bordered buttons in among those would read as four controls that
+     do something rather than four places you can go.
+
+     Marked by weight and colour alone: where you are is the brightest thing
+     in the row, and the rule under it is the only ornament — anything more
+     turns navigation back into buttons. */
+  #navlinks{display:flex;align-items:center;gap:14px;min-width:0;flex-wrap:wrap}
+  #navlinks button{
+    font:inherit;font-size:inherit;letter-spacing:inherit;
+    padding:2px 0;background:none;border:0;cursor:pointer;
+    color:rgba(var(--paper),.62);
+    border-bottom:1px solid transparent;
+  }
+  #navlinks button:hover{color:rgba(var(--paper),.95)}
+  #navlinks button.on{color:var(--hue);border-bottom-color:var(--hue-dim)}
+  /* A hairline between the title and the places it can take you, so the two
+     do not read as one long row of words. */
+  #navlinks::before{
+    content:"";align-self:stretch;width:1px;margin-right:2px;
+    background:rgba(var(--glass),.28);
+  }
   #panelbar .right{margin-left:auto}
   #whobox{display:flex;align-items:center;gap:8px;min-width:0}
   #mine{
@@ -1105,12 +1118,11 @@
     flex:1;font:inherit;font-size:calc(9px * var(--fs));letter-spacing:.18em;padding:6px 4px;cursor:pointer;
     background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.85);
   }
-  /* Five in the foot now, and the widest of them is DOCUMENTATION. A row with
-     no room for all five wraps to a second line rather than squeezing the
-     letter-spacing out of the labels: these are the navigation, and navigation
-     you have to squint at is worse than navigation on two lines. */
-  #foottabs{flex-wrap:wrap}
-  #foottabs button{min-width:86px}
+  /* The three left in the foot keep a tab's width rather than shrinking to
+     their labels. AI is two characters, and a two-character tab beside a
+     seven-character one reads as a mistake rather than as a short word. */
+  .connside .tabs{flex-wrap:wrap}
+  .connside .tabs button{flex:0 0 auto;min-width:96px}
   .tabs button.on{border-color:var(--hue-dim);color:var(--hue);background:rgba(var(--glass),.08)}
   .findrow{display:flex;margin:0 0 4px}
   #rigfind{
@@ -1426,6 +1438,27 @@
          one thing is what lets somebody find help without reading labels. -->
     <button id="panelhelp" type="button"
             title="open the documentation">?</button>
+    <!-- Administering the server, as links in the bar rather than as a row of
+         tabs at the foot. They were never the same kind of thing as the tabs
+         above the settings: those switch which set of controls you are
+         editing, these take you somewhere else entirely — who may sign in, who
+         may connect, what the server itself is. A row that looks like the
+         settings tabs said they were more of them.
+
+         Left, beside the title, because that is where you look for the way
+         around a page. Your name and the way out stay right, where they were:
+         one side is where you are going, the other is who you are. -->
+    <span id="navlinks">
+      <button id="tab_app" data-tab="app">ADMIN SETTINGS</button>
+      <!-- Accounts before devices: a group is made here and named over there,
+           so the order follows the order you do them in. -->
+      <button id="tab_accounts" data-tab="accounts">ADMIN</button>
+      <button id="tab_displays" data-tab="displays">ACCESS</button>
+      <!-- How the server itself is defended, which is administration rather
+           than a connection: ACCESS answers "which device, which endpoint",
+           and this answers what the server is exposed as. -->
+      <button id="tab_security" data-tab="security">SECURITY</button>
+    </span>
     <span class="right" id="whobox">
       <button id="whoname" title="your account">—</button>
       <span id="whorole"></span>
@@ -2621,34 +2654,17 @@ button to download it as a PDF.</div>
   <div id="profstash" hidden></div>
 
   <div id="panelfoot">
-    <!-- The same row treatment as the tabs at the top. They were full-width
-         stacked entries because a 425px column had no room to put four
-         side by side; it does now, and four buttons that behave like tabs
-         should look like the tabs. -->
+    <!-- CONNECTIONS on its own now: the admin tabs that used to share this row
+         are links in the bar at the top. So it sits at the left edge rather
+         than in the right half of a row it no longer shares, and the rule that
+         divided the two subjects has gone with the second subject — a boundary
+         with nothing on the far side of it is a line, not a division.
+
+         DOCUMENTATION is not here either. It is reached from the ? beside the
+         panel title, because it is not something you configure and it was
+         taking a slot in a row of things that are. -->
     <div class="tabrow">
-    <div class="tabside">
-    <div class="tabgroup">Admin settings</div>
-    <div class="tabs" id="foottabs">
-      <button id="tab_app" data-tab="app">ADMIN SETTINGS</button>
-      <!-- A profile is a kind of place — a hallway, a shop floor — rather than
-           a screen, so it belongs beside the deployment's own settings and not
-           in with who may use the server. Both lists moved off ACCESS: what a
-           screen looks like and what it is allowed to do were never the same
-           question. -->
-      <!-- Accounts before devices: a group is made here and named over there,
-           so the order follows the order you do them in. -->
-      <button id="tab_accounts" data-tab="accounts">ADMIN</button>
-      <button id="tab_displays" data-tab="displays">ACCESS</button>
-      <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
-      <!-- DOCUMENTATION is not here any more. It is reached from the ? beside
-           the panel title, because it is not something you configure and it
-           was taking a slot in a row of things that are. -->
-    </div>
-    </div>
-    <div class="tabsplit"></div>
-    <!-- What this server is wired to, and which machines are here. Beside the
-         admin tabs rather than above them: both rows are things you administer,
-         and the rule says they are different subjects. -->
+    <!-- What this server is wired to, and which machines are here. -->
     <div class="tabside connside">
       <div class="tabgroup">Connections</div>
       <div class="tabs">
@@ -2657,10 +2673,11 @@ button to download it as a PDF.</div>
              UI_TABS or SETTINGS_TABS — like AI, nothing here writes the shared
              settings document. -->
         <button id="tab_devices" data-tab="devices">DEVICES</button>
-        <!-- What this deployment is exposed as, as opposed to who may use it:
-             ACCESS answers "which device, which endpoint", and that is a
-             different question from how the server itself is defended. -->
-        <button id="tab_security" data-tab="security">SECURITY</button>
+        <!-- An embed is another application connecting to this one, which is
+             the same question the two beside it answer — what this server is
+             wired to — rather than something you administer about the server
+             itself. -->
+        <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
       </div>
     </div>
     </div>
