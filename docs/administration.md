@@ -56,7 +56,7 @@ At the foot, pinned so they are always reachable:
 - **ACCESS** — what may use this server, and what each may reach.
 - **EMBEDS** — keys that let another application frame this interface.
 - **SECURITY** — how this deployment is defended, as opposed to who may use
-  it. **AI Requires Authentication** lives here: whether a general user needs
+  it. **AI Requires Permission** lives here: whether a general user needs
   approval at all, how long a grant lasts, and how many devices and waiting
   requests there may be. ACCESS answers which device may reach which endpoint.
 - Your own name, your role, and **SIGN OUT**.
@@ -164,7 +164,7 @@ The ACCESS tab holds two topics — the rules about who may be here:
 | **Created Access** | where you invite a device: name it and take the code to the screen |
 
 Whether anybody is asked at all is on **SECURITY**, under **AI Requires
-Authentication** — that is the door rather than the key, and it decides what a
+Permission** — that is the door rather than the key, and it decides what a
 grant is worth once given. ACCESS answers which device may reach which
 endpoint.
 
