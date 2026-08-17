@@ -56,9 +56,9 @@ At the foot, pinned so they are always reachable:
 - **ACCESS** — what may use this server, and what each may reach.
 - **EMBEDS** — keys that let another application frame this interface.
 - **SECURITY** — how this deployment is defended, as opposed to who may use
-  it. ACCESS answers which device may reach which endpoint; this tab is about
-  the server itself. **It is empty at present** — the tab exists, and what
-  belongs on it is being decided.
+  it. **AI Requires Authentication** lives here: whether a general user needs
+  approval at all, how long a grant lasts, and how many devices and waiting
+  requests there may be. ACCESS answers which device may reach which endpoint.
 - Your own name, your role, and **SIGN OUT**.
 
 **Your own account is behind your name.** Click it for the box that changes
@@ -156,13 +156,17 @@ A display is one device — a screen on a wall, a TV, a laptop, somebody's phone
 — as distinct from a browser tab somebody opened. Anything with a browser and a
 microphone counts.
 
-The ACCESS tab holds three topics — the rules about who may be here:
+The ACCESS tab holds two topics — the rules about who may be here:
 
 | | |
 |---|---|
-| **Requested Access** | whether a general user needs approval at all, and what a grant to one is worth once given |
 | **The request form** | what a request asks for, under the setting that decides whether anyone is asked at all |
 | **Created Access** | where you invite a device: name it and take the code to the screen |
+
+Whether anybody is asked at all is on **SECURITY**, under **AI Requires
+Authentication** — that is the door rather than the key, and it decides what a
+grant is worth once given. ACCESS answers which device may reach which
+endpoint.
 
 The register itself is on its own tab, **DEVICES**, on the profile settings
 row —

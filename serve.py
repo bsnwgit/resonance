@@ -2595,7 +2595,8 @@ def open_default(doc):
 GUEST_PATH_MSG = ("guest requests are switched off, so the default endpoint is "
                   "the only thing an uninvited device can reach — it has to "
                   "stay answering and open to any display. Turn guest requests "
-                  "back on under DISPLAYS first, or make another endpoint the "
+                  "back on under SECURITY \u25b8 AI Requires Authentication "
+                  "first, or make another endpoint the "
                   "default.")
 
 

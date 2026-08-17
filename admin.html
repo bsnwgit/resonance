@@ -1942,18 +1942,12 @@ thing they belong to.</div>
     </div>
   </section>
 
-  <!-- Empty on purpose, for now. The tab exists so what goes on it has a
-       home to be built into; nothing has been moved here from another tab,
-       because moving a control is a separate decision from making the place
-       for it. -->
+  <!-- Whether the app takes a sign-in at all, and what a grant is worth once
+       given. On SECURITY rather than ACCESS: ACCESS answers WHICH device may
+       reach which endpoint, and whether anybody has to be approved in the
+       first place is a different question — it is the door, not the key. -->
   <section class="grp" data-tab="security">
-    <h4>Security</h4>
-    <div class="grpbody">
-    </div>
-  </section>
-
-  <section class="grp" data-tab="displays">
-    <h4>Requested Access</h4>
+    <h4>AI Requires Authentication</h4>
     <div class="grpbody">
   <div class="labrow">
     <label class="bklab">General users require approval</label>
@@ -2000,6 +1994,7 @@ by noise.</div>
   <div class="note" id="dpnote"></div>
     </div>
   </section>
+
   <section class="grp" data-tab="displays">
     <h4>Created Access</h4>
     <div class="grpbody">
@@ -7071,7 +7066,8 @@ function panelNav(){
     // Groups moved to ACCOUNT, and it is populated by its own fetch — without
     // this the list would be empty on the tab it now lives on.
     if (tab === 'account') refreshGroups();
-    if (tab === 'displays' || tab === 'devices') refreshDisplays();
+    if (tab === 'displays' || tab === 'devices' || tab === 'security')
+      refreshDisplays();
     /* The three settings tabs ARE profile lists now, and those lists live in
        the displays document — so arriving at one has to fetch it, exactly as
        PROFILES does. Without this the lists were painted only if you happened
