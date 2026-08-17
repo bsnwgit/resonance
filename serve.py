@@ -139,7 +139,39 @@ APP_DEFAULTS = {
     "bind": "everything",            # loopback | address | everything
     "bind_address": "",              # the one address, when bind == "address"
     "auth": "accounts",              # none | accounts
+    # ---- staying up unattended ----
+    # A display at rest issues no requests at all, so without a poll an outage
+    # would end and the screen would stay broken until somebody walked up and
+    # spoke to it. The same poll keeps "last seen" fresh, gives the server
+    # somewhere to answer "reload yourself", and is what makes a dead screen
+    # noticeable from the panel rather than from the hallway.
+    "poll_seconds": 20,
+    # How many times a request tries before the display says so, and how long
+    # it waits between attempts. Three is right for a restart and wrong for a
+    # severed cable, so both are settings rather than constants.
+    "retry_attempts": 3,
+    "retry_seconds": 4,
+    # A forced refresh, because a tab that never reloads accumulates. "HH:MM"
+    # on the DEVICE's own clock, for the same reason a screensaver's dark hours
+    # are read there: a building can span time zones and a screen's night is
+    # the night outside it, not the server's.
+    #
+    # EMPTY IS OFF, and off is the default. A nightly reload is a net under
+    # work not yet done rather than something every install needs, and an
+    # upgrade that silently started reloading every screen in a building at
+    # four in the morning would be this deciding something nobody asked for.
+    "refresh_at": "",
+    # …spread over this many minutes, or zero for all at once. Twelve tablets
+    # reconnecting in the same second is a load this server did not previously
+    # have; each screen takes its own offset inside the window from its own id,
+    # so the spread is stable rather than re-rolled on every reload.
+    "refresh_stagger": 0,
 }
+#: (low, high) for the numbers above. A poll faster than a couple of seconds is
+#: a denial of service somebody configured by accident; one slower than five
+#: minutes is a screen that stays dead through a lunch break.
+UNATTENDED_LIMITS = {"poll_seconds": (2, 300), "retry_attempts": (1, 10),
+                     "retry_seconds": (1, 60), "refresh_stagger": (0, 240)}
 PORT_MIN, PORT_MAX = 1024, 65535     # below 1024 needs root; this runs as you
 SESSION_MIN, SESSION_MAX = 5, 480    # minutes: below 5 is unusable, above 8h absurd
 BIND_MODES = ("loopback", "address", "everything")
@@ -1136,6 +1168,29 @@ def validate_app(obj, current):
     unable to start, because the only way back would be editing JSON on the
     box by hand."""
     cfg = dict(current)
+    # Clamped rather than refused: these are a screen's own housekeeping, and a
+    # number outside the range is somebody nudging a field rather than a
+    # configuration that would stop the server coming up. The ports below are
+    # the opposite, which is why they refuse.
+    for k, (lo, hi) in UNATTENDED_LIMITS.items():
+        if k not in obj:
+            continue
+        try:
+            v = int(obj[k])
+        except (TypeError, ValueError):
+            return None, "%s must be a whole number" % k.replace("_", " ")
+        cfg[k] = min(hi, max(lo, v))
+    if "refresh_at" in obj:
+        # Refused rather than clamped, unlike the numbers above: there is no
+        # nearest sensible time to a typo, and a field silently corrected to
+        # 00:00 is a building reloading at midnight because somebody mistyped.
+        v = str(obj["refresh_at"] or "").strip()
+        if v:
+            m = re.match(r"^([0-9]{1,2}):([0-9]{2})$", v)
+            if not m or int(m.group(1)) > 23 or int(m.group(2)) > 59:
+                return None, "the refresh time reads as HH:MM, or empty for none"
+            v = "%02d:%s" % (int(m.group(1)), m.group(2))
+        cfg["refresh_at"] = v
     for k in ("http_port", "https_port", "admin_port"):
         if k not in obj:
             continue
@@ -1362,6 +1417,11 @@ DISPLAY_DEFAULTS = {
     # changes with it, instead of twelve rows drifting out of step with no way
     # to see which had.
     "kiosk_profile": "",
+    # When an admin last asked this screen to reload itself. The display sends
+    # the moment it booted with every poll and reloads when this is newer, so
+    # the request clears itself by being satisfied — no acknowledgement to
+    # store, and nothing left set to fire a second time on the next boot.
+    "reload_req": 0,
 }
 
 #: How many screensaver profiles may exist. A deployment has a handful of
@@ -1691,6 +1751,14 @@ KIOSK_OFF = {"voice_only": True, "look": "", "motion": "", "speech": "",
              # somebody also browses on wants its address bar, and a television
              # whose operating system already hides the chrome gains nothing.
              "fullscreen": True,
+             # Ask the browser to keep the backlight on. The device's own idea
+             # of when to sleep is the one thing between a wall screen and a
+             # black rectangle, and a screen that sleeps cannot be walked up to
+             # and spoken to — the microphone is behind a page nobody can see.
+             # Off is a real answer on a television or a tablet whose operating
+             # system is already set never to sleep, where holding the lock
+             # gains nothing and costs the battery.
+             "keep_awake": True,
              # The line low in the frame that tells a passer-by this listens.
              "prompt": True,
              # …and what it says. EMPTY MEANS the automatic one, built from the
@@ -1730,6 +1798,7 @@ def clean_kiosks(raw):
                     "speech": str(k.get("speech") or "")[:16],
                     "saver": str(k.get("saver") or "")[:16],
                     "fullscreen": bool(k.get("fullscreen", KIOSK_OFF["fullscreen"])),
+                    "keep_awake": bool(k.get("keep_awake", KIOSK_OFF["keep_awake"])),
                     "prompt": bool(k.get("prompt", KIOSK_OFF["prompt"])),
                     "prompt_text": str(k.get("prompt_text") or "")
                                    .strip()[:MAX_PROMPT_TEXT]})
@@ -2349,6 +2418,7 @@ def kiosk_of(rec, savers=None, looks=None, kiosks=None, default_id=None,
             "look": merged or None,
             "saver": find_saver(str(prof.get("saver") or ""), savers),
             "fullscreen": bool(prof.get("fullscreen", KIOSK_OFF["fullscreen"])),
+            "keep_awake": bool(prof.get("keep_awake", KIOSK_OFF["keep_awake"])),
             "prompt": bool(prof.get("prompt", KIOSK_OFF["prompt"])),
             # The admin's words where there are any, and the empty string where
             # there are not — the display builds the automatic line itself,
@@ -2382,6 +2452,90 @@ def validate_kiosk(obj, rec, kiosks):
                           "panel to see the current list")
         out["kiosk_profile"] = pid
     return out, None
+
+
+#: Last computed displays stamp, keyed by the file's modification time in
+#: nanoseconds. Seconds are too coarse — two writes inside one second would
+#: read as no change at all.
+_DISPLAYS_STAMP = {"key": None, "value": "0"}
+
+
+def _displays_stamp():
+    """A digest of the parts of displays.json a screen actually renders from.
+
+    NOT the file's modification time, and this is the whole reason this
+    function exists: `last_seen` is written every few minutes by the very poll
+    that reads this, so a stamp based on mtime would change on its own and
+    order every display in the building to reload itself for ever. Only the
+    fields an admin can change are in the digest — `asked`, `hint` and
+    `expires` move without an admin (the last one every time a guest renews),
+    and are nobody else's business either.
+
+    Recomputed only when the file has actually been written, so a poll from a
+    building full of screens costs one stat each rather than one hash each."""
+    try:
+        st = os.stat(DISPLAYS_PATH)
+    except OSError:
+        return "0"                       # absent is a stamp of its own
+    key = (st.st_mtime_ns, st.st_size)
+    if _DISPLAYS_STAMP["key"] == key:
+        return _DISPLAYS_STAMP["value"]
+    try:
+        raw = read_displays_doc()
+    except Exception:
+        return _DISPLAYS_STAMP["value"]
+    rows = raw.get("displays") or {}
+    if isinstance(rows, dict):
+        rows = list(rows.values())
+    facts = sorted(
+        "%s|%s|%s|%s|%s|%s" % (r.get("id"), bool(r.get("approved")),
+                               bool(r.get("denied")), bool(r.get("kiosk")),
+                               r.get("kiosk_profile") or "", r.get("name") or "")
+        for r in rows if isinstance(r, dict))
+    facts.append(json.dumps(raw.get("settings") or {}, sort_keys=True))
+    val = hashlib.sha256("\n".join(facts).encode()).hexdigest()[:16]
+    _DISPLAYS_STAMP["key"] = key
+    _DISPLAYS_STAMP["value"] = val
+    return val
+
+
+def config_gen():
+    """A stamp that changes whenever anything a display renders from changes.
+
+    The display keeps the value it booted with and reloads when it moves,
+    which is how a route or an appearance edited during an outage reaches a
+    screen nobody is standing at.
+
+    Coarse on purpose. It cannot say WHAT changed and does not need to — the
+    answer to all of them is the same reload."""
+    parts = []
+    for p in (ROUTES_PATH, SETTINGS_PATH, APP_PATH):
+        try:
+            parts.append(str(os.stat(p).st_mtime_ns))
+        except OSError:
+            parts.append("0")
+    parts.append(_displays_stamp())
+    return ".".join(parts)
+
+
+def refresh_offset(did, stagger_minutes):
+    """How many seconds after the refresh time THIS screen reloads.
+
+    Derived from the display's id rather than rolled at random, so a screen
+    keeps the same slot across reloads and restarts — twelve tablets spread
+    over the window stay spread, instead of re-shuffling every night until two
+    of them land on the same second anyway.
+
+    Computed here rather than in the browser because the id is the one stable
+    thing a display has, and it is deliberately not readable from page script:
+    the cookie carrying it is HttpOnly."""
+    try:
+        span = int(stagger_minutes) * 60
+    except (TypeError, ValueError):
+        return 0
+    if span <= 0:
+        return 0
+    return int(hashlib.sha256(str(did).encode()).hexdigest()[:8], 16) % span
 
 
 def find_display(token):
@@ -4671,6 +4825,72 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             return self.wfile.write(body)
 
+        if parsed.path == "/display/poll":
+            # A display saying it is still here, and asking whether anything
+            # has moved. The smallest answer that lets a screen decide to
+            # reload itself: a stamp, and whether an admin has asked it to.
+            #
+            # Same-origin for the reason hello is — with SameSite=Strict a
+            # cross-site POST arrives without the cookie and would be taken for
+            # a device nobody has seen before.
+            if not self._same_origin():
+                return self._json(403, {"error": "cross-origin request refused"})
+            obj = self._json_body()
+            if obj is None:
+                return
+            try:
+                boot = int(obj.get("boot") or 0)
+            except (TypeError, ValueError):
+                boot = 0
+            gen = config_gen()
+            # The numbers the display needs to keep itself up, answered here
+            # rather than at hello so there is one place that carries them and
+            # a change reaches a screen on its next poll. They are operational
+            # rather than secret — how often a screen checks in and how many
+            # times it tries says nothing about what it is connected to.
+            app = read_app()
+            cfg = {k: app.get(k, APP_DEFAULTS[k])
+                   for k in ("poll_seconds", "retry_attempts", "retry_seconds",
+                             "refresh_at", "refresh_stagger")}
+            cfg["refresh_offset"] = 0
+            # The panel's preview frames the display page and polls like
+            # anything else that does. It is not a device: it must not enrol,
+            # and it must never be told to reload itself out from under the
+            # admin who is editing the very settings it is previewing — by an
+            # admin's request or by the clock, which is why the nightly refresh
+            # is blanked here as well.
+            # THIS server's clock, which is the clock a reload request is
+            # stamped with. The display keeps the value it was given at its
+            # first poll and hands it back as `boot`, so the comparison below
+            # is server time against server time — a tablet whose own clock is
+            # a year out would otherwise obey a request for ever or never.
+            now_ = int(time.time())
+            if self.admin_port:
+                cfg["refresh_at"] = ""
+                return self._json(200, {"ok": True, "gen": gen, "reload": False,
+                                        "cfg": cfg, "now": now_})
+            disp = self._display()
+            if not disp:
+                # No cookie, or one naming a row that is gone. Still a 200:
+                # an unapproved screen renders, and the poll is how it finds
+                # out it has been approved without anybody touching it.
+                return self._json(200, {"ok": True, "gen": gen, "reload": False,
+                                        "cfg": cfg, "now": now_})
+            cfg["refresh_offset"] = refresh_offset(disp["id"],
+                                                   cfg["refresh_stagger"])
+            note_display_seen(disp["id"])
+            try:
+                req = int(disp.get("reload_req") or 0)
+            except (TypeError, ValueError):
+                req = 0
+            # Satisfied by being obeyed: the display reports when it booted, so
+            # a request older than this boot has already been carried out. No
+            # acknowledgement to store, and nothing left set to fire again on
+            # the next restart.
+            return self._json(200, {"ok": True, "gen": gen, "cfg": cfg,
+                                    "now": now_,
+                                    "reload": bool(boot and req > boot)})
+
         if parsed.path == "/display/request":
             # A device asking for access, in the admin's own words. Same-origin
             # for the same reason hello is: nothing here should be reachable
@@ -5025,6 +5245,29 @@ class Handler(SimpleHTTPRequestHandler):
                   flush=True)
             return self._json(200, {"ok": True, "displays": admin_displays(),
                                     "dropped": dropped})
+
+        if parsed.path == "/displays/reload":
+            # Ask a screen to reload itself, without walking to it. What this
+            # actually fixes is a display that is alive but stuck: it is still
+            # polling, so it is still listening, and a reload is the whole
+            # repair. A display that does NOT come back from this is one the
+            # server has no channel to at all — nothing here reaches it, and
+            # that is the condition worth raising an alert about rather than
+            # retrying into.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            did = str(obj.get("id") or "")
+            displays = read_displays()
+            if did not in displays:
+                return self._json(404, {"error": "no such display"})
+            displays[did]["reload_req"] = int(time.time())
+            write_displays(displays)
+            return self._json(200, {"ok": True, "id": did,
+                                    "displays": admin_displays()})
 
         if parsed.path == "/displays/rename":
             s = self._require("admin")
