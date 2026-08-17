@@ -398,26 +398,39 @@
     padding:2px 10px 12px;
     margin-top:10px;
   }
-  /* The panel's opening state: the mark, centred, and nothing that holds
-     anything. Hidden outright the rest of the time rather than left in the
-     flow with no height — a scroll that starts a screen down from the top is
-     the bug this would otherwise be. */
-  #panelhome{display:none}
-  #panel.home #panelhome{
+  /* The ground the panel sits on, present the whole time. Out of the flow and
+     pinned to the panel rather than to the scroll, so it stays put while the
+     topics move over it. */
+  #panelhome{
+    position:absolute;inset:0;z-index:0;
     display:flex;align-items:center;justify-content:center;
-    /* The panel's own height less what the menus above it take, so the mark
-       centres in what is left rather than in a box of its own. */
-    min-height:60vh;
+    /* Never in the way of anything: it is behind the page in every sense, and
+       a click that lands on the wallpaper instead of the control under the
+       cursor is the one way a watermark can be a bug. */
+    pointer-events:none;
+    /* The artwork carries an opaque near-black backing rectangle, drawn for a
+       sign-in card that needed one. Behind a working panel that would be a
+       dark BLOCK rather than a watermark — so it is screened, where near-black
+       contributes nothing and only the strokes and the wordmark come through.
+       Without support for the blend the rectangle is still all but invisible
+       at this opacity, so it degrades to slightly-too-dark rather than to
+       wrong. */
+    mix-blend-mode:screen;
+    opacity:.12;filter:grayscale(.9);
+    /* Slow enough to read as the page settling rather than as something
+       flashing on the way past. */
+    transition:opacity .55s ease, filter .55s ease;
   }
-  /* Three quarters of the panel, which is the space between the window's left
-     edge and the preview — the panel IS that column, so a percentage of it is
-     the measurement without having to know what the preview is set to. */
-  #panel.home #panelhome img{
-    width:75%;height:auto;max-width:none;
-    /* Drawn at whatever size the column is, rather than at the 248px the sign-in
-       card asks for. */
-    opacity:.92;
-  }
+  /* Full strength on the opening state, where it is the only thing there. */
+  #panel.home #panelhome{opacity:1;filter:none}
+  /* Three quarters of the panel, which IS the space between the window's left
+     edge and the preview — so a percentage of this column is the measurement
+     without having to know what the preview is set to. */
+  #panelhome img{width:75%;height:auto;max-width:none}
+  /* Above the mark, both of them. Without a stacking order of their own they
+     share one with it and the answer is whatever the DOM happens to say. */
+  #panelbar,
+  #panelscroll{position:relative;z-index:1}
   /* Nothing to filter and nothing to save while no tab is open, and a field
      offering to filter an empty page is a control wired to nothing. */
   #panel.home #grpbox,
@@ -1628,6 +1641,17 @@
 
 <div id="wrap">
 <div id="panel">
+  <!-- The mark, behind everything, all of the time. Full strength on the
+       opening state where it is the only thing on the page, and a watermark
+       once somebody is working — still there, greyed back far enough to read
+       a setting over.
+
+       Out of the scroll and pinned to the panel: a watermark that slides up
+       under the topics as you scroll is a picture somebody is scrolling, not a
+       ground the page sits on. -->
+  <div id="panelhome" aria-hidden="true">
+    <img src="lockup.svg" alt="">
+  </div>
   <!-- The identity sits at the top right of the panel, opposite the stage's
        own bar across the window. It is outside #panelscroll on purpose: who
        you are signed in as, and the way out, should not scroll away under a
@@ -1736,15 +1760,6 @@
 
   <div class="rule"></div>
   </div><!-- /panelhead -->
-
-  <!-- Where the panel opens: the mark, and nothing else. No box, no topics and
-       no tab lit, because none of them is where you are yet — it used to open
-       on APPEARANCE, which is a choice made on somebody's behalf about what
-       they came here to do. The menus stay, above and in the bar; everything
-       they lead to waits until one of them is pressed. -->
-  <div id="panelhome">
-    <img src="lockup.svg" alt="Resonance">
-  </div>
 
   <div id="grpbox">
   <!-- Which figure it is, and it belongs with how that figure moves rather
