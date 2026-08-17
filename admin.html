@@ -376,23 +376,32 @@
   /* An endpoint's subsections are .subgrp rather than .grp, so they need
      saying separately — but they are the same thing to the eye: a caret, a
      name, and a body that opens. */
-  .erow[data-rid] .subgrp{border:0;margin:0}
-  .erow[data-rid] .subgrp + .subgrp{margin-top:9px}
+  /* …and the embed draft is one of these too: it is a row in a list of named
+     things, made the same way an endpoint is, so it reads the same way down
+     its own row. */
+  .erow[data-rid] .subgrp,
+  #em_draft .subgrp{border:0;margin:0}
+  .erow[data-rid] .subgrp + .subgrp,
+  #em_draft .subgrp + .subgrp{margin-top:9px}
   /* One per line, full width, the way a profile's sections stack — rather than
      tiling into 215px columns. An endpoint reads down its own row instead of
      across it, and the two lists look like the same kind of thing. */
-  .erow[data-rid] .subwrap{
+  .erow[data-rid] .subwrap,
+  #em_draft .subwrap{
     display:block;margin:8px 0 2px;padding-left:9px;
     border-left:2px solid rgba(var(--glass),.22);
   }
   /* No box of its own either: a profile's sections are separated by a hairline
      under the name, not by a frame each. */
-  .erow[data-rid] .subgrp{
+  .erow[data-rid] .subgrp,
+  #em_draft .subgrp{
     border:0;border-top:1px solid rgba(var(--glass),.10);
     background:none;margin:0;
   }
-  .erow[data-rid] .subgrp:first-child{border-top:0}
-  .erow[data-rid] .subgrp > h5{padding-left:20px}
+  .erow[data-rid] .subgrp:first-child,
+  #em_draft .subgrp:first-child{border-top:0}
+  .erow[data-rid] .subgrp > h5,
+  #em_draft .subgrp > h5{padding-left:20px}
 
   /* the first topic's own top rule would double up with the box edge */
   #grpbox .grp:first-of-type{border-top:0;margin-top:6px}
@@ -654,6 +663,10 @@
      them as one teaches the operator the wrong model. */
   .erow{display:block;padding:8px 0;
         border-bottom:1px solid rgba(var(--glass),.08)}
+  /* `display:block` above is a class selector and beats the browser's own
+     rule for [hidden], so a hidden row would go on showing. The embed draft is
+     hidden until somebody adds one, and this is what makes that work. */
+  .erow[hidden]{display:none}
   .erow .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .erow .nm{font-size:calc(10px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.96)}
   /* An endpoint row wears the same title and badge as every other row in the
@@ -2532,15 +2545,123 @@ code for do not, and never will.
     </div>
   </section>
 
-  <section class="grp" data-tab="embeds">
-    <h4>Embed keys</h4>
+  <!-- Laid out like the endpoints on AI, because it is the same kind of list:
+       a set of named things, each of which is one line until you want it, and
+       a new one made by adding a row rather than by filling in a permanent
+       form underneath. It was two headed sections — a list whose every row was
+       always fully expanded, and a create form always on screen whether or not
+       you were making anything.
+
+       Where it PARTS from AI is behaviour, not shape. An endpoint block is an
+       editing surface; a key is not. What it may do and what it draws are
+       fixed when it is created, because a saved key can already be framed by
+       somebody's page and quietly widening it is not a thing an admin should
+       be able to do by accident. So a saved row opens read-only, and the draft
+       is the only row with fields in it. -->
+  <section class="grp bare proflist" data-tab="embeds">
     <div class="grpbody">
   <div id="emblist"></div>
-  <div class="note help" style="margin-top:10px">A key lets another
-application's <b>server</b> ask this one for a short-lived session and put the
-result in an iframe. The key never reaches a browser. What it may do and what
-it draws are fixed at creation — to change either, make a new key and retire
-this one.
+
+  <!-- Kept in the document rather than built on demand: everything below is
+       addressed by id — by the preset buttons, the coherence check and the
+       create itself — and a form cloned into place would either duplicate
+       those ids or need every one of them rewritten to work by position. -->
+  <!-- Deliberately NOT class `isdraft`: that word belongs to the endpoint
+       being created on AI, which is looked up by it. -->
+  <div class="erow" id="em_draft" hidden>
+    <div class="top">
+      <span class="nm">New embed key</span>
+      <span class="badge">NOT CREATED YET</span>
+    </div>
+    <div class="grpbody">
+  <label class="bklab" style="margin-top:2px">Name</label>
+  <input id="em_name" type="text" spellcheck="false" autocomplete="off"
+         placeholder="lobby kiosk">
+  <div class="note help">Labels the key here and in the server log. It is never
+sent to the host page and never seen by anybody using the embed.</div>
+
+  <div class="subwrap">
+  <div class="subgrp open">
+    <h5>Start from<span class="subsum"></span></h5>
+    <div class="subbody">
+  <div class="seg" id="em_preset">
+    <button data-v="full" class="on">FULL</button>
+    <button data-v="console">CONSOLE</button>
+    <button data-v="voice">VOICE</button>
+    <button data-v="chat">CHAT</button>
+    <button data-v="kiosk">KIOSK</button>
+    <button data-v="signage">SIGNAGE</button>
+  </div>
+  <div class="note help">A starting point, not a mode. Pick the one nearest
+what you want and adjust the two lists below — what is stored is the two
+lists, and the preset is only remembered so the list reads as something you
+chose rather than as fourteen ticks.</div>
+    </div>
+  </div>
+
+  <div class="subgrp open">
+    <h5>What it may do<span class="subsum"></span></h5>
+    <div class="subbody">
+  <div class="cks" id="em_cap">
+    <label><input type="checkbox" data-c="ask"> Ask</label>
+    <label><input type="checkbox" data-c="mic"> Microphone</label>
+    <label><input type="checkbox" data-c="speak"> Speak</label>
+  </div>
+  <div class="note help">Permission, not furniture. Hiding the TALK button
+under <b>What it draws</b> does not withdraw the microphone — these are two
+axes on purpose, and the host may narrow either at runtime but never widen
+one.</div>
+    </div>
+  </div>
+
+  <div class="subgrp open">
+    <h5>What it draws<span class="subsum"></span></h5>
+    <div class="subbody">
+  <div class="cks" id="em_parts">
+    <label><input type="checkbox" data-p="visual"> Figure</label>
+    <label><input type="checkbox" data-p="transcript"> Transcript</label>
+    <label><input type="checkbox" data-p="input"> Input field</label>
+    <label><input type="checkbox" data-p="mode"> SPACE/AUTO</label>
+    <label><input type="checkbox" data-p="talk"> TALK</label>
+    <label><input type="checkbox" data-p="audio"> AUDIO</label>
+    <label><input type="checkbox" data-p="text"> TEXT</label>
+  </div>
+  <div class="note help">Parts, not combinations. Some arrangements are
+incoherent — a TEXT button with no transcript to toggle — and those are
+refused here in the same words the server uses, rather than discovered after
+the key is in somebody's application.</div>
+    </div>
+  </div>
+
+  <div class="subgrp">
+    <h5>Who may frame it<span class="subsum"></span></h5>
+    <div class="subbody">
+  <label class="bklab" style="margin-top:2px">One origin a line</label>
+  <textarea id="em_origins" rows="3" spellcheck="false"
+            placeholder="https://app.example.com"></textarea>
+  <div class="note help">These become the <b>frame-ancestors</b> this server
+sends, so a page on any other origin cannot frame it at all — a leaked key is
+useless anywhere you did not name.</div>
+    </div>
+  </div>
+
+  <div class="subgrp">
+    <h5>Session<span class="subsum"></span></h5>
+    <div class="subbody">
+  <label class="bklab" style="margin-top:2px">Length, minutes</label>
+  <input id="em_ttl" type="number" min="5" max="1440" value="60">
+  <div class="note help">How long one exchanged session lasts before the host's
+server has to ask for another. The key itself does not expire; this is the
+window a browser holds.</div>
+    </div>
+  </div>
+
+  <div class="subgrp">
+    <h5>How a host uses it<span class="subsum"></span></h5>
+    <div class="subbody">
+  <div class="note help">A key lets another application's <b>server</b> ask
+this one for a short-lived session and put the result in an iframe. The key
+never reaches a browser.
 
 <b>1</b> their server POSTs the key to <b>/embed/session</b>
 <b>2</b> their page frames <b>/embed?t=…</b> with <b>allow="microphone"</b>
@@ -2553,55 +2674,21 @@ nothing to do with this server.
 
 Worked examples in DOCUMENTATION → Embedding it elsewhere.</div>
     </div>
-  </section>
-
-  <section class="grp" data-tab="embeds">
-    <h4>Create an embed key</h4>
-    <div class="grpbody">
-  <label class="bklab">Name</label>
-  <input id="em_name" type="text" spellcheck="false" autocomplete="off"
-         placeholder="lobby kiosk">
-
-  <label class="bklab">Start from</label>
-  <div class="seg" id="em_preset">
-    <button data-v="full" class="on">FULL</button>
-    <button data-v="console">CONSOLE</button>
-    <button data-v="voice">VOICE</button>
-    <button data-v="chat">CHAT</button>
-    <button data-v="kiosk">KIOSK</button>
-    <button data-v="signage">SIGNAGE</button>
+  </div>
   </div>
 
-  <label class="bklab">What it may do</label>
-  <div class="cks" id="em_cap">
-    <label><input type="checkbox" data-c="ask"> Ask</label>
-    <label><input type="checkbox" data-c="mic"> Microphone</label>
-    <label><input type="checkbox" data-c="speak"> Speak</label>
+  <div class="rtacts">
+    <button id="b_addembed" class="act-save">CREATE</button>
+    <button id="b_emcancel" class="act-undo">CANCEL</button>
   </div>
-  <div class="note help">Permission, not furniture. Hiding the TALK button below
-does not withdraw the microphone.</div>
-
-  <label class="bklab">What it draws</label>
-  <div class="cks" id="em_parts">
-    <label><input type="checkbox" data-p="visual"> Figure</label>
-    <label><input type="checkbox" data-p="transcript"> Transcript</label>
-    <label><input type="checkbox" data-p="input"> Input field</label>
-    <label><input type="checkbox" data-p="mode"> SPACE/AUTO</label>
-    <label><input type="checkbox" data-p="talk"> TALK</label>
-    <label><input type="checkbox" data-p="audio"> AUDIO</label>
-    <label><input type="checkbox" data-p="text"> TEXT</label>
+    </div>
   </div>
 
-  <label class="bklab">Allowed to frame it — one origin a line</label>
-  <textarea id="em_origins" rows="3" spellcheck="false"
-            placeholder="https://app.example.com"></textarea>
-
-  <label class="bklab">Session length, minutes</label>
-  <input id="em_ttl" type="number" min="5" max="1440" value="60">
-
-  <div class="seg" style="margin-top:8px"><button id="b_addembed" class="act-add">CREATE</button></div>
   <div class="note" id="embnote"></div>
   <div id="em_key"></div>
+  <div class="seg addrow">
+    <button id="b_newembed" class="act-add">ADD AN EMBED KEY</button>
+  </div>
     </div>
   </section>
 
@@ -6737,7 +6824,10 @@ function routesChanged(){
 $('b_addroute').addEventListener('click', ()=>{
   DRAFT = newInstance();
   paintBlocks('');
-  const blk = document.querySelector('#panel .erow.isdraft');
+  /* Scoped to the endpoint list rather than to the whole panel: there is more
+     than one list of rows in here now, and "the draft" only ever means the one
+     in this list. */
+  const blk = document.querySelector('#rtlist .erow.isdraft');
   if (blk){
     const n = F(blk, 'name');
     if (n) n.focus();
@@ -6885,6 +6975,10 @@ function emCheck(){
   return !err;
 }
 
+/* Which key is open, by id — the list is rebuilt on every change and an index
+   would move under it. The same reason OPENRT holds an endpoint's id. */
+let OPENEM = '';
+
 async function refreshEmbeds(){
   const box = $('emblist');
   if (!box || ME.role !== 'admin'){ if (box) box.textContent = ''; return; }
@@ -6900,11 +6994,26 @@ async function refreshEmbeds(){
     j.embeds.forEach(e=>{
       const row = document.createElement('div');
       row.className = 'erow' + (e.enabled === false ? ' off' : '');
+      row.dataset.emb = e.id;
+      const cap = ['ask','mic','speak'].filter(k=> e.cap && e.cap[k]);
 
       const top = document.createElement('div'); top.className = 'top';
       const nm = document.createElement('span');
       nm.className = 'nm'; nm.textContent = e.name;
       top.appendChild(nm);
+      /* What it is, on the line you can read without opening it — the same
+         job the summary does on an endpoint. Everything that used to be five
+         permanently visible lines is now behind the row. */
+      const sum = document.createElement('span');
+      sum.className = 'badge';
+      sum.textContent = [cap.length ? cap.join(', ') : 'nothing',
+                         (e.parts || []).length + ' drawn',
+                         (e.origins || []).length === 1 ? '1 origin'
+                           : (e.origins || []).length + ' origins',
+                         e.ttl_minutes + ' min'].join(' · ');
+      top.appendChild(sum);
+      /* The two that are not a summary: one is a state you set, the other is
+         live traffic. Both are worth seeing without opening the row. */
       if (e.enabled === false){
         const b = document.createElement('span');
         b.className = 'badge'; b.textContent = 'DISABLED';
@@ -6916,25 +7025,22 @@ async function refreshEmbeds(){
         b.textContent = e.sessions + (e.sessions === 1 ? ' SESSION' : ' SESSIONS');
         top.appendChild(b);
       }
-      const r = document.createElement('span'); r.className = 'r';
-      const flip = document.createElement('button');
-      flip.textContent = e.enabled === false ? 'ENABLE' : 'DISABLE';
-      flip.onclick = ()=> embedAction('/embeds/enable',
-                                      {id:e.id, enabled: e.enabled === false});
-      const del = document.createElement('button');
-      del.textContent = 'DELETE';
-      del.className = 'act-danger';   // destroys something already saved
-      del.onclick = ()=>{
-        if (confirm('Delete the embed key "' + e.name + '"? Any page using it '
-                    + 'stops working immediately.'))
-          embedAction('/embeds/delete', {id:e.id});
-      };
-      r.appendChild(flip); r.appendChild(del);
-      top.appendChild(r);
+      /* One open at a time, and clicking the open one shuts it — the same
+         contract as an endpoint block and a device row. */
+      top.addEventListener('click', ev=>{
+        if (ev.target.closest('input, button, select, textarea')) return;
+        const opening = row.classList.contains('shut');
+        OPENEM = opening ? e.id : '';
+        box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+        row.classList.toggle('shut', !opening);
+      });
+      row.appendChild(top);
+      if (OPENEM !== e.id) row.classList.add('shut');
 
+      const body = document.createElement('div');
+      body.className = 'grpbody';
       const meta = document.createElement('div');
       meta.className = 'meta';
-      const cap = ['ask','mic','speak'].filter(k=> e.cap && e.cap[k]);
       const lines = [
         ['May', cap.length ? cap.join(', ') : 'nothing'],
         ['Draws', (e.parts || []).join(', ') || 'nothing'],
@@ -6952,11 +7058,65 @@ async function refreshEmbeds(){
         d.appendChild(document.createTextNode(v));
         meta.appendChild(d);
       });
+      body.appendChild(meta);
+      /* Read-only, deliberately, where an endpoint's block is an editing
+         surface: what a key may do and what it draws are fixed when it is
+         created. A page somewhere is already framing this, and widening it
+         from here would change what that page can do without anybody at that
+         end knowing. To change either, make a new key and delete this one. */
+      const why = document.createElement('div');
+      why.className = 'note help';
+      why.textContent = 'What a key may do and what it draws are fixed at '
+        + 'creation. To change either, add a key and delete this one — a page '
+        + 'is already framing this one, and widening it from here would change '
+        + 'what that page can do without anybody at that end knowing.';
+      body.appendChild(why);
 
-      row.appendChild(top); row.appendChild(meta);
+      const acts = document.createElement('div');
+      acts.className = 'rtacts';
+      const flip = document.createElement('button');
+      flip.textContent = e.enabled === false ? 'ENABLE' : 'DISABLE';
+      flip.onclick = ()=> embedAction('/embeds/enable',
+                                      {id:e.id, enabled: e.enabled === false});
+      const del = document.createElement('button');
+      del.textContent = 'DELETE';
+      del.className = 'act-danger';   // destroys something already saved
+      del.onclick = ()=>{
+        if (confirm('Delete the embed key "' + e.name + '"? Any page using it '
+                    + 'stops working immediately.'))
+          embedAction('/embeds/delete', {id:e.id});
+      };
+      acts.appendChild(flip); acts.appendChild(del);
+      body.appendChild(acts);
+      row.appendChild(body);
       box.appendChild(row);
     });
   }catch(e){ box.className = 'note bad'; box.textContent = e.message; }
+}
+
+/* ---- the draft row ----
+   ADD opens a row rather than revealing a form that was always there. The
+   fields are the same ones, in the same document — see the markup for why
+   they are not built on demand — but they are only on screen while somebody
+   is actually making a key. */
+function emDraft(on){
+  const d = $('em_draft');
+  if (!d) return;
+  d.hidden = !on;
+  d.classList.remove('shut');
+  const add = $('b_newembed');
+  if (add){ add.hidden = on; add.disabled = on; }
+  if (on){
+    /* Nothing else open while you are making one: the draft is the thing you
+       are looking at, and a saved row open underneath it is a second subject
+       on screen. */
+    OPENEM = '';
+    const box = $('emblist');
+    if (box) box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+    const nm = $('em_name');
+    if (nm) nm.focus();
+    d.scrollIntoView({block:'nearest'});
+  }
 }
 
 async function embedAction(path, body){
@@ -6968,6 +7128,20 @@ async function embedAction(path, body){
     refreshEmbeds();
   }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
 }
+
+$('b_newembed').addEventListener('click', ()=> emDraft(true));
+$('b_emcancel').addEventListener('click', ()=>{
+  emDraft(false);
+  const note = $('embnote');
+  if (note){ note.className = 'note'; note.textContent = ''; }
+});
+/* The draft's own sections open and shut independently of each other, the
+   same as an endpoint's — they are parts of one thing rather than
+   alternatives, and you are often comparing two of them. */
+$('em_draft').addEventListener('click', e=>{
+  const h5 = e.target.closest('.subgrp > h5');
+  if (h5) h5.parentNode.classList.toggle('open');
+});
 
 document.querySelector('#em_preset').addEventListener('click', e=>{
   const b = e.target.closest('button'); if (!b) return;
@@ -7021,6 +7195,10 @@ $('b_addembed').addEventListener('click', async ()=>{
     note.textContent = 'Created. Copy the key now — it is stored hashed and '
                      + 'this server cannot show it again.';
     $('em_name').value = ''; $('em_origins').value = '';
+    /* The draft has done its job and goes away, the way a saved endpoint's
+       draft block does. The key itself stays on screen underneath: it is the
+       one thing here that cannot be looked up again. */
+    emDraft(false);
     refreshEmbeds();
   }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
 });
