@@ -3488,6 +3488,33 @@ def system_group(kind):
     return ""
 
 
+def ensure_default_membership():
+    """Everything that works is in its default group, and put back if it is
+    not. That group is the root — a custom group is somewhere a row is ALSO
+    put, never somewhere it moves to — so a row missing from it is a row an
+    older rule took out, and it is the one membership nobody chose.
+
+    Rows that do not work yet are left alone: they join when they start
+    working, which is the same rule at the other end."""
+    displays, idents = read_displays(), read_identities()
+    groups = read_groups()
+    added = 0
+    for kind, ids in (("device", [d for d, r in displays.items()
+                                  if r.get("approved") and r.get("hash")]),
+                      ("identity", list(idents))):
+        gid = next((g for g, r in groups.items()
+                    if r["kind"] == kind and r["system"]), "")
+        if not gid:
+            continue
+        for i in ids:
+            if i not in groups[gid]["members"]:
+                groups[gid]["members"] = (groups[gid]["members"] + [i])[:MAX_ALLOW]
+                added += 1
+    if added:
+        write_groups(groups)
+        print("put %d row(s) back in their default group" % added, flush=True)
+
+
 def migrate_unenrolled_invites():
     """Rows invited before enrolment was what approved them.
 
@@ -3670,6 +3697,13 @@ def validate_group(obj, current):
     # Never off the wire. Which group is permanent is this server's to decide,
     # not something a panel can hand back having lost it in a round trip.
     rec["system"] = bool(current.get("system"))
+    if rec["system"]:
+        # THE DEFAULT GROUP IS THE ROOT. Everything that enrols is in it and
+        # stays in it; a custom group is somewhere a row is ALSO put, never
+        # somewhere it moves to. So its membership is not a panel's to edit —
+        # enrolling adds, deleting the row removes, and nothing else touches
+        # it. A name is still the admin's.
+        rec["members"] = list(current.get("members") or [])
     return rec, None
 
 
@@ -4479,7 +4513,7 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/displays", "/displays/approve", "/displays/rename",
                      "/displays/delete", "/displays/new", "/displays/reissue",
                      "/displays/decide", "/displays/settings", "/displays/kiosk",
-                     "/groups", "/groups/save", "/groups/delete", "/groups/move",
+                     "/groups", "/groups/save", "/groups/delete", "/groups/sets",
                      "/identities", "/identities/new", "/identities/rename",
                      "/identities/delete", "/identities/reissue")
 #: where an enrolment code is typed. On the display listeners only — it hands
@@ -6145,12 +6179,17 @@ class Handler(SimpleHTTPRequestHandler):
                      if touched else ""), flush=True)
             return self._json(200, {"ok": True, "identities": admin_identities()})
 
-        if parsed.path == "/groups/move":
-            # Which group a display is in, set from the row rather than from
-            # the group. It replaces the half of /displays/kind that was worth
-            # keeping: that route existed to move a row between POPULATIONS,
-            # which no longer means anything, but "which of my three groups of
-            # screens is this one in" still does.
+        if parsed.path == "/groups/sets":
+            # Which CUSTOM groups a row is in, set from the row rather than
+            # from each group in turn. It replaces /groups/move, which took the
+            # row out of every other group first — a single-select control's
+            # rule, not the model's. A group is a grant and grants add up: a
+            # television is allowed to be physics department kit and a
+            # television at the same time.
+            #
+            # The default group is not in this list and cannot be. It is the
+            # root: enrolling put the row there and only deleting the row takes
+            # it out.
             s = self._require("admin")
             if not s:
                 return
@@ -6158,31 +6197,29 @@ class Handler(SimpleHTTPRequestHandler):
             if obj is None:
                 return
             did = str(obj.get("id") or "")
-            if did not in read_displays():
-                return self._json(404, {"error": "no such display"})
-            gid = str(obj.get("group") or "")
+            people = did in read_identities()
+            if not people and did not in read_displays():
+                return self._json(404, {"error": "no such row"})
+            kinds = IDENTITY_GROUP_KINDS if people else DISPLAY_GROUP_KINDS
+            want = {str(g)[:32] for g in (obj.get("groups") or [])}
             groups = read_groups()
-            if gid and (gid not in groups
-                        or groups[gid]["kind"] not in DISPLAY_GROUP_KINDS):
-                return self._json(400, {"error": "not a group of displays"})
-            # Out of every other one first: "which group is it in" has one
-            # answer on that control, and a row quietly in two of them is a
-            # grant nobody can account for.
-            touched = False
-            for g, rec in groups.items():
-                if g != gid and did in (rec.get("members") or []):
+            touched = []
+            for gid, rec in groups.items():
+                if rec["system"] or rec["kind"] not in kinds:
+                    continue                      # not this control's business
+                here, should = did in rec["members"], gid in want
+                if here == should:
+                    continue
+                if should:
+                    rec["members"] = (rec["members"] + [did])[:MAX_ALLOW]
+                else:
                     rec["members"] = [m for m in rec["members"] if m != did]
-                    touched = True
-            if gid and did not in groups[gid]["members"]:
-                groups[gid]["members"] = (groups[gid]["members"] + [did])[:MAX_ALLOW]
-                touched = True
+                touched.append(rec["name"])
             if touched:
                 write_groups(groups)
-            joined = (groups.get(gid) or {}).get("name", "")
-            print("display %s moved to group %s by %s"
-                  % (did, joined or "(none)", s["user"]), flush=True)
-            return self._json(200, {"ok": True, "groups": admin_groups(),
-                                    "joined": joined})
+                print("row %s regrouped by %s: %s"
+                      % (did, s["user"], ", ".join(touched)), flush=True)
+            return self._json(200, {"ok": True, "groups": admin_groups()})
 
         if parsed.path == "/groups/delete":
             s = self._require("admin")
@@ -6839,6 +6876,7 @@ def main():
     # no moment where a population has nowhere to land.
     ensure_system_groups()
     migrate_unenrolled_invites()
+    ensure_default_membership()
     app = read_app()
     # Environment still wins, so a one-off run on a different port needs no
     # edit to the stored configuration. Setting PORT alone moves all three,

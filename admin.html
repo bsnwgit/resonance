@@ -209,6 +209,11 @@
   /* The kind a custom group is drawn from, and its size. Secondary to the
      name it qualifies: you are picking the group, and this is what tells you
      what you just picked. */
+  /* A tick that states rather than asks: the default group's membership is the
+     server's, so it reads as a fact on the row instead of a control that does
+     nothing when pressed. */
+  .cks label.fixed{opacity:.72}
+  .cks label.fixed input{cursor:default}
   .cks .gkind{
     font-size:calc(8px * var(--fs));letter-spacing:.08em;
     color:rgba(var(--paper),.55);
@@ -5646,6 +5651,11 @@ async function refreshGroups(){
       const cb = document.createElement('input');
       cb.type = 'checkbox'; cb.dataset.m = m.id;
       cb.checked = g.members.indexOf(m.id) >= 0;
+      /* The default group is the root: everything that enrols is in it and
+         stays in it, so its ticks are a statement rather than a control. The
+         server ignores a members list sent for one — this is so nobody is
+         offered a tick that answers no. */
+      if (g.system){ cb.disabled = true; lab.classList.add('fixed'); }
       cb.onchange = ()=> groupAction('/groups/save', {
         id: g.id,
         members: [...cks.querySelectorAll('input:checked')].map(x=> x.dataset.m),
@@ -7095,14 +7105,19 @@ function kioskBlock(d){
      people meant one of the three, and picking it here is the moment they
      know which. Hidden where there is nothing to decide: one group of a kind
      is not a choice, it is the answer. */
+  /* WHICH GROUPS, plural. It was one dropdown, which could only ever say one
+     group — so the server enforced what the control could express and moving a
+     screen into Physics quietly took it out of Devices, losing whatever that
+     granted. A group is a grant and grants add up: a television is allowed to
+     be physics department kit and a television. */
   const grow = document.createElement('div');
   grow.className = 'namerow';
   const glab = document.createElement('b');
-  glab.textContent = 'In group';
+  glab.textContent = 'Also in';
   grow.appendChild(glab);
-  const gsel = document.createElement('select');
-  gsel.className = 'ppick';
-  grow.appendChild(gsel);
+  const gbox2 = document.createElement('div');
+  gbox2.className = 'cks';
+  grow.appendChild(gbox2);
   box.appendChild(grow);
 
   const kindNote = document.createElement('div');
@@ -7112,27 +7127,30 @@ function kioskBlock(d){
     : 'Arrived by opening the display page and asking.';
   box.appendChild(kindNote);
 
-  /* Groups of DISPLAYS, which is the only population a display can be in.
-     People are a different file, and an endpoint grants to them separately. */
+  /* Groups of DISPLAYS, which is the only population a display can be in —
+     people are a different file. CUSTOM ones only: the default group is the
+     root, this row is in it because it enrolled, and it is not a tick anybody
+     can clear. */
   function syncGroups(){
-    const mine = (GROUPS || []).filter(g=> g.kind === 'device');
-    const inNow = mine.filter(g=> (g.members || []).indexOf(d.id) >= 0)[0];
-    gsel.innerHTML = '';
-    mine.forEach(g=>{
-      const o = document.createElement('option');
-      o.value = g.id;
-      o.textContent = g.name;
-      gsel.appendChild(o);
-    });
-    if (!mine.length){
-      const o = document.createElement('option');
-      o.value = '';
-      o.textContent = 'Devices — made when you save';
-      gsel.appendChild(o);
+    const mine = (GROUPS || []).filter(g=> g.kind === 'device' && !g.system);
+    const home = (GROUPS || []).filter(g=> g.kind === 'device' && g.system)[0];
+    gbox2.innerHTML = '';
+    if (home){
+      const em = document.createElement('span');
+      em.className = 'gkind';
+      em.textContent = 'always in ' + home.name + (mine.length ? ' · also:' : '');
+      gbox2.appendChild(em);
     }
-    gsel.value = inNow ? inNow.id : (mine[0] ? mine[0].id : '');
-    /* One group of a kind is not a choice. Two is. */
-    grow.style.display = mine.length > 1 ? '' : 'none';
+    mine.forEach(g=>{
+      const lab = document.createElement('label');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.dataset.g = g.id;
+      cb.checked = (g.members || []).indexOf(d.id) >= 0;
+      lab.appendChild(cb);
+      lab.appendChild(document.createTextNode(' ' + g.name));
+      gbox2.appendChild(lab);
+    });
+    if (!mine.length && !home) grow.style.display = 'none';
   }
   syncGroups();
 
@@ -7210,15 +7228,21 @@ function kioskBlock(d){
          population a row is in can drop it from groups of the other one, and
          the server says which so this can report it rather than let a group
          quietly lose a member. */
-      const wantGroup = gsel.value || '';
-      const inNow = (GROUPS || []).filter(
-        g=> (g.members || []).indexOf(d.id) >= 0)[0];
+      /* Only the custom ones, and only where they actually changed. The
+         default group is not in this list and the server would ignore it. */
+      const wantSet = [...gbox2.querySelectorAll('input:checked')].map(x=> x.dataset.g);
+      const wasSet = (GROUPS || []).filter(
+        g=> !g.system && g.kind === 'device'
+            && (g.members || []).indexOf(d.id) >= 0).map(g=> g.id);
       let extra = '';
-      if (wantGroup && wantGroup !== (inNow || {}).id){
-        const k = await api('/groups/move', {method:'POST', body: JSON.stringify(
-          {id: d.id, group: wantGroup})});
+      if (wantSet.slice().sort().join() !== wasSet.slice().sort().join()){
+        const k = await api('/groups/sets', {method:'POST', body: JSON.stringify(
+          {id: d.id, groups: wantSet})});
         if (k.groups) GROUPS = k.groups;
-        if (k.joined) extra = ' · in ' + k.joined;
+        const names = (k.groups || []).filter(g=> wantSet.indexOf(g.id) >= 0)
+                                      .map(g=> g.name);
+        extra = names.length ? ' · also in ' + names.join(', ')
+                             : ' · in its default group only';
         syncGroups();
         if (typeof refreshGroups === 'function') refreshGroups();
       }
