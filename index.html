@@ -4443,13 +4443,17 @@ if (PREVIEW){
    *reload yourself*, and carries the settings below so a change to them
    reaches a building of screens without anybody visiting one.
 
-   WHAT RELOADS, AND FOR WHOM. An admin's explicit request reaches any display:
-   it was asked for, about that row, by somebody looking at it. Everything
-   automatic — a configuration that moved, a server that came back, the nightly
-   refresh — is for KIOSKS ONLY. A desk tab has a person in front of it who can
-   reload the page themselves, and taking one out from under them to apply an
-   appearance change somebody made upstairs is a worse interruption than the
-   stale colour it fixes. */
+   WHAT RELOADS: everything, on every display. A configuration that moved, a
+   server that came back, an admin's request, the nightly refresh — a screen
+   showing settings somebody replaced an hour ago is stale whether or not it
+   hangs on a wall, and one rule is also a rule somebody can predict. What
+   keeps that from being an interruption is `busy()` below rather than a class
+   of device: nothing reloads while somebody is talking to the screen or
+   typing into it.
+
+   WHAT DIFFERS BY DEVICE is what it SAYS. A kiosk speaks the outage aloud,
+   because it has no transcript and nobody sitting at it; anything else stays
+   quiet and fails at the moment somebody actually uses it. */
 const Watch = {
   /* The server's clock, not this device's, taken from the first poll that
      answered. A reload request is a moment in server time, and comparing it
@@ -4560,16 +4564,17 @@ const Watch = {
        conversation it was holding belongs to somebody who left minutes ago,
        and a reload is what picks up a deploy, a route corrected during the
        outage, and an appearance an admin fixed without walking over. */
-    if (this.down && Kiosk.on) this.want = this.want || 'reconnected';
+    if (this.down) this.want = this.want || 'reconnected';
     this.down = false; this.said = false; this.fails = 0;
     this.offline(false);
     if (j.reload) this.want = this.want || 'asked by an admin';
-    /* A stamp that moved: something a screen renders from was edited. Kiosks
-       only, and not while this one is still waiting to be approved — the
-       approval itself moves the stamp, and Display.watch() is already handling
-       that case in place, with the words for it. */
-    else if (this.gen && j.gen !== this.gen && Kiosk.on
-             && Display.state === 'approved') this.want = 'settings changed';
+    /* A stamp that moved: something a screen renders from was edited. Not
+       while this one is still waiting to be approved, though — the approval
+       itself moves the stamp, and Display.watch() is already handling that
+       case in place, with the words for it. Reloading here would replace those
+       words with a page that came back silently approved. */
+    else if (this.gen && j.gen !== this.gen && Display.state === 'approved')
+      this.want = 'settings changed';
     this.gen = j.gen || this.gen;
     if (!this.boot) this.boot = j.now || 0;
     this.maybeReload();
@@ -4638,7 +4643,7 @@ const Watch = {
     if (!this.refreshAt || Date.now() < this.refreshAt) return;
     this.refreshAt = 0;
     this.planRefresh();                       // the same time tomorrow
-    if (Kiosk.on) this.wantReload('nightly refresh');
+    this.wantReload('nightly refresh');
   },
 
   /* ---- keeping the backlight on ----

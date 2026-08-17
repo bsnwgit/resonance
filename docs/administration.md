@@ -449,13 +449,11 @@ deleting a display clears it from every endpoint that named that. A setting
 pointing at something nobody can see is a setting nobody can change.
 
 **When a device picks a change up.** Every display checks in on the interval
-set under APP SETTINGS ▸ MAINTENANCE. A kiosk reloads itself when anything it
-draws from has moved, so a profile edited here reaches the wall without
-anybody walking to it — though not while somebody is mid-conversation with the
-screen. A display that is *not* a kiosk has a person in front of it who can
-reload the page, and taking one out from under them to apply a colour somebody
-changed upstairs would be a worse interruption than the stale colour; use
-RELOAD on its row under DEVICES to ask it directly, or OPEN DISPLAY here.
+set under APP SETTINGS ▸ MAINTENANCE, and reloads itself when anything it draws
+from has moved — so a profile edited here reaches the wall without anybody
+walking to it. Never while somebody is talking to the screen or typing into it;
+it waits until they have finished. RELOAD on a row under DEVICES asks one
+directly.
 
 
 ### The settings above the list
@@ -601,11 +599,11 @@ it fails at the moment they actually try to use it rather than making them wait
 out three attempts first. Somebody who has just spoken is owed an answer now; a
 hallway nobody is standing in is not.
 
-**On reconnect, a kiosk reloads the page** rather than picking up where it left
-off. Resuming would preserve a conversation nobody is having any more — the
-outage was minutes and the person left — while a reload picks up a deploy and
-anything changed while the screen was down, including a route or an appearance
-an admin corrected during the outage.
+**On reconnect the page reloads** rather than picking up where it left off.
+Resuming would preserve a conversation nobody is having any more — the outage
+was minutes and the person left — while a reload picks up a deploy and anything
+changed while the screen was down, including a route or an appearance an admin
+corrected during the outage.
 
 **It never reloads while the server is unreachable.** A reload into an outage
 replaces a working screen with the browser's own error page, and that page has
@@ -624,13 +622,14 @@ to at all — nothing here reaches it, and no amount of server-side work will.
 
 ### The nightly refresh
 
-**At (HH:MM)** and **spread over (minutes)** — off by default. A kiosk reloads
-itself once a night, because a tab that never reloads accumulates.
+**At (HH:MM)** and **spread over (minutes)** — off by default. Every display
+reloads itself once a night, because a tab that never reloads accumulates.
 
 It is read off **each device's own clock**, not this server's, for the same
 reason a screensaver's dark hours are: a screen's night is the night outside
-it. And it is deferred while somebody is mid-conversation — a reload that lands
-between a question and its answer looks like a crash to whoever asked.
+it. And it is deferred while somebody is talking to the screen or typing into
+it — a reload that lands between a question and its answer looks like a crash
+to whoever asked.
 
 Spread it if the building has more than a handful of screens: twelve tablets
 reconnecting in the same second is a load this server did not previously have.

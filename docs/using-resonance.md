@@ -225,9 +225,14 @@ anything that changed while it was down. If it is still saying it after a few
 minutes, the server or the network between you and it needs somebody — tell
 your administrator.
 
-A screen you opened yourself in a browser does not say any of this. It stays
-quiet and tells you at the moment you actually ask it something, rather than
-interrupting you about a server you were not using.
+A screen you opened yourself in a browser does not say any of this out loud. It
+stays quiet and tells you at the moment you actually ask it something, rather
+than interrupting you about a server you were not using.
+
+**Any display reloads itself when the server comes back**, and when a setting
+it draws from changes — that is how a screen nobody is standing at stays
+current. It waits until you have finished: nothing reloads while you are
+talking to it or typing into the box.
 
 ## If it mishears you
 

@@ -196,7 +196,7 @@ whenever the old session happens to expire.
 
 Four settings that keep a screen nobody touches working: how often every
 display checks in, how many attempts a failing check-in makes and how long it
-waits between them, and whether a kiosk reloads itself once a night.
+waits between them, and whether every display reloads itself once a night.
 
 **None of them needs a restart** — unlike everything else on this tab. Each
 display takes them at its next check-in, which is what makes the check-in

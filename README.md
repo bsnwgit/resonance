@@ -1167,14 +1167,20 @@ a screen noticing on its own that the server came back. Its position held:
 designing it moved nothing, and turned up two real leaks in code that had
 already shipped, both since fixed.
 
-The one thing worth having here rather than in its entry is the split it forced
-between a kiosk and a browser tab. Everything automatic — reloading because a
-setting moved, because the server returned, or because it is four in the
-morning — happens only on a kiosk. A desk tab has somebody in front of it who
-can reload the page, and taking one out from under them to apply a colour
-somebody changed upstairs is a worse interruption than the stale colour. Only
-an admin's explicit RELOAD reaches every display, because that one was asked
-for, about that row, by somebody looking at it.
+The one thing worth having here rather than in its entry is **what reloads, and
+for whom**. It was built kiosks-only — a desk tab has somebody in front of it,
+and taking one out from under them to apply a colour changed upstairs looked
+like the worse interruption — and that was overruled the same day: **every
+display reloads**, for every reason. A screen showing settings somebody
+replaced an hour ago is stale whether or not it hangs on a wall, and one rule
+is a rule somebody can predict. What keeps it from interrupting anybody is that
+nothing reloads while a person is talking to the screen or typing into it,
+which is a test about the moment rather than a class of device — and it was
+already there, guarding the nightly refresh.
+
+What does still differ by device is what a screen *says*: a kiosk speaks the
+outage aloud because it has no transcript and nobody sitting at it, and
+everything else stays quiet and fails when somebody actually uses it.
 
 Two and three were one phase until the wall-mounted side outgrew it. They
 share a substrate — a display the server knows about — but nothing else:
@@ -2138,11 +2144,13 @@ something else.
   check-in and hands that value back; a request older than it has already been
   satisfied by the load that is running. Nothing to acknowledge, nothing left
   set to fire again at the next restart.
-- **Automatic reloads are for kiosks; the admin's RELOAD is for anybody.** A
-  desk tab has a person in front of it who can reload the page, and taking one
-  out from under them to apply an appearance somebody changed upstairs is a
-  worse interruption than the stale colour. An explicit request is different in
-  kind: it was asked for, about that row, by somebody looking at it.
+- **Everything reloads, on every display** — and this went the other way first.
+  It was built with the automatic reloads gated to kiosks, on the argument that
+  a desk tab has somebody in front of it; that was overruled the same day. A
+  screen is stale whether or not it hangs on a wall, and the guard that matters
+  is the one already there for the nightly refresh: nothing reloads while
+  somebody is talking to the screen or typing into it. A test about the moment,
+  not about the kind of device.
 - **It never reloads into an outage.** A reload while the server is unreachable
   swaps a working screen for the browser's error page, which has no check-in,
   no timer and no way back — the display would be gone until somebody walked
