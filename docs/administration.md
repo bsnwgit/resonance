@@ -901,7 +901,7 @@ two it did not ask for.
 
 **Two kinds, and they do not mix.**
 
-- **PEOPLE** holds the people created under ENROLLMENTS ▸ PERSON. A person
+- **USERS** holds the people created under ENROLLMENTS ▸ PERSON. A person
   reaches an endpoint from whatever machine they open their URL on, so a grant
   made here follows the human rather than the hardware.
 - **DEVICES** holds displays — every screen and every laptop, however it got

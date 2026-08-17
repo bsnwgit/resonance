@@ -3458,7 +3458,7 @@ def enrolled_as(rec):
 #: already exists: those are somebody's data, and an upgrade that renamed them
 #: would be editing a list an admin wrote. The kind's LABEL in the panel is
 #: what changes for them.
-DEFAULT_GROUP_NAME = {"device": "Devices", "identity": "People"}
+DEFAULT_GROUP_NAME = {"device": "Devices", "identity": "Users"}
 
 
 def system_group(kind):
