@@ -2515,6 +2515,21 @@ button to download it as a PDF.</div>
   </div><!-- /grpbox -->
   </div><!-- /panelscroll -->
 
+  <!-- Where a tab's settings sections live while no profile of that tab is
+       open. They are MOVED into the open row rather than copied, so they need
+       somewhere to be the rest of the time — and it has to be inside #panel,
+       because profSections() looks for them there and anything outside it
+       would be lost to the next query.
+
+       This element did not exist, and stashSections() has been asking for it
+       by id since it was written. $('profstash') was null, the stash was a
+       silent no-op, and the sections simply stayed inside whichever profile
+       row last held them — so `box.innerHTML = ''` at the top of
+       paintProfiles took them out of the document with the row. Adding a
+       second profile, or removing one, left every following profile opening
+       with nothing in it but its name and its buttons, until a reload. -->
+  <div id="profstash" hidden></div>
+
   <div id="panelfoot">
     <!-- The same row treatment as the tabs at the top. They were full-width
          stacked entries because a 425px column had no room to put four
@@ -5123,8 +5138,19 @@ function profSections(tab){
   return [...document.querySelectorAll('#panel .grp[data-prof="' + tab + '"]')];
 }
 function stashSections(tab){
-  const st = $('profstash');
-  if (st) profSections(tab).forEach(g=> st.appendChild(g));
+  /* Built here if it is not in the markup. `if (st)` is what made this bug
+     survivable-looking: a missing element turned the stash into a silent
+     no-op, the sections stayed in a row that was about to be replaced, and
+     `box.innerHTML = ''` took them out of the document. A move with nowhere
+     to move to has to be impossible rather than quiet. */
+  let st = $('profstash');
+  if (!st){
+    st = document.createElement('div');
+    st.id = 'profstash';
+    st.hidden = true;
+    ($('panel') || document.body).appendChild(st);
+  }
+  profSections(tab).forEach(g=> st.appendChild(g));
 }
 
 /* The controls belong to whichever profile is open, and ONE function decides
