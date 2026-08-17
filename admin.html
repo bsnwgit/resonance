@@ -8814,8 +8814,13 @@ function start(){
      click for was the one that arrived empty — and the only thing that
      covered it was the preview's handshake, which is a race (see askPreview
      below). Two different reasons for the same blank list; this is one of
-     them. */
-  loadTab(CURRENT_TAB);
+     them.
+
+     GUARDED, because the panel now opens on no tab at all. Called with an
+     empty one this selects nothing, and selecting anything is what leaves the
+     opening state — so the mark was drawn and then immediately taken down
+     again, leaving the empty box that used to hold the topics. */
+  if (CURRENT_TAB) loadTab(CURRENT_TAB);
   /* The controls themselves are built from the settings the preview hands
      over. If that already happened while this page was still working out who
      was signed in, the message is gone — so ask for it rather than wait for
