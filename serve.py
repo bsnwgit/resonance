@@ -5095,11 +5095,29 @@ class Handler(SimpleHTTPRequestHandler):
             # which is the only split that is real. Every display is offered
             # for a group of devices whatever way it enrolled; that fact is on
             # the row and says nothing about which list it may be put in.
+            #
+            # APPROVED ONLY. A row waiting on a decision is not a candidate for
+            # a grant: a group is a set of things that work, and offering one
+            # that cannot do anything invites an admin to grant an endpoint to
+            # a device they have not let in yet. Rows join a group when they
+            # start working, so this is the same rule at the other end.
+            #
+            # …plus anything already IN a group, approved or not. Refusing a
+            # display deliberately leaves it in whatever groups it was in — a
+            # group is how you address a set of things, not a record of who is
+            # currently allowed — so a refused member that stopped being
+            # offered would be silently dropped by the next save of that group,
+            # which is that decision being undone by a rendering detail.
+            in_a_group = set()
+            for rec in read_groups().values():
+                if rec["kind"] in DISPLAY_GROUP_KINDS:
+                    in_a_group.update(rec["members"])
             devices = [{"id": did, "label": display_label(rec),
                         "approved": bool(rec.get("approved")),
                         "arrived": enrolled_as(rec)}
                        for did, rec in sorted(read_displays().items(),
-                                              key=lambda kv: display_label(kv[1]).lower())]
+                                              key=lambda kv: display_label(kv[1]).lower())
+                       if rec.get("approved") or did in in_a_group]
             idents = [{"id": p["id"], "label": p["label"], "approved": True}
                       for p in admin_identities()]
             return self._json(200, {"groups": admin_groups(),

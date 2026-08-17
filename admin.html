@@ -5611,8 +5611,12 @@ async function refreshGroups(){
         members: [...cks.querySelectorAll('input:checked')].map(x=> x.dataset.m),
       });
       lab.appendChild(cb);
+      /* Only a row that is already a member can be unapproved here — the
+         server offers approved rows and nothing else. It says so, because the
+         reason it is on the list is not obvious and unticking it is a real
+         choice rather than tidying. */
       lab.appendChild(document.createTextNode(
-        ' ' + m.label + (m.approved ? '' : ' — not approved')));
+        ' ' + m.label + (m.approved ? '' : ' — refused, still in this group')));
       cks.appendChild(lab);
     });
     row.appendChild(cks);
