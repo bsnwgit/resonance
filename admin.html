@@ -414,6 +414,16 @@
     background:rgba(var(--glass),.035);
     padding:0 11px 10px;
   }
+  /* …except a section that is nothing but a title. The rule above exists to
+     put an edge around a block of CONTROLS that belongs to a heading, and a
+     heading with no controls under it gets an empty box instead — which reads
+     as something that failed to load rather than as a caption. The profile
+     lists keep theirs because theirs has a list in it.
+
+     Same specificity as the rule above, so this has to sit after it. */
+  #grpbox .grp.titleonly{
+    border:0;background:none;padding:0;
+  }
   /* The heading keeps its own underline inside the box, separating the
      title from the controls. Left where it is rather than pulled out to the
      box edges — the caret is absolutely positioned against this element, and
@@ -1959,7 +1969,7 @@ thing they belong to.</div>
        first place is a different question — it is the door, not the key. -->
   <!-- The tab's own title, the same treatment the profile lists get: full
        width, and no caret, because there is nothing to collapse. -->
-  <section class="grp bare" data-tab="security">
+  <section class="grp bare titleonly" data-tab="security">
     <div class="barehead"><span class="listtitle">Security</span></div>
   </section>
 
@@ -2525,10 +2535,6 @@ button to download it as a PDF.</div>
       <button id="tab_accounts" data-tab="accounts">ADMIN</button>
       <button id="tab_displays" data-tab="displays">ACCESS</button>
       <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
-      <!-- What this deployment is exposed as, as opposed to who may use it:
-           ACCESS answers "which device, which endpoint", and that is a
-           different question from how the server itself is defended. -->
-      <button id="tab_security" data-tab="security">SECURITY</button>
       <!-- DOCUMENTATION is not here any more. It is reached from the ? beside
            the panel title, because it is not something you configure and it
            was taking a slot in a row of things that are. -->
@@ -2546,6 +2552,10 @@ button to download it as a PDF.</div>
              UI_TABS or SETTINGS_TABS — like AI, nothing here writes the shared
              settings document. -->
         <button id="tab_devices" data-tab="devices">DEVICES</button>
+        <!-- What this deployment is exposed as, as opposed to who may use it:
+             ACCESS answers "which device, which endpoint", and that is a
+             different question from how the server itself is defended. -->
+        <button id="tab_security" data-tab="security">SECURITY</button>
       </div>
     </div>
     </div>
