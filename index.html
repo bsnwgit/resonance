@@ -4406,6 +4406,19 @@ if (PREVIEW){
       // the panel saved a route; take the new document rather than waiting
       // for a reload to notice
       Routes.load().then(()=>{ syncWake(); repaintNames(); });
+    } else if (m.kind === 'hello'){
+      /* The panel asking to be told again. The handshake below is announced
+         once, unprompted, and a single announcement is a race the panel
+         cannot win reliably: this page can finish loading before the parent
+         has attached its listener, or before the parent knows who is signed
+         in — and either way the message is gone and the panel sits empty
+         until somebody reloads it. Asking is idempotent, so the panel can ask
+         whenever it finds itself without an answer.
+
+         Ignored before the settings have settled: replying with a half-loaded
+         document would replace one wrong answer with another. The unprompted
+         announcement is still coming. */
+      if (previewReady) announcePreview();
     } else if (m.kind === 'cmd' && typeof CMD[m.cmd] === 'function'){
       try { CMD[m.cmd](m.arg); }
       catch(err){ relay('ttsnote', m.cmd + ' failed: ' + err.message); }
@@ -4718,9 +4731,18 @@ Promise.all([Settings.load(), Display.hello().then(()=> Routes.load())]).then(()
      preference stored against another page on the same site does not get to
      argue with it. */
   loadEmbed();
-  if (PREVIEW && window.parent !== window)
-    window.parent.postMessage({rsn:1, kind:'ready', settings:S}, '*');
+  announcePreview();
 });
+
+/* The settled document, handed to the admin page — and it can be handed over
+   more than once, because the panel is allowed to ask for it again. See the
+   `hello` branch above for why once was not enough. */
+let previewReady = false;
+function announcePreview(){
+  if (!PREVIEW || window.parent === window) return;
+  previewReady = true;
+  window.parent.postMessage({rsn:1, kind:'ready', settings:S}, '*');
+}
 
 on('reqsend', 'click', sendRequest);
 on('verdictok', 'click', ()=> $('verdict').classList.remove('on'));

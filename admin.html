@@ -3612,6 +3612,11 @@ let openTopic = ()=>{};        // assigned once the panel's sections exist
    thing that knows how to redraw them lives inside the tab machinery. */
 let reRender = ()=>{};
 let rescanGroups = ()=>{};     // ditto — this tab builds sections at runtime
+/* Selecting a tab, from outside the closure that owns the tab machinery.
+   Every tab fetches what it needs when you arrive at it — and until this
+   existed, "arriving" meant clicking, so the tab the panel OPENS on was the
+   one tab whose fetch never ran. */
+let loadTab = ()=>{};
 let RT = {routes: [], default: '', voices: []};
 let LEARNING = '';             // which block asked the display to LEARN
 
@@ -7377,6 +7382,7 @@ function panelNav(){
     g.scrollIntoView({block:'nearest'});
   };
   rescanGroups = ()=>{ rescan(); render(); };
+  loadTab = selectTab;
   rescan();
   // the commit row depends on the filter as well as the tab, so both paths
   // have to re-run it
@@ -7441,9 +7447,37 @@ function start(){
   // the create form opens on the preset its first button is already lit for
   if (ME.role === 'admin') emApplyPreset('full');
   panelNav();
-  // controls are built when the preview announces itself and hands over the
-  // settings; nothing to do here but wait for that message
+  /* The tab this panel opens on, loaded the same way every other tab is. Its
+     fetch used to run only on a click, so the one tab you did not have to
+     click for was the one that arrived empty — and the only thing that
+     covered it was the preview's handshake, which is a race (see askPreview
+     below). Two different reasons for the same blank list; this is one of
+     them. */
+  loadTab(CURRENT_TAB);
+  /* The controls themselves are built from the settings the preview hands
+     over. If that already happened while this page was still working out who
+     was signed in, the message is gone — so ask for it rather than wait for
+     something that may have been and gone. */
+  askPreview();
 }
+
+/* Ask the preview to hand over the settings document again. Safe to call at
+   any time and safe to call twice: the display ignores it until its own load
+   has settled, and answering is the same message it sends unprompted.
+
+   Called once when this page knows who is signed in, and again whenever the
+   frame loads — which covers the two ways the one-shot announcement was
+   missed: the frame finishing before this page attached its listener, and the
+   frame finishing before ME was known. */
+function askPreview(){
+  if (ready) return;
+  try{ frame.contentWindow.postMessage({rsn:1, kind:'hello'}, location.origin); }
+  catch(e){}                            // not loaded yet — its own load will
+}
+
+/* …and every time the frame lands, including the RELOAD button's reload and
+   the very first load if it finished after this page had already asked. */
+frame.addEventListener('load', ()=>{ if (ME) askPreview(); });
 
 whoami().then(me=>{
   if (me){ ME = me; start(); }
