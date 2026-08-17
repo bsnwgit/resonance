@@ -461,11 +461,12 @@
      share one with it and the answer is whatever the DOM happens to say. */
   #panelbar,
   #panelscroll{position:relative;z-index:1}
-  /* Nothing to filter and nothing to save while no tab is open, and a field
-     offering to filter an empty page is a control wired to nothing. The links
-     beside it stay: they are how you leave. */
-  #panel.home #grpbox,
-  #panel.home .findside{display:none}
+  /* The box goes; the search does not. Searching is the one thing that makes
+     sense from a page showing nothing — it looks across every tab at once, so
+     it is how you get somewhere when you do not know which tab to press. It
+     takes the panel out of this state as soon as anything is typed, which is
+     what keeps it from being a field with nowhere to put its answers. */
+  #panel.home #grpbox{display:none}
   /* A register is a table, not a settings column. Where the box tiles its
      topics into 300px columns, this one takes the full width of them — rows
      that read across need the room, and a device row has four things on it
@@ -8894,15 +8895,22 @@ function panelNav(){
   rescan();
   // the commit row depends on the filter as well as the tab, so both paths
   // have to re-run it
-  findEl.addEventListener('input', ()=>{ render(); syncSaveRow(); });
-  /* Empties the field and repaints through the same two calls the typing does,
-     rather than dispatching a synthetic input event — one path, and it cannot
-     drift from the one beside it. */
+  /* One path for both the typing and the X, so the two cannot drift.
+     Searching from the opening state has to LEAVE it, or the field is a
+     control wired to nothing: the matches land in the box that state hides.
+     Emptying it goes back there, but only if no tab was ever chosen — after
+     that, clearing a filter should return you to the tab you were on. */
+  function afterFind(){
+    if ((findEl.value || '').trim()) $('panel').classList.remove('home');
+    else if (!tab) return enterHome();
+    render();
+    syncSaveRow();
+  }
+  findEl.addEventListener('input', afterFind);
   const fclear = $('b_findclear');
   if (fclear) fclear.addEventListener('click', ()=>{
     findEl.value = '';
-    render();
-    syncSaveRow();
+    afterFind();
     findEl.focus();
   });
   render();
