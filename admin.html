@@ -706,23 +706,35 @@
   /* The tab rows are set smaller than the bar, so their labels come down with
      them rather than sitting a size above the links they name. */
   .tablabel{font-size:calc(9px * var(--fs))}
-  /* Shaded from the display's palette, a colour per subject. A label is not
-     pressable, so it takes the quieter half of the treatment the swatches use
-     — a tinted edge and a wash under it — with the text left at the panel's
-     own near-white. The colour is what tells three rows apart at a glance; it
-     is not saying anything a reader has to decode. */
+  /* Shaded from the display's palette, a colour per subject, and shaded hard
+     enough to see. The first pass used the swatch alphas — an edge at .45 over
+     a wash at .12 — which is right for a swatch sitting on its own and wrong
+     here: it REPLACED a seven per cent white, so the box gained a coloured
+     outline and a fill nobody could tell from the one before it. These are the
+     weights SIGN OUT is filled at, which is the reference for "shaded" on this
+     bar. The text stays at the panel's near-white: a label is not pressable
+     and does not need the two filled controls' full white as well. */
   #panelbar .bartitle{
-    border-color:rgba(var(--pal-blue),.45);
-    background:rgba(var(--pal-blue),.12);
+    border-color:rgba(var(--pal-blue),.70);
+    background:rgba(var(--pal-blue),.26);
   }
   .tablabel{
-    border-color:rgba(var(--pal-ice),.45);
-    background:rgba(var(--pal-ice),.12);
+    border-color:rgba(var(--pal-ice),.70);
+    background:rgba(var(--pal-ice),.26);
   }
+  /* Milk is the palest of the five, so it carries a little more of itself to
+     land at the same visual weight as the other two. */
   .findside .tablabel{
-    border-color:rgba(var(--pal-milk),.45);
-    background:rgba(var(--pal-milk),.12);
+    border-color:rgba(var(--pal-milk),.70);
+    background:rgba(var(--pal-milk),.30);
   }
+  /* The foot has a darker ground of its own — rgba(0,0,0,.5) laid over the
+     panel's own .35 — so an identical tint reads weaker down there than the
+     same label does in the bar. CONNECTIONS looked untouched for exactly that
+     reason while the ones above it were already shaded. A few points more so
+     all five land at one weight rather than at one number. */
+  #panelfoot .tablabel{background:rgba(var(--pal-ice),.34)}
+  #panelfoot .findside .tablabel{background:rgba(var(--pal-milk),.38)}
   #navlinks .bartitle{margin-left:10px}
   /* …except the one that opens the bar. That margin is what holds a label off
      the link before it, and there is no link before the first — left in, it
