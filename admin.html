@@ -2599,7 +2599,7 @@ chose rather than as fourteen ticks.</div>
     </div>
   </div>
 
-  <div class="subgrp open">
+  <div class="subgrp">
     <h5>What it may do<span class="subsum"></span></h5>
     <div class="subbody">
   <div class="cks" id="em_cap">
@@ -2614,7 +2614,7 @@ one.</div>
     </div>
   </div>
 
-  <div class="subgrp open">
+  <div class="subgrp">
     <h5>What it draws<span class="subsum"></span></h5>
     <div class="subbody">
   <div class="cks" id="em_parts">
@@ -4386,11 +4386,19 @@ function wireBlock(blk){
     }
   });
   blk.addEventListener('click', e=>{
-    /* Independent, unlike the endpoints themselves: these are parts of one
-       thing rather than alternatives to each other, and you are often
-       comparing two of them. */
+    /* One at a time, like every other section in the panel. These were
+       independent — the argument being that they are parts of one thing
+       rather than alternatives, and that you are often comparing two of them
+       — but a rule that holds everywhere else in a panel and not here is a
+       rule somebody has to learn twice. Opening the open one shuts it, which
+       is how a topic behaves. */
     const h5 = e.target.closest('.subgrp > h5');
-    if (h5){ h5.parentNode.classList.toggle('open'); return; }
+    if (h5){
+      const g = h5.parentNode, was = g.classList.contains('open');
+      blk.querySelectorAll('.subgrp').forEach(x=> x.classList.remove('open'));
+      g.classList.toggle('open', !was);
+      return;
+    }
     const b = e.target.closest('button');
     if (!b) return;
     const seg = b.closest('.seg[data-f]');
@@ -4529,9 +4537,15 @@ function paintBlocks(keepOpen){
         blk.classList.toggle('shut', !opening);
         syncAddRoute();
       });
-      // a new endpoint opens on the two boxes you have to fill in
-      if (!rid) blk.querySelectorAll('[data-g="wake"],[data-g="conn"]')
-                   .forEach(x=> x.classList.add('open'));
+      /* A new endpoint opens on the box it cannot do without. It used to open
+         two — the wake word and the connection — and the wake word has not
+         been a box on an endpoint since a speech profile started carrying it,
+         so that half of the selector was already matching nothing. One is also
+         all that may be open at once now. */
+      if (!rid){
+        const first = blk.querySelector('[data-g="conn"]');
+        if (first) first.classList.add('open');
+      }
     }
     blk.classList.toggle('shut', OPENRT !== (rid || '(new)'));
     order.push(blk);
@@ -7135,12 +7149,14 @@ $('b_emcancel').addEventListener('click', ()=>{
   const note = $('embnote');
   if (note){ note.className = 'note'; note.textContent = ''; }
 });
-/* The draft's own sections open and shut independently of each other, the
-   same as an endpoint's — they are parts of one thing rather than
-   alternatives, and you are often comparing two of them. */
+/* One at a time, the same as an endpoint's and the same as every other
+   section in the panel. */
 $('em_draft').addEventListener('click', e=>{
   const h5 = e.target.closest('.subgrp > h5');
-  if (h5) h5.parentNode.classList.toggle('open');
+  if (!h5) return;
+  const g = h5.parentNode, was = g.classList.contains('open');
+  $('em_draft').querySelectorAll('.subgrp').forEach(x=> x.classList.remove('open'));
+  g.classList.toggle('open', !was);
 });
 
 document.querySelector('#em_preset').addEventListener('click', e=>{
