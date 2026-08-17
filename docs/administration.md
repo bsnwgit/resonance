@@ -14,8 +14,8 @@ The first time the server starts it creates one admin account and prints the
 password to the log, once. If you do not have it, ask whoever installed it, or
 look at the top of `server.log` on the box.
 
-Signing in gets you a session that lasts eight hours by default, sliding — it
-is extended each time you do something, and expires after that long idle.
+Signing in gets you a session that lasts thirty minutes by default, sliding —
+it is extended each time you do something, and expires after that long idle.
 
 ### If you are locked out
 
@@ -40,9 +40,14 @@ At the top:
   controls for one appear inside it when you open it. MODELS and NETWORK are
   the two halves of an endpoint that are not the endpoint: what it speaks to,
   and what it answers on.
-- **AI** and **DEVICES** — the connections group, to the right of a rule. AI
-  holds the endpoints, each naming a speech profile. DEVICES is the register:
-  every device this server knows about, and where each one is set up.
+- **AI**, **DEVICES** and **SECURITY** — the group to the right of a rule. AI
+  holds the endpoints, each naming a speech profile, a model profile and a
+  network profile. DEVICES is the register: every device this server knows
+  about, and where each one is set up. SECURITY holds **AI Requires
+  Permission** — whether a general user needs approval at all, how long a
+  grant lasts, and how many devices and waiting requests there may be. ACCESS
+  answers which device may reach which endpoint; this is whether anybody is
+  asked in the first place.
 - **?**, beside the SETTINGS title — these documents. It is blue, and it is the
   same blue as every ? beside a topic heading, so help is one colour wherever
   you meet it.
@@ -52,13 +57,10 @@ At the foot, pinned so they are always reachable:
 - **ADMIN SETTINGS** — how the server itself is wired: where it can be reached
   from, signing in, sessions, and the admin portal's own port. What the app
   answers on is a network profile, not here.
-- **ACCOUNTS** — who can sign in, and the groups access is granted to.
+- **ADMIN** — who can sign in. The groups access is granted to have a tab of
+  their own, GROUPS, in the profile settings row.
 - **ACCESS** — what may use this server, and what each may reach.
 - **EMBEDS** — keys that let another application frame this interface.
-- **SECURITY** — how this deployment is defended, as opposed to who may use
-  it. **AI Requires Permission** lives here: whether a general user needs
-  approval at all, how long a grant lasts, and how many devices and waiting
-  requests there may be. ACCESS answers which device may reach which endpoint.
 - Your own name, your role, and **SIGN OUT**.
 
 **Your own account is behind your name.** Click it for the box that changes
@@ -74,40 +76,31 @@ nothing for anybody else. The state is yours until you commit it.
 
 ### Every part of the panel commits itself
 
-There is no single save button. **APPEARANCE, GEOMETRY and SPEECH each have their own
-SAVE FOR EVERYONE and REVERT**, at the foot of that tab, writing only the
-settings on that tab.
+There is no single save button, and no per-tab one either. **Every list saves
+one row at a time, from inside the row** — a profile, an endpoint, a group, a
+device. The row you are looking at is the scope of the button in it.
 
-Wherever a block commits itself, its buttons sit at the **bottom right** of
-that block — SAVE and REVERT alike, with anything that MAKES a new thing at the
-left of the same row.
+Wherever a block commits itself, its button sits at the **bottom right** of
+that block, with anything that MAKES a new thing at the left of the same row.
 
-Colour says which kind of act a button is: **green** commits, **red** destroys,
-**amber** brings something new into existence, **yellow** takes something back
-without destroying it, **blue** explains. CREATE and
-SAVE used to share green, which made pressing one feel like pressing the
-other — only one of them adds a row you then have to name. One position for all of them, so
-the commit is where the eye already is rather than somewhere to be found again
-per topic. The one exception is an endpoint's action bar, which is a row of
-seven and keeps its own arrangement: SAVE at the left, and the destructive
-actions held apart at the right.
+Colour says which kind of act a button is: **green** commits, **red**
+destroys, **amber** brings something new into existence, **yellow** takes
+something back without destroying it, **blue** explains. CREATE and SAVE used
+to share green, which made pressing one feel like pressing the other — only
+one of them adds a row you then have to name.
 
-That is not decoration. There used to be one button for all three, which meant
-pressing it while looking at GEOMETRY also published whatever had been left
-half-adjusted on APPEARANCE — a save whose scope was wider than the thing in front
-of you, and no way to tell from the screen. Each row now says what it covers:
-*19 settings on this tab, shared with every viewer*.
+There used to be a SAVE FOR EVERYONE at the foot of APPEARANCE, GEOMETRY and
+SPEECH, publishing that tab's settings to every display at once. There is not
+any more, and the reason is the profiles: those tabs are the **editor** for a
+profile now, and what every display gets is whichever profile is nominated
+DEFAULT, published when that profile is saved. A tab-wide commit sitting
+beside a list of profiles would have published whichever one happened to be
+open to every screen in the building.
 
-The consequence worth knowing: you can leave GEOMETRY unsaved while saving APPEARANCE,
-and the preview will keep showing both. Each row carries its own unsaved
-warning, in red, so the tab with work waiting behind it says so.
-
-**REVERT** puts that tab's settings back to what the server holds and leaves
-every other tab alone — reverting APPEARANCE should not throw away an hour spent on
-SPEECH.
-
-An unsaved change is flagged in red on that tab's row. Walking away from a
-panel full of uncommitted changes is the single easiest mistake to make here.
+The consequence worth knowing: **moving a control changes the preview and
+nothing else.** Nothing reaches a display until you press SAVE in the profile
+row you are editing, and REVERT does not exist — closing the row without
+saving leaves the stored profile as it was.
 
 ### Saves that are not that save
 
@@ -115,16 +108,20 @@ Each of these writes a different document, so each has its own button:
 
 | Button | Writes | Applies |
 |---|---|---|
-| SAVE FOR EVERYONE (per tab) | the shared interface settings on that tab | immediately, everywhere |
+| SAVE, inside a profile row | that profile alone; every display naming it, and every display at all if it is the default | immediately |
 | SAVE, inside an AI endpoint's box | that endpoint alone | immediately, next question |
+| SAVE, on SECURITY | who has to be approved, and what a grant is worth | immediately |
 | SAVE, on ADMIN SETTINGS | the admin port, binding, session lifetime | only after a restart |
 
 Offering one button that meant all of them is how somebody presses the wrong
-one. A tab that writes nothing shared shows no SAVE FOR EVERYONE at all — the
-AI tab has none, because each endpoint saves itself from inside its own block.
-SCREENSAVER and DEVICE share one: **SAVE PROFILES** writes both lists
-together, because they are parts of one document and a device
-profile can name an appearance added in the same sitting.
+one. The AI tab has no tab-wide save because each endpoint saves itself from
+inside its own block, and the profile tabs have none because each profile
+does.
+
+An endpoint's action bar is the one row that is not just a commit: **MAKE
+DEFAULT, TEST and SWITCH OFF** at the left, then a gap, then **SAVE** and
+**DELETE** at the right — the destructive one held apart from the three that
+are safe to press while you are still deciding.
 
 ## The live preview
 
@@ -160,7 +157,7 @@ The ACCESS tab holds two topics — the rules about who may be here:
 
 | | |
 |---|---|
-| **The request form** | what a request asks for, under the setting that decides whether anyone is asked at all |
+| **The request form** | what a request asks for. Whether anyone is asked at all is on SECURITY |
 | **Created Access** | where you invite a device: name it and take the code to the screen |
 
 Whether anybody is asked at all is on **SECURITY**, under **AI Requires
@@ -168,9 +165,8 @@ Permission** — that is the door rather than the key, and it decides what a
 grant is worth once given. ACCESS answers which device may reach which
 endpoint.
 
-The register itself is on its own tab, **DEVICES**, on the profile settings
-row —
-every device this server knows about, in one list.
+The register itself is on its own tab, **DEVICES**, right of the divider
+beside AI and SECURITY — every device this server knows about, in one list.
 
 Each profile list has a tab of its own in the profile settings group — what a
 screen looks like and what it is allowed to do were never the same question:
@@ -357,34 +353,24 @@ given larger type without being told to do either.
 
 ### Appearance profiles
 
-The APPEARANCE tab is **one document for everybody**, and that is right for almost
-all of it — tune the bloom once and every screen in the building gets it. It is
-wrong for exactly four values.
-
 A screen in a hallway is read from three metres. A laptop is read from fifty
 centimetres. One type size cannot be right for both, and neither can one
 layout: a wall wants the figure filling the frame, a desk wants room for the
-transcript beside it. So four values become a profile that a device names:
+transcript beside it.
 
-| | |
-| --- | --- |
-| **Type size** | NORMAL, LARGER, LARGEST — the range the APPEARANCE tab offers |
-| **Palette** | which of the five |
-| **Layout** | HERO, or FULL BLEED for a screen that is mostly being looked at |
-| **Figure** | STACK, DISC, ORB or KNOT |
+**The tab is the editor; a profile is what it looked like when you pressed
+SAVE.** Not a hand-picked shortlist of overridable values — a profile holds
+*every* key the APPEARANCE tab writes, palette and layout and type size and
+the glass sliders and the speaker labels alike. Tune it against the live
+preview, then capture it under a name.
 
-Everything else stays shared. That is the point of the shortlist rather than
-"override anything": a per-place setting that could cover the whole document
-would quietly end the ability to change something once for everyone.
+**Opening a profile loads it back into the tab**, so editing one is the same
+gesture as making one. There is no PREVIEW and no STOP: you are always looking
+at the profile you have open.
 
-**A device that names no profile shows what the APPEARANCE tab says**, which is what
-every display did before this existed. Deleting a profile puts every device
-that named it back to that, rather than to nothing — so the fall-back is always
-a working appearance.
-
-**PREVIEW** lays a profile over the live preview without saving it, and follows
-the controls as you change them. STOP puts the shared document back, and so
-does touching anything on APPEARANCE, GEOMETRY or SPEECH.
+**A device that names no profile gets whichever profile is nominated
+DEFAULT.** Deleting a profile puts every device that named it back to that,
+rather than to nothing — so the fall-back is always a working appearance.
 
 One limit worth knowing before a screen goes up: **type size tops out at
 LARGEST**, because that is the range the APPEARANCE tab offers. If that is not enough
@@ -549,7 +535,7 @@ could see would be worse than anything the expiry bought.
 
 A name for a set of them, so a grant is made once instead of ticked twelve
 times and re-ticked every time somebody gets a new phone. Groups are made on
-the **ACCOUNTS** tab and named wherever access is granted — today that is an
+the **GROUPS** tab and named wherever access is granted — today that is an
 endpoint's *who may use it*, and anything added later that grants something can
 name them the same way.
 

@@ -19,11 +19,11 @@ Without a wake word, an AUTO display responds to any speech near it —
 including two people talking to each other. The wake word is what makes it
 usable in an occupied room.
 
-**The words themselves are not here.** Each belongs to an assistant, on the AI
-tab: with more than one, the word is what picks between them, so it belongs to
-the thing it picks. LEARN, the alternative spellings and each one's own
-greeting are all there too. What is on this tab is the gate's behaviour, which
-is one thing for the whole display however many assistants it can reach.
+**The words themselves are here**, in the speech profile — the word, the
+spellings it will also accept, LEARN, whether matching is forgiving, how long
+it stays awake, and the greeting. An endpoint names a profile and takes all of
+it, and one profile may be named by only one endpoint, so with several
+assistants each still has a word of its own.
 
 | Mode | Behaviour |
 |---|---|
@@ -95,8 +95,8 @@ panel lists which models are resident right now.
 
 If people report being misheard, change this before changing anything else.
 
-**The choice interacts with THE EXACT WORD.** An assistant set to match only
-its exact name refuses `"Magnolia's"` where a CLOSE ENOUGH one forgives it — so
+**The choice interacts with EXACT.** An assistant set to match only its exact
+name refuses `"Magnolia's"` where a FUZZY one forgives it — so
 a smaller model buys speed at the cost of the occasional wake word that does
 not land, and the assistants most likely to be set to exact are the ones that
 switch things on. Measured on the reference box: `small.en` took 4.4s to decode
@@ -180,7 +180,7 @@ answer to *"why did nothing happen?"* now appears:
 | `heard you · woken · 340ms decode, 512ms round trip` | it acted on what you said, and how long each stage took |
 | `nothing recognised — try speaking a little louder` | the recording came back empty; nothing to match against |
 | `"house" is not for this display — ignored` | somebody addressed an assistant this display is not allowed to use. Nothing was sent, nothing was answered, and the conversation it was already having was left alone |
-| `waiting to be approved — kitchen (d4a19…)` | this display has never been approved. It renders correctly and answers to nothing; the id is what an administrator looks for in DISPLAYS |
+| `waiting to be approved — kitchen (d4a19…)` | this display has never been approved. It renders correctly and answers to nothing; the id is what an administrator looks for in DEVICES |
 | `enrolled as kitchen wall — say "house" or "ada"` | an enrolment code was just typed into this screen and it worked |
 | `that code was not recognised — check it and try again` | a mistyped or already-used enrolment code. Case and dashes do not matter, so it is a wrong character rather than a wrong format |
 | `that code had expired — ask for a new one` | the code was real but older than ten minutes. REISSUE in the panel gives another |

@@ -2,11 +2,24 @@
 """Static server + local speech-to-text for Resonance.
 
 Listeners:
-  PORT      (default 9700) plain HTTP  — redirects to HTTPS, except where it
-                                         is the whole product (see below)
-  PORT + 1  (default 9701) HTTPS       — required for getUserMedia, which the
-                                         browser refuses on an insecure origin
-  PORT + 2  (default 9702) ADMIN       — the configuration interface
+  One per NETWORK PROFILE, each carrying the endpoints that name it — one
+  assistant on a port of its own, or several told apart by wake word. The
+  profile nominated DEFAULT is where an endpoint naming none of them answers,
+  and an upgrade turns the ports an install already had into one called
+  "Display" (9701, with 9700 redirecting to it).
+
+  HTTPS wherever a certificate exists, because getUserMedia is refused on an
+  insecure origin — except on loopback, which the browser already treats as
+  secure.
+
+  ADMIN     (default 9702) the configuration interface, and the only port
+                           still configured in app.json. It stays there
+                           deliberately: it is the way back in when what is in
+                           a profile is wrong.
+
+  PORT / HTTPS_PORT / ADMIN_PORT in the environment still override all of it,
+  and PORT alone still shifts all three (PORT, PORT+1, PORT+2) so a second
+  instance needs no stored configuration of its own.
 
 Two independent settings decide what this is: `bind` (loopback | address |
 everything) and `auth` (none | accounts). They are deliberately not one
@@ -682,12 +695,22 @@ ROUTE_DEFAULTS.update({
 MAX_ROUTES = 24                  # a household, not a directory service
 
 
-def _norm_word(s):
-    """The matcher's normalisation, in Python. Wake words are compared here
-    only to refuse an outright collision at the point of saving — the waking
-    itself happens in the browser."""
-    s = re.sub(r"[^a-z0-9\s]", " ", str(s or "").lower())
+def _keep_word(s):
+    """A wake word as it was typed, minus what the matcher cannot carry.
+
+    Case is KEPT. It is a name, and it is printed on a wall — "say Resonance"
+    rather than "say resonance" — so forcing it down was the server deciding
+    how somebody's assistant is spelt. Nothing is lost by keeping it: the
+    browser lowercases both the word and what it heard before comparing them,
+    so what this answers to is unchanged.
+
+    The same characters are still dropped as before, and deliberately: the
+    matcher discards anything that is not a letter, a digit or a space, so
+    keeping a hyphen here would print a word that is not the word being
+    matched."""
+    s = re.sub(r"[^A-Za-z0-9\s]", " ", str(s or ""))
     return re.sub(r"\s+", " ", s).strip()
+
 
 
 def _blank_routes():
@@ -706,8 +729,8 @@ def _migrate_routes():
     stored = read_settings()
     rec = dict(ROUTE_DEFAULTS)
     rec.update({k: cfg[k] for k in BACKEND_DEFAULTS})
-    rec["wakeword"] = _norm_word(stored.get("wakeword")) or ROUTE_DEFAULTS["wakeword"]
-    rec["aliases"] = [w for w in (_norm_word(a) for a in
+    rec["wakeword"] = _keep_word(stored.get("wakeword")) or ROUTE_DEFAULTS["wakeword"]
+    rec["aliases"] = [w for w in (_keep_word(a) for a in
                                   re.split(r"[\n,]", str(stored.get("wakealiases") or "")))
                       if w]
     # A name, not a second wake word: this is what the panel and the
@@ -732,7 +755,7 @@ def read_routes():
             for rid, rec in stored["routes"].items():
                 out = dict(ROUTE_DEFAULTS)
                 out.update({k: v for k, v in rec.items() if k in ROUTE_DEFAULTS})
-                out["aliases"] = [w for w in (_norm_word(a) for a in
+                out["aliases"] = [w for w in (_keep_word(a) for a in
                                               (rec.get("aliases") or [])) if w]
                 out["displays"] = [str(d)[:32] for d in
                                    (rec.get("displays") or [])][:MAX_ALLOW]
@@ -1081,7 +1104,7 @@ def validate_route(obj, current, doc, rid=None):
                 out.append(g)
         rec["groups"] = out[:MAX_GROUPS]
     if "wakeword" in obj:
-        rec["wakeword"] = _norm_word(obj["wakeword"])[:40]
+        rec["wakeword"] = _keep_word(obj["wakeword"])[:40]
     # No longer required on the route. The word lives in the speech profile the
     # route names, and demanding one here would refuse every endpoint saved
     # from a panel that no longer has the field. What a route DOES still need
@@ -1093,7 +1116,7 @@ def validate_route(obj, current, doc, rid=None):
             raw = re.split(r"[\n,]", str(raw or ""))
         seen, out = set(), []
         for a in raw:
-            w = _norm_word(a)[:40]
+            w = _keep_word(a)[:40]
             if w and w not in seen:
                 seen.add(w)
                 out.append(w)

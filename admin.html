@@ -4115,10 +4115,14 @@ function wireBlock(blk){
     /* The wake word follows the name while nobody has touched it. Typing the
        same word twice for the common case is the duplication people notice;
        keeping them separate fields is what lets an endpoint be called
-       "Kitchen Lights" and answer to "kitchen". */
+       "Kitchen Lights" and answer to "kitchen".
+
+       Case is carried across rather than flattened: the word is printed on the
+       wall as "say Resonance", and what it answers to is unaffected — the
+       matcher lowercases both sides before comparing. */
     if (f && f.dataset.f === 'name'){
       const w = F(blk, 'wakeword');
-      if (w && w.dataset.touched !== '1') w.value = f.value.toLowerCase().trim();
+      if (w && w.dataset.touched !== '1') w.value = f.value.trim();
     }
     const s = e.target.closest('[data-s]');
     if (s){

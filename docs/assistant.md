@@ -24,9 +24,9 @@ speech. Say a *different* name mid-conversation and you switch to that one
 instead.
 
 Each names **a model profile** — the service, address, model and key, kept as
-a named set under PROFILES ▸ MODELS — and adds its own instructions, and
-optionally its own greeting and voice, so a room with more than one can hear
-which replied. Two endpoints may name the same profile: one connection, two
+a named set under PROFILES ▸ MODELS — and adds its own instructions. Its
+greeting and its voice come from the speech profile it names rather than from
+fields of its own, so a room with more than one can still hear which replied. Two endpoints may name the same profile: one connection, two
 names to say, two sets of instructions.
 
 **One row per endpoint**, and the row is the whole of it: the speech profile
@@ -92,26 +92,26 @@ is. Restricting the **default** endpoint is worth a moment's thought: anything
 typed into the composer with no name in front of it goes there, so displays
 outside the list get nothing back when somebody types.
 
-### The instance name and the wake word are two fields
+### The instance name and the wake word are two different things
 
-They are the same word by default — the wake word follows the name as you type
-it, until you edit the wake word, after which it stays where you put it.
+The **instance name** labels the endpoint in the panel, in the log and in
+`{assistant}`; it is never spoken and never matched against. The **wake word**
+is what somebody actually says. An endpoint called *Kitchen Lights* is a
+perfectly good label and a terrible thing to say out loud.
 
-They are separate because they answer to different things. The **instance
-name** labels the endpoint in the panel, in the log and in `{assistant}`; it is
-never spoken and never matched against. The **wake word** is what somebody
-actually says. An endpoint called *Kitchen Lights* is a perfectly good label
-and a terrible thing to say out loud.
+**The word is not on this tab.** It lives in the speech profile the endpoint
+names, on SPEECH ▸ WAKE WORD, along with the spellings it will also accept and
+whether matching is forgiving. One endpoint per speech profile is enforced, so
+each endpoint still has a word of its own.
 
-### CLOSE ENOUGH and THE EXACT WORD
+### FUZZY and EXACT
 
-CLOSE ENOUGH forgives a mishearing: a transcriber gets short words wrong
-constantly, so a name that had to come back spelled correctly would make
-waking a coin flip. That is what you want from something that answers
-questions.
+FUZZY forgives a mishearing: a transcriber gets short words wrong constantly,
+so a name that had to come back spelled correctly would make waking a coin
+flip. That is what you want from something that answers questions.
 
-THE EXACT WORD is for one that *does* things. The same near-miss costs you a
-few tokens on one and switches on the lights on the other.
+EXACT is for one that *does* things. The same near-miss costs you a few tokens
+on one and switches on the lights on the other.
 
 **An exact hit always wins**, wherever it was found. Without that rule a
 near-miss on one name could steal an utterance that said another one outright
@@ -125,15 +125,18 @@ syllable counts, vowels and stress survive a noisy room; two names one letter
 apart do not. Worth settling before a household learns them, because changing
 one afterwards is its own small misery.
 
-Two assistants cannot share a word — including through *also answers to* — and
-the panel refuses it as you save. Words that merely *sound* close are not
-checked yet.
+Two assistants sharing a word is a display that cannot tell them apart, and it
+is **no longer refused at the point of saving** — the words moved to speech
+profiles, and the check compared the vestigial copy every endpoint still
+carries, which refused every save. What prevents the clash instead is that one
+speech profile may be named by only one endpoint. Two *profiles* given the
+same word are not caught. Words that merely *sound* close are not checked
+either.
 
 **LEARN HOW I SAY IT** captures what the transcriber actually returns when you
-say the word, three times, and adds those forms to *also answers to*. It
-teaches the endpoint whose block the button is in, and that endpoint has to
-have been saved first. The captured words land in the field unsaved — press **SAVE** to keep
-them.
+say the word, three times, and adds those forms to *Also accept*. It is on the
+SPEECH tab beside the word it teaches, not in an endpoint's block. The
+captured words land in the field unsaved — save the profile to keep them.
 
 ### TEST
 
@@ -160,9 +163,8 @@ names where the same question would have gone in use.
 ## Model profiles
 
 A profile is one connection under a name: **PROFILES ▸ MODELS**, one row each,
-the same caret and the same one-open-at-a-time as every other list. ADD MODEL
-makes one; SAVE commits the row; MAKE DEFAULT nominates the one an endpoint
-naming nothing gets.
+the same caret and the same one-open-at-a-time as every other list. **ADD A PROFILE** makes one; SAVE commits the row; MAKE DEFAULT nominates the
+one an endpoint naming nothing gets.
 
 Editing a profile changes what every endpoint naming it reaches, in one place
 — which is the point. A key typed once serves all of them, and rotating it is
@@ -478,7 +480,7 @@ earshot what the box is wired to.
 | the house says it does not understand | that is a pass for the built-in agent on a test sentence; on a real command, the device is not exposed to Assist or is named something else |
 | the house heard a command and did nothing audible | it did not fail silently — an action with nothing to say is spoken as "Done." If you hear nothing at all, look at the note on screen |
 | still on DEMO | that one is set to DEMO — nothing was asked of a model |
-| the wrong one answered | a near-miss; set the other to THE EXACT WORD, or move the words further apart |
+| the wrong one answered | a near-miss; set the other speech profile to EXACT, or move the words further apart |
 | nothing woke at all | the word belongs to none of them, or the gate is off — SPEECH tab |
 | a confidently wrong answer | the model, not the plumbing — see above |
 

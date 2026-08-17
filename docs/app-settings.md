@@ -74,7 +74,7 @@ and disabled so the omission is visible rather than silent.
 
 The default, because the safe default is the one that assumes it can be
 reached. With sign-in set to nothing there are no accounts to manage: the
-ACCOUNTS tab is not offered, and the account routes refuse rather than quietly
+ADMIN tab is not offered, and the account routes refuse rather than quietly
 writing to a file nothing consults.
 
 ## Ports
@@ -93,10 +93,6 @@ port a network profile is using, and refuses to give a network profile this
 one.
 
 The admin routes are not merely hidden on the app's ports — they **do not
-exist** there. Asking for one returns "not found", not "unauthorised", because
-answering "unauthorised" would confirm the route is there for anyone probing.
-
-The admin routes are not merely hidden on the display ports — they **do not
 exist** there. Asking for one returns "not found", not "unauthorised", because
 answering "unauthorised" would confirm the route is there for anyone probing.
 
@@ -130,8 +126,10 @@ Two cases where the plain port keeps serving normally:
   air to enforce a rule it cannot satisfy, so it keeps serving and says so at
   startup.
 
-Ports must be between 1024 and 65535 and all three different. Below 1024
-requires root, and this server deliberately runs as an ordinary user.
+A port must be between 1024 and 65535, and no two may collide — not the admin
+portal's with a network profile's, and not two profiles' with each other.
+Below 1024 requires root, and this server deliberately runs as an ordinary
+user.
 
 Before accepting a change, the server tries to bind the port. A port already
 taken by something else is refused at the point of saving — otherwise it would
@@ -232,16 +230,20 @@ impractical quickly without ever locking a legitimate user out permanently.
 | File | Holds | Mode |
 |---|---|---|
 | `settings.json` | shared interface settings | world-readable by design |
-| `backend.json` | assistant configuration and API key | 600 |
+| `routes.json` | every AI endpoint, and which model, speech and network profile it names | 600 |
+| `displays.json` | every display and every profile — including the model profiles' API keys | 600 |
+| `backend.json` | the single assistant this server had before endpoints. Read once at the migration and never written again | ordinary |
 | `users.json` | accounts and password hashes | 600 |
 | `embeds.json` | embed keys, hashed | 600 |
-| `app.json` | ports and session lifetime | ordinary |
+| `app.json` | the admin portal's port, binding, sign-in mode and session lifetime | ordinary |
 | `server.pid` | the running process id | ordinary |
 
 `settings.json` has to be readable — every viewer's browser fetches it to
-build the interface. That is precisely why the key, the accounts and the embed
-keys live somewhere else. None of the first four should ever be committed to a
-repository.
+build the interface. That is precisely why the keys, the accounts and the
+embed keys live somewhere else: the model profiles' API keys are in
+`displays.json`, the accounts in `users.json`, the embed keys in
+`embeds.json`, none of them served by anything. **None of the files at mode
+600 should ever be committed to a repository.**
 
 ## The service, or the deliberate lack of one
 
