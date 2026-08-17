@@ -295,8 +295,9 @@
   /* Sign in and Sessions moved to SECURITY and brought their commit with
      them. Always shown, unlike #approw: that one is hidden on tabs it does
      not belong to, and this one only exists on the tab it belongs to. */
-  #secapprow{margin-top:14px;padding-top:10px;
+  #secapprow{display:none;margin-top:14px;padding-top:10px;
              border-top:1px solid rgba(var(--glass),.30)}
+  #secapprow.on{display:block}
   #secapprow .seg{justify-content:flex-end;margin-top:8px}
   #secapprow .seg button{border-width:2px;border-style:solid;padding:6px 10px}
   #approw .seg,.uirow .seg{justify-content:flex-end;margin-top:8px}
@@ -7909,6 +7910,14 @@ function panelNav(){
     const ar = $('approw');
     if (ar) ar.classList.toggle('on',
       tab === 'app' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
+    /* …and the one Sign in and Sessions brought with them to SECURITY. It is
+       a bare div rather than a .grp, which is what a commit row has to be —
+       and a bare div carries no data-tab, so nothing in the machinery above
+       was ever going to hide it. It showed on every tab in the panel. */
+    const sr = $('secapprow');
+    if (sr) sr.classList.toggle('on',
+      tab === 'security' && !(findEl.value || '').trim()
+      && !!ME && ME.role === 'admin');
     /* ADD INSTANCE is not inside any block, because it makes one — it has to
        stay reachable whichever block happens to be open, or the only way to
        add a second endpoint is to first collapse the first. */
