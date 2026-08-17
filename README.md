@@ -1496,8 +1496,8 @@ it. Each entry below carries its own panel scope.
   which is not a permission model, it is data entry. A group is a name for a
   set of them, made under GROUPS and named wherever access is granted.
 
-  **Two kinds, and they do not mix**: people who asked to be here, and devices
-  an admin created and sent a code to. They answer separate questions — *the
+  **Two kinds, and they do not mix**: people and devices, set per row under
+  DEVICES and otherwise inferred from how the row arrived. They answer separate questions — *the
   physics department*, *the screens in the east wing* — and one list that could
   hold both would be a list nobody could describe. A group's kind is fixed at
   creation, because changing it would silently empty it.

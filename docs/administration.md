@@ -539,11 +539,23 @@ the **GROUPS** tab and named wherever access is granted — today that is an
 endpoint's *who may use it*, and anything added later that grants something can
 name them the same way.
 
-**Two kinds, and they do not mix.** A group of **people** holds those who asked
-for access and were approved. A group of **devices** holds the screens you
-created and sent a code to. They answer separate questions — *the physics
-department* and *the screens in the east wing* — so a group holds one or the
-other, and its kind cannot be changed once it exists.
+**Two kinds, and they do not mix.** They answer separate questions — *the
+physics department* and *the screens in the east wing* — so a group holds one
+population or the other, and its kind cannot be changed once it exists.
+
+**Which population a row is in is set on the row**, under DEVICES: *It is a*
+— DEVICE, PERSON, or WORK IT OUT. Left at WORK IT OUT it is inferred from how
+the row arrived: asked for access reads as a person, issued a code reads as a
+device. That inference answers the wrong question and is only there so every
+existing row has an answer — asking for access happens in a browser on one
+machine, which describes a device. A **person** is an identity that carries
+from a phone to a laptop, and nothing here issues one yet, so today almost
+everything is honestly a device.
+
+**Changing it can drop the row from a group.** A group takes one population,
+so moving a row to the other one removes it from any group of the kind it
+left. The panel says which groups, rather than letting one quietly lose a
+member.
 
 **Grants add up.** An endpoint reachable by a group and by one device named on
 its own is reachable by everyone in the group plus that device. Being in a

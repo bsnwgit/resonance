@@ -1292,6 +1292,13 @@ def note_code_failure(ip):
 
 DISPLAY_DEFAULTS = {
     "name": "",                  # what an admin called it
+    # Which population this row belongs to when a group is drawn from one:
+    # "user", "device", or blank for "work it out". Set by an admin, because
+    # the inference below can only see how the row ARRIVED — and asking for
+    # access is something a browser on one machine does, which describes a
+    # device rather than a person. A person is an identity that carries from a
+    # phone to a laptop, and nothing here issues one yet.
+    "kind": "",
     "asked": "",                 # the ?display= name it announced itself with
     "approved": False,
     # An unspent enrolment code, and when it dies. Stored in the clear rather
@@ -2682,6 +2689,10 @@ def admin_displays():
         live = bool(rec.get("code")) and (rec.get("code_expires") or 0) > now_
         row.update(id=did, label=display_label(rec),
                    guest=is_guest(rec), expired=display_expired(rec),
+                   # What it was SET to, and what it resolves to. The panel
+                   # needs both: one is the control's value, the other is the
+                   # answer a blank control is currently getting.
+                   kind=str(rec.get("kind") or ""), group_kind=group_kind_of(rec),
                    # Three states, and the panel needs to tell them apart:
                    # INVITED is a row waiting for somebody to type its code
                    # into a screen, WAITING is a device that turned up on its
@@ -2746,9 +2757,16 @@ def write_groups(groups):
 
 
 def group_kind_of(rec):
-    """Which population a display row belongs to. Asking to be here is what
-    makes somebody a person as far as this is concerned; everything else is a
-    device an admin put somewhere."""
+    """Which population a display row belongs to.
+
+    What an admin said it is, where they have said. Otherwise it is inferred
+    from how the row arrived — asked for access, or issued a code — which is a
+    guess about the wrong question: both of those happen in a browser on one
+    machine. The inference is kept only so that every existing row has an
+    answer without anybody visiting it."""
+    k = str(rec.get("kind") or "")
+    if k in GROUP_KINDS:
+        return k
     return "user" if is_guest(rec) else "device"
 
 
@@ -4965,6 +4983,48 @@ class Handler(SimpleHTTPRequestHandler):
             write_displays(displays)
             return self._json(200, {"ok": True, "id": did,
                                     "displays": admin_displays()})
+
+        if parsed.path == "/displays/kind":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            did = str(obj.get("id") or "")
+            displays = read_displays()
+            if did not in displays:
+                return self._json(404, {"error": "no such display"})
+            want = str(obj.get("kind") or "")
+            if want and want not in GROUP_KINDS:
+                return self._json(400, {"error": "kind must be one of: "
+                                                 + ", ".join(GROUP_KINDS)})
+            was = group_kind_of(displays[did])
+            displays[did]["kind"] = want
+            now = group_kind_of(displays[did])
+            write_displays(displays)
+            # A group is drawn from one population, and clean_members drops a
+            # member of the wrong one — silently, at the next save of that
+            # group. Done here instead, and counted, so moving a row between
+            # populations says what it cost rather than emptying a group
+            # somebody built weeks ago with nothing on screen about it.
+            dropped = []
+            if now != was:
+                groups = read_groups()
+                touched = False
+                for gid, g in groups.items():
+                    if g["kind"] != now and did in (g.get("members") or []):
+                        g["members"] = [m for m in g["members"] if m != did]
+                        dropped.append(g["name"])
+                        touched = True
+                if touched:
+                    write_groups(groups)
+            print("display %s kind=%s by %s%s"
+                  % (did, want or "(inferred: %s)" % now, s["user"],
+                     "; dropped from " + ", ".join(dropped) if dropped else ""),
+                  flush=True)
+            return self._json(200, {"ok": True, "displays": admin_displays(),
+                                    "dropped": dropped})
 
         if parsed.path == "/displays/rename":
             s = self._require("admin")

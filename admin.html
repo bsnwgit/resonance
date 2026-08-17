@@ -5883,6 +5883,38 @@ function kioskBlock(d){
      tick. The shut row says what it IS in words instead — a checkbox you
      cannot press without opening the row would be a control pretending to be
      a status. */
+  /* Which population this row belongs to when a group is drawn from one.
+     It used to be inferred from how the row arrived — asked for access, or
+     issued a code — which answers the wrong question: both happen in a
+     browser on one machine, and that describes a device. A person is an
+     identity that carries from a phone to a laptop, so it is a thing to be
+     told rather than guessed at. */
+  const krow = document.createElement('div');
+  krow.className = 'namerow';
+  const klab = document.createElement('b');
+  klab.textContent = 'It is a';
+  krow.appendChild(klab);
+  const kseg = document.createElement('div');
+  kseg.className = 'seg';
+  const kindNow = d.kind || '';
+  [['device', 'DEVICE'], ['user', 'PERSON'], ['', 'WORK IT OUT']].forEach(([v, txt])=>{
+    const b = document.createElement('button');
+    b.dataset.v = v; b.textContent = txt;
+    b.classList.toggle('on', v === kindNow);
+    b.onclick = ()=>{
+      kseg.querySelectorAll('button').forEach(x=> x.classList.toggle('on', x === b));
+    };
+    kseg.appendChild(b);
+  });
+  krow.appendChild(kseg);
+  box.appendChild(krow);
+  const kindNote = document.createElement('div');
+  kindNote.className = 'note';
+  kindNote.textContent = d.kind ? ''
+    : 'Not set — currently read as ' + (d.group_kind === 'user' ? 'a person' : 'a device')
+      + ' from how it arrived.';
+  box.appendChild(kindNote);
+
   const l = document.createElement('label');
   l.className = 'vo';
   const kb = document.createElement('input');
@@ -5952,7 +5984,24 @@ function kioskBlock(d){
          row somebody has open and this message with it, and nothing else on
          screen draws these two values. */
       if (j.displays) DISPLAYS = j.displays;
-      said.textContent = 'saved';
+      /* Its own call, because it is its own document: changing which
+         population a row is in can drop it from groups of the other one, and
+         the server says which so this can report it rather than let a group
+         quietly lose a member. */
+      const wantKind = (kseg.querySelector('button.on') || {}).dataset.v || '';
+      let extra = '';
+      if (wantKind !== (d.kind || '')){
+        const k = await api('/displays/kind', {method:'POST', body: JSON.stringify(
+          {id: d.id, kind: wantKind})});
+        if (k.displays) DISPLAYS = k.displays;
+        d.kind = wantKind;
+        kindNote.textContent = '';
+        if ((k.dropped || []).length)
+          extra = ' · removed from ' + k.dropped.join(', ')
+                + ' — a group takes one population';
+        if (typeof refreshGroups === 'function') refreshGroups();
+      }
+      said.textContent = 'saved' + extra;
     }catch(e){
       said.className = 'note bad';
       said.textContent = e.message;
@@ -5967,6 +6016,8 @@ function kioskBlock(d){
        screen, it does not go looking for what changed elsewhere meanwhile. */
     kb.checked = !!d.kiosk;
     sel.value = d.kiosk_profile || '';
+    kseg.querySelectorAll('button').forEach(x=>
+      x.classList.toggle('on', x.dataset.v === (d.kind || '')));
     sync();
     said.className = 'note';
     said.textContent = 'back to what is saved';
