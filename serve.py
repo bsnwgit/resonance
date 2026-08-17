@@ -3807,7 +3807,17 @@ def ensure_system_groups(by="the server"):
                           flush=True)
             continue
         gid = str(cfg.get(kind + "_group") or "")
-        if gid in groups and groups[gid]["kind"] == kind:
+        # ONLY a group this server named. That settings key was written by an
+        # older default_group which fell back to "the first group of this kind"
+        # whenever it was blank — so on an upgraded install it routinely names
+        # a group an ADMIN created and named. Adopting that makes their group
+        # permanent, fills it with the whole estate, and leaves no way back:
+        # its members cannot be edited, it cannot be deleted, and no other
+        # group can be nominated. A name this server chose is the only safe
+        # evidence that the group was ever meant to be the default.
+        ours = (DEFAULT_GROUP_NAME[kind],) + SUPERSEDED_GROUP_NAMES.get(kind, ())
+        if gid in groups and groups[gid]["kind"] == kind \
+           and groups[gid]["name"] in ours:
             groups[gid]["system"] = True          # adopt what is already there
             print("group %s (%s) is now the permanent %s group"
                   % (gid, groups[gid]["name"], kind), flush=True)
@@ -3874,11 +3884,51 @@ def drop_from_groups(row_id):
     return was
 
 
+def _rows_readable(path, key):
+    """(readable, ids). The distinction read_displays cannot make: it answers
+    {} for a file with no rows AND for one that could not be read at all, which
+    is the right shape for a caller that wants to carry on and a catastrophe
+    for one that DELETES what is missing from it."""
+    try:
+        with open(path) as fh:
+            doc = json.load(fh)
+    except FileNotFoundError:
+        return True, set()                       # nothing here yet, genuinely
+    except (OSError, ValueError):
+        return False, set()                      # unreadable, malformed, denied
+    rows = doc.get(key)
+    if not isinstance(rows, dict):
+        return False, set()
+    return True, set(rows)
+
+
 def prune_group_members():
     """Ids in groups that belong to no row at all — left by every delete that
-    happened before drop_from_groups existed. Swept once, at startup."""
-    live = set(read_displays()) | set(read_identities())
+    happened before drop_from_groups existed.
+
+    GUARDED, because it deletes from one file based on the contents of two
+    others. A truncated displays.json, a hand edit with a trailing comma, or a
+    restart under an account that cannot read a 0600 file all look exactly like
+    "there are no displays" — and this would then strip every display from
+    every group. The system groups would be refilled at the next healthy
+    startup, which is what would hide it; a custom group has no repopulation
+    path and would be gone for good."""
+    ok_d, dids = _rows_readable(DISPLAYS_PATH, "displays")
+    ok_i, pids = _rows_readable(IDENTITIES_PATH, "identities")
+    if not (ok_d and ok_i):
+        print("not pruning groups: %s could not be read"
+              % (", ".join(n for n, ok in (("displays.json", ok_d),
+                                           ("identities.json", ok_i)) if not ok)),
+              flush=True)
+        return
+    live = dids | pids
     groups = read_groups()
+    if not live and any(r["members"] for r in groups.values()):
+        # Every row gone and groups still full is a state to look at, not one
+        # to tidy up after.
+        print("not pruning groups: no rows exist at all, which is not a thing "
+              "to act on unprompted", flush=True)
+        return
     gone = 0
     for rec in groups.values():
         keep = [m for m in rec["members"] if m in live]

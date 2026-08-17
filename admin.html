@@ -7215,6 +7215,14 @@ function kioskBlock(d){
       lab.appendChild(document.createTextNode(' ' + g.name));
       gbox2.appendChild(lab);
     });
+    /* What was on screen when this was drawn. SAVE compares against THIS, not
+       against the live GROUPS array — otherwise "the ticks changed" and "the
+       server changed under us" are the same test, and a save about kiosk mode
+       resolves the second by overwriting the server from a snapshot the admin
+       never touched. /groups/sets is an authoritative full set, so that drops
+       a grant somebody made from the group list a moment earlier. */
+    gbox2.dataset.painted = mine.filter(g=> (g.members || []).indexOf(d.id) >= 0)
+                                .map(g=> g.id).sort().join(',');
     if (!mine.length && !home) grow.style.display = 'none';
   }
   syncGroups();
@@ -7296,11 +7304,8 @@ function kioskBlock(d){
       /* Only the custom ones, and only where they actually changed. The
          default group is not in this list and the server would ignore it. */
       const wantSet = [...gbox2.querySelectorAll('input:checked')].map(x=> x.dataset.g);
-      const wasSet = (GROUPS || []).filter(
-        g=> !g.system && g.kind === 'device'
-            && (g.members || []).indexOf(d.id) >= 0).map(g=> g.id);
       let extra = '';
-      if (wantSet.slice().sort().join() !== wasSet.slice().sort().join()){
+      if (wantSet.slice().sort().join(',') !== (gbox2.dataset.painted || '')){
         const k = await api('/groups/sets', {method:'POST', body: JSON.stringify(
           {id: d.id, groups: wantSet})});
         if (k.groups) GROUPS = k.groups;
