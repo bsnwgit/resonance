@@ -326,10 +326,9 @@ def holding_it(host, port):
       which is a profile moving the other way, off an address onto ANY
 
     Anything else is somebody else's, and gets a real bind test."""
-    bound = RUNNING.get("bound") or set()
-    if (host, port) in bound or ("0.0.0.0", port) in bound:
+    if (host, port) in _BOUND or ("0.0.0.0", port) in _BOUND:
         return True
-    return host == "0.0.0.0" and any(pp == port for _, pp in bound)
+    return host == "0.0.0.0" and any(pp == port for _, pp in _BOUND)
 
 
 def local_interfaces():
@@ -3351,6 +3350,13 @@ ROLES = ("admin", "viewer")
 PBKDF2_ROUNDS = 600_000          # ~0.3s per attempt: cheap once, costly to grind
 SESSION_IDLE = 30 * 60           # inactivity before a session dies; set at startup
 RUNNING = {}                     # what is actually bound, to compare against config
+#: The exact sockets this process is holding, as (host, port). Kept OUT of
+#: RUNNING deliberately: RUNNING is handed to the panel as JSON, and a set of
+#: tuples in it stops the whole /app response being serialisable — which is
+#: not a degraded answer but no answer at all, read in the browser as
+#: "Failed to fetch" and in the log as a traceback. RUNNING is a wire format;
+#: this is bookkeeping.
+_BOUND = set()
 # Read once at startup rather than per request, for the same reason the ports
 # are: this decides what a listener IS, and a listener cannot be re-founded
 # under the requests already in flight on it.
@@ -6366,7 +6372,7 @@ def main():
                 print("network %-10s port %d NOT bound: %s"
                       % (_n["name"], _bind, exc), flush=True)
                 continue
-            RUNNING.setdefault("bound", set()).add((_host, _bind))
+            _BOUND.add((_host, _bind))
             if _to is not None:
                 print("HTTP  on %s:%d  → redirects to %d" % (_host, _bind, _p),
                       flush=True)
