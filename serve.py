@@ -3409,6 +3409,9 @@ def read_groups():
             "kind": kind if kind in GROUP_KINDS else "device",
             "members": [str(m)[:32] for m in (rec.get("members") or [])][:MAX_ALLOW],
             "created": rec.get("created"), "created_by": rec.get("created_by"),
+            # One per kind, made by the server and not deletable. See
+            # ensure_system_groups.
+            "system": bool(rec.get("system")),
         }
     return out
 
@@ -3458,44 +3461,64 @@ def enrolled_as(rec):
 DEFAULT_GROUP_NAME = {"device": "Devices", "identity": "People"}
 
 
-def default_group(kind, by="the server"):
-    """The group a row joins the moment it starts working, minting one if there
-    is not one yet.
+def system_group(kind):
+    """The permanent group for a population, by id, or "" if it is somehow
+    missing. Never mints: ensure_system_groups does that, once, at startup."""
+    for gid, rec in sorted(read_groups().items()):
+        if rec["kind"] == kind and rec["system"]:
+            return gid
+    return ""
 
-    A row that belongs to no group is a row an endpoint's allow-list cannot
-    name, so every grant has to be made device by device — which is the data
-    entry a group exists to remove. Landing somewhere by default means the
-    first grant to a whole population is one tick rather than twelve.
 
-    Stored by id, not "the first group of this kind": reordering a list, or
-    somebody adding a second group of people, must not silently change where
-    everything arriving tomorrow ends up."""
-    if kind not in GROUP_KINDS:
-        return ""
-    cfg = display_settings()
-    key = kind + "_group"
-    gid = str(cfg.get(key) or "")
+def ensure_system_groups(by="the server"):
+    """The two groups that always exist: one for displays, one for people.
+
+    They are made HERE, in code, rather than on first need, and they cannot be
+    deleted. A default that an admin can delete is not a default — everything
+    enrolling afterwards has nowhere to land, and the version of this that
+    minted on demand made that worse rather than better: it adopted any
+    existing group of the right kind before creating one, so deleting "Devices"
+    while a group called "East wing" existed sent every screen that arrived
+    afterwards silently into East wing.
+
+    An install that already has a default from that era keeps it — the group
+    the settings key names is adopted, with its name and its members, rather
+    than left beside a second one meaning the same thing. Only where there is
+    nothing to adopt is one created.
+    """
     groups = read_groups()
-    if gid and gid in groups and groups[gid]["kind"] == kind:
-        return gid
-    # Blank, or naming one that was deleted. Adopt an existing group of this
-    # kind before making a second one — an admin who has already made "Staff"
-    # and nothing else meant that one.
-    for g, rec in sorted(groups.items()):
-        if rec["kind"] == kind:
-            gid = g
-            break
-    else:
-        gid = "g" + secrets.token_hex(4)
-        groups[gid] = {"name": DEFAULT_GROUP_NAME[kind], "kind": kind,
-                       "members": [], "created": int(time.time()),
-                       "created_by": by}
+    cfg = display_settings()
+    changed = cfg_changed = False
+    for kind in GROUP_KINDS:
+        if any(r["kind"] == kind and r["system"] for r in groups.values()):
+            continue
+        gid = str(cfg.get(kind + "_group") or "")
+        if gid in groups and groups[gid]["kind"] == kind:
+            groups[gid]["system"] = True          # adopt what is already there
+            print("group %s (%s) is now the permanent %s group"
+                  % (gid, groups[gid]["name"], kind), flush=True)
+        else:
+            gid = "g" + secrets.token_hex(4)
+            groups[gid] = {"name": DEFAULT_GROUP_NAME[kind], "kind": kind,
+                           "members": [], "created": int(time.time()),
+                           "created_by": by, "system": True}
+            print("group %s (%s) created as the permanent %s group"
+                  % (gid, DEFAULT_GROUP_NAME[kind], kind), flush=True)
+        changed = True
+        if cfg.get(kind + "_group") != gid:
+            cfg[kind + "_group"] = gid
+            cfg_changed = True
+    if changed:
         write_groups(groups)
-        print("group %s (%s) created for arriving %ss"
-              % (gid, DEFAULT_GROUP_NAME[kind], kind), flush=True)
-    cfg[key] = gid
-    write_display_settings(cfg)
-    return gid
+    if cfg_changed:
+        write_display_settings(cfg)
+
+
+def default_group(kind, by="the server"):
+    """Where a row lands when it starts working. One answer per kind, and it is
+    the permanent group — never "the first one of this kind I found", which is
+    how a screen ended up in a group somebody built for something else."""
+    return system_group(kind) if kind in GROUP_KINDS else ""
 
 
 def join_group(did, gid):
@@ -3592,6 +3615,9 @@ def validate_group(obj, current):
         rec["kind"] = k
     if "members" in obj:
         rec["members"] = clean_members(obj["members"], rec["kind"])
+    # Never off the wire. Which group is permanent is this server's to decide,
+    # not something a panel can hand back having lost it in a round trip.
+    rec["system"] = bool(current.get("system"))
     return rec, None
 
 
@@ -6086,6 +6112,13 @@ class Handler(SimpleHTTPRequestHandler):
             gid = str(obj.get("id") or "")
             if gid not in groups:
                 return self._json(404, {"error": "no such group"})
+            if groups[gid]["system"]:
+                # A default an admin can delete is not a default: everything
+                # enrolling afterwards would have nowhere to land.
+                return self._json(400, {"error": "this group cannot be deleted "
+                                                 "— it is where new %ss land"
+                                                 % ("person" if groups[gid]["kind"]
+                                                    == "identity" else "display")})
             name = groups.pop(gid)["name"]
             write_groups(groups)
             # An endpoint naming a group that no longer exists is a permission
@@ -6718,6 +6751,10 @@ def main():
     ensure_default_kiosk()
     migrate_models()
     migrate_networks()
+    # The two groups that always exist. Made at startup rather than on first
+    # need, so they are there before anything can enrol into them and there is
+    # no moment where a population has nowhere to land.
+    ensure_system_groups()
     app = read_app()
     # Environment still wins, so a one-off run on a different port needs no
     # edit to the stored configuration. Setting PORT alone moves all three,

@@ -5531,6 +5531,14 @@ async function refreshGroups(){
     b.className = 'badge';
     b.textContent = g.kind === 'identity' ? 'PEOPLE' : 'DEVICES';
     top.appendChild(b);
+    /* After the kind, not before it: the row reads "PEOPLE · DEFAULT", which
+       is the population first and its standing second. */
+    if (g.system){
+      const sb = document.createElement('span');
+      sb.className = 'badge';
+      sb.textContent = 'DEFAULT';
+      top.appendChild(sb);
+    }
     const cnt = document.createElement('span');
     cnt.className = 'badge';
     cnt.textContent = g.members.length + (g.members.length === 1 ? ' member' : ' members');
@@ -5559,16 +5567,24 @@ async function refreshGroups(){
     /* On the name's own line, hard right. Deleting a group is the one thing
        here that cannot be undone, and it belongs beside the thing it names
        rather than at the foot of a list of ticks. */
-    const del = document.createElement('button');
-    del.textContent = 'DELETE';
-    del.className = 'act-danger';
-    del.onclick = ()=>{
-      if (confirm('Delete the group "' + g.name + '"? It is removed from every '
-                  + 'endpoint that names it. Nothing in it is deleted — a group '
-                  + 'is a way of referring to them, not a thing they belong to.'))
-        groupAction('/groups/delete', {id: g.id});
-    };
-    namerow.appendChild(del);
+    /* No DELETE on the two the server keeps. They are where a new display and
+       a new person land, and a default an admin can delete is not a default —
+       everything enrolling afterwards would have nowhere to go. The server
+       refuses it as well; this is so nobody is offered a button that answers
+       no. Renaming is still yours: the name is a label, the group is the
+       thing. */
+    if (!g.system){
+      const del = document.createElement('button');
+      del.textContent = 'DELETE';
+      del.className = 'act-danger';
+      del.onclick = ()=>{
+        if (confirm('Delete the group "' + g.name + '"? It is removed from every '
+                    + 'endpoint that names it. Nothing in it is deleted — a group '
+                    + 'is a way of referring to them, not a thing they belong to.'))
+          groupAction('/groups/delete', {id: g.id});
+      };
+      namerow.appendChild(del);
+    }
     row.appendChild(namerow);
 
     /* Membership is the group. Ticked in place rather than behind an EDIT,
