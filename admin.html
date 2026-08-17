@@ -966,9 +966,21 @@
   /* The same row, at the head of a list rather than the foot: its rule goes
      under it, because a rule above the first thing on a page is a line under
      the title it already has. */
+  /* No rule of its own: the code it produces belongs with the act of making
+     one, so the divider goes UNDER that rather than between the field and its
+     own answer. */
   .addrow.addtop{
-    margin-top:2px;margin-bottom:11px;padding-top:0;padding-bottom:10px;
-    border-top:0;border-bottom:2px solid rgba(var(--glass),.34);
+    margin-top:2px;margin-bottom:11px;padding-top:0;padding-bottom:2px;
+    border-top:0;border-bottom:0;
+  }
+  /* The one heavy rule on the page, between making a code and the screens
+     waiting to be given one. Those are two different jobs — one you came here
+     to do, one you came here to watch — and a hairline says "next control"
+     where this has to say "different subject". Same weight as the rule that
+     used to divide the two halves of the tab row, for the same reason. */
+  #enrollist{
+    margin-top:14px;padding-top:14px;
+    border-top:3px solid rgba(var(--glass),.55);
   }
   #dispadd input{
     flex:1;min-width:0;padding:5px 6px;font:inherit;
