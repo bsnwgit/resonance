@@ -955,7 +955,14 @@
   /* It is an addrow now, like ADD A PROFILE — so it keeps that row's rule
      above it and only sets what is particular to it: a field beside the
      button, because naming the thing IS the act of adding it here. */
-  #dispadd{gap:4px}
+  #dispadd .seg{gap:4px}
+  /* The two things you set before you press it, on a line under the name.
+     Wrapping rather than shrinking: these are choices, and a picker squeezed
+     to nothing is a choice you cannot read. */
+  .setuprow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+            margin-top:8px}
+  .setuprow .ppick{max-width:230px}
+  .setuprow .bklab{margin:0}
   /* The same row, at the head of a list rather than the foot: its rule goes
      under it, because a rule above the first thing on a page is a line under
      the title it already has. */
@@ -2641,10 +2648,21 @@ CONNECTIONS, filed with the other people.</div>
        watched. So the code you just asked for appears at the top with the
        screens still waiting for theirs underneath, instead of at the foot of
        a list you have to scroll past to reach it. -->
-  <div class="seg addrow addtop" id="dispadd">
-    <input id="dp_name" type="text" spellcheck="false" autocomplete="off"
-           placeholder="kitchen wall">
-    <button id="b_adddisp" class="act-add">GET A CODE</button>
+  <!-- What an admin already knows about the screen, set while creating it
+       rather than found and filled in afterwards on a row among fifty. All of
+       it is optional: a code with nothing set is exactly what it was before. -->
+  <div class="addtop" id="dispadd">
+    <div class="seg">
+      <input id="dp_name" type="text" spellcheck="false" autocomplete="off"
+             placeholder="kitchen wall">
+      <button id="b_adddisp" class="act-add">GET A CODE</button>
+    </div>
+    <div class="setuprow">
+      <label class="vo"><input type="checkbox" id="dp_newkiosk"> Kiosk mode</label>
+      <select id="dp_newprofile" class="ppick" hidden></select>
+      <label class="bklab" for="dp_newnet">Network</label>
+      <select id="dp_newnet" class="ppick"></select>
+    </div>
   </div>
   <div id="dispcode"></div>
   <div class="note" id="dispnote"></div>
@@ -4800,6 +4818,7 @@ let ENROL_BASE = '';
 let OPENROW = '';
 let DPCFG = null;                // the displays document's own settings
 let DPADDRS = [];                // the addresses this machine answers on
+let ENROL_BASES = {};            // where each row's code is typed
 let DPEND = [];                  // endpoints, for the grant ticks
 let DPOPEN = '';                 // the default, if it is open to any display
 
@@ -4817,6 +4836,10 @@ async function loadDisplays(){
     const j = await api('/displays');
     DISPLAYS = j.displays || [];
     ENROL_BASE = j.enrol_base || '';
+    /* One per row: a display set up on a network profile is typed at that
+       profile's address and port, so a single base for the list stopped being
+       the truth the moment one could differ. */
+    ENROL_BASES = j.enrol_bases || {};
     DPCFG = j.settings || null;
     /* What this machine actually has, for the network profiles' address
        picker. It is not a setting — it is a fact about the box — so it rides
@@ -5020,6 +5043,7 @@ function paintDpSettings(){
   paintKiosks(DPCFG.kiosks || [], DPCFG.kiosk_default || '');
   paintModels(DPCFG.models || [], DPCFG.model_default || '');
   paintNetworks(DPCFG.networks || [], DPCFG.network_default || '');
+  paintNewSetup();
 }
 
 /* The two profile lists live on their own tab now, and they are painted from
@@ -6737,7 +6761,10 @@ async function refreshDisplays(){
     seen[bucket] = true;
     const st = dispState(d);
     const row = document.createElement('div');
-    row.className = 'erow' + (st === 'live' ? '' : ' off');
+    /* Greyed where nothing is happening — but a row holding a LIVE CODE is
+       not that. It is mid-enrolment, which on this tab is the state everything
+       else is waiting for, and dimming it said the opposite of what is true. */
+    row.className = 'erow' + (st === 'live' || st === 'code' ? '' : ' off');
 
     /* Shut unless it is the one being looked at. A list of fifty devices is a
        register, and a register you scroll through is a register nobody reads —
@@ -6813,7 +6840,13 @@ async function refreshDisplays(){
     if (d.renewals) badge('RENEWED ' + d.renewals + '×');
     if (d.refused) badge(d.refused + (d.refused === 1 ? ' REFUSAL' : ' REFUSALS'));
 
-    const kb = kioskBlock(d);
+    /* A row waiting for its code carries the code and nothing else. What the
+       screen will BE was chosen when the code was made, one line above this
+       list — so restating it here is a second place to set the same thing, on
+       a row about to stop existing in this list anyway. Everything a device
+       has to say about itself it says once it is connected. */
+    const waiting = st === 'code' || st === 'stale';
+    const kb = waiting ? null : kioskBlock(d);
     /* What they told you, on the shut row. The labels are the admin's own, so
        there is nothing to hard-code here: everything except the message field
        — the long one, which is the reason and is kept for the open row — is
@@ -6832,7 +6865,7 @@ async function refreshDisplays(){
     top.appendChild(cell);
     const kcell = document.createElement('div');
     kcell.className = 'dcell dkstate';
-    kcell.textContent = kb.label;
+    kcell.textContent = kb ? kb.label : '';
     top.appendChild(kcell);
     const r = document.createElement('div'); r.className = 'acts';
     /* Deciding is for a device that turned up on its own. A row created here
@@ -6906,8 +6939,7 @@ async function refreshDisplays(){
     const gap = document.createElement('span');
     gap.className = 'spacer';
     r.appendChild(gap);
-    r.appendChild(kb.save);
-    r.appendChild(kb.undo);
+    if (kb){ r.appendChild(kb.save); r.appendChild(kb.undo); }
     const del = document.createElement('button');
     del.textContent = 'DELETE';
     del.className = 'act-danger';
@@ -6936,7 +6968,7 @@ async function refreshDisplays(){
       row.appendChild(clock);
       const c = document.createElement('div');
       c.className = 'dcode';
-      c.textContent = ENROL_BASE + dispCode(d.code);
+      c.textContent = (ENROL_BASES[d.id] || ENROL_BASE) + dispCode(d.code);
       const sub = document.createElement('span');
       sub.textContent = ' · case and dashes do not matter';
       c.appendChild(sub);
@@ -6947,7 +6979,7 @@ async function refreshDisplays(){
     }
     /* Directly under the name: what this screen IS comes before what somebody
        said to get it here and before the machine detail. */
-    row.appendChild(kb.box);
+    if (kb) row.appendChild(kb.box);
 
     /* What they told you, in your own words — the labels are the ones you put
        on the form. This is the whole of what an admin who cannot see the
@@ -7017,14 +7049,14 @@ async function refreshDisplays(){
       meta.appendChild(el);
     });
 
-    row.appendChild(meta);
+    if (!waiting) row.appendChild(meta);
     /* Under the facts and above the buttons that end the row's life. A screen
        can be told what it will look like before it has ever been switched on,
        the same way its endpoints can be ticked before it arrives. */
     /* Last in the row: whether it may be here on the left, what it is and
        whether that is saved on the right. */
     row.appendChild(r);
-    row.appendChild(kb.said);
+    if (kb) row.appendChild(kb.said);
     conn.appendChild(row);
   });
   /* A list with nothing in it says what would put something in it. An empty
@@ -7093,6 +7125,41 @@ $('b_bulkapply').addEventListener('click', async ()=>{
 
 /* Name it, get a code. The row exists from this moment, so its endpoints can
    be ticked before the screen it is for has ever been switched on. */
+/* The two pickers on GET A CODE, filled from the same document the profile
+   lists are drawn from. Repainted with it, so a profile added on another tab
+   is offered here without a reload. */
+function paintNewSetup(){
+  const tick = $('dp_newkiosk'), prof = $('dp_newprofile'), net = $('dp_newnet');
+  if (!tick || !prof || !net) return;
+  const fill = (sel, rows, blank)=>{
+    const had = sel.value;
+    sel.innerHTML = '';
+    const none = document.createElement('option');
+    none.value = ''; none.textContent = blank;
+    sel.appendChild(none);
+    (rows || []).forEach(r=>{
+      const o = document.createElement('option');
+      o.value = r.id; o.textContent = r.name;
+      sel.appendChild(o);
+    });
+    sel.value = had;
+  };
+  const kd = ((DPCFG && DPCFG.kiosks) || [])
+             .filter(k=> k.id === (DPCFG && DPCFG.kiosk_default))[0];
+  fill(prof, (DPCFG && DPCFG.kiosks) || [],
+       kd ? 'DEFAULT — ' + kd.name : 'DEFAULT — none set yet');
+  const nd = ((DPCFG && DPCFG.networks) || [])
+             .filter(n=> n.id === (DPCFG && DPCFG.network_default))[0];
+  fill(net, (DPCFG && DPCFG.networks) || [],
+       nd ? 'DEFAULT — ' + nd.name : 'DEFAULT');
+  /* The profile picker belongs to the tick above it and means nothing without
+     it, so it goes away with it rather than sitting there inert. */
+  prof.hidden = !tick.checked;
+}
+$('dp_newkiosk').addEventListener('change', ()=>{
+  $('dp_newprofile').hidden = !$('dp_newkiosk').checked;
+});
+
 $('b_adddisp').addEventListener('click', async ()=>{
   const el = $('dp_name'), note = $('dispnote'), out = $('dispcode');
   const name = (el.value || '').trim();
@@ -7113,7 +7180,12 @@ $('b_adddisp').addEventListener('click', async ()=>{
     return;
   }
   el.value = '';
-  const j = await displayAction('/displays/new', {name});
+  const j = await displayAction('/displays/new', {
+    name,
+    kiosk: $('dp_newkiosk').checked,
+    kiosk_profile: $('dp_newkiosk').checked ? $('dp_newprofile').value : '',
+    network: $('dp_newnet').value,
+  });
   if (!j || !j.code) return;              // displayAction has said why
   /* The whole thing somebody has to type, on its own line and big enough to
      read from across a room while typing it into a television with a remote.

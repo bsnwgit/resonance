@@ -1511,6 +1511,12 @@ DISPLAY_DEFAULTS = {
     # changes with it, instead of twelve rows drifting out of step with no way
     # to see which had.
     "kiosk_profile": "",
+    # Which network profile this device was set up on, by id. Empty is the
+    # deployment's default. It decides the address and port its enrolment URL
+    # names: a building with several ports has several right answers to "what
+    # do I type into this screen", and the one that is right is the one for the
+    # network the screen is on.
+    "network": "",
     # When an admin last asked this screen to reload itself. The display sends
     # the moment it booted with every poll and reloads when this is newer, so
     # the request clears itself by being satisfied — no acknowledgement to
@@ -2747,7 +2753,27 @@ def new_display(asked, hint):
     return did + "." + secret, dict(rec, id=did)
 
 
-def invite_display(name, by):
+def enrol_base_for(rec, host, secure):
+    """Where the code for this row is typed. The network profile it names, or
+    the server's own listener where it names none — an address and a port,
+    because a code without them is six characters and no idea where to put
+    them."""
+    nid = str((rec or {}).get("network") or "")
+    if nid:
+        prof = net_profile(nid)
+        vals = (prof or {}).get("values") or {}
+        try:
+            port = int(vals.get("port"))
+        except (TypeError, ValueError):
+            port = 0
+        if port:
+            addr = str(vals.get("address") or "").strip() or host
+            return "https://%s:%d/e/" % (addr, port)
+    return "%s://%s:%d/e/" % ("https" if secure else "http", host,
+                              secure or RUNNING.get("http_port") or 0)
+
+
+def invite_display(name, by, setup=None):
     """A row created from the panel, before the device it is for has ever been
     switched on. Approved from the moment it exists — an admin naming a screen
     and ticking the endpoints it may use IS the approval — but holding no
@@ -2763,6 +2789,12 @@ def invite_display(name, by):
     rec = dict(DISPLAY_DEFAULTS)
     rec.update(name=name, approved=True, approved_by=by, approved_at=now_,
                created=now_, code=new_code(), code_expires=code_deadline(now_))
+    # What the admin already knows about the screen, set while creating it
+    # rather than found and filled in afterwards on a row among fifty.
+    if isinstance(setup, dict):
+        rec["kiosk"] = bool(setup.get("kiosk"))
+        rec["kiosk_profile"] = str(setup.get("kiosk_profile") or "")[:16]
+        rec["network"] = str(setup.get("network") or "")[:16]
     displays[did] = rec
     write_displays(displays)
     return dict(rec, id=did), None
@@ -3018,6 +3050,7 @@ def admin_displays():
         deadline = rec.get("code_expires") or 0
         live = bool(rec.get("code")) and (not deadline or deadline > now_)
         row.update(id=did, label=display_label(rec),
+                   network=str(rec.get("network") or ""),
                    guest=is_guest(rec), expired=display_expired(rec),
                    # What it was SET to, and what it resolves to. The panel
                    # needs both: one is the control's value, the other is the
@@ -4549,6 +4582,14 @@ class Handler(SimpleHTTPRequestHandler):
                                     # be placed without going to the box.
                                     "addresses": [{"addr": a, "iface": i}
                                                   for a, i in local_interfaces()],
+                                    # One base per row now: a display set up on
+                                    # a network profile is typed at that
+                                    # profile's address and port, so a single
+                                    # base for the whole list stopped being
+                                    # the truth the moment one could differ.
+                                    "enrol_bases": {d["id"]: enrol_base_for(
+                                        read_displays().get(d["id"]), host, secure)
+                                        for d in admin_displays()},
                                     "enrol_base": "%s://%s:%d/e/"
                                                   % ("https" if secure else "http", host,
                                                      secure or RUNNING.get("http_port") or 0)})
@@ -5550,8 +5591,24 @@ class Handler(SimpleHTTPRequestHandler):
             obj = self._json_body()
             if obj is None:
                 return
+            # Validated here rather than trusted: a profile id that does not
+            # exist would leave a screen naming nothing, which reads on the row
+            # as a setting somebody chose.
+            cfg = display_settings()
+            kp = str(obj.get("kiosk_profile") or "")[:16]
+            nw = str(obj.get("network") or "")[:16]
+            if kp and not any(k["id"] == kp for k in cfg["kiosks"]):
+                return self._json(400, {"error": "that display profile no "
+                                                 "longer exists — reload the "
+                                                 "panel to see the list"})
+            if nw and not any(n["id"] == nw for n in cfg["networks"]):
+                return self._json(400, {"error": "that network profile no "
+                                                 "longer exists — reload the "
+                                                 "panel to see the list"})
             rec, err = invite_display(str(obj.get("name") or "").strip()[:40],
-                                      s["user"])
+                                      s["user"],
+                                      {"kiosk": obj.get("kiosk"),
+                                       "kiosk_profile": kp, "network": nw})
             if err:
                 return self._json(400, {"error": err})
             print("display %s (%s) invited by %s — code issued"

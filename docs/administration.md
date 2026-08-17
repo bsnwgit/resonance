@@ -244,8 +244,19 @@ attention, and anything working by what was heard from most recently.
 **There are two ways one gets in**, and which you use depends on whether you
 knew it was coming.
 
-**You are installing it — name it here first.** Type a name into the box, press
-GET A CODE, and you are given an address to type into that screen:
+**You are installing it — name it here first.** Type a name into the box and,
+if you already know them, set the two things you would otherwise come back and
+fill in on the row afterwards:
+
+- **Kiosk mode**, and which display profile it is — what the screen will look
+  like and behave as, chosen before it has ever been switched on
+- **Network** — which profile it answers on, which also decides the address and
+  port in the code you are about to be given. A building with several ports has
+  several right answers to *what do I type into this screen*, and the right one
+  is the one for the network the screen is on
+
+Both are optional; leaving them alone gives exactly the code it always did.
+Press GET A CODE, and you are given an address to type into that screen:
 
 ```
 https://<host>:9701/e/K7QP-4M
@@ -265,6 +276,12 @@ The code **works once** and is forgiving about how it is typed: case does not
 matter, dashes and spaces are ignored, and the characters people misread on a
 remote — `O` and `0`, `I` and `1`, `l` — are not in it at all. `k7qp4m` is the
 same code as `K7QP-4M`.
+
+**A row waiting for its code shows its name and that address, and nothing
+else.** What the screen will be was chosen a line above the list, so restating
+it on a row that is about to leave the list would be a second place to set the
+same thing. Everything a device has to say about itself, it says once it is
+connected.
 
 **A clock runs on the row**, above everything else it says and in the one
 colour on it that is not grey: green while there is time, amber in the last
