@@ -292,6 +292,13 @@
   #approw,.uirow{display:none;margin-top:14px;padding-top:10px;
           border-top:1px solid rgba(var(--glass),.30)}
   #approw.on,.uirow.on{display:block}
+  /* Sign in and Sessions moved to SECURITY and brought their commit with
+     them. Always shown, unlike #approw: that one is hidden on tabs it does
+     not belong to, and this one only exists on the tab it belongs to. */
+  #secapprow{margin-top:14px;padding-top:10px;
+             border-top:1px solid rgba(var(--glass),.30)}
+  #secapprow .seg{justify-content:flex-end;margin-top:8px}
+  #secapprow .seg button{border-width:2px;border-style:solid;padding:6px 10px}
   #approw .seg,.uirow .seg{justify-content:flex-end;margin-top:8px}
   #approw .seg button,
   .uirow .seg button{border-width:2px;border-style:solid;padding:6px 10px}
@@ -1932,28 +1939,6 @@ nothing crosses a network. Start it, open localhost, talk to it.</div>
     </div>
   </section>
 
-  <section class="grp" data-tab="app">
-    <h4>Sign in</h4>
-    <div class="grpbody">
-  <label class="bklab">Sign in</label>
-  <div class="seg" id="ap_auth">
-    <button data-v="none">NOTHING</button>
-    <button data-v="pin" disabled title="arrives with identity">A SINGLE PIN</button>
-    <button data-v="accounts">ACCOUNTS &amp; ROLES</button>
-  </div>
-  <div class="note help">What it takes to reach this configuration page.
-
-<b>Nothing</b> is for a machine only you can reach, where the network is
-already the boundary and accounts add nothing — and it is what makes a
-personal install possible without fishing a generated password out of a log.
-<b>Accounts &amp; roles</b> is the default, because the safe default is the one
-that assumes it can be reached.
-
-<b>A single PIN</b> — one number for the whole display, no account management —
-is the middle rung and is not built yet. It is the PIN machinery from identity
-pointed at a display rather than a person, so it lands with that.</div>
-    </div>
-  </section>
 
   <section class="grp" data-tab="app">
     <h4>Ports</h4>
@@ -1975,19 +1960,6 @@ using. Below 1024 needs root, and the server runs as an ordinary user.</div>
     </div>
   </section>
 
-  <section class="grp" data-tab="app">
-    <h4>Sessions</h4>
-    <div class="grpbody">
-  <label class="bklab">Sign-in lasts (minutes of inactivity)</label>
-  <input id="ap_session" type="number" inputmode="numeric" min="5" max="480">
-  <div class="note help">Idle minutes before an admin has to sign in again.
-Activity pushes the deadline out; the panel checks every 45 seconds and
-returns you to the sign-in as soon as it lapses.
-
-Short by default — this session configures what everyone else is looking at.
-5 to 480. Full reasoning in DOCUMENTATION → App settings &amp; accounts.</div>
-    </div>
-  </section>
 
   <section class="grp" data-tab="app">
     <h4>Maintenance</h4>
@@ -2191,6 +2163,57 @@ extend one already out there. REISSUE gives that row a fresh one on the new
 setting.</div>
     </div>
   </section>
+
+  <!-- Signing in, and how long a session lasts. Moved off ADMIN SETTINGS,
+       which is about how the server is WIRED — ports, addresses, maintenance —
+       where these two are about who gets in and for how long, which is this
+       tab's subject. They still write app.json and still need a restart, so
+       they bring their own commit row with them rather than borrowing the one
+       that saves who may be approved. -->
+  <section class="grp" data-tab="security">
+    <h4>Sign in</h4>
+    <div class="grpbody">
+  <label class="bklab">Sign in</label>
+  <div class="seg" id="ap_auth">
+    <button data-v="none">NOTHING</button>
+    <button data-v="pin" disabled title="arrives with identity">A SINGLE PIN</button>
+    <button data-v="accounts">ACCOUNTS &amp; ROLES</button>
+  </div>
+  <div class="note help">What it takes to reach this configuration page.
+
+<b>Nothing</b> is for a machine only you can reach, where the network is
+already the boundary and accounts add nothing — and it is what makes a
+personal install possible without fishing a generated password out of a log.
+<b>Accounts &amp; roles</b> is the default, because the safe default is the one
+that assumes it can be reached.
+
+<b>A single PIN</b> — one number for the whole display, no account management —
+is the middle rung and is not built yet. It is the PIN machinery from identity
+pointed at a display rather than a person, so it lands with that.</div>
+    </div>
+  </section>
+
+  <section class="grp" data-tab="security">
+    <h4>Sessions</h4>
+    <div class="grpbody">
+  <label class="bklab">Sign-in lasts (minutes of inactivity)</label>
+  <input id="ap_session" type="number" inputmode="numeric" min="5" max="480">
+  <div class="note help">Idle minutes before an admin has to sign in again.
+Activity pushes the deadline out; the panel checks every 45 seconds and
+returns you to the sign-in as soon as it lapses.
+
+Short by default — this session configures what everyone else is looking at.
+5 to 480. Full reasoning in DOCUMENTATION → App settings &amp; accounts.</div>
+    </div>
+  </section>
+
+  <div id="secapprow">
+    <div class="note" id="secappnote"></div>
+    <div class="pending" id="secapppending" hidden></div>
+    <div class="seg actrow">
+      <button id="b_secappsave" class="act-save">SAVE SIGN-IN &amp; SESSIONS</button>
+    </div>
+  </div>
 
   <!-- Bare, like the profile lists — and BELOW the security topics, because
        what the door is set to comes before who is standing behind it. -->
@@ -3661,8 +3684,8 @@ function postureSync(){
   } else w.hidden = true;
 }
 
-function showPending(j){
-  const box = $('apppending');
+function showPending(j, into){
+  const box = $(into || 'apppending');
   const names = {http_port:'display · plain HTTP', https_port:'display · HTTPS',
                  admin_port:'administration', session_idle_minutes:'session length',
                  bind:'reachable at', bind_address:'which address',
@@ -3720,6 +3743,7 @@ async function loadApp(){
     segSet('ap_auth', j.app.auth);
     postureSync();
     showPending(j);
+    showPending(j, 'secapppending');
   }catch(e){ $('appnote').className = 'note bad'; $('appnote').textContent = e.message; }
 }
 
@@ -3749,6 +3773,29 @@ $('b_apprevert').addEventListener('click', async ()=>{
   });
 });
 $('ap_bindaddr').addEventListener('change', postureSync);
+
+/* The two topics that moved to SECURITY still write app.json, and app.json
+   still needs a restart — so they commit themselves there rather than from a
+   button on a tab they are no longer on. Their own keys only: pressing this
+   must not publish a port somebody was halfway through changing next door. */
+$('b_secappsave').addEventListener('click', async ()=>{
+  const note = $('secappnote');
+  note.className = 'note';
+  note.textContent = 'saving…';
+  try{
+    const body = {auth: segValue('ap_auth')};
+    const el = $('ap_session');
+    if (el && el.value !== '') body.session_idle_minutes = parseInt(el.value, 10);
+    const j = await api('/app', {method:'POST', body: JSON.stringify(body)});
+    note.textContent = (j.pending && j.pending.length)
+      ? 'saved — a restart is needed, see below'
+      : 'saved — nothing here is waiting on a restart';
+    showPending(j, 'secapppending');
+    /* The other tab's copy of the same document, so a warning about a pending
+       restart is not stale on whichever of the two you look at next. */
+    loadApp();
+  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+});
 
 $('b_appsave').addEventListener('click', async ()=>{
   const note = $('appnote');
@@ -7886,7 +7933,7 @@ function panelNav(){
     if (tab === 'accounts') refreshUsers();
     // Groups live on SECURITY now, and the list is populated by its own fetch
     // — without this it would be empty on the tab it lives on.
-    if (tab === 'security') refreshGroups();
+    if (tab === 'security'){ refreshGroups(); loadApp(); }
     if (tab === 'displays' || tab === 'devices' || tab === 'security'
         || tab === 'enrol') refreshDisplays();
     /* The three settings tabs ARE profile lists now, and those lists live in

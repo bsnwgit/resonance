@@ -35,15 +35,17 @@ panel can take you — links rather than tabs, because they do not switch which
 controls you are editing, they change the subject entirely:
 
 - **ADMIN SETTINGS** — how the server itself is wired: where it can be reached
-  from, signing in, sessions, maintenance, and the admin portal's own port.
-  What the app answers on is a network profile, not here.
-- **ADMIN USERS** — who can sign in. The groups access is granted to have a tab
-  of their own, GROUPS, in the profile settings row.
+  from, maintenance, and the admin portal's own port. What the app answers on
+  is a network profile, not here; signing in and session lifetime are on
+  SECURITY, with the rest of who-gets-in.
+- **ADMIN USERS** — the accounts that can sign in to this panel.
 - **USER ACCESS** — the request form, and everybody who has asked to be here
   and not yet been decided about.
-- **SECURITY** — **AI Requires Permission**: whether a general user needs
-  approval at all, how long a grant lasts, and how many devices and waiting
-  requests there may be. USER ACCESS answers who is waiting;
+- **SECURITY** — who gets in and on what terms: **signing in** and how long an
+  admin session lasts, how long an **enrolment code** is worth anything for,
+  **AI Requires Permission** — whether a general user needs approval at all,
+  how long a grant lasts, how many devices and waiting requests there may be —
+  and the **groups** access is granted to. USER ACCESS answers who is waiting;
   this is whether anybody is asked in the first place.
 - **?** — these documents. It is blue, and it is the same blue as every ?
   beside a topic heading, so help is one colour wherever you meet it.
@@ -119,7 +121,8 @@ Each of these writes a different document, so each has its own button:
 |---|---|---|
 | SAVE, inside a profile row | that profile alone; every display naming it, and every display at all if it is the default | immediately |
 | SAVE, inside an AI endpoint's box | that endpoint alone | immediately, next question |
-| SAVE, on SECURITY | who has to be approved, and what a grant is worth | immediately |
+| SAVE, on SECURITY | who has to be approved, what a grant is worth, how long a code lasts | immediately |
+| SAVE SIGN-IN & SESSIONS, on SECURITY | how you get in, and how long a session lasts | only after a restart |
 | SAVE, on ADMIN SETTINGS | the admin port, binding, session lifetime | only after a restart |
 
 Offering one button that meant all of them is how somebody presses the wrong

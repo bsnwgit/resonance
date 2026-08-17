@@ -10,11 +10,19 @@ Two settings, deliberately not one "mode": **what it is reachable at**, and
 both starts lying the moment somebody changes half of it — "personal" would
 still read personal after the binding moved to every interface on the machine.
 
-They are two topics under ADMIN SETTINGS for the same reason. **EXT Access**
-holds where the server can be reached from; **Sign in** holds what it takes to
-get past the door. The posture line — what it is reachable at and what the door
-is, in the words it actually means — is stated under EXT Access, because what
-it warns about is exposure.
+They are two topics for the same reason, and they now sit on two tabs:
+**EXT Access**, under ADMIN SETTINGS, holds where the server can be reached
+from; **Sign in**, under SECURITY, holds what it takes to get past the door —
+with the rest of who-gets-in, which is what that tab is about. **Sessions**
+went with it, since how long a session lasts is the same subject.
+
+The posture line — what it is reachable at and what the door is, in the words
+it actually means — stays under EXT Access, because what it warns about is
+exposure, and it still reports the pair whichever tab you set half of it on.
+
+Both moved topics still write `app.json`, so they still need a restart, and
+they carry their own **SAVE SIGN-IN & SESSIONS** rather than being committed by
+a button on a tab they are no longer on.
 
 They are still read as a pair:
 
@@ -152,6 +160,8 @@ restarting means the page you are on is no longer served — that is expected,
 and the new address is the one you just saved.
 
 ## Sessions
+
+*Under SECURITY, with signing in.*
 
 **session idle minutes** is how long an idle admin session survives before it
 has to sign in again. It slides: activity pushes the deadline out, so a
