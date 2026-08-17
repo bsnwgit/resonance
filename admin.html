@@ -419,6 +419,12 @@
      Brighter than the hairline between topics, so they group rather than
      merge into the section rules. */
   .rule{height:1px;margin:9px 0 2px;background:rgba(var(--glass),.55)}
+  /* Between the groups the server keeps and the ones an admin made. More air
+     than the rule above the topics gets, because it is separating two halves
+     of one list rather than capping a column — rows sit tight against each
+     other, so a hairline with a row's own spacing either side of it reads as
+     one more row. */
+  .grouprule{margin:14px 0 12px}
 
   /* The topics are bounded, so it is obvious where the list of them starts
      and stops rather than the column running on into the foot. Same strength
@@ -5515,6 +5521,15 @@ async function refreshGroups(){
   const addrow = $('gr_addrow');
   if (addrow) addrow.hidden = !!OPENGR && GROUPS.some(x=> x.id === OPENGR);
   GROUPS.forEach((g, i)=>{
+    /* The server sorts the two it keeps to the top; this draws the line under
+       them. Between the last default and the first custom one, and only where
+       both exist — a rule with nothing on one side of it is a line, not a
+       division. */
+    if (!g.system && i && GROUPS[i - 1].system){
+      const rule = document.createElement('div');
+      rule.className = 'rule grouprule';
+      box.appendChild(rule);
+    }
     const row = document.createElement('div');
     row.className = 'erow';
     if (OPENGR !== g.id) row.classList.add('shut');

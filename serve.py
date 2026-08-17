@@ -3626,8 +3626,13 @@ def admin_groups():
     displays = read_displays()
     idents = read_identities()
     out = []
+    # The two the server keeps come first, always, whatever they are called.
+    # They are where everything lands, so they are the two an admin looks for —
+    # and sorting them in among the custom ones by name would move them every
+    # time somebody made a group starting with an earlier letter.
     for gid, rec in sorted(groups.items(),
-                           key=lambda kv: (kv[1]["kind"], kv[1]["name"].lower())):
+                           key=lambda kv: (not kv[1]["system"], kv[1]["kind"],
+                                           kv[1]["name"].lower())):
         # Named rows only. A member whose row was deleted is not shown as a
         # phantom — it is simply gone, the same way a deleted display leaves an
         # endpoint's allow-list. Which FILE the name comes out of is the
