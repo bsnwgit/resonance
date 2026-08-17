@@ -312,9 +312,12 @@
      a control — it is the edge of a region, and it has to reach as far as
      the region does or it reads as an underline on the column above it
      instead of a division of the panel. */
-  #panelhead > .findrow,
-  #panelhead > .tabgroup,
-  #panelhead > .tabs{max-width:560px}
+  #panelhead > .findrow{max-width:560px}
+  /* The tabs are not held to that measure any more. They were a column of
+     boxed controls, where a readable width is the right constraint; they are a
+     row of links behind a label now, and a menu bar that wraps onto three
+     lines at 560px is one nobody can scan. */
+  #panelhead > .tabs{max-width:none}
   /* …but the tab row itself runs the whole width, out to the edge of the
      preview, because it now carries two groups that have to sit apart. */
   #panelhead > .tabrow{max-width:none}
@@ -355,15 +358,10 @@
      whole box rather than the tail of whichever column it landed in. */
   @container (min-width:700px){ #approw,.uirow{grid-column:1/-1} }
 
-  /* The caption over a row of tabs. Quieter than anything it labels — it is
-     there to be read once and then ignored, not to compete with the tabs
-     underneath it. */
-  .tabgroup{
-    font-size:calc(8px * var(--fs));letter-spacing:.22em;
-    text-transform:uppercase;color:rgba(var(--paper),.55);
-    margin:0 0 5px;
-  }
-  #panelfoot .tabgroup{margin-top:2px}
+  /* The caption OVER a row of tabs is gone. It was a quiet line above the row
+     saying what the row was; it is now a boxed label sitting in the row, the
+     same as the three in the bar — one idiom for "this word names the links
+     next to it" rather than two that had to be kept looking related. */
   #panelfoot .tabrow{align-items:flex-end}
   #panelfoot .tabside .tabs{margin-bottom:0}
   #panelfoot{
@@ -550,7 +548,6 @@
      row and the segmented controls had no hover at all. Disabled controls
      are excluded, so a read-only account still gets no false affordance.
      :not() carries the specificity needed to beat the .on selected state. */
-  .tabs button:hover:not(:disabled),
   .seg button:hover:not(:disabled),
   .urow button:hover:not(:disabled),
   #stagebar button:hover:not(:disabled),
@@ -657,13 +654,22 @@
      cheapest way to say "this is a label", and it doubles as the division
      between the two groups, which is why the group divider came off the
      second one. */
-  #panelbar .bartitle{
+  /* One rule for every boxed label on the page, wherever the row is. The bar
+     at the top and the two rows of tabs are the same kind of thing — a word
+     saying what the links beside it have in common — and two rules that had to
+     be kept looking alike would eventually stop being. */
+  #panelbar .bartitle,
+  .tablabel{
     display:flex;align-items:center;align-self:center;
     padding:3px 9px 3px 11px;letter-spacing:.2em;
     color:rgba(var(--paper),.92);
     border:1px solid rgba(var(--glass),.40);
     background:rgba(var(--glass),.07);
+    white-space:nowrap;
   }
+  /* The tab rows are set smaller than the bar, so their labels come down with
+     them rather than sitting a size above the links they name. */
+  .tablabel{font-size:calc(9px * var(--fs))}
   #navlinks .bartitle{margin-left:10px}
   /* …except the one that opens the bar. That margin is what holds a label off
      the link before it, and there is no link before the first — left in, it
@@ -1329,17 +1335,26 @@
   #em_key.on{display:block}
 
   /* ---- rig: tabs > collapsible sections ---- */
-  .tabs{display:flex;gap:4px;margin-bottom:10px}
+  /* Built like the bar at the top, because they are doing the bar's job: a
+     boxed label and the places it leads to. They were boxed buttons in a row
+     of boxes, which read as a row of CONTROLS — things that do something when
+     pressed — rather than as somewhere you can go. Marked by colour and a rule
+     under the current one, and separated by the same hairline. */
+  .tabs{display:flex;align-items:stretch;gap:0;margin-bottom:10px;flex-wrap:wrap}
   .tabs button{
-    flex:1;font:inherit;font-size:calc(9px * var(--fs));letter-spacing:.18em;padding:6px 4px;cursor:pointer;
-    background:none;border:1px solid rgba(var(--glass),.22);color:rgba(var(--paper),.85);
+    display:flex;align-items:center;
+    font:inherit;font-size:calc(9px * var(--fs));letter-spacing:.18em;
+    padding:2px 14px;cursor:pointer;
+    background:none;border:0;border-bottom:1px solid transparent;
+    color:rgba(var(--paper),.62);
   }
-  /* The three left in the foot keep a tab's width rather than shrinking to
-     their labels. AI is two characters, and a two-character tab beside a
-     seven-character one reads as a mistake rather than as a short word. */
-  .connside .tabs{flex-wrap:wrap}
-  .connside .tabs button{flex:0 0 auto;min-width:96px}
-  .tabs button.on{border-color:var(--hue-dim);color:var(--hue);background:rgba(var(--glass),.08)}
+  /* Between each pair and never after the label: the label already has an edge
+     of its own, and a rule against it is a line beside a line. */
+  .tabs button + button{border-left:1px solid rgba(var(--glass),.28)}
+  .tabs button.on{color:var(--hue);border-bottom-color:var(--hue-dim)}
+  /* Brightening, the way a link in the bar does — not a border appearing on
+     something that has none. */
+  .tabs button:hover:not(:disabled){color:rgba(var(--paper),.95)}
   .findrow{display:flex;margin:0 0 4px}
   #rigfind,
   #docfind{
@@ -1742,8 +1757,8 @@
        are different subjects that happen to share a row. -->
   <!-- One group, the full width of the panel. What a display looks and
        sounds like: nothing else shares this row. -->
-  <div class="tabgroup">Profile settings</div>
   <div class="tabs">
+    <span class="tablabel">PROFILES</span>
     <!-- APPEARANCE rather than LOOK, so the tab and the "Appearance
      profiles" read as the same subject. data-tab stays "look": it is
      the storage key, and renaming it would rewrite every stored
@@ -2847,7 +2862,7 @@ tick. <b>REFUSE</b> gives them a message and you a note for whoever comes back
 to this row in six months, and says whether they may ask again.
 
 They leave this list the moment you decide and appear under CONNECTIONS ▸
-CONNECTIONS, filed with the other people.</div>
+NODES, filed with the other people.</div>
     </div>
   </section>
 
@@ -2904,7 +2919,7 @@ characters into the box it offers. Case and dashes do not matter —
 <b>k7qp4m</b> is the same as <b>K7QP-4M</b>.
 
 A row leaves this list the moment its code is used and appears under
-CONNECTIONS ▸ CONNECTIONS, filed with the other devices so a grant to all
+CONNECTIONS ▸ NODES, filed with the other devices so a grant to all
 of them is one tick.</div>
     </div>
   </section>
@@ -3198,15 +3213,18 @@ key inside an example sends you to a line that cannot answer you.</div>
     <div class="tabrow">
     <!-- What this server is wired to, and which machines are here. -->
     <div class="tabside connside">
-      <!-- No caption. One of the three below is now called CONNECTIONS, and a
-           caption saying the same word over it is the panel saying it twice —
-           the rule that keeps a bare list from repeating the tab it sits on. -->
       <div class="tabs">
+        <span class="tablabel">CONNECTIONS</span>
         <button id="tab_ai" data-tab="ai">AI</button>
-        <!-- The register: every device this server knows about. Not in
-             UI_TABS or SETTINGS_TABS — like AI, nothing here writes the shared
-             settings document. -->
-        <button id="tab_devices" data-tab="devices">CONNECTIONS</button>
+        <!-- The register: every device this server knows about. NODES rather
+             than CONNECTIONS, which is now the label over the row — a link
+             repeating the word above it says nothing about which of the three
+             it is. data-tab stays "devices": it is the key everything else
+             addresses this tab by, and renaming it for a label is how a stored
+             document gets rewritten to no purpose. Not in UI_TABS or
+             SETTINGS_TABS — like AI, nothing here writes the shared settings
+             document. -->
+        <button id="tab_devices" data-tab="devices">NODES</button>
         <!-- An embed is another application connecting to this one, which is
              the same question the two beside it answer — what this server is
              wired to — rather than something you administer about the server
@@ -7665,7 +7683,7 @@ function showCode(name, code, left){
       clearInterval(codeTick);
       out.classList.add('dead');
       sub.textContent = '“' + name + '” · this code has expired — REISSUE the '
-                      + 'row under CONNECTIONS ▸ DEVICES for another';
+                      + 'row under CONNECTIONS ▸ NODES for another';
       return;
     }
     out.classList.remove('dead');
