@@ -34,7 +34,7 @@ state to leave it in.
 panel can take you — links rather than tabs, because they do not switch which
 controls you are editing, they change the subject entirely:
 
-- **ADMIN SETTINGS** — how the server itself is wired: where it can be reached
+- **ADMIN** — how the server itself is wired: where it can be reached
   from, maintenance, and the admin portal's own port. What the app answers on
   is a network profile, not here; signing in and session lifetime are on
   SECURITY, with the rest of who-gets-in.
@@ -43,7 +43,7 @@ controls you are editing, they change the subject entirely:
   admin session lasts, how long an **enrolment code** is worth anything for,
   **AI Requires Permission** — whether a general user needs approval at all,
   how long a grant lasts, how many devices and waiting requests there may be —
-  and the **groups** access is granted to. ENROLLMENTS ▸ USER answers who is waiting;
+  and the **groups** access is granted to. ENROLLMENTS ▸ PERSON answers who is waiting;
   this is whether anybody is asked in the first place.
 - **?** — these documents. It is blue, and it is the same blue as every ?
   beside a topic heading, so help is one colour wherever you meet it.
@@ -130,7 +130,7 @@ Each of these writes a different document, so each has its own button:
 | SAVE, on SECURITY | who has to be approved, what a grant is worth, how long a code lasts | immediately |
 | SAVE, inside Sign in | how you get in | only after a restart |
 | SAVE, inside Sessions | how long an admin session lasts | only after a restart |
-| SAVE, on ADMIN SETTINGS | the admin port, binding, maintenance | only after a restart, except maintenance |
+| SAVE, on ADMIN | the admin port, binding, maintenance | only after a restart, except maintenance |
 
 Offering one button that meant all of them is how somebody presses the wrong
 one. The AI tab has no tab-wide save because each endpoint saves itself from
@@ -197,7 +197,7 @@ leaves the tab it arrived through.
 
 Whether anybody is asked at all is on **SECURITY**, under **AI Requires
 Permission** — that is the door rather than the key, and it decides what a
-grant is worth once given. ENROLLMENTS ▸ USER answers who is waiting; SECURITY
+grant is worth once given. ENROLLMENTS ▸ PERSON answers who is waiting; SECURITY
 answers whether anybody has to.
 
 Each profile list has a tab of its own in the profile settings group — what a
@@ -233,7 +233,7 @@ person who filled in a form the same as a screen an admin minted a code for.
 The two populations arrive by different routes with different buttons, and
 neither wants to read the other's queue while doing it.
 
-So an arrival is under **ENROLLMENTS** — ▸ USER while a person waits on a
+So an arrival is under **ENROLLMENTS** — ▸ PERSON while a person waits on a
 decision, ▸ DEVICE while a screen has not taken its code — and everything
 working is under **CONNECTIONS**, in its own area. A row
 moves itself the moment it starts working.
@@ -858,7 +858,7 @@ effect:
 
 1. **Put the wall displays on their own VLAN** and let nothing else onto it.
    A device that cannot open a connection needs no other control.
-2. **Bind to one address** rather than every interface, in ADMIN SETTINGS →
+2. **Bind to one address** rather than every interface, in ADMIN →
    Reach & sign-in. A machine that later joins another network then does not
    follow you onto it.
 3. **Firewall the display ports** to the addresses that should have them.

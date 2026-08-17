@@ -182,13 +182,13 @@ The microphone requires a secure origin, so generate a certificate first:
 The first two are a **network profile** — a port under a name, carrying one
 endpoint or several — and an upgrade turns the ports an install already had
 into one called *Display*. The third is the admin portal's own, and it is the
-only port configured under ADMIN SETTINGS: it is the way back in when what is
+only port configured under ADMIN: it is the way back in when what is
 in a profile is wrong.
 
 The certificate is self-signed, so expect one browser warning.
 
 **On your own machine, none of that applies.** Set *reachable at* to **this
-machine only** in ADMIN SETTINGS and restart, and there is no certificate to
+machine only** in ADMIN and restart, and there is no certificate to
 make, no browser warning, and no first-run password to fish out of a log:
 
 | listener | purpose |
@@ -355,7 +355,7 @@ raise a permission prompt nobody asked for.
 
 ### Admin settings
 
-**ADMIN SETTINGS**, at the foot of the panel, covers how the server is wired
+**ADMIN**, at the foot of the panel, covers how the server is wired
 rather than how the interface looks: where it can be reached from, what it
 takes to sign in, how long an idle sign-in survives, and the admin portal's
 own port. It is stored in `app.json`. What the app answers on is not here — a

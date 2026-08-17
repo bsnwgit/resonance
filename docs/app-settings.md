@@ -11,7 +11,7 @@ both starts lying the moment somebody changes half of it — "personal" would
 still read personal after the binding moved to every interface on the machine.
 
 They are two topics for the same reason, and they now sit on two tabs:
-**IP Address**, under ADMIN SETTINGS, holds where the server can be reached
+**IP Address**, under ADMIN, holds where the server can be reached
 from; **Sign in**, under SECURITY, holds what it takes to get past the door —
 with the rest of who-gets-in, which is what that tab is about. **Sessions**
 went with it, since how long a session lasts is the same subject.

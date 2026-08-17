@@ -189,7 +189,7 @@ Two profiles may share a port when they answer on different addresses, because
 the machine can carry that. ANY collides with everything on its port, which is
 what ANY means.
 
-**A profile never reaches further than the server itself.** With ADMIN SETTINGS
+**A profile never reaches further than the server itself.** With ADMIN
 ▸ IP Address set to one address — or to this machine only — that address wins
 for every profile, whatever they name. A setting that says *this machine only*
 has to mean it, and a profile able to bind a LAN address anyway would be that
@@ -266,7 +266,7 @@ more thing to renew.
 
 **Ports are bound when the server starts.** Adding a profile, changing a port
 or pointing a different endpoint at one takes a restart, the same as the ports
-on ADMIN SETTINGS: a listening socket is not something to open and close under
+on ADMIN: a listening socket is not something to open and close under
 a mouse. A port that turns out to be taken is reported and skipped rather than
 stopping the server — everything else still answers, and you need the panel in
 order to fix it.

@@ -556,11 +556,11 @@
   }
   #navlinks button:hover{color:rgba(var(--paper),.95)}
   #navlinks button.on{color:var(--hue);border-bottom-color:var(--hue-dim)}
-  /* One between each pair, and one before the first — which separates the
-     places you can go from the title of the page you are on. The same
-     hairline in both cases: they are doing the same job. */
-  #navlinks::before{content:""}
-  #navlinks::before,
+  /* One between each pair, and only between a pair. There used to be one
+     before the first link as well, separating the places you can go from the
+     title of the page you are on — and it came off when that title moved into
+     this row: the bar now opens on a boxed label, and a hairline drawn against
+     the left edge of a box is a line beside a line. */
   #navlinks button + button{border-left:1px solid rgba(var(--glass),.28)}
   /* A large space, and nothing in it. It is what separates the two subjects;
      the boxed title after it is what stops the space reading as the bar
@@ -584,6 +584,10 @@
     background:rgba(var(--glass),.07);
   }
   #navlinks .bartitle{margin-left:10px}
+  /* …except the one that opens the bar. That margin is what holds a label off
+     the link before it, and there is no link before the first — left in, it
+     reads as the row starting indented from everything under it. */
+  #navlinks .bartitle:first-child{margin-left:0}
   /* Filled rather than outlined, unlike the ? beside a section heading: those
      are one per section and have their heading right there for context, where
      these two have to be findable on their own from across the panel.
@@ -1557,8 +1561,6 @@
          and the same blue as every ? beside a section heading; one colour
          meaning one thing is what lets somebody find help without reading
          labels. -->
-    <span class="bartitle">SETTINGS<button id="panelhelp" class="helpmark"
-            type="button" title="open the documentation">?</button></span>
     <!-- Administering the server, as links in the bar rather than as a row of
          tabs at the foot. They were never the same kind of thing as the tabs
          above the settings: those switch which set of controls you are
@@ -1568,27 +1570,49 @@
 
          Left, beside the title, because that is where you look for the way
          around a page. Your name and the way out stay right, where they were:
-         one side is where you are going, the other is who you are. -->
+         one side is where you are going, the other is who you are.
+
+         THREE subjects now, each behind its own boxed label with a large space
+         between them: who the server knows about, how it is wired, and how
+         something comes to be here. SETTINGS moved into this row to become the
+         middle one — it used to sit outside as the title of the page, which
+         worked while it was the only label and read as a fourth kind of thing
+         the moment there were three. -->
     <span id="navlinks">
-      <button id="tab_app" data-tab="app">ADMIN SETTINGS</button>
+      <!-- Who the server knows about, as against how it is wired or how
+           anything got here. ADMIN USERS is the only one under it today; it is
+           the accounts that reach THIS panel, which is why it is not filed
+           with the people the display side knows about. -->
+      <span class="navtitle bartitle">IDENTITY</span>
       <button id="tab_accounts" data-tab="accounts">ADMIN USERS</button>
+      <span class="navgap"></span>
+      <!-- The way into the manual, INSIDE the title rather than beside it:
+           documentation is not a topic you configure, it is the thing you reach
+           for when a topic will not explain itself — so it belongs to the title
+           it explains rather than sitting in the row of places you can go.
+           Blue, and the same blue as every ? beside a section heading; one
+           colour meaning one thing is what lets somebody find help without
+           reading labels. -->
+      <span class="navtitle bartitle">SETTINGS<button id="panelhelp"
+              class="helpmark" type="button"
+              title="open the documentation">?</button></span>
+      <button id="tab_app" data-tab="app">ADMIN</button>
       <!-- How the server itself is defended, which is administration rather
            than a connection: who gets in, on what terms, and into which
            group. -->
       <button id="tab_security" data-tab="security">SECURITY</button>
-      <!-- Two subjects in one bar, and the gap is what says so. Everything
-           left of it configures the server; everything right of it is how
-           something comes to be here. A second title rather than a fourth and
-           fifth link, because they are not more of the same thing — and it
-           carries its own ? for the same reason SETTINGS does. -->
+      <!-- The gap is what says these are a different subject. Everything left
+           of it is the server; everything right of it is how something comes
+           to be here. -->
       <span class="navgap"></span>
       <span class="navtitle bartitle">ENROLLMENTS<button id="enrolhelp"
               class="helpmark" type="button"
               title="open the documentation">?</button></span>
-      <!-- People, and only people: the two populations arrive by different
-           routes with different buttons, and neither wants to read the
-           other's queue while doing it. -->
-      <button id="tab_displays" data-tab="displays">USER</button>
+      <!-- PERSON and DEVICE, in the same words the rest of the product uses
+           for the two populations: they arrive by different routes with
+           different buttons, and neither wants to read the other's queue
+           while doing it. -->
+      <button id="tab_displays" data-tab="displays">PERSON</button>
       <button id="tab_enrol" data-tab="enrol">DEVICE</button>
     </span>
     <span class="right" id="whobox">
@@ -1740,7 +1764,7 @@ size it is setting, so you read the choice while making it.</div>
        else on this tab: what the transcript calls each speaker is part of how
        a place reads, and a hallway screen and a laptop can want different
        answers. It writes the shared settings document, which is what the rest
-       of this tab writes — it was on ADMIN SETTINGS, which meant the one tab
+       of this tab writes — it was on ADMIN, which meant the one tab
        carried two different commits. -->
   <section class="grp" data-prof="look" data-tab="look">
     <h4>Speaker label</h4>
@@ -2242,7 +2266,7 @@ setting.</div>
     </div>
   </section>
 
-  <!-- Signing in, and how long a session lasts. Moved off ADMIN SETTINGS,
+  <!-- Signing in, and how long a session lasts. Moved off ADMIN,
        which is about how the server is WIRED — ports, addresses, maintenance —
        where these two are about who gets in and for how long, which is this
        tab's subject. They still write app.json and still need a restart, so
@@ -2432,7 +2456,7 @@ which is how you tell a fault in the interface from a fault in whatever it is
 pointed at.</div>
     </div>
   </section>
-  <!-- A port, under a name. The ports on ADMIN SETTINGS are the admin
+  <!-- A port, under a name. The ports on ADMIN are the admin
        portal's own; what the app answers on is here, with the rest of what an
        endpoint is made of. -->
   <section class="grp bare proflist" data-tab="network">
@@ -2463,7 +2487,7 @@ one more thing to renew.
 
 <b>Ports are bound when the server starts.</b> Adding a profile, changing a
 port or pointing a different endpoint at one takes a restart, exactly as the
-ports on ADMIN SETTINGS do — a listening socket is not something to open and
+ports on ADMIN do — a listening socket is not something to open and
 close under a mouse.</div>
     </div>
   </section>
@@ -2811,7 +2835,7 @@ is the last time one asked this server anything, so a screen unplugged for a
 week says so here before anybody notices the wall.
 
 Anything that has NOT finished arriving is on the tab it is arriving through —
-ENROLLMENTS ▸ USER for a person waiting on a decision, ▸ DEVICE for a screen
+ENROLLMENTS ▸ PERSON for a person waiting on a decision, ▸ DEVICE for a screen
 that has not taken its code yet. A row moves here on its own the moment it is
 working.
 
@@ -4164,7 +4188,7 @@ name. One port reaches one endpoint, so a profile another endpoint already
 answers on is not offered here.
 
 <b>The port is bound when the server starts</b>, so choosing one here takes a
-restart to come into effect — the same as the ports on ADMIN SETTINGS.</div>
+restart to come into effect — the same as the ports on ADMIN.</div>
     </div>
   </div>
 <div class="subgrp" data-g="limits">
