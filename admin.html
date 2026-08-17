@@ -961,6 +961,10 @@
      to nothing is a choice you cannot read. */
   .setuprow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
             margin-top:8px}
+  /* Stacked, so the two read as two decisions rather than one long line —
+     and tighter between themselves than either is from the field above. */
+  .setuprow + .setuprow{margin-top:6px}
+  .setuprow .vo{margin:0}
   .setuprow .ppick{max-width:230px}
   .setuprow .bklab{margin:0}
   /* The same row, at the head of a list rather than the foot: its rule goes
@@ -2669,11 +2673,16 @@ CONNECTIONS, filed with the other people.</div>
              placeholder="kitchen wall">
       <button id="b_adddisp" class="act-add">GET A CODE</button>
     </div>
+    <!-- Network first: it is the one that decides the address in the code you
+         are about to be handed, so it belongs above the pair that only decide
+         what the screen looks like once it has used it. -->
+    <div class="setuprow">
+      <label class="bklab" for="dp_newnet">Network</label>
+      <select id="dp_newnet" class="ppick"></select>
+    </div>
     <div class="setuprow">
       <label class="vo"><input type="checkbox" id="dp_newkiosk"> Kiosk mode</label>
       <select id="dp_newprofile" class="ppick" hidden></select>
-      <label class="bklab" for="dp_newnet">Network</label>
-      <select id="dp_newnet" class="ppick"></select>
     </div>
   </div>
   <div id="dispcode"></div>
