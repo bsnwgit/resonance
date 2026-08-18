@@ -3228,6 +3228,33 @@ code for do not, and never will.
            placeholder="persistent_notification.create">
   </div>
   <div class="setuprow">
+    <label class="vo"><input type="checkbox" id="ml_on"> Send alerts by email</label>
+  </div>
+  <div class="setuprow" id="ml_where">
+    <label class="bklab" for="ml_host">Server</label>
+    <input id="ml_host" type="text" spellcheck="false" autocomplete="off"
+           placeholder="smtp.example">
+    <label class="bklab" for="ml_port">Port</label>
+    <input id="ml_port" class="num" type="number" inputmode="numeric" min="1" max="65535">
+    <label class="vo"><input type="checkbox" id="ml_tls"> Use STARTTLS</label>
+    <label class="bklab" for="ml_user">Username (blank for none)</label>
+    <input id="ml_user" type="text" spellcheck="false" autocomplete="off">
+    <label class="bklab" for="ml_pass">Password</label>
+    <input id="ml_pass" type="password" autocomplete="new-password">
+    <label class="bklab" for="ml_from">From</label>
+    <input id="ml_from" type="text" spellcheck="false" autocomplete="off"
+           placeholder="resonance@example">
+    <label class="bklab" for="ml_to">To (comma separated)</label>
+    <input id="ml_to" type="text" spellcheck="false" autocomplete="off">
+  </div>
+  <div class="setuprow">
+    <label class="vo"><input type="checkbox" id="dg_on"> Gather alerts into a digest</label>
+  </div>
+  <div class="setuprow" id="dg_when">
+    <label class="bklab" for="dg_mins">Send at most every (minutes)</label>
+    <input id="dg_mins" class="num" type="number" inputmode="numeric" min="5" max="1440">
+  </div>
+  <div class="setuprow">
     <label class="vo"><input type="checkbox" id="q_on"> Quiet hours</label>
   </div>
   <div class="setuprow" id="q_when">
@@ -3274,7 +3301,19 @@ the morning is how alerting gets switched off in its first week.
 <b>Two exceptions, both deliberate.</b> Syslog ignores quiet hours, because a
 log with a hole in it every night is useless for the one fault that only
 happens at night. And a device asking to be let in comes through anyway —
-somebody is standing at a screen waiting, whatever time it is.</div>
+somebody is standing at a screen waiting, whatever time it is.
+
+<b>Email is last on this list and that is not an accident.</b> It costs no
+dependency, but it wants a server and credentials and it fails somewhere this
+process cannot see more often than anything else here. The password is stored
+and never sent back to this page; blank keeps the one saved.
+
+<b>A digest</b> gathers everything held and sends it as one message, timed from
+the OLDEST thing waiting rather than from the last digest — what matters is how
+long something has gone unsaid, not how long since a message that may have
+carried nothing. It is also what makes quiet hours a hold rather than a drop:
+nothing goes out during the quiet, and it all arrives afterwards. A device
+asking to be let in ignores this too.</div>
 
   <div class="note help">An alert has four states, not two: open or resolved,
 acknowledged or not. The one that matters is <b>resolved but unread</b> — a
@@ -5997,6 +6036,17 @@ function paintSyslog(cfg){
      one already stored" — which is also what an empty box SAVES. */
   $('ha_token').placeholder = cfg.ha_has_token
     ? 'a token is stored — leave blank to keep it' : 'paste the token';
+  $('ml_on').checked = !!cfg.mail_on;
+  $('ml_host').value = cfg.mail_host || '';
+  $('ml_port').value = cfg.mail_port == null ? 587 : cfg.mail_port;
+  $('ml_tls').checked = !!cfg.mail_tls;
+  $('ml_user').value = cfg.mail_user || '';
+  $('ml_from').value = cfg.mail_from || '';
+  $('ml_to').value = cfg.mail_to || '';
+  $('ml_pass').placeholder = cfg.mail_has_pass
+    ? 'a password is stored — leave blank to keep it' : '';
+  $('dg_on').checked = !!cfg.digest_on;
+  $('dg_mins').value = cfg.digest_minutes == null ? 60 : cfg.digest_minutes;
   $('q_on').checked = !!cfg.quiet_on;
   /* Written out rather than `|| 22`: midnight is 0 and falsy, which is
      exactly the bug this pair had on the server. */
@@ -6018,13 +6068,14 @@ function paintSyslog(cfg){
 function syncSyslog(){
   /* Each address only means something once its own switch is on. */
   const pairs = [['sl_where', 'sl_on'], ['hk_where', 'hk_on'],
-                 ['ha_where', 'ha_on'], ['q_when', 'q_on']];
+                 ['ha_where', 'ha_on'], ['ml_where', 'ml_on'],
+                 ['dg_when', 'dg_on'], ['q_when', 'q_on']];
   pairs.forEach(([box, sw])=>{
     const el = $(box);
     if (el) el.style.display = $(sw).checked ? '' : 'none';
   });
 }
-['sl_on', 'hk_on', 'ha_on', 'q_on'].forEach(id=>{
+['sl_on', 'hk_on', 'ha_on', 'ml_on', 'dg_on', 'q_on'].forEach(id=>{
   const el = $(id);
   if (el) el.addEventListener('change', syncSyslog);
 });
@@ -6043,6 +6094,16 @@ if (bsl) bsl.addEventListener('click', async ()=>{
       ha_url: ($('ha_url').value || '').trim(),
       ha_token: $('ha_token').value,
       ha_service: ($('ha_service').value || '').trim(),
+      mail_on: $('ml_on').checked ? 1 : 0,
+      mail_host: ($('ml_host').value || '').trim(),
+      mail_port: parseInt($('ml_port').value, 10) || 587,
+      mail_tls: $('ml_tls').checked ? 1 : 0,
+      mail_user: ($('ml_user').value || '').trim(),
+      mail_pass: $('ml_pass').value,
+      mail_from: ($('ml_from').value || '').trim(),
+      mail_to: ($('ml_to').value || '').trim(),
+      digest_on: $('dg_on').checked ? 1 : 0,
+      digest_minutes: parseInt($('dg_mins').value, 10) || 60,
       quiet_on: $('q_on').checked ? 1 : 0,
       quiet_from: parseInt($('q_from').value, 10),
       quiet_to: parseInt($('q_to').value, 10),
@@ -6052,7 +6113,9 @@ if (bsl) bsl.addEventListener('click', async ()=>{
     if ($('sl_on').checked) on.push('syslog');
     if ($('hk_on').checked) on.push('a webhook');
     if ($('ha_on').checked) on.push('Home Assistant');
-    $('ha_token').value = '';        // never left on screen after a save
+    if ($('ml_on').checked) on.push('email');
+    /* Neither secret is left on screen after a save. */
+    $('ha_token').value = ''; $('ml_pass').value = '';
     note.textContent = 'saved — ' + (on.length ? 'also going to ' + on.join(' and ')
                                                : 'the list only')
                      + ($('q_on').checked ? ', quiet ' + $('q_from').value

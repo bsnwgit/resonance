@@ -1805,6 +1805,17 @@ DISPLAY_SETTINGS = {
     # tts service is the one that actually speaks, and is a field rather than
     # an assumption because which of them exists is the deployment's business.
     "ha_service": "persistent_notification/create",
+    # LAST, and last for a reason. smtplib costs no dependency, but email wants
+    # a server and credentials and fails silently more often than anything else
+    # here — a queue somewhere else decides whether this was ever delivered.
+    "mail_on": 0,
+    "mail_host": "", "mail_port": 587, "mail_tls": 1,
+    "mail_user": "", "mail_pass": "",
+    "mail_from": "", "mail_to": "",
+    # Immediate, or gathered up and sent on a timer. Alerts marked `now` — the
+    # one with a person standing at a screen — ignore this entirely.
+    "digest_on": 0,
+    "digest_minutes": 60,
     # The house asleep, on the device clock — the same clock dark hours use.
     "quiet_on": 0,
     "quiet_from": 22,
@@ -2122,6 +2133,7 @@ def panel_settings():
     # is set, which is what tells a configured sink from an unconfigured one,
     # and never the token.
     cfg["ha_has_token"] = bool(cfg.pop("ha_token", ""))
+    cfg["mail_has_pass"] = bool(cfg.pop("mail_pass", ""))
     return cfg
 
 
@@ -2196,6 +2208,41 @@ def validate_display_settings(obj, current):
         cfg["hook_url"] = u
     if cfg.get("hook_on") and not cfg.get("hook_url"):
         return None, "give the webhook an address before switching it on"
+    if "mail_on" in obj:
+        cfg["mail_on"] = 1 if obj["mail_on"] else 0
+    for k, cap in (("mail_host", 200), ("mail_user", 200),
+                   ("mail_from", 200), ("mail_to", 400)):
+        if k in obj:
+            cfg[k] = str(obj[k] or "").strip()[:cap]
+    if "mail_pass" in obj:
+        # Blank keeps what is stored, the same rule the HA token follows.
+        pw = str(obj["mail_pass"] or "")
+        if pw:
+            cfg["mail_pass"] = pw[:200]
+    if "mail_clear_pass" in obj and obj["mail_clear_pass"]:
+        cfg["mail_pass"] = ""
+    if "mail_tls" in obj:
+        cfg["mail_tls"] = 1 if obj["mail_tls"] else 0
+    if "mail_port" in obj:
+        try:
+            mp = int(obj["mail_port"])
+        except (TypeError, ValueError):
+            return None, "the mail port must be a whole number"
+        if not (1 <= mp <= 65535):
+            return None, "the mail port must be between 1 and 65535"
+        cfg["mail_port"] = mp
+    if cfg.get("mail_on") and not (cfg.get("mail_host") and cfg.get("mail_to")):
+        return None, "mail needs a server and somewhere to send to"
+    if "digest_on" in obj:
+        cfg["digest_on"] = 1 if obj["digest_on"] else 0
+    if "digest_minutes" in obj:
+        try:
+            dm = int(obj["digest_minutes"])
+        except (TypeError, ValueError):
+            return None, "the digest interval is a whole number of minutes"
+        if not (5 <= dm <= 1440):
+            return None, "the digest interval runs from 5 minutes to a day"
+        cfg["digest_minutes"] = dm
     if "quiet_on" in obj:
         cfg["quiet_on"] = 1 if obj["quiet_on"] else 0
     for k in ("quiet_from", "quiet_to"):
@@ -3699,7 +3746,8 @@ def raise_alert(kind, did="", detail=""):
                                  ": " + detail if detail else ""), flush=True)
     # Outside the lock: a sink is a network call, and holding the alert file
     # while one of them times out would stop every other alert being written.
-    deliver_alert(row)
+    if deliver_alert(row):
+        mark_sent([row["id"]])
     return row
 
 
@@ -3836,6 +3884,36 @@ def post_home_assistant(text, level, row):
         print("home assistant alert failed: %s" % exc, flush=True)
 
 
+def send_mail(subject, body):
+    """One message, or nothing. Costs no dependency and is still last on the
+    list: it wants a server and credentials, and when it fails it usually
+    fails somewhere this process cannot see."""
+    cfg = display_settings()
+    host = str(cfg.get("mail_host") or "").strip()
+    to = [a.strip() for a in str(cfg.get("mail_to") or "").split(",") if a.strip()]
+    if not (cfg.get("mail_on") and host and to):
+        return
+    frm = str(cfg.get("mail_from") or "").strip() or "resonance@localhost"
+    try:
+        import smtplib
+        from email.message import EmailMessage
+        msg = EmailMessage()
+        msg["Subject"] = subject[:200]
+        msg["From"] = frm
+        msg["To"] = ", ".join(to)
+        msg.set_content(body)
+        port = int(cfg.get("mail_port") or 587)
+        with smtplib.SMTP(host, port, timeout=10) as sm:
+            if cfg.get("mail_tls"):
+                sm.starttls()
+            user = str(cfg.get("mail_user") or "").strip()
+            if user:
+                sm.login(user, str(cfg.get("mail_pass") or ""))
+            sm.send_message(msg)
+    except Exception as exc:                     # noqa: BLE001
+        print("mail failed: %s" % exc, flush=True)
+
+
 def post_webhook(text, level, row):
     """One JSON POST. Reaches ntfy, Slack, Discord, Gotify and whatever else
     somebody already runs — the most reach per line of code available here,
@@ -3874,14 +3952,17 @@ def deliver_alert(row, resolved=False):
     # with a hole in it every night is worse than useless for the one fault
     # that only ever happens at night.
     syslog_send(level, text)
-    if in_quiet_hours() and not spec.get("now"):
-        # Held rather than dropped. Something is still true and somebody still
-        # has to hear it; the list has it, and the digest carries it at a
-        # civilised hour. The exception is the alert with a person standing at
-        # a screen — they are waiting now, whatever time it is.
-        return
+    # HELD, NOT DROPPED — and this is where the difference is made real. Quiet
+    # hours and digest mode both leave the row unsent; flush_digest carries it
+    # at a civilised hour, or on the timer. The exception is the alert with a
+    # person standing at a screen: they are waiting now, whatever time it is.
+    cfg = display_settings()
+    if not spec.get("now") and (in_quiet_hours() or cfg.get("digest_on")):
+        return False
     post_webhook(text, level, row)
     post_home_assistant(text, level, row)
+    send_mail("Resonance: " + text[:120], text)
+    return True
 
 
 #: How many missed polls before a screen is called gone. Three rather than one:
@@ -3942,6 +4023,60 @@ def evaluate_alerts():
         for did in displays:
             if counts.get((kind, did), 0) == 0:
                 clear_alert(kind, did)
+
+
+def mark_sent(ids):
+    with _alerts_lock:
+        rows = read_alerts()
+        now_ = int(time.time())
+        hit = False
+        for r in rows:
+            if r["id"] in ids and not r.get("sent"):
+                r["sent"], hit = now_, True
+        if hit:
+            write_alerts(rows)
+
+
+def flush_digest(force=False):
+    """Everything held, in one message.
+
+    This is what makes quiet hours a HOLD rather than a drop, and what digest
+    mode is. Nothing goes out during the quiet: the whole point is that the
+    house is asleep, and a digest that fired at three would be the thing it
+    exists to prevent."""
+    cfg = display_settings()
+    if in_quiet_hours():
+        return 0
+    waiting = [r for r in read_alerts() if not r.get("sent")]
+    if not waiting:
+        return 0
+    if not force:
+        every = max(5, int(cfg.get("digest_minutes") or 60)) * 60
+        oldest = min(r["last"] for r in waiting)
+        # Counted from the OLDEST held thing rather than from the last digest:
+        # what matters is how long something has gone unsaid, not how long it
+        # has been since a message that may have carried nothing.
+        if int(time.time()) - oldest < every:
+            return 0
+    displays = read_displays()
+    lines = []
+    for r in sorted(waiting, key=lambda r: r["last"]):
+        spec = ALERT_KINDS.get(r["kind"]) or {}
+        who = display_label(displays[r["did"]]) if r.get("did") in displays \
+            else (r.get("did") or "this server")
+        lines.append("%s %s%s%s" % (who, spec.get("words", r["kind"]),
+                                    " — RESOLVED" if r["resolved"] else "",
+                                    (": " + r["detail"]) if r.get("detail") else ""))
+    text = "%d thing%s to report:\n" % (len(lines), "" if len(lines) == 1 else "s")
+    text += "\n".join("  · " + ln for ln in lines)
+    worst = "error" if any(r["level"] == "error" for r in waiting) else "warn"
+    post_webhook(text, worst, waiting[0])
+    post_home_assistant(text, worst, waiting[0])
+    send_mail("Resonance: %d thing%s to report"
+              % (len(lines), "" if len(lines) == 1 else "s"), text)
+    mark_sent([r["id"] for r in waiting])
+    print("digest sent: %d alert(s)" % len(waiting), flush=True)
+    return len(waiting)
 
 
 def ack_alerts(ids):
@@ -6718,10 +6853,16 @@ class Handler(SimpleHTTPRequestHandler):
                 # The sink's settings ride with the data it reports on, so the
                 # panel fills that box from the same fetch rather than a second
                 # one that can disagree with it.
-                "settings": {k: display_settings().get(k)
+                "settings": {k: panel_settings().get(k)
                              for k in ("syslog_on", "syslog_host",
                                        "syslog_port", "syslog_facility",
                                        "hook_on", "hook_url",
+                                       "ha_on", "ha_url", "ha_service",
+                                       "ha_has_token",
+                                       "mail_on", "mail_host", "mail_port",
+                                       "mail_tls", "mail_user", "mail_from",
+                                       "mail_to", "mail_has_pass",
+                                       "digest_on", "digest_minutes",
                                        "quiet_on", "quiet_from", "quiet_to")},
                 "limits": {"event_days": EVENT_DAYS_LIMITS},
                 "kinds": list(EVENT_KINDS), "total": len(rows)})
@@ -7513,6 +7654,9 @@ class Handler(SimpleHTTPRequestHandler):
             # and because liveness is read from this very request — the thing
             # measured and the thing measuring arrive together.
             evaluate_alerts()
+            # The poll is the only clock, so it is also what releases anything
+            # being held — by quiet hours, or by the digest timer.
+            flush_digest()
             try:
                 req = int(disp.get("reload_req") or 0)
             except (TypeError, ValueError):
