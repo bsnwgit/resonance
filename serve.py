@@ -52,7 +52,8 @@ Plain `python3 -m http.server` also honours conditional GETs, so a browser can
 sit on a cached copy of index.html and you end up debugging code that is no
 longer running. This sends no-store on everything instead.
 """
-import base64, functools, hashlib, hmac, http.cookies, inspect, json, os, re, \
+import base64, contextlib, functools, hashlib, hmac, http.cookies, inspect, \
+       json, os, re, \
        secrets, ssl, subprocess, sys, tempfile, threading, time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
@@ -61,6 +62,11 @@ import manual                            # the manual, and its PDF writer
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SETTINGS_PATH = os.path.join(ROOT, "settings.json")
 USERS_PATH = os.path.join(ROOT, "users.json")
+#: The panel's own PIN, for the middle rung. Its own file rather than a key in
+#: app.json, because that document is handed to the panel whole on /app and a
+#: credential — even a hashed one — has no business riding along with the
+#: ports and the bind address.
+PANEL_PIN_PATH = os.path.join(ROOT, "panel_pin.json")
 APP_PATH = os.path.join(ROOT, "app.json")
 BACKEND_PATH = os.path.join(ROOT, "backend.json")
 _settings_lock = threading.Lock()
@@ -183,11 +189,17 @@ UNATTENDED_LIMITS = {"poll_seconds": (2, 300), "retry_attempts": (1, 10),
 PORT_MIN, PORT_MAX = 1024, 65535     # below 1024 needs root; this runs as you
 SESSION_MIN, SESSION_MAX = 5, 480    # minutes: below 5 is unusable, above 8h absurd
 BIND_MODES = ("loopback", "address", "everything")
-# "pin" — one number for the whole display, no accounts — is the middle rung
-# and is not here yet. It is the identity work's PIN machinery pointed at the
-# display rather than at a named person, so it lands with that rather than
-# being built twice. Named here so the omission is deliberate and visible.
-AUTH_MODES = ("none", "accounts")
+#: THREE RUNGS. Nothing at the door, one number for the whole panel, or
+#: accounts with roles. The middle one is the identity work's PIN machinery
+#: pointed at the panel rather than at a named person — which is why it waited
+#: for that rather than being built twice.
+#:
+#: What it is FOR is the deployment with one administrator: accounts exist to
+#: tell people apart, and telling one person apart from themselves is a login
+#: screen charging rent. What it is NOT for is a deployment where the log has
+#: to say who did a thing. A single PIN cannot, and the log says "(single PIN)"
+#: rather than implying somebody.
+AUTH_MODES = ("none", "pin", "accounts")
 LOOPBACK = "127.0.0.1"
 
 
@@ -830,6 +842,12 @@ ROUTE_DEFAULTS.update({
     # read that way next year, and flattening it at the point of saving would
     # turn it into twelve ids nobody can maintain.
     "groups": [],
+    # The people it names. A THIRD list rather than more ids in the first,
+    # because a display and a person are different populations reached by
+    # different sessions — the same reason groups refuse to mix the two kinds
+    # — and one list holding either would be a list nobody could audit. Empty
+    # on every existing route, so an upgrade grants nobody anything.
+    "identities": [],
 })
 MAX_ROUTES = 24                  # a household, not a directory service
 
@@ -900,6 +918,8 @@ def read_routes():
                                    (rec.get("displays") or [])][:MAX_ALLOW]
                 out["groups"] = [str(g)[:32] for g in
                                  (rec.get("groups") or [])][:MAX_GROUPS]
+                out["identities"] = [str(p)[:32] for p in
+                                     (rec.get("identities") or [])][:MAX_ALLOW]
                 out["created"] = rec.get("created")
                 out["created_by"] = rec.get("created_by")
                 doc["routes"][str(rid)] = out
@@ -1003,7 +1023,7 @@ def _speech_default():
         return ""
 
 
-def public_routes(doc, disp=None):
+def public_routes(doc, disp=None, ident=None):
     """The two halves a browser may see. The connection half is not omitted
     from the serialisation by accident — it is enumerated the other way
     round, so a field added to a route later is private until somebody
@@ -1042,8 +1062,13 @@ def public_routes(doc, disp=None):
             row["greeting"] = prof["greetings"]
         if not row.get("voice") and prof.get("ttsvoice"):
             row["voice"] = prof["ttsvoice"]
-        row.update(id=rid, allowed=display_may(disp, rec))
-        if disp:
+        row.update(id=rid, allowed=subject_may(rec, disp, ident))
+        # A PERSON gets the routing half on the same terms a display does. The
+        # wake gate runs in the browser, so a session that is handed no wake
+        # words cannot drop an utterance it should drop — it simply never
+        # recognises one, which is the fault this half exists to prevent,
+        # arriving through the door marked "we only thought about devices".
+        if disp or ident:
             row.update({k: rec[k] for k in ROUTE_ROUTING})
             # …and the words come from the speech profile now, not from the
             # route's own record. An endpoint names a profile; the profile says
@@ -1058,6 +1083,17 @@ def public_routes(doc, disp=None):
                                   if a.strip()]
             if "wakestrict" in prof:
                 row["strict"] = bool(prof.get("wakestrict"))
+            # A PERSON'S OWN WORD, on the endpoint a question goes to when
+            # nothing named one. It is added rather than substituted: the
+            # shared word still works on their device, because taking it away
+            # would mean somebody who set a personal word could no longer join
+            # in when a room says the house's name.
+            #
+            # Only theirs. Every other browser is handed the shared words
+            # alone, which is the whole mechanism — the collision stops because
+            # nobody else's device has ever heard of it.
+            if ident and ident.get("wakeword") and rid == doc.get("default"):
+                row["aliases"] = list(row.get("aliases") or []) + [ident["wakeword"]]
         out.append(row)
     return out
 
@@ -1242,6 +1278,18 @@ def validate_route(obj, current, doc, rid=None):
                 seen.add(g)
                 out.append(g)
         rec["groups"] = out[:MAX_GROUPS]
+    if "identities" in obj:
+        # Same treatment as the displays above, and for the same reason: an id
+        # for somebody who has been deleted must not sit in an allow-list
+        # looking like a grant to a person.
+        known = read_identities()
+        seen, out = set(), []
+        for p in (obj["identities"] or []):
+            p = str(p)[:32]
+            if p in known and p not in seen:
+                seen.add(p)
+                out.append(p)
+        rec["identities"] = out[:MAX_ALLOW]
     if "wakeword" in obj:
         rec["wakeword"] = _keep_word(obj["wakeword"])[:40]
     # No longer required on the route. The word lives in the speech profile the
@@ -1358,12 +1406,14 @@ def validate_app(obj, current):
     if "auth" in obj:
         v = str(obj["auth"] or "").strip()
         if v not in AUTH_MODES:
-            # The rung that is specified but not built. Saying so beats a
-            # generic "not one of" that reads like a typo in the request.
-            if v == "pin":
-                return None, ("a single PIN with no accounts is not built yet — "
-                              "it arrives with identity")
             return None, "sign-in must be one of: " + ", ".join(AUTH_MODES)
+        if v == "pin" and not has_panel_pin():
+            # Refused HERE rather than at the restart that would apply it.
+            # Saving this and restarting is how a panel ends up in a mode whose
+            # only key was never cut, and the way back is a text editor on the
+            # box.
+            return None, ("set the panel PIN first — switching to it with none "
+                          "set would leave no way in")
         cfg["auth"] = v
     if "session_idle_minutes" in obj:
         try:
@@ -1456,12 +1506,11 @@ def note_code_failure(ip):
 
 DISPLAY_DEFAULTS = {
     "name": "",                  # what an admin called it
-    # Which population this row belongs to when a group is drawn from one:
-    # "user", "device", or blank for "work it out". Set by an admin, because
-    # the inference below can only see how the row ARRIVED — and asking for
-    # access is something a browser on one machine does, which describes a
-    # device rather than a person. A person is an identity that carries from a
-    # phone to a laptop, and nothing here issues one yet.
+    # An admin's override of which display population this row was in, back
+    # when there were two of them. There is one now — a display is a display,
+    # and how it enrolled is `origin` below, which describes the row instead of
+    # sorting it. Kept so an existing document round-trips rather than losing a
+    # key on its first save; nothing reads it and nothing writes it.
     "kind": "",
     "asked": "",                 # the ?display= name it announced itself with
     "approved": False,
@@ -1529,7 +1578,7 @@ DISPLAY_DEFAULTS = {
     # HOW THIS ROW GOT HERE: "code" for one an admin named and minted a code
     # for, "page" for one that arrived because somebody opened the display
     # page. Empty on rows that predate the field, which fall back to a guess —
-    # see group_kind_of.
+    # see enrolled_as.
     #
     # Recorded at creation because it is the one thing about a row that is
     # true from the start and never changes. It used to be inferred from
@@ -1612,6 +1661,14 @@ MAX_LOOKS = 8
 
 #: The displays document's own settings, as opposed to the rows in it. Set in
 #: the panel, and none of them needs a restart.
+#: Six digits is a low bar that rate limiting carries, and it is the number a
+#: person keys into a screen. An admin can raise it where the room deserves
+#: more; below four is not a secret, above twelve is a password with the wrong
+#: keyboard.
+PIN_MIN_DEFAULT = 6
+PIN_LIMITS = (4, 12)
+PIN_MAX = 32
+
 DISPLAY_SETTINGS = {
     # May a device nobody invited ask for access at all?
     #
@@ -1705,12 +1762,25 @@ DISPLAY_SETTINGS = {
     # Which group each population lands in when it starts working. Minted on
     # first need rather than shipped, so an install that never uses groups
     # never grows two it did not ask for — see default_group.
-    "user_group": "",
     "device_group": "",
+    "identity_group": "",
+    # Set once ensure_system_groups has had its one chance to correct a name it
+    # had shipped and since changed. After that a default group's name is the
+    # admin's, including if they choose the old one back.
+    "group_names_done": 0,
+    # The fewest digits a PIN may have. Raising it does not revoke anything —
+    # it marks every PIN below it, and those are made to conform at the next
+    # unlock. See identity_pin_state.
+    "pin_min": PIN_MIN_DEFAULT,
+    # Kept so an existing document round-trips rather than losing a key on the
+    # first save. `user` was the second DISPLAY kind and folded into `device`;
+    # nothing reads this now, and nothing writes it either.
+    "user_group": "",
 }
 MAX_FORM_FIELDS = 5
 #: (low, high) for each number the panel can set
-DISPLAY_LIMITS = {"max_displays": (2, 5000), "max_pending": (1, 1000),
+DISPLAY_LIMITS = {"pin_min": PIN_LIMITS,
+                  "max_displays": (2, 5000), "max_pending": (1, 1000),
                   "guest_days": (1, 3650),
                   # 0 is off — see code_minutes. A week is the top because a
                   # code good for longer than anybody remembers issuing it is
@@ -2830,10 +2900,16 @@ def enrol_base_for(rec, host, secure):
 
 def invite_display(name, by, setup=None):
     """A row created from the panel, before the device it is for has ever been
-    switched on. Approved from the moment it exists — an admin naming a screen
-    and ticking the endpoints it may use IS the approval — but holding no
-    token, so nothing can BE it until somebody types the code into the screen
-    itself."""
+    switched on. It holds a code and NOTHING ELSE: no token, and not approved.
+
+    It used to be approved from the moment it existed, on the reasoning that an
+    admin naming a screen and ticking its endpoints IS the approval. That reads
+    well and it is wrong in the one place it matters — the row then sits
+    `approved` with no device behind it, so anything asking "is this a display
+    that works" is told yes about a television nobody has switched on. It gets
+    offered as a member of a group, and it would be counted as a grant that had
+    landed. Enrolment is what completes it, so enrolment is what approves it:
+    see redeem_code."""
     displays = read_displays()
     limit = display_settings()["max_displays"]
     if len(displays) >= limit:
@@ -2842,7 +2918,9 @@ def invite_display(name, by, setup=None):
     did = "d" + secrets.token_hex(6)
     now_ = int(time.time())
     rec = dict(DISPLAY_DEFAULTS)
-    rec.update(name=name, approved=True, approved_by=by, approved_at=now_,
+    # `approved_by` is who INVITED it, recorded now because that is when it is
+    # known; `approved_at` waits for the moment it is true.
+    rec.update(name=name, approved=False, approved_by=by, approved_at=0,
                created=now_, code=new_code(), code_expires=code_deadline(now_),
                origin="code")
     # What the admin already knows about the screen, set while creating it
@@ -2872,7 +2950,10 @@ def reissue_display(did):
     if not rec:
         return None, "no such display"
     now_ = int(time.time())
-    rec.update(salt="", hash="", approved=True,
+    # Back to an invitation: no token, and not approved until the new code is
+    # used. The row is the place and keeps its name and its grants, but it is
+    # not a working display again until a device is behind it.
+    rec.update(salt="", hash="", approved=False, approved_at=0,
                code=new_code(), code_expires=code_deadline(now_))
     write_displays(displays)
     return dict(rec, id=did), None
@@ -2911,8 +2992,10 @@ def redeem_code(raw):
         # Spent. The code is gone from the record before the token exists
         # anywhere else, so the same six characters cannot enrol a second
         # device however quickly somebody types them.
+        # Approved HERE, because this is the moment the row becomes a device.
+        # Before it, the code was an invitation nobody had taken up.
         rec.update(salt=salt, hash=dk, code="", code_expires=0,
-                   last_seen=now_, approved=True)
+                   last_seen=now_, approved=True, approved_at=now_)
         write_displays(displays)
         return did + "." + secret, dict(rec, id=did)
     return None, "unknown"
@@ -3052,18 +3135,36 @@ def guest_path_broken(doc):
     return not display_settings()["guest_requests"] and not open_default(doc)
 
 
-def display_may(disp, route):
-    """May this display use this endpoint?
+def subject_may(route, disp=None, ident=None):
+    """May this caller use this endpoint?
+
+    The caller is a DEVICE or a PERSON, never both — see `_subject`, which is
+    where that is decided — so this takes one of the two and answers about it.
+    A person's grant is their own and does not depend on what the machine they
+    are sitting at was approved for; a device's is the machine's and owes
+    nothing to whoever happens to be standing in front of it.
 
     An endpoint with no allow-list is reachable by anything that can reach the
     port, which is what every endpoint was before displays existed — so an
     upgrade changes nothing until somebody restricts one, and the restriction
     is a thing you can see rather than a default nobody was told about.
 
-    Where there IS one: approval is the floor. An unapproved device holding a
-    freshly minted token is exactly the phone somebody typed the URL into."""
+    Where there IS one: approval is the floor for a device. An unapproved one
+    holding a freshly minted token is exactly the phone somebody typed the URL
+    into. A person has no equivalent test, because an identity only exists at
+    all if an admin made it — creation IS the approval, and there is no way to
+    turn up asking to be one."""
     if not route.get("restricted"):
         return True
+    if ident:
+        # Named directly, or named by a group of people. Grants add up here
+        # exactly as they do for a display, and only GROUPS OF PEOPLE count: a
+        # group of screens on the same allow-list says nothing about who may
+        # use this, and the two files mint ids independently.
+        if ident["id"] in (route.get("identities") or []):
+            return True
+        return ident["id"] in group_members(route.get("groups"),
+                                            kinds=IDENTITY_GROUP_KINDS)
     if not disp:
         return False
     # The preview is the panel. It is already signed in as an admin, who can
@@ -3078,8 +3179,11 @@ def display_may(disp, route):
         return False
     if disp["id"] in (route.get("displays") or []):
         return True
-    # Grants add up: named directly, or named by a group it is in.
-    return disp["id"] in group_members(route.get("groups"))
+    # Grants add up: named directly, or named by a group it is in — and only
+    # by a group of DISPLAYS. Both of those kinds hold display rows; the third
+    # holds people, and a screen is not let through by a grant made to them.
+    return disp["id"] in group_members(route.get("groups"),
+                                       kinds=DISPLAY_GROUP_KINDS)
 
 
 def admin_displays():
@@ -3111,7 +3215,7 @@ def admin_displays():
                    # What it was SET to, and what it resolves to. The panel
                    # needs both: one is the control's value, the other is the
                    # answer a blank control is currently getting.
-                   kind=str(rec.get("kind") or ""), group_kind=group_kind_of(rec),
+                   kind=str(rec.get("kind") or ""), arrived=enrolled_as(rec),
                    # Three states, and the panel needs to tell them apart:
                    # INVITED is a row waiting for somebody to type its code
                    # into a screen, WAITING is a device that turned up on its
@@ -3176,7 +3280,291 @@ IDENTITY_DEFAULTS = {
     "salt": "", "hash": "",
     "created": 0, "last_seen": 0,
     "created_by": "",
+    # THE PIN. PBKDF2 like an admin password and not the SHA-256 the URL gets:
+    # a URL secret is 32 bytes from the system generator with no dictionary to
+    # run, where a PIN is six digits a human chose. Stretching is the only
+    # thing standing between that and a list of a million guesses.
+    #
+    # `pin_len` is kept because the policy is a MINIMUM that can be raised
+    # later, and a hash cannot be asked how long the thing behind it was. It
+    # is the length and nothing else — it narrows the search space by a factor
+    # nobody can use without the hash, and without it raising the minimum
+    # would either do nothing to existing PINs or force everybody to reset.
+    "pin_salt": "", "pin_hash": "", "pin_len": 0, "pin_set_at": 0,
+    # PER-IDENTITY SETTINGS: the storage tier a PIN unlocks, and the one this
+    # server did not have. There was shared configuration, a per-browser
+    # preference and a per-embed grant; a setting belonging to a PERSON had
+    # nowhere to live, so it lived in whichever browser they happened to be
+    # using and did not follow them anywhere.
+    "settings": {},
+    # THEIR OWN WAKE WORD. Two people in a room with their own devices, one of
+    # them says the name that reaches the model, and both answer — route
+    # binding cannot help, because both are legitimately allowed that route.
+    # A word of their own stops the collision happening rather than
+    # reconciling it afterwards, and it is what people expect anyway: an
+    # assistant answers to a name you chose.
+    "wakeword": "",
+    # How long an unlock lasts on this person's own device, in hours. Theirs
+    # rather than the deployment's: a PIN is now entered at their own URL, not
+    # at a screen standing in a room, so there is no place carrying the risk to
+    # set it from. Zero takes the deployment default.
+    "session_hours": 0,
 }
+
+#: What a person is allowed to keep. An ALLOW-list, not a filter: this store is
+#: written from a browser, and a document shaped by whatever a page decided to
+#: send is one nobody can reason about a year from now. These three are exactly
+#: what the display has always kept per browser — push-to-talk, muted, and
+#: whether the transcript is showing.
+IDENTITY_PREF_KEYS = ("ptt", "muted", "text")
+#: Hours, where an identity names none. Long enough that somebody is not asked
+#: again in a working day, short enough to matter on a machine they borrowed.
+SESSION_HOURS_DEFAULT = 12
+SESSION_HOURS_LIMITS = (1, 720)
+#: A browser that has unlocked. Its own cookie, because the identity cookie is
+#: the URL secret and every device that person owns holds the same one —
+#: unlocking on the laptop would unlock the phone, which is not what entering a
+#: PIN on one machine means. In memory, like the admin sessions: a restart asks
+#: again, and that is the same bargain the rest of this server makes.
+_pin_sessions = {}               # token -> {"pid": str, "expires": float}
+_pin_lock = threading.Lock()
+PIN_COOKIE = "rsn_pinq"
+
+
+def clean_identity_settings(obj):
+    """Only the keys that exist, only as booleans. Everything a person may keep
+    today is a switch; the day one is not, this is where that is decided rather
+    than wherever the page happened to send it."""
+    out = {}
+    if isinstance(obj, dict):
+        for k in IDENTITY_PREF_KEYS:
+            if k in obj:
+                out[k] = bool(obj[k])
+    return out
+
+
+def identity_settings(pid):
+    rec = read_identities().get(pid)
+    return clean_identity_settings((rec or {}).get("settings"))
+
+
+def write_identity_settings(pid, obj):
+    rows = read_identities()
+    if pid not in rows:
+        return None
+    rows[pid]["settings"] = clean_identity_settings(obj)
+    write_identities(rows)
+    return rows[pid]["settings"]
+
+
+def identity_hours(rec):
+    h = int(rec.get("session_hours") or 0)
+    return h if h > 0 else SESSION_HOURS_DEFAULT
+
+
+def open_pin_session(pid, hours):
+    token = secrets.token_urlsafe(32)
+    with _pin_lock:
+        # Swept here rather than on a timer: this runs when somebody unlocks,
+        # which is the only moment the map grows.
+        now_ = time.time()
+        for t in [t for t, v in _pin_sessions.items() if v["expires"] <= now_]:
+            _pin_sessions.pop(t, None)
+        _pin_sessions[token] = {"pid": pid, "expires": now_ + hours * 3600}
+    return token
+
+
+def pin_session_pid(token):
+    """Which person this browser has unlocked, or "". Expiry is read HERE
+    rather than swept on a clock, so a session that has run out is over the
+    moment it is asked about rather than whenever a timer next fired."""
+    rec = _pin_sessions.get(str(token or ""))
+    if not rec:
+        return ""
+    if rec["expires"] <= time.time():
+        _pin_sessions.pop(str(token), None)
+        return ""
+    return rec["pid"]
+
+
+def close_pin_sessions(pid):
+    """Every unlocked browser for one person, ended. Called where their PIN
+    changes hands — an admin clearing it, or the person setting a new one —
+    because a session opened by a secret that no longer exists is a door left
+    open behind a lock somebody just changed."""
+    with _pin_lock:
+        for t in [t for t, v in _pin_sessions.items() if v["pid"] == pid]:
+            _pin_sessions.pop(t, None)
+
+#: Guessing is per IDENTITY rather than per address. A six-digit PIN is small
+#: enough that the thing to slow down is attempts against one person, and an
+#: attacker who changes address between guesses must not get a fresh budget.
+#: Its own ledger, so somebody fumbling their PIN cannot lock an admin out of
+#: the panel — the same reason the embed keys keep theirs.
+_pin_fails = {}                  # identity id -> [count, blocked_until]
+
+
+def pin_blocked(pid):
+    rec = _pin_fails.get(pid)
+    return bool(rec and rec[1] > time.time())
+
+
+def note_pin_failure(pid):
+    rec = _pin_fails.setdefault(pid, [0, 0])
+    rec[0] += 1
+    if rec[0] >= 5:
+        rec[1] = time.time() + min(300, 15 * (2 ** (rec[0] - 5)))
+
+
+def weak_pin(pin):
+    """The guesses anybody would try first, refused where they are chosen
+    rather than left for the back-off to absorb. A run, a repeat, or the year
+    somebody was born is most of what a keypad ever sees, and rate limiting is
+    what makes six digits survivable — it should not be spending its budget on
+    111111."""
+    if len(set(pin)) == 1:
+        return "that is one digit repeated"
+    runs = "0123456789" * 2
+    if pin in runs or pin in runs[::-1]:
+        return "that is a run of digits"
+    if len(pin) == 4 and pin.startswith(("19", "20")):
+        return "that reads as a year"
+    return ""
+
+
+def check_pin(pin, minimum=None):
+    """What is wrong with this PIN, or "" if nothing is. Digits only: it is
+    keyed into a screen, often with a remote, and a PIN that needed letters
+    would be a password with the wrong name."""
+    pin = str(pin or "")
+    low = PIN_MIN_DEFAULT if minimum is None else minimum
+    if not pin.isdigit():
+        return "a PIN is digits only"
+    if len(pin) > PIN_MAX:
+        return "that is longer than a PIN needs to be"
+    if len(pin) < low:
+        return "a PIN needs at least %d digits here" % low
+    return weak_pin(pin)
+
+
+def set_identity_pin(pid, pin, minimum=None):
+    """Set or replace somebody's PIN. Returns "" or the reason it was refused."""
+    rows = read_identities()
+    if pid not in rows:
+        return "no such identity"
+    bad = check_pin(pin, minimum)
+    if bad:
+        return bad
+    salt, dk = hash_password(str(pin))
+    rows[pid].update(pin_salt=salt, pin_hash=dk, pin_len=len(str(pin)),
+                     pin_set_at=int(time.time()))
+    write_identities(rows)
+    _pin_fails.pop(pid, None)
+    close_pin_sessions(pid)
+    return ""
+
+
+def clear_identity_pin(pid):
+    """An admin resetting a forgotten one. With no email here this is the only
+    recovery path, which is why it exists in the first version — and it does
+    not set a new PIN, it removes the old one: an admin who chose somebody's
+    PIN would know it."""
+    rows = read_identities()
+    if pid not in rows:
+        return False
+    rows[pid].update(pin_salt="", pin_hash="", pin_len=0, pin_set_at=0)
+    write_identities(rows)
+    _pin_fails.pop(pid, None)
+    close_pin_sessions(pid)
+    return True
+
+
+def verify_identity_pin(pid, pin):
+    """True where it matches. Compared HERE and never in the browser, and the
+    back-off is charged on the way out rather than the way in, so a correct PIN
+    entered after four wrong ones still works."""
+    rec = read_identities().get(pid)
+    if not rec or not rec.get("pin_hash"):
+        return False
+    ok = verify_password(str(pin or ""), rec["pin_salt"], rec["pin_hash"])
+    if ok:
+        _pin_fails.pop(pid, None)
+    else:
+        note_pin_failure(pid)
+    return bool(ok)
+
+
+def wake_words_in_use(skip_pid=""):
+    """Every word that already wakes something, as (word, what it belongs to).
+
+    Both populations, because a collision does not care which list it came
+    from: a person whose word is near the house's is a person who turns the
+    lights off by saying their own name."""
+    out = []
+    doc = read_routes()
+    for rid in route_order(doc):
+        rec = doc["routes"][rid]
+        prof = find_look(str(rec.get("speech") or ""), _speech_pool()) \
+               or find_look(_speech_default(), _speech_pool()) or {}
+        for w in [prof.get("wakeword") or rec.get("wakeword") or ""] \
+                 + list(prof.get("aliases") or rec.get("aliases") or []):
+            if w:
+                out.append((w, rec.get("name") or rid))
+    for pid, rec in read_identities().items():
+        if pid != skip_pid and rec.get("wakeword"):
+            out.append((rec["wakeword"], identity_label(rec)))
+    return out
+
+
+def check_wake_word(word, skip_pid=""):
+    """"" if this word is somebody's to take, or why it is not.
+
+    Refused HERE, against the matcher that does the waking, rather than by
+    comparing strings: a word acoustically close to the house name puts you
+    back where you started, and it would pass any comparison of letters. What
+    gets through is exactly what will not cross-trigger, because the same
+    rules decided both."""
+    w = wake_norm(word)
+    if not w:
+        return "give them a word"
+    if len(w) < 3:
+        return "too short to hear reliably — three letters or more"
+    if len(w.split(" ")) > 2:
+        return "one word, or two at most"
+    for other, whose in wake_words_in_use(skip_pid):
+        if wake_collides(w, other):
+            same = wake_norm(other) == w
+            return ('"%s" is already %s\'s word' % (other, whose) if same else
+                    '"%s" is too close to "%s", which is %s\'s — they would '
+                    'wake each other' % (word.strip(), other, whose))
+    return ""
+
+
+def set_identity_wake(pid, word):
+    rows = read_identities()
+    if pid not in rows:
+        return "no such identity"
+    w = str(word or "").strip()
+    if not w:                                    # clearing it is always allowed
+        rows[pid]["wakeword"] = ""
+        write_identities(rows)
+        return ""
+    bad = check_wake_word(w, skip_pid=pid)
+    if bad:
+        return bad
+    rows[pid]["wakeword"] = wake_norm(w)
+    write_identities(rows)
+    return ""
+
+
+def identity_pin_state(rec, minimum=None):
+    """none, ok, or short. SHORT is a PIN that was legal when it was set and is
+    below a minimum raised since — marked rather than revoked, because the
+    person still has to be able to unlock in order to change it."""
+    low = PIN_MIN_DEFAULT if minimum is None else minimum
+    if not rec.get("pin_hash"):
+        return "none"
+    return "ok" if (rec.get("pin_len") or 0) >= low else "short"
 
 
 def read_identities():
@@ -3234,6 +3622,12 @@ def new_identity(name, by):
     rows[pid] = dict(IDENTITY_DEFAULTS, name=name, salt=salt, hash=dk,
                      created=int(time.time()), created_by=str(by or "")[:60])
     write_identities(rows)
+    # Filed with their own population the moment they exist, and the group is
+    # minted if there is not one — the same rule every other kind follows. A
+    # row belonging to no group is one an allow-list cannot name, so the first
+    # grant to everybody would be a tick per person, which is the data entry
+    # groups exist to remove.
+    join_group(pid, default_group("identity", by))
     return pid + "." + secret, dict(rows[pid], id=pid)
 
 
@@ -3286,9 +3680,16 @@ def admin_identities():
     """The list, less the credential. What a URL secret IS never leaves this
     server after the one moment it was minted."""
     rows = read_identities()
+    low = display_settings()["pin_min"]
+    # The STATE of a PIN, never the PIN. Whether somebody has one, and whether
+    # theirs is below a minimum raised since they set it, is what an admin has
+    # to be able to see — the rollout of a tightened policy is otherwise a
+    # thing you assume rather than watch.
     return [dict({k: rec.get(k) for k in
-                  ("name", "created", "last_seen", "created_by")},
-                 id=pid, label=identity_label(rec))
+                  ("name", "created", "last_seen", "created_by", "pin_set_at")},
+                 id=pid, label=identity_label(rec),
+                 wakeword=rec.get("wakeword") or "",
+                 pin=identity_pin_state(rec, low))
             for pid, rec in sorted(rows.items(), key=lambda kv: kv[1]["created"])]
 
 
@@ -3307,8 +3708,35 @@ def admin_identities():
 # which is the point of them living in a file of their own rather than inside
 # the thing that currently uses them.
 GROUPS_PATH = os.path.join(ROOT, "groups.json")
-_groups_lock = threading.Lock()
-GROUP_KINDS = ("user", "device")
+#: Re-entrant, because a mutation holds it across read-modify-WRITE and
+#: write_groups takes it again on the way out.
+_groups_lock = threading.RLock()
+#: THREE populations now, and the third is the only one that is not a display.
+#: `user` and `device` both hold DISPLAY rows — one arrived by asking, the
+#: other by taking a code — which is what "people" meant here while a refusal
+#: was per device and nothing issued a person anything. `identity` holds people
+#: proper: rows from identities.json, reached by their own URL from whatever
+#: machine they open it on.
+#:
+#: The obvious move was to repurpose `user` and it is the one to refuse. A
+#: group's kind is fixed at creation BECAUSE changing it silently empties it,
+#: and repurposing the kind does that to every existing group of it at once, on
+#: upgrade, with nothing to migrate into — the identities those laptops belong
+#: to do not exist. So the third kind is added beside them and nothing empties.
+GROUP_KINDS = ("device", "identity")
+#: Whose members are display rows, and whose are people. A route names groups
+#: without caring what is in them, so the answer depends on who is asking: a
+#: device must not be let through by a group of people that happens to sit on
+#: the same allow-list, and a person must not be let through by a group of
+#: screens.
+DISPLAY_GROUP_KINDS = ("device",)
+IDENTITY_GROUP_KINDS = ("identity",)
+#: Read-time only, and it never rewrites the file. `user` was a second kind of
+#: DISPLAY group — the machines that asked rather than the ones an admin
+#: invited — which is how a row ENROLLED and not which population it is in. It
+#: folds into `device` because both were always display rows, so no group loses
+#: a member and no admin loses a name.
+LEGACY_GROUP_KINDS = {"user": "device"}
 MAX_GROUPS = 200
 
 
@@ -3323,12 +3751,18 @@ def read_groups():
     for gid, rec in stored.items():
         if not isinstance(rec, dict):
             continue
-        kind = rec.get("kind")
+        kind = LEGACY_GROUP_KINDS.get(rec.get("kind"), rec.get("kind"))
         out[str(gid)] = {
             "name": str(rec.get("name") or "")[:60],
             "kind": kind if kind in GROUP_KINDS else "device",
-            "members": [str(m)[:32] for m in (rec.get("members") or [])][:MAX_ALLOW],
+            # NOT truncated on read. A system group legitimately holds the
+            # whole deployment, and cutting the stored list here would drop
+            # members on the next write of a document that was never too long.
+            "members": [str(m)[:32] for m in (rec.get("members") or [])],
             "created": rec.get("created"), "created_by": rec.get("created_by"),
+            # One per kind, made by the server and not deletable. See
+            # ensure_system_groups.
+            "system": bool(rec.get("system")),
         }
     return out
 
@@ -3341,79 +3775,185 @@ def write_groups(groups):
         os.replace(tmp, GROUPS_PATH)
 
 
-def group_kind_of(rec):
-    """Which population a display row belongs to.
+def enrolled_as(rec):
+    """HOW a display row got here: "asked" or "invited".
 
-    What an admin said it is, where they have said. Otherwise HOW IT ARRIVED,
-    which is recorded when the row is made and never changes: a code an admin
-    minted is a device, and a browser that opened the display page is a person
-    until somebody says otherwise.
+    It was `group_kind_of`, and it decided which of two display populations a
+    row belonged to — which was the wrong question. Both happen in a browser on
+    one machine, so both describe a device; what differed was only the door
+    they came through. A person is an identity that carries from a phone to a
+    laptop, and that is a different FILE rather than a different flavour of
+    this one.
 
-    It used to ask whether the row had ever pressed REQUEST ACCESS — a field
-    kept for deciding whether a grant expires, borrowed for this because it
-    was there. That is a different question: somebody looking at the request
-    form has not pressed it yet, and filing them under the code process until
-    they do put them on the one page that has nothing to do with them.
+    So this is an attribute now. It labels a row and nothing more: it does not
+    pick a group, it cannot keep two rows out of the same group, and there is
+    no control to override it. A screen an admin minted a code for is
+    "invited"; a browser that opened the display page and asked is "asked".
 
     Rows that predate `origin` are read from what only an admin's invitation
-    leaves behind: an approver's name on a row that never asked for anything.
-    A guess, but the same guess the row's own history supports, and it costs
-    no migration."""
-    k = str(rec.get("kind") or "")
-    if k in GROUP_KINDS:
-        return k
+    leaves behind — an approver's name on a row that never asked for anything.
+    A guess, and the same guess the row's own history supports."""
     origin = str(rec.get("origin") or "")
-    if origin in ("code", "page"):
-        return "device" if origin == "code" else "user"
-    if is_guest(rec):
-        return "user"
-    return "device" if rec.get("approved_by") else "user"
+    if origin:
+        return "invited" if origin == "code" else "asked"
+    return "invited" if (rec.get("approved_by") and not rec.get("requested_at")) \
+           else "asked"
 
 
 #: What the group each population lands in is called when this server has to
 #: make one. Named for what is in them rather than for how they arrived, since
 #: an admin will rename them long before they remember which is which.
-DEFAULT_GROUP_NAME = {"user": "People", "device": "Devices"}
+#: The auto-created group per kind. `user` is named for what it has always
+#: actually held — the personal machines that asked to be here — now that
+#: "People" means people. Renaming the constant does NOT rename a group that
+#: already exists: those are somebody's data, and an upgrade that renamed them
+#: would be editing a list an admin wrote. The kind's LABEL in the panel is
+#: what changes for them.
+DEFAULT_GROUP_NAME = {"device": "Devices", "identity": "Users"}
+#: Names these groups used to be created with. A system group still carrying
+#: one is corrected to the current name — it was the server's word, not an
+#: admin's, and leaving it means an install renamed by a day's timing. Only
+#: these exact strings; anything else is a name somebody chose and is theirs.
+SUPERSEDED_GROUP_NAMES = {"identity": ("People",)}
+
+
+def system_group(kind):
+    """The permanent group for a population, by id, or "" if it is somehow
+    missing. Never mints: ensure_system_groups does that, once, at startup."""
+    for gid, rec in sorted(read_groups().items()):
+        if rec["kind"] == kind and rec["system"]:
+            return gid
+    return ""
+
+
+def ensure_default_membership():
+    """Everything that works is in its default group, and put back if it is
+    not. That group is the root — a custom group is somewhere a row is ALSO
+    put, never somewhere it moves to — so a row missing from it is a row an
+    older rule took out, and it is the one membership nobody chose.
+
+    Rows that do not work yet are left alone: they join when they start
+    working, which is the same rule at the other end."""
+    displays, idents = read_displays(), read_identities()
+    groups = read_groups()
+    added = 0
+    for kind, ids in (("device", [d for d, r in displays.items()
+                                  if r.get("approved") and r.get("hash")]),
+                      ("identity", list(idents))):
+        gid = next((g for g, r in groups.items()
+                    if r["kind"] == kind and r["system"]), "")
+        if not gid:
+            continue
+        for i in ids:
+            if i not in groups[gid]["members"] and add_member(groups[gid], i):
+                added += 1
+    if added:
+        write_groups(groups)
+        print("put %d row(s) back in their default group" % added, flush=True)
+
+
+def migrate_unenrolled_invites():
+    """Rows invited before enrolment was what approved them.
+
+    They sit `approved` with no token and a code still waiting, which is a
+    screen nobody has switched on being counted as one that works. Corrected
+    once, here, because the alternative is every reader of `approved` carrying
+    an "…and does it have a token" clause forever.
+
+    Only that exact shape. A row with a token is working and is left alone; a
+    row with neither is one whose code ran out, and its approval is not this
+    function's business."""
+    displays = read_displays()
+    fixed = [d for d, r in displays.items()
+             if r.get("approved") and not r.get("hash") and r.get("code")]
+    for did in fixed:
+        displays[did]["approved"] = False
+        displays[did]["approved_at"] = 0
+    if fixed:
+        write_displays(displays)
+        print("corrected %d invited row(s) that were approved before enrolling: %s"
+              % (len(fixed), ", ".join(fixed)), flush=True)
+
+
+def ensure_system_groups(by="the server"):
+    """The two groups that always exist: one for displays, one for people.
+
+    They are made HERE, in code, rather than on first need, and they cannot be
+    deleted. A default that an admin can delete is not a default — everything
+    enrolling afterwards has nowhere to land, and the version of this that
+    minted on demand made that worse rather than better: it adopted any
+    existing group of the right kind before creating one, so deleting "Devices"
+    while a group called "East wing" existed sent every screen that arrived
+    afterwards silently into East wing.
+
+    An install that already has a default from that era keeps it — the group
+    the settings key names is adopted, with its name and its members, rather
+    than left beside a second one meaning the same thing. Only where there is
+    nothing to adopt is one created.
+    """
+    groups = read_groups()
+    cfg = display_settings()
+    changed = cfg_changed = False
+    for kind in GROUP_KINDS:
+        mine = [g for g, r in groups.items() if r["kind"] == kind and r["system"]]
+        if mine:
+            # There is one. Correct its name only where it still carries a
+            # default this server has since stopped using.
+            # ONCE, not at every startup. An admin may rename a default group
+            # — the name is theirs, only its membership is the server's — and
+            # "People" is a name somebody might legitimately choose. Running
+            # this on every start would take it back off them a restart later,
+            # which is the thing DEFAULT_GROUP_NAME's own comment says must not
+            # happen.
+            for g in (mine if not cfg.get("group_names_done") else []):
+                if groups[g]["name"] in SUPERSEDED_GROUP_NAMES.get(kind, ()):
+                    was = groups[g]["name"]
+                    groups[g]["name"] = DEFAULT_GROUP_NAME[kind]
+                    changed = True
+                    print("group %s renamed %s -> %s (it was still on the old "
+                          "default)" % (g, was, DEFAULT_GROUP_NAME[kind]),
+                          flush=True)
+            continue
+        gid = str(cfg.get(kind + "_group") or "")
+        # ONLY a group this server named. That settings key was written by an
+        # older default_group which fell back to "the first group of this kind"
+        # whenever it was blank — so on an upgraded install it routinely names
+        # a group an ADMIN created and named. Adopting that makes their group
+        # permanent, fills it with the whole estate, and leaves no way back:
+        # its members cannot be edited, it cannot be deleted, and no other
+        # group can be nominated. A name this server chose is the only safe
+        # evidence that the group was ever meant to be the default.
+        ours = (DEFAULT_GROUP_NAME[kind],) + SUPERSEDED_GROUP_NAMES.get(kind, ())
+        if gid in groups and groups[gid]["kind"] == kind \
+           and groups[gid]["name"] in ours:
+            groups[gid]["system"] = True          # adopt what is already there
+            print("group %s (%s) is now the permanent %s group"
+                  % (gid, groups[gid]["name"], kind), flush=True)
+        else:
+            gid = "g" + secrets.token_hex(4)
+            groups[gid] = {"name": DEFAULT_GROUP_NAME[kind], "kind": kind,
+                           "members": [], "created": int(time.time()),
+                           "created_by": by, "system": True}
+            print("group %s (%s) created as the permanent %s group"
+                  % (gid, DEFAULT_GROUP_NAME[kind], kind), flush=True)
+        changed = True
+        if cfg.get(kind + "_group") != gid:
+            cfg[kind + "_group"] = gid
+            cfg_changed = True
+    if not cfg.get("group_names_done"):
+        cfg["group_names_done"] = 1
+        cfg_changed = True
+    if changed:
+        write_groups(groups)
+    if cfg_changed:
+        write_display_settings(cfg)
 
 
 def default_group(kind, by="the server"):
-    """The group a row joins the moment it starts working, minting one if there
-    is not one yet.
-
-    A row that belongs to no group is a row an endpoint's allow-list cannot
-    name, so every grant has to be made device by device — which is the data
-    entry a group exists to remove. Landing somewhere by default means the
-    first grant to a whole population is one tick rather than twelve.
-
-    Stored by id, not "the first group of this kind": reordering a list, or
-    somebody adding a second group of people, must not silently change where
-    everything arriving tomorrow ends up."""
-    if kind not in GROUP_KINDS:
-        return ""
-    cfg = display_settings()
-    key = kind + "_group"
-    gid = str(cfg.get(key) or "")
-    groups = read_groups()
-    if gid and gid in groups and groups[gid]["kind"] == kind:
-        return gid
-    # Blank, or naming one that was deleted. Adopt an existing group of this
-    # kind before making a second one — an admin who has already made "Staff"
-    # and nothing else meant that one.
-    for g, rec in sorted(groups.items()):
-        if rec["kind"] == kind:
-            gid = g
-            break
-    else:
-        gid = "g" + secrets.token_hex(4)
-        groups[gid] = {"name": DEFAULT_GROUP_NAME[kind], "kind": kind,
-                       "members": [], "created": int(time.time()),
-                       "created_by": by}
-        write_groups(groups)
-        print("group %s (%s) created for arriving %ss"
-              % (gid, DEFAULT_GROUP_NAME[kind], kind), flush=True)
-    cfg[key] = gid
-    write_display_settings(cfg)
-    return gid
+    """Where a row lands when it starts working. One answer per kind, and it is
+    the permanent group — never "the first one of this kind I found", which is
+    how a screen ended up in a group somebody built for something else."""
+    return system_group(kind) if kind in GROUP_KINDS else ""
 
 
 def join_group(did, gid):
@@ -3422,12 +3962,92 @@ def join_group(did, gid):
     screen, and a failure to file it is not a reason to refuse the screen."""
     if not gid:
         return
-    groups = read_groups()
-    rec = groups.get(gid)
-    if not rec or did in rec["members"]:
+    with group_edit() as groups:
+      rec = groups.get(gid)
+      if not rec or did in rec["members"]:
         return
-    rec["members"] = (rec["members"] + [did])[:MAX_ALLOW]
-    write_groups(groups)
+      if not add_member(rec, did):
+        print("group %s is full (%d) — %s was NOT filed into it"
+              % (gid, MAX_ALLOW, did), flush=True)
+        return
+      write_groups(groups)
+
+
+def drop_from_groups(row_id):
+    """Take a deleted row out of every group. Returns the names it was in.
+
+    The opposite of join_group, and it was missing: deleting a display or a
+    person cleared it from every endpoint's allow-list and left it sitting in
+    its groups. That reads as harmless — admin_groups filters to rows that
+    still exist, so nothing phantom is ever shown — and it is not, for one
+    reason. A group's member list is capped at MAX_ALLOW and join_group appends
+    before it truncates, so a group filled with dead ids silently stops
+    accepting live ones: the new member is the element that gets cut. The
+    screen enrols, appears to work, and is simply not in the group."""
+    with group_edit() as groups:
+        was = []
+        for rec in groups.values():
+            if row_id in rec["members"]:
+                rec["members"] = [m for m in rec["members"] if m != row_id]
+                was.append(rec["name"])
+        if was:
+            write_groups(groups)
+        return was
+
+
+def _rows_readable(path, key):
+    """(readable, ids). The distinction read_displays cannot make: it answers
+    {} for a file with no rows AND for one that could not be read at all, which
+    is the right shape for a caller that wants to carry on and a catastrophe
+    for one that DELETES what is missing from it."""
+    try:
+        with open(path) as fh:
+            doc = json.load(fh)
+    except FileNotFoundError:
+        return True, set()                       # nothing here yet, genuinely
+    except (OSError, ValueError):
+        return False, set()                      # unreadable, malformed, denied
+    rows = doc.get(key)
+    if not isinstance(rows, dict):
+        return False, set()
+    return True, set(rows)
+
+
+def prune_group_members():
+    """Ids in groups that belong to no row at all — left by every delete that
+    happened before drop_from_groups existed.
+
+    GUARDED, because it deletes from one file based on the contents of two
+    others. A truncated displays.json, a hand edit with a trailing comma, or a
+    restart under an account that cannot read a 0600 file all look exactly like
+    "there are no displays" — and this would then strip every display from
+    every group. The system groups would be refilled at the next healthy
+    startup, which is what would hide it; a custom group has no repopulation
+    path and would be gone for good."""
+    ok_d, dids = _rows_readable(DISPLAYS_PATH, "displays")
+    ok_i, pids = _rows_readable(IDENTITIES_PATH, "identities")
+    if not (ok_d and ok_i):
+        print("not pruning groups: %s could not be read"
+              % (", ".join(n for n, ok in (("displays.json", ok_d),
+                                           ("identities.json", ok_i)) if not ok)),
+              flush=True)
+        return
+    live = dids | pids
+    groups = read_groups()
+    if not live and any(r["members"] for r in groups.values()):
+        # Every row gone and groups still full is a state to look at, not one
+        # to tidy up after.
+        print("not pruning groups: no rows exist at all, which is not a thing "
+              "to act on unprompted", flush=True)
+        return
+    gone = 0
+    for rec in groups.values():
+        keep = [m for m in rec["members"] if m in live]
+        gone += len(rec["members"]) - len(keep)
+        rec["members"] = keep
+    if gone:
+        write_groups(groups)
+        print("pruned %d member(s) of no row from groups" % gone, flush=True)
 
 
 def file_display(rec_or_id, kind=None, by="the server"):
@@ -3437,40 +4057,110 @@ def file_display(rec_or_id, kind=None, by="the server"):
     request approved — because those are the two ways in, and neither of them
     used to leave the row anywhere an allow-list could find it."""
     did = rec_or_id if isinstance(rec_or_id, str) else rec_or_id["id"]
-    if kind is None:
-        displays = read_displays()
-        rec = displays.get(did)
-        if not rec:
-            return
-        kind = group_kind_of(rec)
-    join_group(did, default_group(kind, by))
+    # One display population now, so there is nothing to work out: every screen
+    # and every laptop is a display. How it enrolled is still on the row, where
+    # it describes the row rather than deciding which list it may be put in.
+    join_group(did, default_group("device", by))
 
 
 def clean_members(ids, kind):
-    """Only rows that exist, and only of this group's own kind. A member that
-    is neither is dropped rather than refused — the panel sends the list it was
-    shown, and a display deleted in another tab between the two is not a
-    mistake worth making somebody retype a form over."""
-    displays = read_displays()
+    """Only rows that exist, out of this kind's own FILE. A member that is not
+    there is dropped rather than refused — the panel sends the list it was
+    shown, and a row deleted in another tab between the two is not a mistake
+    worth making somebody retype a form over.
+
+    There is no longer a test on how a display enrolled. That was the second
+    display kind, and enrolment is a property of a row rather than a
+    population: a group holding a wall screen and somebody's laptop is a
+    perfectly good group, and refusing to let one exist was the split saying
+    something about the rows that the rows already said themselves.
+
+    What remains is the one distinction that is real — WHICH FILE the ids come
+    out of. Displays and people are minted independently, so their ids are not
+    interchangeable, and that is why a kind still cannot change under an
+    existing group: it would not filter the members, it would fail to find any
+    of them."""
     seen, out = set(), []
+    if kind in IDENTITY_GROUP_KINDS:
+        known = read_identities()
+        for pid in (ids or []):
+            pid = str(pid)[:32]
+            if pid in known and pid not in seen:
+                seen.add(pid)
+                out.append(pid)
+        return out[:MAX_ALLOW]
+    displays = read_displays()
     for did in (ids or []):
         did = str(did)[:32]
-        rec = displays.get(did)
-        if rec and did not in seen and group_kind_of(rec) == kind:
+        if did in displays and did not in seen:
             seen.add(did)
             out.append(did)
     return out[:MAX_ALLOW]
 
 
-def group_members(gids, groups=None):
-    """Every display id named by these groups, flattened. Grants ADD UP: this
-    is unioned with an endpoint's individually named displays, and being in a
-    group never takes an individual grant away."""
+@contextlib.contextmanager
+def group_edit():
+    """Read, change, write — with nothing else writing in between.
+
+    Every mutator used to read the whole document, change one row and write the
+    whole document back, with the lock held only around the write itself. This
+    is a threading server and displays enrol on their own schedule, so those
+    interleave for real: the last writer wins wholesale and the loser's change
+    is gone with no error and no log line. The dangerous one is join_group,
+    which is fire-and-forget by design — a screen enrols, is told nothing went
+    wrong, and is not in its group."""
+    with _groups_lock:
+        groups = read_groups()
+        yield groups
+
+
+def group_cap(rec):
+    """How many members this group may hold, or None for no bound.
+
+    MAX_ALLOW bounds a HAND-WRITTEN list: an admin ticking devices into a
+    group, or naming them on an endpoint, and nobody does that five thousand
+    times. The default group is not that. It holds the whole deployment by
+    construction — everything that enrols is in it — so bounding it by a number
+    meant for a curated list makes the cap a limit on the installation, and
+    MAX_IDENTITIES is 500, exactly MAX_ALLOW, so the Users group could not hold
+    the maximum number of people even with nothing ever deleted.
+
+    What bounds a system group is what bounds the population: max_displays and
+    MAX_IDENTITIES, enforced where rows are created."""
+    return None if rec.get("system") else MAX_ALLOW
+
+
+def add_member(rec, row_id):
+    """Put a row in a group, and say whether it actually went in.
+
+    Every add used to be `(members + [id])[:MAX_ALLOW]` — append, then keep the
+    FIRST cap-many — so a full group discarded the element just added and every
+    caller reported success. A screen enrolled, got a token, showed as approved,
+    and was refused by every endpoint naming its group, with nothing anywhere
+    saying why. Truncation is not a way to report a failure."""
+    if row_id in rec["members"]:
+        return True
+    cap = group_cap(rec)
+    if cap is not None and len(rec["members"]) >= cap:
+        return False
+    rec["members"] = rec["members"] + [row_id]
+    return True
+
+
+def group_members(gids, groups=None, kinds=None):
+    """Every member id named by these groups, flattened. Grants ADD UP: this
+    is unioned with an endpoint's individually named rows, and being in a group
+    never takes an individual grant away.
+
+    `kinds` narrows it to one population. Without it a route naming both a
+    group of screens and a group of people would answer for either — and since
+    the two files mint ids independently, that is not merely wrong, it is
+    wrong in a way nobody would see until two ids happened to collide."""
     groups = read_groups() if groups is None else groups
     out = set()
     for gid in (gids or []):
         rec = groups.get(gid)
-        if rec:
+        if rec and (kinds is None or rec["kind"] in kinds):
             out.update(rec["members"])
     return out
 
@@ -3485,24 +4175,53 @@ def validate_group(obj, current):
         k = str(obj["kind"] or "").strip()
         if k not in GROUP_KINDS:
             return None, "a group is either people or devices"
-        rec["kind"] = k
+        # ONLY on a group being created. On an existing one the kind is fixed,
+        # and taking the requested one here made it decide which FILE the
+        # members below were resolved against — so a save that switched the
+        # kind had its members validated as the other population, and the
+        # handler then put the kind back and kept them. The group ended up
+        # holding ids it could never show, never grant and never be rid of,
+        # still counting against its cap.
+        if not current.get("kind"):
+            rec["kind"] = k
     if "members" in obj:
         rec["members"] = clean_members(obj["members"], rec["kind"])
+    # Never off the wire. Which group is permanent is this server's to decide,
+    # not something a panel can hand back having lost it in a round trip.
+    rec["system"] = bool(current.get("system"))
+    if rec["system"]:
+        # THE DEFAULT GROUP IS THE ROOT. Everything that enrols is in it and
+        # stays in it; a custom group is somewhere a row is ALSO put, never
+        # somewhere it moves to. So its membership is not a panel's to edit —
+        # enrolling adds, deleting the row removes, and nothing else touches
+        # it. A name is still the admin's.
+        rec["members"] = list(current.get("members") or [])
     return rec, None
 
 
 def admin_groups():
     groups = read_groups()
     displays = read_displays()
+    idents = read_identities()
     out = []
+    # The two the server keeps come first, always, whatever they are called.
+    # They are where everything lands, so they are the two an admin looks for —
+    # and sorting them in among the custom ones by name would move them every
+    # time somebody made a group starting with an earlier letter.
     for gid, rec in sorted(groups.items(),
-                           key=lambda kv: (kv[1]["kind"], kv[1]["name"].lower())):
-        # Named rows only. A member whose display was deleted is not shown as a
+                           key=lambda kv: (not kv[1]["system"], kv[1]["kind"],
+                                           kv[1]["name"].lower())):
+        # Named rows only. A member whose row was deleted is not shown as a
         # phantom — it is simply gone, the same way a deleted display leaves an
-        # endpoint's allow-list.
-        live = [m for m in rec["members"] if m in displays]
-        out.append(dict(rec, id=gid, members=live,
-                        labels=[display_label(displays[m]) for m in live]))
+        # endpoint's allow-list. Which FILE the name comes out of is the
+        # group's kind: a group of people is the one that is not displays.
+        if rec["kind"] in IDENTITY_GROUP_KINDS:
+            live = [m for m in rec["members"] if m in idents]
+            labels = [identity_label(idents[m]) for m in live]
+        else:
+            live = [m for m in rec["members"] if m in displays]
+            labels = [display_label(displays[m]) for m in live]
+        out.append(dict(rec, id=gid, members=live, labels=labels))
     return out
 
 
@@ -3668,6 +4387,183 @@ def hash_password(password, salt=None):
     salt = salt or secrets.token_bytes(16)
     dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, PBKDF2_ROUNDS)
     return salt.hex(), dk.hex()
+
+
+# ------------------------------------------------------------ wake matching
+# A PORT of the display's own matcher — index.html, Wake._tryWord and the two
+# helpers above it. It is here because a collision has to be refused where the
+# word is STORED and not only where it is typed: a panel that checked in the
+# browser would be a check an API call walks straight past, and the word that
+# got in that way is the one that cross-triggers.
+#
+# THE COUPLING IS REAL AND IS NAMED HERE. Waking happens in the browser and
+# always will — it has to be instant and it is what drops an utterance before
+# it is anybody's business — so these two implementations must agree, and
+# nothing in the language makes them. wake_conformance() below is the corpus
+# they are both held to; change one and run it.
+def wake_norm(s):
+    s = re.sub(r"[^a-z0-9\s]", " ", str(s or "").lower())
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def wake_skel(x):
+    """Consonant skeleton. Vowels are what a small model gets wrong, so two
+    spellings of one spoken word collapse together: berth and birth both go
+    to brth."""
+    x = re.sub(r"[^a-z]", "", x)
+    return x[:1] + re.sub(r"[aeiouy]", "", x[1:]) if x else x
+
+
+def wake_lev(a, b):
+    if a == b:
+        return 0
+    m, n = len(a), len(b)
+    if not m or not n:
+        return m or n
+    prev = list(range(n + 1))
+    for i in range(1, m + 1):
+        cur = [i] + [0] * n
+        for j in range(1, n + 1):
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1,
+                         prev[j - 1] + (0 if a[i - 1] == b[j - 1] else 1))
+        prev = cur
+    return prev[n]
+
+
+def wake_hit(spoken, word, strict=False):
+    """Would this utterance wake that word? The same rules the display uses."""
+    word = wake_norm(word)
+    toks = [t for t in wake_norm(spoken).split(" ") if t]
+    if not word or not toks:
+        return False
+    if len(word.split(" ")) > 1:                 # a multi-word alias
+        return word in " ".join(toks)
+    tol = 0 if strict else (2 if len(word) >= 7 else 1 if len(word) >= 4 else 0)
+    skel = wake_skel(word)
+    for k, t in enumerate(toks):
+        if t == word:
+            return True
+        # the transcriber often splits a compound: "goodbye" -> "good bye"
+        if k + 1 < len(toks) and t + toks[k + 1] == word:
+            return True
+        if strict:
+            continue
+        if t.startswith(word) and len(t) - len(word) <= 2:
+            return True
+        if tol and wake_lev(t, word) <= tol:
+            return True
+        if len(t) >= 3 and abs(len(t) - len(word)) <= 2 and wake_skel(t) == skel:
+            return True
+    return False
+
+
+def wake_collides(candidate, existing):
+    """Whether a proposed word would cross-trigger with one already in use, or
+    the other way round. BOTH directions, because waking is not symmetric: a
+    prefix rule fires for "orbital" said at "orbit" and not the reverse, and a
+    word nobody can use without also waking somebody else is exactly as broken
+    as one that steals theirs."""
+    a, b = wake_norm(candidate), wake_norm(existing)
+    if not a or not b:
+        return False
+    return a == b or wake_hit(a, b) or wake_hit(b, a)
+
+
+#: The corpus both matchers are held to. Captured by running this port and the
+#: shipping JS — index.html, Wake._tryWord — over the same cases and checking
+#: they agreed on every one; they did, 368 of 368. What is kept here is the
+#: subset that pins the behaviour worth not losing: near misses, a compound the
+#: transcriber split, a prefix, a consonant skeleton, and strict mode refusing
+#: all of it. Change either matcher and run wake_conformance().
+WAKE_CORPUS = (
+    ('orbit', 'orbit', False, True),
+    ('orbit', 'orbit', True, True),
+    ('orbital', 'orbit', False, True),
+    ('orbital', 'orbit', True, False),
+    ('orbits', 'orbit', False, True),
+    ('orbits', 'orbit', True, False),
+    ('orbet', 'orbit', False, True),
+    ('orbet', 'orbit', True, False),
+    ('beak on', 'beacon', False, False),
+    ('beak on', 'beacon', True, False),
+    ('bacon', 'beacon', False, True),
+    ('bacon', 'beacon', True, False),
+    ('good bye', 'goodbye', False, True),
+    ('good bye', 'goodbye', True, True),
+    ('commuter', 'computer', False, True),
+    ('commuter', 'computer', True, False),
+    ('hey computer', 'computer', False, True),
+    ('hey computer', 'computer', True, True),
+    ('sara', 'sarah', False, True),
+    ('sara', 'sarah', True, False),
+    ('saran wrap', 'sarah', False, True),
+    ('saran wrap', 'sarah', True, False),
+    ('adder', 'ada', False, False),
+    ('adder', 'ada', True, False),
+    ('aida', 'ada', False, True),
+    ('aida', 'ada', True, False),
+    ('haus', 'house', False, True),
+    ('haus', 'house', True, False),
+    ('resonate', 'resonance', False, True),
+    ('resonate', 'resonance', True, False),
+    ('turn off the couch lamps', 'house', False, False),
+    ('turn off the couch lamps', 'house', True, False),
+    ('', 'orbit', False, False),
+    ('', 'orbit', True, False),
+)
+
+
+def wake_conformance():
+    """Every case, or the ones that no longer hold. Returns [] when the port
+    still behaves as it did the day it was checked against the browser's."""
+    return [(sp, w, st, want, serve_got)
+            for sp, w, st, want in WAKE_CORPUS
+            for serve_got in (wake_hit(sp, w, st),) if serve_got != want]
+
+
+def read_panel_pin():
+    try:
+        with open(PANEL_PIN_PATH) as fh:
+            doc = json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    return doc if isinstance(doc, dict) else {}
+
+
+def has_panel_pin():
+    d = read_panel_pin()
+    return bool(d.get("hash") and d.get("salt"))
+
+
+def set_panel_pin(pin, minimum=None):
+    """The panel's PIN. Returns "" or the reason it was refused.
+
+    Stretched with the same PBKDF2 as an account password and held to the same
+    rules as a person's PIN — a run or a repeat is refused where it is chosen,
+    because rate limiting is what makes a short secret survivable and it should
+    not spend its budget on 111111.
+
+    Setting it does NOT end the sessions it protects, unlike a person's. Those
+    are one human's own browsers, and locking yourself out of the panel from
+    the panel is not a security property."""
+    bad = check_pin(pin, minimum)
+    if bad:
+        return bad
+    salt, dk = hash_password(str(pin))
+    tmp = PANEL_PIN_PATH + ".tmp"
+    with open(tmp, "w") as fh:
+        json.dump({"version": 1, "salt": salt, "hash": dk,
+                   "set": int(time.time())}, fh)
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, PANEL_PIN_PATH)
+    return ""
+
+
+def verify_panel_pin(pin):
+    d = read_panel_pin()
+    if not (d.get("salt") and d.get("hash")):
+        return False
+    return verify_password(str(pin or ""), d["salt"], d["hash"])
 
 
 def verify_password(password, salt_hex, hash_hex):
@@ -4286,9 +5182,12 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/displays", "/displays/approve", "/displays/rename",
                      "/displays/delete", "/displays/new", "/displays/reissue",
                      "/displays/decide", "/displays/settings", "/displays/kiosk",
-                     "/groups", "/groups/save", "/groups/delete",
+                     "/groups", "/groups/save", "/groups/delete", "/groups/sets",
+                     "/app/pin",
+                     "/identities/wake", "/identities/wake/check",
                      "/identities", "/identities/new", "/identities/rename",
-                     "/identities/delete", "/identities/reissue")
+                     "/identities/delete", "/identities/reissue",
+                     "/identities/pin")
 #: where an enrolment code is typed. On the display listeners only — it hands
 #: out a display's token, and the admin listener is not a display.
 ENROL_PREFIX = "/e/"
@@ -4522,6 +5421,48 @@ class Handler(SimpleHTTPRequestHandler):
             return None
         morsel = jar.get(IDENTITY_COOKIE)
         return find_identity(morsel.value) if morsel else None
+
+    def _subject(self):
+        """Which caller this request IS: `(display, identity)`, never both.
+
+        The precedence `/display/hello` applies, in the other two places it
+        matters. An approved display is a device whatever else is in the cookie
+        jar — a kiosk stays a kiosk, which is the whole of why signing a person
+        into one is refused at the door. Below that line a person's cookie wins
+        over a token nobody approved, because such a token is somebody who once
+        opened this page rather than a screen anybody hung.
+
+        Returning a pair rather than a tagged object because both callers want
+        to pass them straight through to `subject_may`, and a wrapper would be
+        unpacked at every one of them."""
+        disp = self._display()
+        if disp and disp.get("approved"):
+            return disp, None
+        ident = self._identity()
+        if ident:
+            return None, ident
+        return disp, None
+
+    def _pin_pid(self):
+        """Which person this browser has UNLOCKED, or "". Distinct from
+        `_identity`, which says who it claims to be: the cookie is the claim,
+        this is the claim having been proved."""
+        raw = self.headers.get("Cookie")
+        if not raw or self.admin_port:
+            return ""
+        try:
+            jar = http.cookies.SimpleCookie(raw)
+        except http.cookies.CookieError:
+            return ""
+        m = jar.get(PIN_COOKIE)
+        return pin_session_pid(m.value) if m else ""
+
+    def _set_pin_cookie(self, token, hours):
+        bits = ["%s=%s" % (PIN_COOKIE, token), "Path=/", "HttpOnly",
+                "SameSite=Strict", "Max-Age=%d" % int(hours * 3600)]
+        if isinstance(self.connection, ssl.SSLSocket):
+            bits.insert(3, "Secure")
+        self.send_header("Set-Cookie", "; ".join(bits))
 
     def _set_identity_cookie(self, token):
         # Same reasoning as the display cookie: Secure only where the
@@ -4830,7 +5771,11 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/auth/me":
             s = self._session()
             if not s:
-                return self._json(401, {"error": "not signed in"})
+                # WHICH DOOR. The gate cannot know whether to ask for a
+                # username and a password or for one number, and guessing wrong
+                # is a form somebody fills in twice.
+                return self._json(401, {"error": "not signed in",
+                                        "mode": AUTH_MODE})
             # The panel needs to tell "signed in as an admin" from "there is no
             # sign-in here" — they grant the same access and want different
             # words, and one of them has no account to offer or to sign out of.
@@ -4855,7 +5800,7 @@ class Handler(SimpleHTTPRequestHandler):
             # page that draws correctly and answers to nothing. The connection
             # half is not here at all, at any tier.
             doc = read_routes()
-            rows = public_routes(doc, self._display())
+            rows = public_routes(doc, *self._subject())
             if self.pinned_net:
                 # This port carries its own endpoints and no others. They are
                 # not filtered out of a list the browser then ignores — they
@@ -4934,19 +5879,59 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/groups":
             if not self._require("admin"):
                 return
-            # The two populations a group can be drawn from, so the panel can
-            # offer the right one rather than every row it has ever seen.
-            displays = read_displays()
-            people, devices = [], []
-            for did, rec in sorted(displays.items(),
-                                   key=lambda kv: display_label(kv[1]).lower()):
-                row = {"id": did, "label": display_label(rec),
-                       "approved": bool(rec.get("approved"))}
-                (people if group_kind_of(rec) == "user" else devices).append(row)
+            # The two populations a group can be drawn from — the two FILES,
+            # which is the only split that is real. Every display is offered
+            # for a group of devices whatever way it enrolled; that fact is on
+            # the row and says nothing about which list it may be put in.
+            #
+            # WORKING ONLY, which is approval AND a token. Approval alone is
+            # not enough: an admin who names a screen and mints a code for it
+            # has approved a row that does not exist yet as a device, and it
+            # sits there `approved` with nothing behind it until somebody
+            # carries the code to the television. Offering it invites a grant
+            # to a screen that has never been switched on.
+            #
+            # The same pair the gate itself requires, and the same pair the
+            # register draws its three states from: INVITED is a code waiting,
+            # WAITING is a browser waiting on a decision, and neither is a
+            # thing a group should be able to name. Rows join a group when they
+            # start working; this is that rule at the other end of the list.
+            #
+            # …plus anything already IN a group, approved or not. Refusing a
+            # display deliberately leaves it in whatever groups it was in — a
+            # group is how you address a set of things, not a record of who is
+            # currently allowed — so a refused member that stopped being
+            # offered would be silently dropped by the next save of that group,
+            # which is that decision being undone by a rendering detail.
+            in_a_group = set()
+            for rec in read_groups().values():
+                if rec["kind"] in DISPLAY_GROUP_KINDS:
+                    in_a_group.update(rec["members"])
+            devices = [{"id": did, "label": display_label(rec),
+                        "approved": bool(rec.get("approved")),
+                        "arrived": enrolled_as(rec)}
+                       for did, rec in sorted(read_displays().items(),
+                                              key=lambda kv: display_label(kv[1]).lower())
+                       if (rec.get("approved") and rec.get("hash"))
+                       or did in in_a_group]
+            idents = [{"id": p["id"], "label": p["label"], "approved": True}
+                      for p in admin_identities()]
             return self._json(200, {"groups": admin_groups(),
-                                    "people": people, "devices": devices,
+                                    "devices": devices, "identities": idents,
                                     "kinds": list(GROUP_KINDS),
                                     "max": MAX_GROUPS})
+        if path == "/identities/wake/check":
+            # Answered as it is TYPED rather than on save. A word is refused
+            # for a reason somebody has to be able to act on — "too close to
+            # the house" tells them to pick another one; a form that only says
+            # so after they commit tells them they wasted their time.
+            if not self._require("admin"):
+                return
+            q = parse_qs(urlparse(self.path).query)
+            word = (q.get("w") or [""])[0]
+            skip = (q.get("id") or [""])[0]
+            bad = check_wake_word(word, skip_pid=skip)
+            return self._json(200, {"ok": not bad, "why": bad})
         if path == "/identities":
             if not self._require("admin"):
                 return
@@ -4959,6 +5944,7 @@ class Handler(SimpleHTTPRequestHandler):
             secure = RUNNING.get("https_port")
             return self._json(200, {"identities": admin_identities(),
                                     "max": MAX_IDENTITIES,
+                                    "pin_min": display_settings()["pin_min"],
                                     "base": "%s://%s:%d%s"
                                             % ("https" if secure else "http", host,
                                                secure or RUNNING.get("http_port") or 0,
@@ -4981,7 +5967,12 @@ class Handler(SimpleHTTPRequestHandler):
                                                "session_min": SESSION_MIN,
                                                "session_max": SESSION_MAX,
                                                "bind_modes": list(BIND_MODES),
-                                               "auth_modes": list(AUTH_MODES)}})
+                                               "auth_modes": list(AUTH_MODES),
+                                               # Whether the middle rung can be
+                                               # switched to at all. The panel
+                                               # says so rather than letting a
+                                               # save come back refused.
+                                               "has_panel_pin": has_panel_pin()}})
         if path == "/users":
             if not self._require("admin"):
                 return
@@ -5096,6 +6087,26 @@ class Handler(SimpleHTTPRequestHandler):
             obj = self._json_body()
             if obj is None:
                 return
+            if AUTH_MODE == "pin":
+                # One number, no account to name. The session is an admin
+                # because there is nobody else it could be: this rung exists
+                # for the deployment with one administrator, and a role system
+                # with one member is a role system pretending.
+                if not verify_panel_pin(obj.get("pin")):
+                    note_login_failure(ip)
+                    print("failed PIN sign-in from %s" % ip, flush=True)
+                    return self._json(401, {"error": "that is not the PIN"})
+                clear_login_failures(ip)
+                name, role = "(single PIN)", "admin"
+                token = new_session(name, role)
+                body = json.dumps({"ok": True, "user": name, "role": role}).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self._set_cookie(token)
+                self.end_headers()
+                print("signed in with the panel PIN", flush=True)
+                return self.wfile.write(body)
             name = str(obj.get("username") or "").strip()
             users = read_users()
             u = users.get(name)
@@ -5593,8 +6604,31 @@ class Handler(SimpleHTTPRequestHandler):
                 who = self._identity()
                 if who:
                     note_identity_seen(who["id"])
-                    return self._json(200, {"person": {"id": who["id"],
-                                                       "name": who["name"]}})
+                    open_for = self._pin_pid()
+                    # THREE STATES, and the page needs all three. `none` is
+                    # somebody with no PIN, who keeps their preferences in this
+                    # browser exactly as the display always has. `locked` is a
+                    # PIN set and this browser not having entered it. `open` is
+                    # the durable tier, and the only one whose settings come
+                    # from the server rather than from localStorage.
+                    pin = ("open" if open_for == who["id"]
+                           else "locked" if who.get("pin_hash") else "none")
+                    low = display_settings()["pin_min"]
+                    out = {"id": who["id"], "name": who["name"], "pin": pin,
+                           "pin_min": low}
+                    if pin == "open":
+                        out["settings"] = identity_settings(who["id"])
+                        # A PIN that was legal when it was set and is below a
+                        # minimum raised since. Marked rather than revoked:
+                        # they still have to be able to unlock in order to
+                        # change it, and this is what says the change is owed.
+                        out["conform"] = identity_pin_state(who, low) == "short"
+                    elif pin == "locked":
+                        # Said plainly rather than left for a failed unlock to
+                        # reveal: somebody who is locked out should stop, not
+                        # keep typing into a box that looks like it is working.
+                        out["blocked"] = pin_blocked(who["id"])
+                    return self._json(200, {"person": out})
             if disp:
                 note_display_seen(disp["id"], asked=asked or None,
                                   hint=hint or None)
@@ -5833,6 +6867,179 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"ok": True, "token": token,
                                     "identities": admin_identities()})
 
+        if parsed.path == "/person/unlock":
+            # A PIN, entered by the person it belongs to, at their own URL.
+            #
+            # HTTPS ONLY, and refused rather than degraded: a PIN typed over
+            # plain HTTP is a PIN somebody else has. The loopback case is the
+            # exception the whole server already makes — bound there it is the
+            # only listener and there is nothing between the two ends.
+            if self.admin_port:
+                return self._json(404, {"error": "not found"})
+            if not self._same_origin():
+                return self._json(403, {"error": "cross-origin request refused"})
+            if not isinstance(self.connection, ssl.SSLSocket) \
+               and exposed(read_app()):
+                return self._json(400, {"error": "a PIN needs a secure "
+                                                 "connection"})
+            who = self._identity()
+            if not who:
+                return self._json(401, {"error": "open your own URL first"})
+            obj = self._json_body()
+            if obj is None:
+                return
+            pid = who["id"]
+            if pin_blocked(pid):
+                # The number is not given: "wait 47 seconds" is a clock an
+                # attacker can read, and the person who typed it wrong twice
+                # needs to know to stop rather than to know when.
+                return self._json(429, {"error": "too many attempts — wait a "
+                                                 "little and try again"})
+            rec = read_identities()[pid]
+            if not rec.get("pin_hash"):
+                return self._json(400, {"error": "there is no PIN on this "
+                                                 "identity"})
+            if not verify_identity_pin(pid, obj.get("pin")):
+                print("PIN refused for %s from %s" % (pid, self.address_string()),
+                      flush=True)
+                return self._json(401, {"error": "that is not the PIN"})
+            hours = identity_hours(rec)
+            token = open_pin_session(pid, hours)
+            print("identity %s unlocked for %dh" % (pid, hours), flush=True)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self._set_pin_cookie(token, hours)
+            body = json.dumps({"ok": True, "hours": hours,
+                               "settings": identity_settings(pid)}).encode()
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if parsed.path == "/person/pin":
+            # A person choosing their OWN PIN. An admin never sets one — they
+            # clear it, and this is the other half of that: the only way a PIN
+            # comes to exist.
+            #
+            # Two doors, and which one applies is whether there is a PIN
+            # already. With none, the URL is the credential and holding it is
+            # the whole claim. With one, the OLD PIN authenticates the change —
+            # which means an unlocked session, because that is what having
+            # entered it looks like a moment later. Anything else would let
+            # somebody who found an open browser change the lock on it.
+            if self.admin_port:
+                return self._json(404, {"error": "not found"})
+            if not self._same_origin():
+                return self._json(403, {"error": "cross-origin request refused"})
+            if not isinstance(self.connection, ssl.SSLSocket) \
+               and exposed(read_app()):
+                return self._json(400, {"error": "a PIN needs a secure "
+                                                 "connection"})
+            who = self._identity()
+            if not who:
+                return self._json(401, {"error": "open your own URL first"})
+            obj = self._json_body()
+            if obj is None:
+                return
+            pid = who["id"]
+            has = bool(read_identities()[pid].get("pin_hash"))
+            if has and self._pin_pid() != pid:
+                return self._json(401, {"error": "enter your current PIN first"})
+            low = display_settings()["pin_min"]
+            bad = set_identity_pin(pid, obj.get("pin"), low)
+            if bad:
+                return self._json(400, {"error": bad})
+            # set_identity_pin ended every session this person had, including
+            # this browser's — a PIN changing hands closes the doors the old
+            # one opened. So a fresh one is issued here, or somebody would set
+            # a PIN and be asked for it in the same breath.
+            hours = identity_hours(read_identities()[pid])
+            token = open_pin_session(pid, hours)
+            print("identity %s %s its PIN" % (pid, "changed" if has else "set"),
+                  flush=True)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self._set_pin_cookie(token, hours)
+            body = json.dumps({"ok": True, "hours": hours,
+                               "settings": identity_settings(pid)}).encode()
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if parsed.path == "/person/settings":
+            # What a person keeps. Only for a browser that has UNLOCKED: the
+            # identity cookie says who this claims to be, and a claim is not
+            # what durable storage hangs off. Without a PIN the display keeps
+            # its own preferences in the browser, exactly as it always has.
+            if self.admin_port:
+                return self._json(404, {"error": "not found"})
+            if not self._same_origin():
+                return self._json(403, {"error": "cross-origin request refused"})
+            pid = self._pin_pid()
+            if not pid:
+                return self._json(401, {"error": "not unlocked"})
+            obj = self._json_body()
+            if obj is None:
+                return
+            saved = write_identity_settings(pid, obj.get("settings"))
+            if saved is None:
+                return self._json(404, {"error": "no such identity"})
+            return self._json(200, {"ok": True, "settings": saved})
+
+        if parsed.path == "/app/pin":
+            # The panel's own PIN, set from the panel. Admin only, and there is
+            # no "old PIN" gate on it: reaching this route already required a
+            # session, which in PIN mode means having just entered the current
+            # one. Asking for it again would be asking somebody to prove twice
+            # what one door already proved.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            bad = set_panel_pin(obj.get("pin"), display_settings()["pin_min"])
+            if bad:
+                return self._json(400, {"error": bad})
+            print("the panel PIN was set by %s" % s["user"], flush=True)
+            return self._json(200, {"ok": True, "has_pin": True})
+
+        if parsed.path == "/identities/wake":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            pid = str(obj.get("id") or "")
+            bad = set_identity_wake(pid, obj.get("word"))
+            if bad == "no such identity":
+                return self._json(404, {"error": bad})
+            if bad:
+                return self._json(409, {"error": bad})
+            print("identity %s wake word set to %r by %s"
+                  % (pid, str(obj.get("word") or "").strip(), s["user"]), flush=True)
+            return self._json(200, {"ok": True, "identities": admin_identities()})
+
+        if parsed.path == "/identities/pin":
+            # An admin CLEARS a PIN; they never choose one. With no email here
+            # this is the only recovery path, which is why it is in the first
+            # version — and clearing rather than setting is the difference
+            # between giving somebody their account back and knowing their PIN.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            pid = str(obj.get("id") or "")
+            if not clear_identity_pin(pid):
+                return self._json(404, {"error": "no such identity"})
+            print("identity %s had its PIN cleared by %s" % (pid, s["user"]),
+                  flush=True)
+            return self._json(200, {"ok": True, "identities": admin_identities()})
+
         if parsed.path == "/identities/reissue":
             s = self._require("admin")
             if not s:
@@ -5886,9 +7093,69 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(404, {"error": "no such identity"})
             name = identity_label(rows.pop(pid))
             write_identities(rows)
-            print("identity %s (%s) deleted by %s" % (pid, name, s["user"]),
-                  flush=True)
+            left = drop_from_groups(pid)
+            # An allow-list holding somebody who no longer exists is a
+            # permission nobody can see and nobody can withdraw. Cleared here,
+            # exactly as a deleted display's is.
+            doc = read_routes()
+            touched = [r for r, o in doc["routes"].items()
+                       if pid in (o.get("identities") or [])]
+            for r in touched:
+                doc["routes"][r]["identities"] = [
+                    p for p in doc["routes"][r]["identities"] if p != pid]
+            if touched:
+                write_routes(doc)
+            print("identity %s (%s) deleted by %s%s%s"
+                  % (pid, name, s["user"],
+                     " — removed from %d endpoint(s)" % len(touched)
+                     if touched else "",
+                     "; out of " + ", ".join(left) if left else ""), flush=True)
             return self._json(200, {"ok": True, "identities": admin_identities()})
+
+        if parsed.path == "/groups/sets":
+            # Which CUSTOM groups a row is in, set from the row rather than
+            # from each group in turn. It replaces /groups/move, which took the
+            # row out of every other group first — a single-select control's
+            # rule, not the model's. A group is a grant and grants add up: a
+            # television is allowed to be physics department kit and a
+            # television at the same time.
+            #
+            # The default group is not in this list and cannot be. It is the
+            # root: enrolling put the row there and only deleting the row takes
+            # it out.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            did = str(obj.get("id") or "")
+            people = did in read_identities()
+            if not people and did not in read_displays():
+                return self._json(404, {"error": "no such row"})
+            kinds = IDENTITY_GROUP_KINDS if people else DISPLAY_GROUP_KINDS
+            want = {str(g)[:32] for g in (obj.get("groups") or [])}
+            groups = read_groups()
+            touched = []
+            for gid, rec in groups.items():
+                if rec["system"] or rec["kind"] not in kinds:
+                    continue                      # not this control's business
+                here, should = did in rec["members"], gid in want
+                if here == should:
+                    continue
+                if should:
+                    if not add_member(rec, did):
+                        return self._json(409, {"error": '"%s" is full — it '
+                                                         "holds %d already"
+                                                         % (rec["name"], MAX_ALLOW)})
+                else:
+                    rec["members"] = [m for m in rec["members"] if m != did]
+                touched.append(rec["name"])
+            if touched:
+                write_groups(groups)
+                print("row %s regrouped by %s: %s"
+                      % (did, s["user"], ", ".join(touched)), flush=True)
+            return self._json(200, {"ok": True, "groups": admin_groups()})
 
         if parsed.path == "/groups/delete":
             s = self._require("admin")
@@ -5901,6 +7168,13 @@ class Handler(SimpleHTTPRequestHandler):
             gid = str(obj.get("id") or "")
             if gid not in groups:
                 return self._json(404, {"error": "no such group"})
+            if groups[gid]["system"]:
+                # A default an admin can delete is not a default: everything
+                # enrolling afterwards would have nowhere to land.
+                return self._json(400, {"error": "this group cannot be deleted "
+                                                 "— it is where new %ss land"
+                                                 % ("person" if groups[gid]["kind"]
+                                                    == "identity" else "display")})
             name = groups.pop(gid)["name"]
             write_groups(groups)
             # An endpoint naming a group that no longer exists is a permission
@@ -6127,6 +7401,14 @@ class Handler(SimpleHTTPRequestHandler):
                 # be called "kitchen" when the tablet moves to the hall.
                 displays[did]["name"] = name
             write_displays(displays)
+            # Approving a row that already holds a token is the moment it
+            # starts working, and everything that starts working is filed. The
+            # panel goes through /displays/decide, which does this — so without
+            # it here the invariant held only for the route the shipped UI
+            # happens to use, and a row approved through the API stayed outside
+            # its group until the next restart backfilled it.
+            if on and displays[did].get("hash"):
+                file_display(did, by=s["user"])
             print("display %s (%s) %s by %s"
                   % (did, display_label(displays[did]),
                      "approved" if on else "approval withdrawn", s["user"]),
@@ -6158,73 +7440,11 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"ok": True, "id": did,
                                     "displays": admin_displays()})
 
-        if parsed.path == "/displays/kind":
-            s = self._require("admin")
-            if not s:
-                return
-            obj = self._json_body()
-            if obj is None:
-                return
-            did = str(obj.get("id") or "")
-            displays = read_displays()
-            if did not in displays:
-                return self._json(404, {"error": "no such display"})
-            want = str(obj.get("kind") or "")
-            if want and want not in GROUP_KINDS:
-                return self._json(400, {"error": "kind must be one of: "
-                                                 + ", ".join(GROUP_KINDS)})
-            was = group_kind_of(displays[did])
-            displays[did]["kind"] = want
-            now = group_kind_of(displays[did])
-            write_displays(displays)
-            # A group is drawn from one population, and clean_members drops a
-            # member of the wrong one — silently, at the next save of that
-            # group. Done here instead, and counted, so moving a row between
-            # populations says what it cost rather than emptying a group
-            # somebody built weeks ago with nothing on screen about it.
-            dropped = []
-            if now != was:
-                groups = read_groups()
-                touched = False
-                for gid, g in groups.items():
-                    if g["kind"] != now and did in (g.get("members") or []):
-                        g["members"] = [m for m in g["members"] if m != did]
-                        dropped.append(g["name"])
-                        touched = True
-                if touched:
-                    write_groups(groups)
-            # …and into one of the right population, so changing what a row IS
-            # never leaves it belonging to nothing. The panel names which,
-            # where an admin has more than one to choose from; where it names
-            # none, or names one that has gone, the population's own group
-            # takes it — minted here if this is the first of its kind.
-            joined = ""
-            if now != was or obj.get("group"):
-                want_gid = str(obj.get("group") or "")
-                groups = read_groups()
-                if want_gid not in groups or groups[want_gid]["kind"] != now:
-                    want_gid = default_group(now, s["user"])
-                # Out of every other group of this kind first: "which group is
-                # it in" has one answer on this control, and a row silently in
-                # two of them is a grant somebody cannot account for.
-                groups = read_groups()
-                touched = False
-                for gid, g in groups.items():
-                    if gid != want_gid and did in (g.get("members") or []):
-                        g["members"] = [m for m in g["members"] if m != did]
-                        touched = True
-                if touched:
-                    write_groups(groups)
-                join_group(did, want_gid)
-                joined = (read_groups().get(want_gid) or {}).get("name", "")
-            print("display %s kind=%s by %s%s%s"
-                  % (did, want or "(inferred: %s)" % now, s["user"],
-                     "; dropped from " + ", ".join(dropped) if dropped else "",
-                     "; joined " + joined if joined else ""),
-                  flush=True)
-            return self._json(200, {"ok": True, "displays": admin_displays(),
-                                    "dropped": dropped, "joined": joined,
-                                    "groups": admin_groups()})
+        # /displays/kind is GONE. It moved a display row between two display
+        # populations, and there is one — how a row enrolled describes the row
+        # rather than deciding which list it may be put in. The panel control
+        # went with it; a control whose only two answers are the same answer
+        # is a control wired to nothing.
 
         if parsed.path == "/displays/reload":
             # Ask a screen to reload itself, without walking to it. What this
@@ -6280,6 +7500,7 @@ class Handler(SimpleHTTPRequestHandler):
             name = display_label(displays.pop(did))
             write_displays(displays)
             _display_refusals.pop(did, None)
+            left = drop_from_groups(did)
             # An allow-list holding the id of a display that no longer exists
             # is a permission nobody can see and nobody can withdraw. Cleared
             # here, for the same reason a deleted endpoint's fallthrough is.
@@ -6291,10 +7512,11 @@ class Handler(SimpleHTTPRequestHandler):
                                                 if d != did]
             if touched:
                 write_routes(doc)
-            print("display %s (%s) deleted by %s%s"
+            print("display %s (%s) deleted by %s%s%s"
                   % (did, name, s["user"],
                      " — removed from %d endpoint(s)" % len(touched)
-                     if touched else ""), flush=True)
+                     if touched else "",
+                     "; out of " + ", ".join(left) if left else ""), flush=True)
             # Its token still exists in a cookie jar somewhere and now matches
             # nothing, so the device it belonged to is back to being a browser
             # that has never been here. That is the revocation.
@@ -6354,11 +7576,13 @@ class Handler(SimpleHTTPRequestHandler):
             # one we shipped. An embed is not a display and does not inherit
             # one: its rights come from its key, so it reaches the endpoints
             # anything can reach and no others.
-            disp = None if emb else self._display()
-            if not (self.pinned_open or display_may(disp, cfg)):
+            disp, ident = (None, None) if emb else self._subject()
+            if not (self.pinned_open or subject_may(cfg, disp, ident)):
                 note_display_refused(disp, cfg["name"])
                 print("refused: %s may not use %s (%s)"
-                      % (disp["id"] if disp else "a display with no token",
+                      % (disp["id"] if disp else
+                         ("identity " + ident["id"] if ident else
+                          "a caller with no token"),
                          cfg["name"], rid), flush=True)
                 # The DISPLAY says nothing about this: that utterance was
                 # addressed to a different device, and one nobody was talking
@@ -6593,6 +7817,13 @@ def main():
     ensure_default_kiosk()
     migrate_models()
     migrate_networks()
+    # The two groups that always exist. Made at startup rather than on first
+    # need, so they are there before anything can enrol into them and there is
+    # no moment where a population has nowhere to land.
+    ensure_system_groups()
+    migrate_unenrolled_invites()
+    prune_group_members()
+    ensure_default_membership()
     app = read_app()
     # Environment still wins, so a one-off run on a different port needs no
     # edit to the stored configuration. Setting PORT alone moves all three,
@@ -6660,7 +7891,9 @@ def main():
     print("reachable at %s · %s" % (
         "this machine only (loopback)" if personal else
         "every interface on this machine" if host == "0.0.0.0" else host,
-        "no sign-in" if AUTH_MODE == "none" else "accounts and roles"), flush=True)
+        "no sign-in" if AUTH_MODE == "none"
+        else "one PIN, no accounts" if AUTH_MODE == "pin"
+        else "accounts and roles"), flush=True)
 
     if have_tls:
         # Pinned to the default profile, so an endpoint moved onto a port of
@@ -6770,6 +8003,8 @@ def main():
     # ceremony it forces is pure obstruction — which is exactly the install
     # this setting exists to make possible.
     if have_tls or personal:
+        # Only the accounts rung mints one. In PIN mode the key was cut before
+        # the mode could be saved, and with nothing at the door there is no key.
         first_pw = ensure_first_admin() if AUTH_MODE == "accounts" else None
         if have_tls:
             start_tls(adm_port, cert, key, admin_port=True, host=host)

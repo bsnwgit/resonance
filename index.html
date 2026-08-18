@@ -329,6 +329,22 @@
   #enrol{display:none;flex-direction:column;gap:8px;
          padding-bottom:14px;border-bottom:1px solid rgba(var(--glass),.18)}
   body[data-enrol] #enrol{display:flex}
+  #pinbox{display:none;flex-direction:column;gap:8px;
+          padding-bottom:14px;border-bottom:1px solid rgba(var(--glass),.18)}
+  body[data-pin] #pinbox{display:flex}
+  #pinhead{font-size:calc(12px * var(--fs));line-height:1.6;
+           color:rgba(var(--paper),.88)}
+  #pinrow{display:flex;gap:8px;flex-wrap:wrap}
+  #pincode{
+    flex:1 1 180px;min-width:0;font:inherit;
+    font-size:calc(17px * var(--fs));letter-spacing:.34em;
+    padding:8px 10px;background:rgba(0,0,0,.45);color:var(--text);
+    border:1px solid rgba(var(--glass),.3);outline:0;border-radius:0;
+  }
+  #pincode:focus{border-color:rgba(var(--glass),.62)}
+  #pinnote{font-size:calc(10px * var(--fs));line-height:1.6;
+           color:rgba(var(--paper),.62)}
+  #pinnote.bad{color:#ff8a8a}
   #enrolhead{
     font-size:calc(12px * var(--fs));line-height:1.6;color:rgba(var(--paper),.88);
   }
@@ -341,13 +357,24 @@
   }
   #enrolcode:focus{border-color:rgba(var(--glass),.62)}
   #enrolcode::placeholder{color:rgba(var(--paper),.28);letter-spacing:.28em}
+  #pincode::placeholder{color:rgba(var(--paper),.28);letter-spacing:.34em}
+  #pingo,
   #enrolgo{
     font:inherit;font-size:calc(10px * var(--fs));letter-spacing:.18em;
     padding:8px 14px;cursor:pointer;
     background:none;color:rgba(var(--paper),.9);
     border:1px solid rgba(var(--glass),.4);
   }
+  #pingo:hover,
   #enrolgo:hover{border-color:rgba(var(--glass),.75)}
+  /* Quieter than the thing it sits beside: leaving is the lesser of the two
+     answers, not the one being recommended. */
+  #pinskip{
+    font:inherit;font-size:calc(10px * var(--fs));letter-spacing:.18em;
+    padding:8px 12px;cursor:pointer;background:none;
+    color:rgba(var(--paper),.55);border:1px solid transparent;
+  }
+  #pinskip:hover{color:rgba(var(--paper),.85)}
   #enrolgo[disabled]{opacity:.5;cursor:default}
   #enrolnote{
     font-size:calc(9.5px * var(--fs));line-height:1.6;
@@ -603,6 +630,24 @@
          Its own path to the end: the URL form, /e/CODE, is a fine thing to
          type into a television with a remote and a poor thing to ask for from
          somebody already looking at this screen. -->
+    <!-- A PERSON, at their own URL, with a PIN on their identity. Built like
+         the code box beside it because it is the same moment — something is
+         being typed to finish arriving — and unlike it in one way: this is a
+         secret, so it is a password field and the server refuses it outright
+         over a plain connection. -->
+    <div id="pinbox">
+      <div id="pinhead">Welcome back<span id="pinwho"></span></div>
+      <div id="pinrow">
+        <input id="pincode" type="password" inputmode="numeric"
+               autocomplete="one-time-code" maxlength="32"
+               placeholder="······" aria-label="your PIN">
+        <button id="pingo" type="button">UNLOCK</button>
+        <!-- Only where a PIN is being OFFERED, never where one is owed. -->
+        <button id="pinskip" type="button">NOT NOW</button>
+      </div>
+      <div id="pinnote">Your PIN keeps what this screen remembers about you, so
+it follows you to any machine you open your URL on.</div>
+    </div>
     <div id="enrol">
       <div id="enrolhead">Setting this screen up?</div>
       <div id="enrolrow">
@@ -766,6 +811,176 @@ const ENROL = (new URLSearchParams(location.search).get('enrol') || '')
 if (ENROL && window.history && history.replaceState)
   history.replaceState(null, '', location.pathname);
 
+/* ================================================================== PERSON
+   Who is at this browser, as against WHERE it is. A display is one machine in
+   one room; a person opens their own URL on whatever they are sitting at.
+
+   Three states, and the middle one is the only one with a control:
+     none    somebody with no PIN. Their preferences stay in this browser,
+             exactly as the display has always kept them.
+     locked  a PIN is set and this browser has not entered it.
+     open    it has. Preferences now come from the server and go back to it,
+             so they follow the person to the next machine.
+
+   `?person=` is the one word the server sends back after spending a minted
+   URL, read once and taken straight out of the address bar — the outcome of a
+   thing that happened once has no business surviving a reload. */
+/* Waved away for this page only. Not stored: somebody who says NOT NOW on a
+   borrowed machine has not decided anything about the next one, and a server
+   that remembered it would be keeping a preference for a person who declined
+   to have preferences kept. */
+let PIN_DISMISSED = false;
+const PERSON_ARRIVED = (new URLSearchParams(location.search).get('person') || '')
+  .replace(/[^a-z]/g, '').slice(0, 12);
+if (PERSON_ARRIVED && window.history && history.replaceState)
+  history.replaceState(null, '', location.pathname);
+
+const Person = {
+  id: '', name: '', pin: '', blocked: false, conform: false, min: 6,
+  is(){ return !!this.id; },
+  open(){ return this.pin === 'open'; },
+  /* Setting one is offered where there is none, and REQUIRED where the one
+     they have is below a minimum raised since they chose it. */
+  setting(){ return this.is() && (this.pin === 'none' || this.conform); },
+  take(p){
+    this.id = p.id || '';
+    this.name = p.name || '';
+    this.pin = p.pin || 'none';
+    this.blocked = !!p.blocked;
+    this.conform = !!p.conform;
+    this.min = p.pin_min || 6;
+    /* Their own settings win over whatever this browser had. That is the
+       whole point of the tier: the machine's copy is a local habit, theirs is
+       the thing that follows them. */
+    if (this.pin === 'open' && p.settings) Prefs.adopt(p.settings);
+    paintPin();
+  },
+};
+
+async function setPin(){
+  const el = $('pincode'), note = $('pinnote');
+  const pin = (el.value || '').trim();
+  if (!pin) return;
+  note.className = '';
+  note.textContent = 'saving…';
+  try{
+    const r = await fetch('person/pin', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({pin}),
+    });
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok){
+      el.value = '';
+      note.className = 'bad';
+      note.textContent = j.error || 'that did not work';
+      return;
+    }
+    el.value = '';
+    Person.pin = 'open';
+    Person.conform = false;
+    if (j.settings) Prefs.adopt(j.settings);
+    paintPin();
+    applyPrefs();
+  }catch(e){
+    note.className = 'bad';
+    note.textContent = 'could not reach the server';
+  }
+}
+
+function paintPin(){
+  const locked = Person.is() && Person.pin === 'locked';
+  /* The two ways spending a URL fails. Shown here rather than nowhere: the
+     server answers a redirect with one word, and a person who followed a link
+     that did not work should be told, not left looking at a page that behaves
+     as though they had never clicked it. */
+  const failed = !Person.is()
+                 && (PERSON_ARRIVED === 'bad' || PERSON_ARRIVED === 'isdevice');
+  const setting = Person.setting() && !PIN_DISMISSED;
+  document.body.toggleAttribute('data-pin', locked || failed || setting);
+  const head = $('pinhead'), row = $('pinrow'), note = $('pinnote');
+  const go = $('pingo'), skip = $('pinskip');
+  if (row) row.style.display = (locked || setting) ? '' : 'none';
+  if (go) go.textContent = setting ? 'SET IT' : 'UNLOCK';
+  /* Offered where there is no PIN, and not where one is owed: a minimum that
+     can be waved away is a minimum that only ever applied to people who set a
+     PIN after it changed. */
+  if (skip) skip.style.display = (setting && !Person.conform) ? '' : 'none';
+  if (setting){
+    if (head) head.textContent = Person.conform
+      ? 'Your PIN is shorter than this server now asks for'
+      : 'Keep your settings across machines?';
+    if (note){
+      note.className = '';
+      note.textContent = Person.conform
+        ? 'Choose a new one of at least ' + Person.min + ' digits to carry on.'
+        : 'Choose a PIN of at least ' + Person.min + ' digits and what this '
+          + 'screen remembers about you follows you to any machine you open '
+          + 'your URL on. You can leave it — without one, your settings stay '
+          + 'in this browser.';
+    }
+    return;
+  }
+  if (!(locked || failed)) return;
+  if (failed){
+    if (head) head.textContent = PERSON_ARRIVED === 'isdevice'
+      ? 'This screen belongs to the building'
+      : 'That link did not work';
+    if (note){
+      note.className = '';
+      note.textContent = PERSON_ARRIVED === 'isdevice'
+        ? 'It is set up as a display, so a personal URL cannot be opened on it. '
+          + 'Use your own device, or ask an administrator.'
+        : 'It may have been replaced since it was sent to you. Ask an '
+          + 'administrator for a new one.';
+    }
+    return;
+  }
+  const who = $('pinwho');
+  if (who) who.textContent = Person.name ? ', ' + Person.name : '';
+  if (note && Person.blocked){
+    note.className = 'bad';
+    /* No countdown. How long is a clock somebody guessing can read, and the
+       person who mistyped it needs to know to stop rather than to know when. */
+    note.textContent = 'Too many attempts. Wait a little and try again.';
+  }
+}
+/* Said even where hello never reports a person, which is both failure cases:
+   a spent or reissued URL leaves no cookie, and a display's browser is a
+   display. */
+if (PERSON_ARRIVED === 'bad' || PERSON_ARRIVED === 'isdevice')
+  window.addEventListener('DOMContentLoaded', paintPin);
+
+async function unlockPin(){
+  const el = $('pincode'), note = $('pinnote');
+  const pin = (el.value || '').trim();
+  if (!pin) return;
+  note.className = '';
+  note.textContent = 'checking…';
+  try{
+    const r = await fetch('person/unlock', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({pin}),
+    });
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok){
+      el.value = '';
+      note.className = 'bad';
+      note.textContent = j.error || 'that did not work';
+      return;
+    }
+    el.value = '';
+    Person.pin = 'open';
+    if (j.settings) Prefs.adopt(j.settings);
+    note.className = '';
+    note.textContent = '';
+    paintPin();
+    applyPrefs();
+  }catch(e){
+    note.className = 'bad';
+    note.textContent = 'could not reach the server';
+  }
+}
+
 /* ================================================================= DISPLAY
    Which physical thing this page is running on, as far as the server is
    concerned — the tablet in the kitchen rather than a browser tab.
@@ -815,6 +1030,15 @@ const Display = {
         body: JSON.stringify({name: DISPLAY_NAME, hint: this.hint()})
       });
       const j = await r.json().catch(()=>({}));
+      /* A PERSON, not a place. The server answers one or the other and never
+         both — an approved display is a device whatever else is in the cookie
+         jar, and below that line a person's cookie wins. There is no display
+         state to take: this browser is not a screen anybody hung, and which
+         endpoints it may reach comes back on /routes the same as ever. */
+      if (r.ok && j.person){
+        Person.take(j.person);
+        return true;
+      }
       if (!r.ok || !j.display) return false;
       this.take(j.display);
       return true;
@@ -1389,7 +1613,35 @@ const Prefs = {
   set(k, v){
     this.data[k] = v;
     try{ localStorage.setItem(PREFS_KEY, JSON.stringify(this.data)); }catch(e){}
-  }
+    /* …and to the person, where one has unlocked. Kept in the browser as well
+       rather than instead: the local copy is what this machine falls back to
+       when nobody is signed in, and losing it because somebody once unlocked
+       here would change what the machine does after they leave. */
+    this.push();
+  },
+  /* The server's copy, taken wholesale. Not merged with what this browser had
+     — a merge would mean a machine somebody borrowed once quietly voting on
+     their settings forever. */
+  adopt(obj){
+    if (!obj || typeof obj !== 'object') return;
+    this.data = Object.assign({}, this.data, obj);
+    try{ localStorage.setItem(PREFS_KEY, JSON.stringify(this.data)); }catch(e){}
+  },
+  push(){
+    if (typeof Person === 'undefined' || !Person.open()) return;
+    clearTimeout(this._t);
+    /* Debounced. Three switches can move in a second while somebody settles
+       in, and each one is a write of a document nobody is reading yet. */
+    this._t = setTimeout(()=>{
+      const out = {};
+      ['ptt', 'muted', 'text'].forEach(k=>{ if (this.has(k)) out[k] = !!this.data[k]; });
+      fetch('person/settings', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({settings: out}),
+      }).catch(()=>{});
+    }, 400);
+  },
+  _t: 0,
 };
 Prefs.load();
 
@@ -4860,6 +5112,12 @@ function announcePreview(){
 }
 
 on('reqsend', 'click', sendRequest);
+/* One control, two jobs, and the state decides which — the box is the same
+   box and the difference is whether there is a PIN behind it yet. */
+const pinGo = ()=> (Person.setting() ? setPin() : unlockPin());
+on('pingo', 'click', pinGo);
+on('pincode', 'keydown', e=>{ if (e.key === 'Enter') pinGo(); });
+on('pinskip', 'click', ()=>{ PIN_DISMISSED = true; paintPin(); });
 on('enrolgo', 'click', useCode);
 on('enrolcode', 'keydown', e=>{ if (e.key === 'Enter') useCode(); });
 /* Typed off another screen, so it arrives with whatever spacing and case the

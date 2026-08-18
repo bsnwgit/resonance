@@ -206,6 +206,18 @@
   }
   /* Said after a capped run, never left to be inferred: a list that stops
      without saying so reads as everything there was. */
+  /* The kind a custom group is drawn from, and its size. Secondary to the
+     name it qualifies: you are picking the group, and this is what tells you
+     what you just picked. */
+  /* A tick that states rather than asks: the default group's membership is the
+     server's, so it reads as a fact on the row instead of a control that does
+     nothing when pressed. */
+  .cks label.fixed{opacity:.72}
+  .cks label.fixed input{cursor:default}
+  .cks .gkind{
+    font-size:calc(8px * var(--fs));letter-spacing:.08em;
+    color:rgba(var(--paper),.55);
+  }
   .docmore{
     font-size:calc(8.5px * var(--fs));letter-spacing:.1em;
     color:rgba(var(--paper),.5);margin:5px 0 0;padding-left:11px;
@@ -419,6 +431,12 @@
      Brighter than the hairline between topics, so they group rather than
      merge into the section rules. */
   .rule{height:1px;margin:9px 0 2px;background:rgba(var(--glass),.55)}
+  /* Between the groups the server keeps and the ones an admin made. More air
+     than the rule above the topics gets, because it is separating two halves
+     of one list rather than capping a column — rows sit tight against each
+     other, so a hairline with a row's own spacing either side of it reads as
+     one more row. */
+  .grouprule{margin:14px 0 12px}
 
   /* The topics are bounded, so it is obvious where the list of them starts
      and stops rather than the column running on into the foot. Same strength
@@ -1413,6 +1431,10 @@
   }
   .erow .badge{font-size:calc(7.5px * var(--fs));letter-spacing:.14em;padding:1px 5px;
                border:1px solid rgba(var(--glass),.25);color:rgba(var(--paper),.8)}
+  /* A badge that is a thing to do rather than a thing to know. Used where a
+     PIN sits below a minimum raised since it was set: nothing is broken, and
+     somebody still has to go and fix it. */
+  .erow .badge.warn{border-color:rgba(224,113,107,.55);color:#eaa8a8}
   .cks{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;margin:6px 0 2px}
   .cks label{display:flex;align-items:center;gap:6px;font-size:calc(9px * var(--fs));
              letter-spacing:.08em;color:rgba(var(--paper),.9);cursor:pointer}
@@ -1810,7 +1832,7 @@
            for the two populations: they arrive by different routes with
            different buttons, and neither wants to read the other's queue
            while doing it. -->
-      <button id="tab_displays" data-tab="displays">PERSON</button>
+      <button id="tab_displays" data-tab="displays">USER</button>
       <button id="tab_enrol" data-tab="enrol">DEVICE</button>
     </span>
     <span class="right" id="whobox">
@@ -2461,6 +2483,38 @@ by noise.</div>
     </div>
   </section>
 
+  <!-- A person's own secret, as against a screen's. It sits on SECURITY with
+       the rest of who-gets-in rather than beside the people themselves: it is
+       one number for the whole deployment, and a policy set on the row it
+       applies to is a policy somebody sets differently twelve times. -->
+  <section class="grp wide" data-tab="security">
+    <h4>PIN policy</h4>
+    <div class="grpbody">
+  <label class="bklab" style="margin-top:2px">Fewest digits a PIN may have</label>
+  <input id="dp_pinmin" class="num" type="number" inputmode="numeric"
+         min="4" max="12">
+  <div class="note help">A PIN is what turns somebody's URL into a person who
+can be remembered — it buys durable memory, not reach, so a user without one
+still reaches everything they were granted.
+
+<b>Six digits is the default</b>, and it is a low bar that rate limiting
+carries: guessing backs off geometrically per person, so an attacker who
+changes address gets no fresh budget. Runs, repeats and anything that reads as
+a year are refused where they are chosen rather than left for the back-off to
+absorb.
+
+<b>Raising this does not revoke anything.</b> Every PIN below the new minimum
+is marked in the list, and the person is made to set a conforming one the next
+time they unlock — their old PIN still authenticates that change, or an admin
+resetting every account by hand would be the price of tightening a number.
+Lowering it invalidates nothing.
+
+<b>A PIN is not a password.</b> Six digits keyed into a screen suits an
+internal tool; it should not be the only thing standing in front of anything
+genuinely sensitive.</div>
+    </div>
+  </section>
+
   <section class="grp wide" data-tab="security">
     <h4>Enrolment codes</h4>
     <div class="grpbody">
@@ -2497,7 +2551,7 @@ setting.</div>
   <label class="bklab">Sign in</label>
   <div class="seg" id="ap_auth">
     <button data-v="none">NOTHING</button>
-    <button data-v="pin" disabled title="arrives with identity">A SINGLE PIN</button>
+    <button data-v="pin" title="one number for the whole panel">A SINGLE PIN</button>
     <button data-v="accounts">ACCOUNTS &amp; ROLES</button>
   </div>
   <div class="note help">What it takes to reach this configuration page.
@@ -2508,9 +2562,29 @@ personal install possible without fishing a generated password out of a log.
 <b>Accounts &amp; roles</b> is the default, because the safe default is the one
 that assumes it can be reached.
 
-<b>A single PIN</b> — one number for the whole display, no account management —
-is the middle rung and is not built yet. It is the PIN machinery from identity
-pointed at a display rather than a person, so it lands with that.</div>
+<b>A single PIN</b> — one number for the whole panel, no account management —
+is for the deployment with one administrator. Accounts exist to tell people
+apart, and telling one person apart from themselves is a login screen charging
+rent.
+
+<b>What it costs is the log.</b> Everything an account does is recorded against
+a name; everything done behind the PIN is recorded as <b>(single PIN)</b>,
+because that is all this rung knows. If it ever has to matter who did
+something, this is not the rung for it.
+
+Set the PIN below before switching to it — the switch is refused otherwise,
+since a restart into a mode whose key was never cut leaves no way in.</div>
+  <label class="bklab" style="margin-top:12px">The panel PIN</label>
+  <div class="seg">
+    <input id="ap_pin" class="num" type="password" inputmode="numeric"
+           autocomplete="new-password" placeholder="······">
+    <button id="b_appin" class="act-save">SET THE PIN</button>
+  </div>
+  <div class="note" id="pinsetnote"></div>
+  <div class="note help">Held to the same rules as a person's: digits only, at
+least as many as the PIN policy asks for, and runs, repeats and years refused
+where they are chosen. Setting it does not sign anybody out — locking yourself
+out of the panel from inside the panel is not a security property.</div>
   <div class="note" id="authnote"></div>
   <div class="pending" id="authpending" hidden></div>
   <div class="seg actrow">
@@ -2552,19 +2626,36 @@ Short by default — this session configures what everyone else is looking at.
   <div class="labrow" id="gr_addrow" style="margin-top:10px">
     <input id="gr_name" type="text" spellcheck="false" autocomplete="off"
            placeholder="Physics department">
+    <!-- Two populations, and they are the two FILES. There was briefly a third
+         — the machines that asked, as against the ones an admin invited — and
+         that is how a row ENROLLED rather than which population it is in. It
+         is on the row now, where it describes without sorting. Groups stored
+         under the old kind read back as DEVICES with their members and their
+         names intact. -->
     <div class="seg" id="gr_kind">
-      <button data-v="user" class="on">PEOPLE</button>
+      <button data-v="identity" class="on">USERS</button>
       <button data-v="device">DEVICES</button>
     </div>
   </div>
   <div class="note" id="groupnote"></div>
   <div class="seg actrow"><button id="b_addgroup" class="act-add">CREATE</button></div>
-  <div class="note help" style="margin-top:10px">A group of <b>people</b> holds
-those who asked for access and were approved. A group of <b>devices</b> holds
-the screens you created and sent a code to. They are separate populations
-answering separate questions — <i>the physics department</i> and <i>the screens
-in the east wing</i> — so a group holds one or the other, and its kind cannot
-be changed once it exists.
+  <div class="note help" style="margin-top:10px">Two populations, and a group
+holds one of them.
+
+<b>USERS</b> holds the people you created under ENROLLMENTS ▸ USER. A person
+reaches an endpoint from whatever machine they open their URL on, so a grant
+here follows the human rather than the hardware.
+
+<b>DEVICES</b> holds displays — every screen and every laptop, however it got
+here. Whether it was created here and given a code or turned up and asked is
+written on the row itself; it does not decide which groups the row may be in,
+so a group holding a wall screen and somebody's laptop is a perfectly good
+group.
+
+The two cannot mix, and the reason is concrete rather than tidy: they are
+different files, their ids are minted independently, and <b>a group's kind
+cannot change once it exists</b> — a kind that changed would not filter the
+members, it would fail to find any of them.
 
 Name a group under an endpoint's <b>who may use it</b> and everyone in it may
 reach that endpoint. <b>Grants add up:</b> a group never takes away a grant
@@ -2997,6 +3088,12 @@ one and you are given a six-character code; the row exists from that moment, so
 its endpoints can be ticked and its profile chosen before the screen it is for
 has ever been switched on.
 
+<b>It is not approved until the code is used.</b> Naming a screen is an
+invitation, not a device — the row holds a code and nothing else, so until
+somebody carries that code to the television it is not offered as a member of a
+group and does not count as a display that works. Reissuing a code puts it back
+to exactly that state.
+
 <b>A code works once</b>, and the clock on its row is counting down what is
 left of it — set under SECURITY, where it can also be switched off entirely. If
 it runs out, <b>REISSUE</b> gives another on the current setting: the row is the
@@ -3054,7 +3151,7 @@ is the last time one asked this server anything, so a screen unplugged for a
 week says so here before anybody notices the wall.
 
 Anything that has NOT finished arriving is on the tab it is arriving through —
-ENROLLMENTS ▸ PERSON for a person waiting on a decision, ▸ DEVICE for a screen
+ENROLLMENTS ▸ USER for a person waiting on a decision, ▸ DEVICE for a screen
 that has not taken its code yet. A row moves here on its own the moment it is
 working.
 
@@ -3525,7 +3622,11 @@ async function api(path, opts){
     /* /auth/login answers 401 for a wrong password, which is a message on
        the gate that is already up — not a session ending. */
     if (r.status === 401 && path !== '/auth/login' && ME) endSession();
-    throw new Error(j.error || ('HTTP ' + r.status));
+    const err = new Error(j.error || ('HTTP ' + r.status));
+    /* The whole answer, not just its sentence. /auth/me's 401 says WHICH door
+       this is, and the gate cannot ask for the right thing without it. */
+    err.payload = j;
+    throw err;
   }
   return j;
 }
@@ -3562,7 +3663,31 @@ function endSession(){
 }
 
 async function whoami(){
-  try{ return await api('/auth/me'); }catch(e){ return null; }
+  try{ return await api('/auth/me'); }
+  catch(e){
+    GATE_MODE = (e.payload && e.payload.mode) || 'accounts';
+    paintGate();
+    return null;
+  }
+}
+
+/* Which door the gate is standing at. Read off the 401 that sent us here,
+   because a gate that guesses asks somebody to fill in a form twice. */
+let GATE_MODE = 'accounts';
+function paintGate(){
+  const pin = GATE_MODE === 'pin';
+  const ulab = document.querySelector('label[for="u"]');
+  const plab = document.querySelector('label[for="p"]');
+  if (ulab) ulab.style.display = pin ? 'none' : '';
+  if ($('u')) $('u').style.display = pin ? 'none' : '';
+  if (plab) plab.textContent = pin ? 'PIN' : 'password';
+  const f = $('p');
+  if (f){
+    f.setAttribute('autocomplete', pin ? 'one-time-code' : 'current-password');
+    if (pin) f.setAttribute('inputmode', 'numeric');
+    else f.removeAttribute('inputmode');
+    f.focus();
+  }
 }
 
 let signingIn = false;
@@ -3575,9 +3700,10 @@ async function signIn(){
   const label = btn.textContent;
   btn.textContent = 'SIGNING IN…';
   try{
-    ME = await api('/auth/login', {method:'POST', body: JSON.stringify({
-      username: $('u').value.trim(), password: $('p').value
-    })});
+    ME = await api('/auth/login', {method:'POST', body: JSON.stringify(
+      GATE_MODE === 'pin' ? {pin: $('p').value}
+                          : {username: $('u').value.trim(), password: $('p').value}
+    )});
     $('p').value = '';
     start();
   }catch(ex){
@@ -3589,6 +3715,19 @@ async function signIn(){
     btn.textContent = label;
   }
 }
+
+$('b_appin').addEventListener('click', async ()=>{
+  const el = $('ap_pin'), note = $('pinsetnote');
+  const pin = (el.value || '').trim();
+  note.className = 'note';
+  if (!pin){ note.className = 'note bad'; note.textContent = 'type one first';
+             el.focus(); return; }
+  try{
+    await api('/app/pin', {method:'POST', body: JSON.stringify({pin})});
+    el.value = '';
+    note.textContent = 'the panel PIN is set';
+  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+});
 
 $('gateform').addEventListener('submit', e=>{ e.preventDefault(); signIn(); });
 
@@ -4175,6 +4314,12 @@ async function loadApp(){
     sel.value = j.app.bind_address || '';
     segSet('ap_bind', j.app.bind);
     segSet('ap_auth', j.app.auth);
+    /* Whether a key has been cut. The switch is refused server-side without
+       one; saying so here means the refusal is not the way somebody finds
+       out. */
+    const pinnote = $('pinsetnote');
+    if (pinnote && !(j.limits || {}).has_panel_pin)
+      pinnote.textContent = 'No panel PIN is set yet.';
     postureSync();
     showPending(j);
     showPending(j, 'authpending');
@@ -4202,7 +4347,7 @@ $('b_apprevert').addEventListener('click', async ()=>{
 ['ap_bind', 'ap_auth'].forEach(id=>{
   document.querySelector('#' + id).addEventListener('click', e=>{
     const b = e.target.closest('button');
-    if (!b || b.disabled) return;      // the PIN rung is not built yet
+    if (!b || b.disabled) return;
     segSet(id, b.dataset.v);
     postureSync();
   });
@@ -4373,6 +4518,12 @@ never spoken and never matched against.</div>
   </div>
   <label class="bklab" data-r="grouplab">Groups</label>
   <div class="cks" data-r="groups"></div>
+  <!-- People, in a box of their own. A person's grant is theirs and travels
+       with them to whatever machine they open their URL on, where a group or a
+       display is a grant to a machine — different populations, so a list that
+       could hold either would be one nobody could audit. -->
+  <label class="bklab" data-r="peoplelab">People</label>
+  <div class="cks" data-r="identities"></div>
   <div class="note" data-r="whonote"></div>
   <div class="note help">Two reasons to restrict one. <b>A room with several
 microphones in it</b> — one person addresses the wall screen and every other
@@ -4719,12 +4870,17 @@ function blockPaint(blk, r){
         + (words ? ' +' + words + ' more' : '')
         + (r.strict ? ' · exact' : ''),
     who: !r.restricted ? 'any display'
-       : ((r.groups || []).length + (r.displays || []).length)
+       : ((r.groups || []).length + (r.displays || []).length
+          + (r.identities || []).length)
          ? [(r.groups || []).length
               ? (r.groups || []).length + ' group' + ((r.groups || []).length === 1 ? '' : 's')
               : '',
             (r.displays || []).length
-              ? (r.displays || []).length + ' named' : ''].filter(Boolean).join(' + ')
+              ? (r.displays || []).length + ' named' : '',
+            (r.identities || []).length
+              ? (r.identities || []).length
+                + ((r.identities || []).length === 1 ? ' person' : ' people')
+              : ''].filter(Boolean).join(' + ')
          : 'nobody',
     voice: (r.greeting ? '“' + r.greeting.slice(0, 28)
                        + (r.greeting.length > 28 ? '…' : '') + '” · ' : 'shared greeting · ')
@@ -4786,12 +4942,14 @@ function blockPaint(blk, r){
    list, so a device that has been deleted stops being offered and one that
    arrived a minute ago is there to tick. */
 function blockFillWho(blk, r){
-  const box = R(blk, 'displays'), gbox = R(blk, 'groups');
+  const box = R(blk, 'displays'), gbox = R(blk, 'groups'),
+        pbox = R(blk, 'identities');
   // Groups are filled here as well, so this must not give up when the
   // per-display box is absent — it is, now that restricting one device at a
   // time has gone and a grant is made to a group.
-  if (!box && !gbox) return;
-  const want = r.displays || [], wantG = r.groups || [];
+  if (!box && !gbox && !pbox) return;
+  const want = r.displays || [], wantG = r.groups || [],
+        wantP = r.identities || [];
   // Never rebuilt under somebody's cursor — replacing the nodes would drop
   // the tick they were in the middle of making.
   // Both guarded. `box` is gone now that a grant is made to groups rather than
@@ -4799,7 +4957,26 @@ function blockFillWho(blk, r){
   // endpoint paint — which aborted the loop, so only the first endpoint drew
   // and the block was never hidden when you left the tab.
   if (!(box && box.contains(document.activeElement))
-      && !(gbox && gbox.contains(document.activeElement))){
+      && !(gbox && gbox.contains(document.activeElement))
+      && !(pbox && pbox.contains(document.activeElement))){
+    if (pbox){
+      pbox.innerHTML = '';
+      IDENTITIES.forEach(p=>{
+        const lab = document.createElement('label');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.dataset.p = p.id;
+        cb.checked = wantP.indexOf(p.id) >= 0;
+        lab.appendChild(cb);
+        lab.appendChild(document.createTextNode(' ' + (p.label || p.id)));
+        pbox.appendChild(lab);
+      });
+      if (!IDENTITIES.length){
+        const em = document.createElement('span');
+        em.textContent = 'nobody yet — people are created under '
+                       + 'ENROLLMENTS ▸ USER';
+        pbox.appendChild(em);
+      }
+    }
     /* Groups first, and in their own box. Naming a group is the grant you
        want to make most of the time — twelve people who all get the same
        thing — and a list that mixed them in among the individuals would bury
@@ -4812,8 +4989,25 @@ function blockFillWho(blk, r){
         cb.type = 'checkbox'; cb.dataset.g = g.id;
         cb.checked = wantG.indexOf(g.id) >= 0;
         lab.appendChild(cb);
-        lab.appendChild(document.createTextNode(
-          ' ' + g.name + ' (' + g.members.length + ')'));
+        /* The name, then what KIND of group it is. This box is the one place
+           the two populations meet — the boxes under it are already split by
+           them — so a tick reading "Physics" alone says nothing about whether
+           it grants three people or three screens.
+
+           Suppressed only where the NAME already says it — "Devices -
+           Devices" is the panel saying it twice. It used to be suppressed for
+           every system group, on the assumption that those are named after
+           their own kind; nothing enforces that, and a default group's name is
+           the admin's to change. So the two entries most likely to be ticked
+           were the two that hid the fact. */
+        lab.appendChild(document.createTextNode(' ' + g.name));
+        const kindName = g.kind === 'identity' ? 'Users' : 'Devices';
+        const q = document.createElement('span');
+        q.className = 'gkind';
+        q.textContent = ((g.name || '').trim().toLowerCase() === kindName.toLowerCase()
+                         ? '' : ' - ' + kindName)
+                      + ' (' + g.members.length + ')';
+        lab.appendChild(q);
         gbox.appendChild(lab);
       });
       if (!GROUPS.length){
@@ -4850,11 +5044,13 @@ function blockFillWho(blk, r){
 function blockSyncWho(blk){
   const on = blk.querySelector('[data-f="restricted"] button.on');
   const restricted = !!on && on.dataset.v === '1';
-  ['groups', 'grouplab'].forEach(n=>{
+  ['groups', 'grouplab', 'identities', 'peoplelab'].forEach(n=>{
     const el = R(blk, n);
     if (el) el.style.display = restricted ? '' : 'none';
   });
-  const box = R(blk, 'displays'), gbox = R(blk, 'groups');
+  const box = R(blk, 'displays'), gbox = R(blk, 'groups'),
+        pbox = R(blk, 'identities');
+  const tickedP = pbox ? [...pbox.querySelectorAll('input:checked')] : [];
   const tickedG = gbox ? [...gbox.querySelectorAll('input:checked')] : [];
   const ticked = box ? [...box.querySelectorAll('input:checked')] : [];
   const live = ticked.filter(cb=>{
@@ -4867,11 +5063,11 @@ function blockSyncWho(blk){
     if (!restricted){
       msg = 'Any display, approved or not — the same as every endpoint before '
           + 'displays existed.';
-    }else if (!ticked.length && !tickedG.length){
+    }else if (!ticked.length && !tickedG.length && !tickedP.length){
       // Allowed rather than refused: restricting one before the tablet that
       // will use it has been hung is a legitimate order to do things in.
-      msg = 'No display may use this endpoint — nothing reaches it until one '
-          + 'is ticked.';
+      msg = 'Nobody and nothing may use this endpoint — it is reached only '
+          + 'once something is ticked.';
       bad = true;
     }else{
       const bits = [];
@@ -4880,6 +5076,12 @@ function blockSyncWho(blk){
       if (ticked.length)
         bits.push(ticked.length + (ticked.length === 1 ? ' display named on its own'
                                                        : ' displays named on their own'));
+      /* Counted apart from the displays rather than added to them. A person
+         reaches this from whatever machine they open their URL on, where a
+         display is one machine — "5 named" covering both would be a number
+         that answers neither question. */
+      if (tickedP.length)
+        bits.push(tickedP.length + (tickedP.length === 1 ? ' person' : ' people'));
       msg = bits.join(' · ');
       if (live.length !== ticked.length)
         msg += ' — ' + (ticked.length - live.length) + ' of those not approved '
@@ -4927,6 +5129,12 @@ function blockCollect(blk){
     body.displays = [...dbox.querySelectorAll('input:checked')].map(cb=> cb.dataset.d);
   body.groups = [...blk.querySelectorAll('[data-r="groups"] input:checked')]
                   .map(cb=> cb.dataset.g);
+  /* Guarded the same way the displays box is: sending an empty list from a
+     panel that does not have the box would wipe every grant a route already
+     carries, where omitting the field leaves the server's copy alone. */
+  const pbox = blk.querySelector('[data-r="identities"]');
+  if (pbox)
+    body.identities = [...pbox.querySelectorAll('input:checked')].map(cb=> cb.dataset.p);
   const ft = F(blk, 'fallthrough');
   if (ft) body.fallthrough = ft.value;
   const key = F(blk, 'api_key');
@@ -4955,7 +5163,12 @@ function wireBlock(blk){
   /* Ticking a display changes what the note under the list says, and a tick
      is a change rather than an input. */
   blk.addEventListener('change', e=>{
-    if (e.target.closest('[data-r="displays"]')) blockSyncWho(blk);
+    /* Every box the summary counts, not just the first one it counted. The
+       line under them says how many groups, displays and people are ticked,
+       and it went stale on two of the three. */
+    if (e.target.closest('[data-r="displays"]')
+        || e.target.closest('[data-r="groups"]')
+        || e.target.closest('[data-r="identities"]')) blockSyncWho(blk);
     /* Which limits and which notes apply is the PROFILE's provider, so
        choosing a different profile rearranges the block the same way choosing
        a different provider used to. */
@@ -5227,13 +5440,14 @@ async function loadDisplays(){
    A PERSON, as against the browser somebody happened to open. Minted here and
    nowhere else: there is no email and nothing to vouch for a name, so anybody
    who could mint their own could mint somebody else's. */
-let IDENTITIES = [], IDBASE = '', OPENPID = '';
+let IDENTITIES = [], IDBASE = '', OPENPID = '', IDPINMIN = 6;
 
 async function loadIdentities(){
   try{
     const j = await api('/identities');
     IDENTITIES = j.identities || [];
     IDBASE = j.base || '';
+    IDPINMIN = j.pin_min || 6;
   }catch(e){ IDENTITIES = []; }
   return IDENTITIES;
 }
@@ -5302,6 +5516,16 @@ async function refreshIdentities(){
     seen.className = 'badge';
     seen.textContent = p.last_seen ? 'IN USE' : 'URL NOT PICKED UP';
     top.appendChild(seen);
+    /* Whether there is a PIN, and whether it still meets the minimum. SHORT is
+       the one worth seeing from the list: raising the policy marks every PIN
+       below it, and who is still outstanding is how a rollout is watched
+       rather than assumed. */
+    const pin = document.createElement('span');
+    pin.className = 'badge' + (p.pin === 'short' ? ' warn' : '');
+    pin.textContent = p.pin === 'ok' ? 'PIN'
+                    : p.pin === 'short' ? 'PIN BELOW ' + IDPINMIN
+                    : 'NO PIN';
+    top.appendChild(pin);
     top.onclick = (e)=>{
       if (e.target.closest('input, button, select, textarea')) return;
       const opening = row.classList.contains('shut');
@@ -5342,8 +5566,73 @@ async function refreshIdentities(){
     namerow.appendChild(del);
     row.appendChild(namerow);
 
+    /* THEIR OWN WAKE WORD. Checked as it is typed rather than on save: a
+       word is refused for a reason somebody has to act on, and a form that
+       only says so after they commit tells them they wasted their time. */
+    const wrow = document.createElement('div');
+    wrow.className = 'namerow';
+    const wlab = document.createElement('b');
+    wlab.textContent = 'Wakes to';
+    wrow.appendChild(wlab);
+    const wf = document.createElement('input');
+    wf.type = 'text'; wf.className = 'nmedit'; wf.spellcheck = false;
+    wf.value = p.wakeword || '';
+    wf.placeholder = 'shared words only';
+    wrow.appendChild(wf);
+    row.appendChild(wrow);
+    const wnote = document.createElement('div');
+    wnote.className = 'note';
+    row.appendChild(wnote);
+
+    let wtimer = 0;
+    const wcheck = ()=>{
+      clearTimeout(wtimer);
+      const w = (wf.value || '').trim();
+      if (!w){ wnote.className = 'note'; wnote.textContent = ''; return; }
+      wtimer = setTimeout(async ()=>{
+        try{
+          const j = await api('/identities/wake/check?w=' + encodeURIComponent(w)
+                              + '&id=' + encodeURIComponent(p.id));
+          wnote.className = 'note' + (j.ok ? '' : ' bad');
+          wnote.textContent = j.ok ? 'nothing else answers to that' : j.why;
+        }catch(e){ wnote.className = 'note bad'; wnote.textContent = e.message; }
+      }, 250);
+    };
+    wf.addEventListener('input', wcheck);
+    wf.onchange = async ()=>{
+      const j = await idAction('/identities/wake',
+                               {id: p.id, word: (wf.value || '').trim()});
+      if (j){
+        wnote.className = 'note';
+        wnote.textContent = (wf.value || '').trim()
+          ? 'saved — only their own devices hear it'
+          : 'cleared — the shared words again';
+        refreshIdentities();
+      }else{
+        /* idAction has put the reason in the row's own note; leave the field
+           holding what they typed so it can be edited rather than retyped. */
+        wcheck();
+      }
+    };
+
     const acts = document.createElement('div');
     acts.className = 'seg actrow';
+    /* Clearing, never setting. An admin who chose somebody's PIN would know
+       it; this hands the account back and lets them pick their own. */
+    if (p.pin !== 'none'){
+      const rp = document.createElement('button');
+      rp.className = 'act-undo';
+      rp.textContent = 'CLEAR THE PIN';
+      rp.onclick = async ()=>{
+        if (!confirm('Clear the PIN for "' + (p.label || p.id) + '"? They set a '
+                     + 'new one the next time they unlock. You are not shown '
+                     + 'the old one and cannot choose the new one.')) return;
+        const j = await idAction('/identities/pin', {id: p.id});
+        if (j){ idNote('their PIN is cleared — they set a new one next time');
+                refreshIdentities(); }
+      };
+      acts.appendChild(rp);
+    }
     const re = document.createElement('button');
     re.className = 'act-undo';
     re.textContent = 'REISSUE THE URL';
@@ -5407,14 +5696,14 @@ $('id_name').addEventListener('keydown', e=>{
 /* ----------------------------------------------------------- groups
    A name for a set of displays, so a grant is made once instead of ticked
    twelve times. Two kinds, two populations, and a group holds one of them. */
-let GROUPS = [], GRPEOPLE = [], GRDEVICES = [];
+let GROUPS = [], GRDEVICES = [], GRIDENT = [];
 
 async function loadGroups(){
   try{
     const j = await api('/groups');
     GROUPS = j.groups || [];
-    GRPEOPLE = j.people || [];
     GRDEVICES = j.devices || [];
+    GRIDENT = j.identities || [];
   }catch(e){ GROUPS = []; }
   return GROUPS;
 }
@@ -5447,6 +5736,15 @@ async function refreshGroups(){
   const addrow = $('gr_addrow');
   if (addrow) addrow.hidden = !!OPENGR && GROUPS.some(x=> x.id === OPENGR);
   GROUPS.forEach((g, i)=>{
+    /* The server sorts the two it keeps to the top; this draws the line under
+       them. Between the last default and the first custom one, and only where
+       both exist — a rule with nothing on one side of it is a line, not a
+       division. */
+    if (!g.system && i && GROUPS[i - 1].system){
+      const rule = document.createElement('div');
+      rule.className = 'rule grouprule';
+      box.appendChild(rule);
+    }
     const row = document.createElement('div');
     row.className = 'erow';
     if (OPENGR !== g.id) row.classList.add('shut');
@@ -5461,8 +5759,16 @@ async function refreshGroups(){
     top.appendChild(nmt);
     const b = document.createElement('span');
     b.className = 'badge';
-    b.textContent = g.kind === 'user' ? 'PEOPLE' : 'DEVICES';
+    b.textContent = g.kind === 'identity' ? 'USERS' : 'DEVICES';
     top.appendChild(b);
+    /* After the kind, not before it: the row reads "USERS · DEFAULT", which
+       is the population first and its standing second. */
+    if (g.system){
+      const sb = document.createElement('span');
+      sb.className = 'badge';
+      sb.textContent = 'DEFAULT';
+      top.appendChild(sb);
+    }
     const cnt = document.createElement('span');
     cnt.className = 'badge';
     cnt.textContent = g.members.length + (g.members.length === 1 ? ' member' : ' members');
@@ -5491,29 +5797,38 @@ async function refreshGroups(){
     /* On the name's own line, hard right. Deleting a group is the one thing
        here that cannot be undone, and it belongs beside the thing it names
        rather than at the foot of a list of ticks. */
-    const del = document.createElement('button');
-    del.textContent = 'DELETE';
-    del.className = 'act-danger';
-    del.onclick = ()=>{
-      if (confirm('Delete the group "' + g.name + '"? It is removed from every '
-                  + 'endpoint that names it. Nothing in it is deleted — a group '
-                  + 'is a way of referring to them, not a thing they belong to.'))
-        groupAction('/groups/delete', {id: g.id});
-    };
-    namerow.appendChild(del);
+    /* No DELETE on the two the server keeps. They are where a new display and
+       a new person land, and a default an admin can delete is not a default —
+       everything enrolling afterwards would have nowhere to go. The server
+       refuses it as well; this is so nobody is offered a button that answers
+       no. Renaming is still yours: the name is a label, the group is the
+       thing. */
+    if (!g.system){
+      const del = document.createElement('button');
+      del.textContent = 'DELETE';
+      del.className = 'act-danger';
+      del.onclick = ()=>{
+        if (confirm('Delete the group "' + g.name + '"? It is removed from every '
+                    + 'endpoint that names it. Nothing in it is deleted — a group '
+                    + 'is a way of referring to them, not a thing they belong to.'))
+          groupAction('/groups/delete', {id: g.id});
+      };
+      namerow.appendChild(del);
+    }
     row.appendChild(namerow);
 
     /* Membership is the group. Ticked in place rather than behind an EDIT,
        because the list is short and the whole reason to open a group is to
        change who is in it. */
-    const pool = g.kind === 'user' ? GRPEOPLE : GRDEVICES;
+    const pool = g.kind === 'identity' ? GRIDENT : GRDEVICES;
     const cks = document.createElement('div');
     cks.className = 'cks';
     if (!pool.length){
       const em = document.createElement('span');
-      em.textContent = g.kind === 'user'
-        ? 'nobody has asked for access yet'
-        : 'no devices have been created yet';
+      em.textContent = g.kind === 'identity'
+        ? 'nobody has been created yet — people are made under '
+          + 'ENROLLMENTS ▸ USER'
+        : 'no displays here yet';
       cks.appendChild(em);
     }
     pool.forEach(m=>{
@@ -5521,13 +5836,22 @@ async function refreshGroups(){
       const cb = document.createElement('input');
       cb.type = 'checkbox'; cb.dataset.m = m.id;
       cb.checked = g.members.indexOf(m.id) >= 0;
+      /* The default group is the root: everything that enrols is in it and
+         stays in it, so its ticks are a statement rather than a control. The
+         server ignores a members list sent for one — this is so nobody is
+         offered a tick that answers no. */
+      if (g.system){ cb.disabled = true; lab.classList.add('fixed'); }
       cb.onchange = ()=> groupAction('/groups/save', {
         id: g.id,
         members: [...cks.querySelectorAll('input:checked')].map(x=> x.dataset.m),
       });
       lab.appendChild(cb);
+      /* Only a row that is already a member can be unapproved here — the
+         server offers approved rows and nothing else. It says so, because the
+         reason it is on the list is not obvious and unticking it is a real
+         choice rather than tidying. */
       lab.appendChild(document.createTextNode(
-        ' ' + m.label + (m.approved ? '' : ' — not approved')));
+        ' ' + m.label + (m.approved ? '' : ' — refused, still in this group')));
       cks.appendChild(lab);
     });
     row.appendChild(cks);
@@ -5589,6 +5913,7 @@ function paintDpSettings(){
   $('dp_max').value = DPCFG.max_displays;
   $('dp_pending').value = DPCFG.max_pending;
   $('dp_codemins').value = DPCFG.code_minutes;
+  $('dp_pinmin').value = DPCFG.pin_min;
   paintDpForm(DPCFG.form || []);
   PROFILE_KINDS.forEach(k=> paintProfiles(k, DPCFG[k.key] || [],
                                           DPCFG[DEF_KEY[k.key]] || ''));
@@ -5707,6 +6032,7 @@ $('b_dpsave').addEventListener('click', ()=>{
     max_displays: parseInt($('dp_max').value, 10),
     max_pending: parseInt($('dp_pending').value, 10),
     code_minutes: parseInt($('dp_codemins').value, 10),
+    pin_min: parseInt($('dp_pinmin').value, 10),
   }, 'dpnote');
 });
 
@@ -6955,32 +7281,10 @@ function kioskBlock(d){
      tick. The shut row says what it IS in words instead — a checkbox you
      cannot press without opening the row would be a control pretending to be
      a status. */
-  /* Which population this row belongs to when a group is drawn from one.
-     It used to be inferred from how the row arrived — asked for access, or
-     issued a code — which answers the wrong question: both happen in a
-     browser on one machine, and that describes a device. A person is an
-     identity that carries from a phone to a laptop, so it is a thing to be
-     told rather than guessed at. */
-  const krow = document.createElement('div');
-  krow.className = 'namerow';
-  const klab = document.createElement('b');
-  klab.textContent = 'It is a';
-  krow.appendChild(klab);
-  const kseg = document.createElement('div');
-  kseg.className = 'seg';
-  const kindNow = d.kind || '';
-  [['device', 'DEVICE'], ['user', 'PERSON'], ['', 'WORK IT OUT']].forEach(([v, txt])=>{
-    const b = document.createElement('button');
-    b.dataset.v = v; b.textContent = txt;
-    b.classList.toggle('on', v === kindNow);
-    b.onclick = ()=>{
-      kseg.querySelectorAll('button').forEach(x=> x.classList.toggle('on', x === b));
-      syncGroups();
-    };
-    kseg.appendChild(b);
-  });
-  krow.appendChild(kseg);
-  box.appendChild(krow);
+  /* "It is a — DEVICE / PERSONAL / WORK IT OUT" is gone, and so is the route
+     behind it. It moved a row between two DISPLAY populations, and there is
+     one: how a row enrolled is a fact about the row, not a list it may be put
+     in. It is shown below rather than chosen. */
 
   /* …and WHICH group of that population, where there is a choice to make.
      Everything that starts working is filed with its own kind, so a grant to
@@ -6988,48 +7292,66 @@ function kioskBlock(d){
      people meant one of the three, and picking it here is the moment they
      know which. Hidden where there is nothing to decide: one group of a kind
      is not a choice, it is the answer. */
+  /* WHICH GROUPS, plural. It was one dropdown, which could only ever say one
+     group — so the server enforced what the control could express and moving a
+     screen into Physics quietly took it out of Devices, losing whatever that
+     granted. A group is a grant and grants add up: a television is allowed to
+     be physics department kit and a television. */
   const grow = document.createElement('div');
   grow.className = 'namerow';
   const glab = document.createElement('b');
-  glab.textContent = 'In group';
+  glab.textContent = 'Also in';
   grow.appendChild(glab);
-  const gsel = document.createElement('select');
-  gsel.className = 'ppick';
-  grow.appendChild(gsel);
+  const gbox2 = document.createElement('div');
+  gbox2.className = 'cks';
+  grow.appendChild(gbox2);
   box.appendChild(grow);
 
   const kindNote = document.createElement('div');
   kindNote.className = 'note';
-  kindNote.textContent = d.kind ? ''
-    : 'Not set — currently read as ' + (d.group_kind === 'user' ? 'a person' : 'a device')
-      + ' from how it arrived.';
+  kindNote.textContent = d.arrived === 'invited'
+    ? 'Created here and enrolled with a code.'
+    : 'Arrived by opening the display page and asking.';
   box.appendChild(kindNote);
 
-  /* Redrawn whenever the population changes, because the list it offers is
-     the groups OF that population — the answer to "which group" is not even
-     the same set of options a moment after somebody presses PERSON. */
+  /* Groups of DISPLAYS, which is the only population a display can be in —
+     people are a different file. CUSTOM ones only: the default group is the
+     root, this row is in it because it enrolled, and it is not a tick anybody
+     can clear. */
   function syncGroups(){
-    const want = (kseg.querySelector('button.on') || {}).dataset.v
-                 || d.group_kind || 'device';
-    const mine = (GROUPS || []).filter(g=> g.kind === want);
-    const inNow = mine.filter(g=> (g.members || []).indexOf(d.id) >= 0)[0];
-    gsel.innerHTML = '';
-    mine.forEach(g=>{
-      const o = document.createElement('option');
-      o.value = g.id;
-      o.textContent = g.name;
-      gsel.appendChild(o);
-    });
-    if (!mine.length){
-      const o = document.createElement('option');
-      o.value = '';
-      o.textContent = want === 'user' ? 'People — made when you save'
-                                      : 'Devices — made when you save';
-      gsel.appendChild(o);
+    const mine = (GROUPS || []).filter(g=> g.kind === 'device' && !g.system);
+    const home = (GROUPS || []).filter(g=> g.kind === 'device' && g.system)[0];
+    gbox2.innerHTML = '';
+    if (home){
+      const em = document.createElement('span');
+      em.className = 'gkind';
+      em.textContent = 'always in ' + home.name + (mine.length ? ' · also:' : '');
+      gbox2.appendChild(em);
     }
-    gsel.value = inNow ? inNow.id : (mine[0] ? mine[0].id : '');
-    /* One group of a kind is not a choice. Two is. */
-    grow.style.display = mine.length > 1 ? '' : 'none';
+    mine.forEach(g=>{
+      const lab = document.createElement('label');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.dataset.g = g.id;
+      cb.checked = (g.members || []).indexOf(d.id) >= 0;
+      lab.appendChild(cb);
+      lab.appendChild(document.createTextNode(' ' + g.name));
+      gbox2.appendChild(lab);
+    });
+    /* What was on screen when this was drawn. SAVE compares against THIS, not
+       against the live GROUPS array — otherwise "the ticks changed" and "the
+       server changed under us" are the same test, and a save about kiosk mode
+       resolves the second by overwriting the server from a snapshot the admin
+       never touched. /groups/sets is an authoritative full set, so that drops
+       a grant somebody made from the group list a moment earlier. */
+    gbox2.dataset.painted = mine.filter(g=> (g.members || []).indexOf(d.id) >= 0)
+                                .map(g=> g.id).sort().join(',');
+    /* Set both ways round. It only ever hid, so a row built while the group
+       list had failed to load stayed hidden for its lifetime — and the save
+       path reads its checkboxes regardless, so a control the admin cannot see
+       was still voting, and always for "no custom groups". */
+    const usable = !!(mine.length || home);
+    grow.style.display = usable ? '' : 'none';
+    gbox2.dataset.usable = usable ? '1' : '';
   }
   syncGroups();
 
@@ -7107,22 +7429,20 @@ function kioskBlock(d){
          population a row is in can drop it from groups of the other one, and
          the server says which so this can report it rather than let a group
          quietly lose a member. */
-      const wantKind = (kseg.querySelector('button.on') || {}).dataset.v || '';
-      const wantGroup = gsel.value || '';
-      const inNow = (GROUPS || []).filter(
-        g=> (g.members || []).indexOf(d.id) >= 0)[0];
+      /* Only the custom ones, and only where they actually changed. The
+         default group is not in this list and the server would ignore it. */
+      const wantSet = [...gbox2.querySelectorAll('input:checked')].map(x=> x.dataset.g);
       let extra = '';
-      if (wantKind !== (d.kind || '') || (wantGroup && wantGroup !== (inNow || {}).id)){
-        const k = await api('/displays/kind', {method:'POST', body: JSON.stringify(
-          {id: d.id, kind: wantKind, group: wantGroup})});
-        if (k.displays) DISPLAYS = k.displays;
+      /* Nothing drawn is not the same as nothing ticked. */
+      if (gbox2.dataset.usable
+          && wantSet.slice().sort().join(',') !== (gbox2.dataset.painted || '')){
+        const k = await api('/groups/sets', {method:'POST', body: JSON.stringify(
+          {id: d.id, groups: wantSet})});
         if (k.groups) GROUPS = k.groups;
-        d.kind = wantKind;
-        kindNote.textContent = '';
-        if ((k.dropped || []).length)
-          extra = ' · removed from ' + k.dropped.join(', ')
-                + ' — a group takes one population';
-        if (k.joined) extra += ' · in ' + k.joined;
+        const names = (k.groups || []).filter(g=> wantSet.indexOf(g.id) >= 0)
+                                      .map(g=> g.name);
+        extra = names.length ? ' · also in ' + names.join(', ')
+                             : ' · in its default group only';
         syncGroups();
         if (typeof refreshGroups === 'function') refreshGroups();
       }
@@ -7141,8 +7461,6 @@ function kioskBlock(d){
        screen, it does not go looking for what changed elsewhere meanwhile. */
     kb.checked = !!d.kiosk;
     sel.value = d.kiosk_profile || '';
-    kseg.querySelectorAll('button').forEach(x=>
-      x.classList.toggle('on', x.dataset.v === (d.kind || '')));
     sync();
     said.className = 'note';
     said.textContent = 'back to what is saved';
@@ -7232,7 +7550,10 @@ function paintBulk(){
    different questions asked by the same admin on different days. */
 const DISP_BUCKETS = ['waiting', 'enrol', 'users', 'devices'];
 function dispBucket(d){
-  const person = d.group_kind === 'user';
+  /* The register files a row by how it ARRIVED, which is what these buckets
+     have always actually been about — "who has been let in" and "which of my
+     screens is on the wall" are two doors, not two populations. */
+  const person = d.arrived === 'asked';
   if (dispState(d) === 'live') return person ? 'users' : 'devices';
   return person ? 'waiting' : 'enrol';
 }
@@ -8846,8 +9167,13 @@ function panelNav(){
       /* The endpoint blocks list SPEECH PROFILES, and those live in the
          displays document — which this tab never fetched. Painted before it
          arrives, every picker on every endpoint is empty but for DEFAULT.
-         Load first, then paint. */
-      Promise.resolve(refreshProfiles()).then(loadBackend);
+         Load first, then paint.
+
+         The people an endpoint can be granted to are the same problem in the
+         same place: their list is fetched by the tab they are managed on, and
+         an endpoint painted before it arrives offers nobody. */
+      Promise.resolve(Promise.all([refreshProfiles(), loadIdentities()]))
+        .then(loadBackend);
     }
     if (tab === 'docs') loadDocs();
   }

@@ -78,7 +78,7 @@ a URL and talks to the display.
   admin session lasts, how long an **enrolment code** is worth anything for,
   **AI Requires Permission** — whether a general user needs approval at all,
   how long a grant lasts, how many devices and waiting requests there may be —
-  and the **groups** access is granted to. ENROLLMENTS ▸ PERSON answers who is
+  and the **groups** access is granted to. ENROLLMENTS ▸ USER answers who is
   waiting; this is whether anybody is asked in the first place.
 
 **ENROLLMENTS** — how something comes to be here, as opposed to everything left
@@ -294,7 +294,7 @@ leaves the tab it arrived through.
 
 Whether anybody is asked at all is on **SECURITY**, under **AI Requires
 Permission** — that is the door rather than the key, and it decides what a
-grant is worth once given. ENROLLMENTS ▸ PERSON answers who is waiting; SECURITY
+grant is worth once given. ENROLLMENTS ▸ USER answers who is waiting; SECURITY
 answers whether anybody has to.
 
 Each profile list has a tab of its own in the profile settings group — what a
@@ -330,7 +330,7 @@ person who filled in a form the same as a screen an admin minted a code for.
 The two populations arrive by different routes with different buttons, and
 neither wants to read the other's queue while doing it.
 
-So an arrival is under **ENROLLMENTS** — ▸ PERSON while a person waits on a
+So an arrival is under **ENROLLMENTS** — ▸ USER while a person waits on a
 decision, ▸ DEVICE while a screen has not taken its code — and everything
 working is under **CONNECTIONS**, in its own area. A row
 moves itself the moment it starts working.
@@ -899,15 +899,32 @@ needed rather than shipped, and an existing group of the right kind is adopted
 before a second is created — so an install that never uses groups never grows
 two it did not ask for.
 
-**Two kinds, and they do not mix.** They answer separate questions — *the
-physics department* and *the screens in the east wing* — so a group holds one
-population or the other, and its kind cannot be changed once it exists.
+**Two kinds, and they do not mix.**
 
-**Which population a row is in is set on the row**, wherever that row is
-currently listed: *It is a* — DEVICE, PERSON, or WORK IT OUT. Changing it moves
-the row into that population's group, and where you have more than one group of
-that kind a picker appears beside the control to say which. It is hidden where
-there is one, because one is not a choice.
+- **USERS** holds the people created under ENROLLMENTS ▸ USER. A person
+  reaches an endpoint from whatever machine they open their URL on, so a grant
+  made here follows the human rather than the hardware.
+- **DEVICES** holds displays — every screen and every laptop, however it got
+  here.
+
+There was briefly a third, separating the machines that *asked* from the ones
+an admin *invited*. That is how a row enrolled, not which population it is in:
+both are a browser on one machine, so both are displays. It is written on the
+row now, where it describes without sorting — which means a group holding a
+wall screen and somebody's laptop is a perfectly good group, where before it
+could not exist.
+
+**Groups stored under the old kind read back as DEVICES**, keeping their
+members and the names you gave them. Nothing was rewritten on disk.
+
+The two that remain cannot mix, and the reason is concrete rather than tidy:
+they are different files whose ids are minted independently. That is also why
+**a group's kind cannot change once it exists** — a kind that changed would not
+filter the group's members, it would fail to find any of them.
+
+**How a display got here is shown on the row**, not chosen: *created here and
+enrolled with a code*, or *arrived by opening the display page and asking*. The
+control that used to set it is gone with the distinction it was setting.
 
 **Left at WORK IT OUT it follows how the row arrived** — recorded when the row
 was made and never changed after. A code you minted is a **device**; a browser
@@ -933,10 +950,14 @@ member.
 its own is reachable by everyone in the group plus that device. Being in a
 group never takes away a grant made individually.
 
-**A group is not approval.** Somebody in a group who has not been approved is
-still refused, and so is somebody whose access has run out. The group says
-*which* endpoints they may reach; approval says whether they may reach anything
-at all.
+**A group is not approval** — for a display. A device in a group that has not
+been approved is still refused, and so is one whose access has run out. The
+group says *which* endpoints it may reach; approval says whether it may reach
+anything at all.
+
+**A person has no equivalent test.** An identity exists only because you made
+it, so creating one *is* the approval and there is no way to turn up asking to
+be one. Withdrawing it is deleting the person, or reissuing their URL.
 
 **Deleting a group** removes it from every endpoint that named it. Nothing in
 it is deleted — a group is a way of referring to people and devices, not a
