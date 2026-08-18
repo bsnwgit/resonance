@@ -3381,6 +3381,85 @@ def display_health(did, rows=None, now_=None):
             "last": max([r["at"] for r in mine], default=0)}
 
 
+# THE CONVERSATION RECORD. This entry used to promise "no conversation
+# content", and that boundary has moved — stated plainly rather than quietly
+# broken, because a promise like that is worth only what it is kept to:
+#
+#   What was addressed to the device — from the wake word to the end of the
+#   conversation — and the routing decision that followed, retained for a
+#   window. Nothing outside an active conversation is recorded.
+#
+# The reasoning: a voice-only display shows nobody anything, so when it
+# mishears there is no record at all and nothing to fix. And the captured text
+# is exactly what already leaves the machine — it goes to a house or a model
+# regardless — so this adds retention, not disclosure. Nothing is captured
+# unless somebody said a wake word.
+#
+# THE WORDS ARE THE LEAST USEFUL PART. What makes a voice fault diagnosable is
+# the decision trail beside them, and "it didn't work" resolves into: the
+# recogniser heard "hows" and matched it fuzzily to the house route.
+TURNS_PATH = os.path.join(ROOT, "turns.json")
+_turns_lock = threading.RLock()
+MAX_TURNS = 500
+
+
+def read_turns():
+    try:
+        with open(TURNS_PATH) as fh:
+            doc = json.load(fh)
+        rows = doc.get("turns") if isinstance(doc, dict) else None
+    except (OSError, ValueError):
+        return []
+    return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+
+
+def write_turns(rows):
+    with _turns_lock:
+        tmp = TURNS_PATH + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump({"version": 1, "turns": rows[-MAX_TURNS:]}, fh)
+        os.chmod(tmp, 0o600)          # it holds what was said to a display
+        os.replace(tmp, TURNS_PATH)
+
+
+def note_turn(did, route, heard, sent, reply, trail=None, ms=0, error="",
+              fell_to=""):
+    """One turn, with the trail that explains it. Only ever called where an
+    utterance has already been decided to be this screen's business."""
+    if not did:
+        # A turn with no screen to attach it to is a turn nobody can act on,
+        # and the embed is not a screen. Recording it would be collecting for
+        # its own sake.
+        return
+    t = trail if isinstance(trail, dict) else {}
+    with _turns_lock:
+        rows = read_turns()
+        rows.append({
+            "did": str(did)[:32], "route": str(route or "")[:60],
+            # BEFORE the wake word came off, which is the whole point: it is
+            # the only field that can show a near miss.
+            "heard": str(heard or "")[:400],
+            "sent": str(sent or "")[:400],
+            "reply": str(reply or "")[:400],
+            "via": str(t.get("via") or "")[:12],
+            "word": str(t.get("word") or "")[:40],
+            "as": str(t.get("as") or "")[:40],
+            "ms": max(0, int(ms or 0)), "error": str(error or "")[:300],
+            "fell_to": str(fell_to or "")[:60],
+            "at": int(time.time()),
+        })
+        write_turns(rows)
+
+
+def prune_turns():
+    cutoff = int(time.time()) - event_window_days() * 86400
+    rows = read_turns()
+    keep = [r for r in rows if int(r.get("at") or 0) >= cutoff]
+    if len(keep) != len(rows):
+        write_turns(keep)
+    return len(rows) - len(keep)
+
+
 def prune_events():
     """Past the window, gone. Read at startup and after each poll that wrote
     anything, which is often enough on a server that only grows this file when
@@ -6117,6 +6196,11 @@ class Handler(SimpleHTTPRequestHandler):
                 "recent": [dict(r, label=display_label(displays[r["did"]])
                                 if r.get("did") in displays else "")
                            for r in sorted(rows, key=lambda r: -r["at"])[:200]],
+                # The conversation record, newest first. Bounded the same way
+                # the events are: a tail to read, not a dataset to page.
+                "turns": [dict(r, label=display_label(displays[r["did"]])
+                               if r.get("did") in displays else "")
+                          for r in sorted(read_turns(), key=lambda r: -r["at"])[:120]],
                 "days": event_window_days(),
                 "limits": {"event_days": EVENT_DAYS_LIMITS},
                 "kinds": list(EVENT_KINDS), "total": len(rows)})
@@ -6903,6 +6987,7 @@ class Handler(SimpleHTTPRequestHandler):
             # no row to file against, and its poll returns above.
             if obj.get("events") and take_events(disp["id"], obj.get("events")):
                 prune_events()
+                prune_turns()
             try:
                 req = int(disp.get("reload_req") or 0)
             except (TypeError, ValueError):
@@ -7214,10 +7299,18 @@ class Handler(SimpleHTTPRequestHandler):
             # should be able to start clean without being taken off the wall.
             keep = [r for r in rows if r.get("did") != did] if did else []
             write_events(keep)
-            print("%d event(s) cleared by %s%s"
-                  % (len(rows) - len(keep), s["user"],
+            # The conversation record goes with it. They are one window and one
+            # control; clearing what a screen reported while keeping what was
+            # said to it would be the surprising half of the pair.
+            turns = read_turns()
+            tkeep = [r for r in turns if r.get("did") != did] if did else []
+            write_turns(tkeep)
+            print("%d event(s) and %d turn(s) cleared by %s%s"
+                  % (len(rows) - len(keep), len(turns) - len(tkeep), s["user"],
                      " for " + did if did else " (all)"), flush=True)
-            return self._json(200, {"ok": True, "cleared": len(rows) - len(keep)})
+            return self._json(200, {"ok": True,
+                                    "cleared": len(rows) - len(keep),
+                                    "turns": len(turns) - len(tkeep)})
 
         if parsed.path == "/identities/wake":
             s = self._require("admin")
@@ -7827,10 +7920,14 @@ class Handler(SimpleHTTPRequestHandler):
                 # The leg only this side can see. A display is told something
                 # went wrong and deliberately not what; the panel is where the
                 # verbatim error belongs, keyed to the screen that hit it.
+                failed_ms = int((time.time() - t0) * 1000)
                 note_event("backend_error", did=disp["id"] if disp else "",
                            level="error", route=cfg.get("name") or rid,
-                           detail=str(exc)[:300],
-                           ms=int((time.time() - t0) * 1000))
+                           detail=str(exc)[:300], ms=failed_ms)
+                bad_trail = obj.get("trail") if isinstance(obj.get("trail"), dict) else None
+                note_turn(disp["id"] if disp else "", cfg.get("name") or rid,
+                          (bad_trail or {}).get("heard"), text, "", bad_trail,
+                          failed_ms, error=str(exc))
                 # The message names the route rather than the adapter. A
                 # display says this out loud, and "openai returned 401" tells
                 # the person standing in front of it nothing they can act on
@@ -7896,7 +7993,15 @@ class Handler(SimpleHTTPRequestHandler):
 
             ms = int((time.time() - t0) * 1000)
             reply = out.get("reply") or ""
+            # The trail comes from the display, which is the only place it ever
+            # existed: after the gate the wake word is stripped and the near
+            # miss is gone. A turn typed into the composer carries none, and
+            # gets none invented for it.
+            trail = obj.get("trail") if isinstance(obj.get("trail"), dict) else None
             if not reply:
+                note_turn(disp["id"] if disp else "", cfg.get("name") or rid,
+                          (trail or {}).get("heard"), text, "", trail, ms,
+                          error="that route returned nothing")
                 return self._json(502, dict(about, ms=ms,
                                             error="that route returned nothing"))
             print("ask ok (%s %s) %dms%s"
@@ -7907,6 +8012,9 @@ class Handler(SimpleHTTPRequestHandler):
             # window, and the server has no idea a conversation is in progress
             # between two requests. Nothing here ends one — see the note in
             # ask_homeassistant about the flag that used to.
+            note_turn(disp["id"] if disp else "", cfg.get("name") or rid,
+                      (trail or {}).get("heard"), text, reply, trail, ms,
+                      fell_to=fell_to)
             return self._json(200, dict(about, reply=reply, ms=ms,
                                         conversation_id=out.get("conversation_id") or ""))
 
@@ -8065,6 +8173,7 @@ def main():
     # so a server that has been down for a fortnight does not come back holding
     # a fortnight of what was said to a screen.
     prune_events()
+    prune_turns()
     app = read_app()
     # Environment still wins, so a one-off run on a different port needs no
     # edit to the stored configuration. Setting PORT alone moves all three,

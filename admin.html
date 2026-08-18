@@ -3177,6 +3177,10 @@ code for do not, and never will.
   </div>
   <div class="note" id="evnote"></div>
   <div id="evlist"></div>
+  <div class="barehead" style="margin-top:14px">
+    <span class="listtitle">What was said to them</span>
+  </div>
+  <div id="turnlist"></div>
   <div class="seg actrow"><button id="b_evclear" class="act-undo">CLEAR ALL</button></div>
   <div class="note help">A screen with a fault cannot tell anybody. This is
 where it says so: a microphone that would not open, a browser with no recorder
@@ -5768,6 +5772,7 @@ async function refreshEvents(){
     box.className = 'note';
     box.textContent = 'Nothing reported. A screen with no faults says nothing, '
                     + 'which is the answer you want.';
+    paintTurns();
     return;
   }
   box.className = '';
@@ -5830,6 +5835,78 @@ async function refreshEvents(){
     };
     acts.appendChild(clr);
     row.appendChild(acts);
+    box.appendChild(row);
+  });
+  paintTurns();
+}
+
+/* The decision trail, which is the half that makes a voice fault answerable.
+   "It didn't work" becomes "the recogniser heard hows and matched it fuzzily
+   to the house route", and that is a thing somebody can act on. */
+function paintTurns(){
+  const box = $('turnlist');
+  if (!box) return;
+  const rows = (EVENTS && EVENTS.turns) || [];
+  box.innerHTML = '';
+  if (!rows.length){
+    box.className = 'note';
+    box.textContent = 'Nothing yet. Only what a screen was addressed to is '
+                    + 'kept — from a wake word to the end of that '
+                    + 'conversation, and nothing outside one.';
+    return;
+  }
+  box.className = '';
+  rows.forEach(t=>{
+    const row = document.createElement('div');
+    row.className = 'erow shut';
+    const top = document.createElement('div'); top.className = 'top';
+    const nm = document.createElement('span');
+    nm.className = 'nm';
+    nm.textContent = t.heard || t.sent || '(nothing)';
+    top.appendChild(nm);
+    /* HOW it matched, which is the field the whole record exists for. A near
+       miss is the only way two wake words cross-triggering is ever found. */
+    if (t.via){
+      const v = document.createElement('span');
+      v.className = 'badge' + (t.via === 'fuzzy' ? ' warn' : '');
+      v.textContent = t.via === 'fuzzy'
+        ? 'NEAR “' + (t.word || '') + '”' : 'EXACT';
+      top.appendChild(v);
+    }
+    const rt = document.createElement('span');
+    rt.className = 'badge';
+    rt.textContent = t.route || '';
+    top.appendChild(rt);
+    if (t.error){
+      const e = document.createElement('span');
+      e.className = 'badge warn';
+      e.textContent = 'FAILED';
+      top.appendChild(e);
+    }
+    top.onclick = ()=>{
+      const opening = row.classList.contains('shut');
+      box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+      row.classList.toggle('shut', !opening);
+    };
+    row.appendChild(top);
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    [['Screen', t.label || t.did],
+     ['Heard', t.heard || '—'],
+     ['Sent', t.sent || '—'],
+     t.via === 'fuzzy' ? ['Matched', '“' + t.as + '” near “' + t.word + '”'] : null,
+     ['Answered', t.error ? '' : (t.reply || '—')],
+     t.error ? ['Error', t.error] : null,
+     t.fell_to ? ['Fell through to', t.fell_to] : null,
+     ['Took', t.ms + 'ms · ' + evWhen(t.at)]].filter(Boolean).forEach(([k, v])=>{
+      const el = document.createElement('div');
+      const bb = document.createElement('b');
+      bb.textContent = k + ' ';
+      el.appendChild(bb);
+      el.appendChild(document.createTextNode(v));
+      meta.appendChild(el);
+    });
+    row.appendChild(meta);
     box.appendChild(row);
   });
 }

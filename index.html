@@ -3520,6 +3520,11 @@ async function askBackend(text, bare){
      setting nobody could reason about. */
   let who = '';
   try{
+    /* Taken and cleared in one step, before the request rather than after
+       it: a typed question following a spoken one must not inherit the spoken
+       one's trail, and a failed request must not leave it to be picked up by
+       the next. */
+    const trail = Wake.trail; Wake.trail = null;
     const r = await fetch('ask', {
       method:'POST', headers:{'Content-Type':'application/json'},
       /* The server runs on UTC and the person is not necessarily standing in
@@ -3533,8 +3538,13 @@ async function askBackend(text, bare){
          one of its own. It is held for exactly as long as the route binding —
          see Wake.convo — because that is what makes an answer of "which
          room?" followed by "the kitchen" mean anything. */
+      /* What was HEARD, before the wake word came off, and how it matched.
+         Only for a turn that arrived by voice: a question typed into the
+         composer has no recogniser output and no wake word to have matched,
+         and inventing one would put a fiction in the record. */
       body: JSON.stringify({text, history: bare ? [] : convo, tz: LOCAL_TZ,
                             route: Routes.currentId(),
+                            trail: trail,
                             conversation_id: bare ? '' : Wake.convo})
     });
     const j = await r.json().catch(()=>({}));
@@ -4052,6 +4062,10 @@ const Wake = {
      held while awake, dropped on sleep and on switching endpoints, for the
      same reason the conversation itself is. */
   convo:'',
+  /* Set by the gate on the turn that woke it, read once by the request that
+     follows, and cleared there — a typed question after a spoken one must not
+     inherit the spoken one's trail. */
+  trail: null,
 
   norm(s){
     return (s||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
@@ -4230,7 +4244,16 @@ const Wake = {
       this.touch();
       return text;
     }
+    /* THE TRAIL, and this is the only moment it exists. After this the wake
+       word is stripped and the near-miss is gone — which is why "it didn't
+       work" has never been answerable: the one fact that explains it was
+       discarded a line later. Carried on the object rather than logged,
+       because nothing is recorded until the utterance turns out to have been
+       addressed to this screen. */
     const h = this.heard(text);
+    if (h) this.trail = {heard: text,
+                         via: h.fuzzy ? 'fuzzy' : 'exact',
+                         word: h.word || '', as: h.fuzzy || ''};
     if (!h){
       /* Nothing is said about it. Speech that named no assistant was not
          addressed to this screen, and announcing that it was heard and
