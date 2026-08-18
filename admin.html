@@ -1045,15 +1045,22 @@
       color:rgba(var(--paper),.8);cursor:pointer}
   .vo.hd{color:rgba(var(--paper),.96);letter-spacing:.1em}
   .vo input{flex:0 0 auto}
-  /* What a kiosk IS lives in its profile, so a row carries one choice rather
-     than a panel of settings. Revealed by the tick above it: most rows in a
-     real deployment are a laptop or a phone, and a control that does not apply
-     to them on every one of fifty rows is a register nobody reads. Indented
-     under the tick that turns it on, so it reads as belonging to it. */
-  .kiosk .kioskon{margin-left:18px;padding-left:8px;
-                  border-left:1px solid rgba(var(--glass),.14)}
-  .kiosk .kioskon.off{display:none}
+  /* .kioskon is gone with the tick it was revealed by: what a screen looks
+     like is one picker now, on a line with the other two things a row was
+     created with, and an indented reveal under a checkbox was the second
+     control that choice no longer needs. */
   .kiosk .acts{margin-top:7px}
+  /* The row's own copy of the three, laid out exactly as GET A CODE lays them
+     out — a register that describes a screen differently from the form that
+     made it is two vocabularies for one thing. */
+  .kiosk .setuprow{margin-top:4px}
+  /* A rule under the ticks. Everything above it is what this screen is SET to
+     and can be changed here; everything below is what is known ABOUT it and
+     cannot. Two kinds of line reading as one list was the whole complaint. */
+  .kiosk .newends{
+    margin-top:8px;padding-bottom:10px;
+    border-bottom:1px solid rgba(var(--glass),.16);
+  }
   /* A profile is drawn with the device register's own .erow — the same
      caret, the same one-open-at-a-time, the same name-as-title. They are the
      same kind of thing in the same panel, and a second row style that behaved
@@ -1230,7 +1237,36 @@
      and tighter between themselves than either is from the field above. */
   .setuprow + .setuprow{margin-top:6px}
   .setuprow .vo{margin:0}
-  .setuprow .ppick{max-width:230px}
+  /* A label and the control it names, kept together across a wrap. Without
+     this the row wraps on whatever boundary happens to fall at the edge, and
+     "Network" ends a line with its picker starting the next one. */
+  .setpair{display:flex;align-items:center;gap:8px;min-width:0}
+  .setuprow .ppick{max-width:230px;min-width:0}
+  .setpair .ppick{flex:0 1 auto;min-width:140px}
+  /* Wide enough to read as a division rather than as a wider gap, with the
+     rule centred in it. It goes when the row wraps: a vertical divider at the
+     end of a line divides a thing from nothing. */
+  .setgap{
+    width:46px;flex:0 0 auto;align-self:stretch;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .setgap::before{
+    content:'';width:1px;height:24px;background:rgba(var(--glass),.30);
+  }
+  /* The ticks under the pair, with their name over them rather than beside
+     them: a grid cannot sit at the end of a flex line without deciding to be
+     one column or the whole width, and both are wrong. */
+  .newends{margin-top:9px}
+  .newends .bklab{display:block;margin:0 0 2px}
+  /* NOT the two half-width columns .cks gives a row. That grid is right
+     inside an open row, which is narrow; out here the container is the whole
+     panel, so two columns put a tick at the left edge and its neighbour half
+     a screen away with nothing between them. These sit at their own width,
+     next to each other, and wrap when they run out of line. */
+  .newends .cks{
+    display:flex;flex-wrap:wrap;gap:3px 20px;margin:0;
+  }
+  .newends .cks label{white-space:nowrap}
   .setuprow .bklab{margin:0}
   /* The same row, at the head of a list rather than the foot: its rule goes
      under it, because a rule above the first thing on a page is a line under
@@ -1276,13 +1312,14 @@
   .codeclock.spent{color:#e0716b}
   .codeclock.forever{color:rgba(var(--paper),.75);letter-spacing:.1em}
 
-  /* …and the same box where the code is ASKED for, which is not on the same
-     tab as the register it appears in. Pressing GET A CODE and being shown
-     nothing, because the answer landed somewhere you were not looking, is not
-     a flow anybody can follow. */
+  /* There was a SECOND box of this kind, up beside GET A CODE, from when the
+     code was asked for on a different tab from the register it appeared in —
+     pressing the button and being shown nothing was not a flow anybody could
+     follow. Both now sit on ENROLLMENTS ▸ DEVICE, the row opens itself the
+     moment it is made, and the second box was the same URL twice on one
+     screen. */
   .erow .dcode,
-  #idurl,
-  #dispcode{
+  #idurl{
     margin:6px 0 2px;padding:6px 8px;user-select:all;
     background:rgba(122,201,160,.07);
     border:1px solid rgba(122,201,160,.5);
@@ -1290,25 +1327,15 @@
     color:#d2f2e2;word-break:break-all;
   }
   .erow .dcode span,
-  #idurl span,
-  #dispcode span{
+  #idurl span{
     display:block;margin-top:3px;user-select:none;
     font-size:calc(8.5px * var(--fs));letter-spacing:.06em;
     color:rgba(var(--paper),.62);
   }
   /* A URL rather than six characters, so it wraps instead of tracking wide. */
   #idurl{letter-spacing:.02em}
-  #dispcode,
   #idurl{display:none}
-  #dispcode.on,
   #idurl.on{display:block}
-  /* Spent. Kept on screen rather than removed, because a box that vanishes
-     while you are walking back to the keyboard is indistinguishable from one
-     that was never there — and this one has to say what to do next. */
-  #dispcode.dead{
-    background:rgba(224,113,107,.06);border-color:rgba(224,113,107,.45);
-    color:rgba(var(--paper),.6);user-select:none;
-  }
   .erow .r{margin-left:auto;display:flex;gap:4px}
   .erow button{font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.1em;padding:3px 6px;
                cursor:pointer;background:none;color:rgba(var(--paper),.87);
@@ -3139,19 +3166,51 @@ NODES, filed with the other people.</div>
              placeholder="kitchen wall">
       <button id="b_adddisp" class="act-add">GET A CODE</button>
     </div>
-    <!-- Network first: it is the one that decides the address in the code you
-         are about to be handed, so it belongs above the pair that only decide
-         what the screen looks like once it has used it. -->
+    <!-- The three things an admin already knows about a screen, on one line
+         in the order they are decided: WHO it talks to, WHERE it answers, and
+         WHAT it looks like. Each label stays welded to its own picker — a
+         line of three that wraps by label and control separately is three
+         choices nobody can read.
+
+         Assistant is an ENDPOINT and not a model: a model profile is what an
+         endpoint speaks to, and several endpoints can name the same one. What
+         a screen is granted is the endpoint, which carries the model, the
+         voice and the wake word together.
+
+         Display mode is a picker alone, where it was a tick with a picker
+         that appeared when it was ticked. Two controls for one choice, and
+         the second one hidden until the first was found: NONE is the top of
+         the list and the default, and choosing anything else IS switching it
+         on. -->
+    <!-- NETWORK IS NOT HERE. It was, and it was the second control in this
+         product called that: one on the screen, one on the endpoint, meaning
+         different things. A row could say HA Display while every endpoint
+         answered on Default, and the screen then loaded, drew correctly and
+         answered to nothing. Where a screen is opened from is the port its
+         AI answers on, so it is read back off the ticks below rather than
+         asked for twice. -->
     <div class="setuprow">
-      <label class="bklab" for="dp_newnet">Network</label>
-      <select id="dp_newnet" class="ppick"></select>
+      <span class="setpair">
+        <label class="bklab" for="dp_newprofile">Display mode</label>
+        <select id="dp_newprofile" class="ppick"></select>
+      </span>
     </div>
-    <div class="setuprow">
-      <label class="vo"><input type="checkbox" id="dp_newkiosk"> Display mode</label>
-      <select id="dp_newprofile" class="ppick" hidden></select>
+    <!-- TICKS AND NOT A PICKER, under the two above rather than beside them.
+         A screen may be given several assistants — that is the ordinary case
+         for a wall panel that answers to a house name and a model — and a
+         dropdown says the opposite: one of these, choose. It is also the same
+         control, in the same words, as the grant on the row itself, so what
+         is set here and what is read there are recognisably one thing.
+
+         Under, because it is the one that can be several: two pickers side by
+         side are a line, and a line with a grid hanging off the end of it is
+         neither. -->
+    <div class="newends">
+      <!-- AI, the same word the tab these come from is called. -->
+      <label class="bklab">AI</label>
+      <div class="cks" id="dp_newends"></div>
     </div>
   </div>
-  <div id="dispcode"></div>
   <div class="note" id="dispnote"></div>
   <div id="enrollist"></div>
   <div class="note help">A screen, from naming it to the moment it works. Name
@@ -8164,21 +8223,33 @@ function kioskBlock(d){
   }
   syncGroups();
 
-  const l = document.createElement('label');
-  l.className = 'vo';
-  const kb = document.createElement('input');
-  kb.type = 'checkbox'; kb.checked = !!d.kiosk;
-  l.appendChild(kb);
-  l.appendChild(document.createTextNode('Display mode'));
-  box.appendChild(l);
+  /* THE SAME THINGS THE ROW WAS CREATED WITH, in the same order and the same
+     shape as GET A CODE: display mode, and the AI it may use. The register
+     showed only the first, so what a screen was granted could be chosen when
+     it was made and never seen again.
 
-  const inner = document.createElement('div');
-  inner.className = 'kioskon';
+     Network is on neither, by design — where a screen is opened from is the
+     port its AI answers on, and asking for it twice is what let a row claim
+     one port while its endpoints answered on another.
 
-  /* No label beside it. The tick immediately above says Display mode, and a
-     second "Display" on the line under it is the same word twice. */
+     The tick that used to switch display mode on is gone here as well: NONE at
+     the top of the picker is the whole of saying no, which is one control for
+     one choice rather than two that can disagree. */
+  const line = document.createElement('div');
+  line.className = 'setuprow';
+  const pair = (text, ctl, forId)=>{
+    const sp = document.createElement('span');
+    sp.className = 'setpair';
+    const lb = document.createElement('label');
+    lb.className = 'bklab';
+    lb.textContent = text;
+    if (forId){ ctl.id = forId; lb.htmlFor = forId; }
+    sp.appendChild(lb); sp.appendChild(ctl);
+    return sp;
+  };
+
   const sel = document.createElement('select');
-  sel.className = 'kpick';
+  sel.className = 'ppick';
 
   const kiosks = (DPCFG && DPCFG.kiosks) || [];
   const defId  = (DPCFG && DPCFG.kiosk_default) || '';
@@ -8186,11 +8257,21 @@ function kioskBlock(d){
   /* Naming the default rather than saying "default" alone. A row left on this
      is the commonest state in a building, and somebody reading the register
      should not have to open another tab to find out what it means. */
+  /* THREE kinds of answer, and all three already exist in the stored row: not
+     a display-mode screen at all, one that is but names no profile so it
+     follows whichever is default, and one that names its own. NONE is new and
+     is what the tick used to say; DEFAULT is kept because rows are sitting in
+     exactly that state and rendering them as NONE would turn a save into a
+     silent change of what the screen does. */
   const none = document.createElement('option');
-  none.value = '';
-  none.textContent = defOne ? 'DEFAULT — ' + defOne.name
-                            : 'DEFAULT — none set yet';
+  none.value = '__off';
+  none.textContent = 'NONE';
   sel.appendChild(none);
+  const dflt = document.createElement('option');
+  dflt.value = '';
+  dflt.textContent = defOne ? 'DEFAULT — ' + defOne.name
+                            : 'DEFAULT — none set yet';
+  sel.appendChild(dflt);
   kiosks.forEach(k=>{
     const o = document.createElement('option');
     o.value = k.id;
@@ -8211,13 +8292,22 @@ function kioskBlock(d){
     o.title = bits.join(', ');
     sel.appendChild(o);
   });
-  sel.value = d.kiosk_profile || '';
-  inner.appendChild(sel);
-  box.appendChild(inner);
+  sel.value = d.kiosk ? (d.kiosk_profile || '') : '__off';
+  line.appendChild(pair('Display mode', sel));
+  box.appendChild(line);
 
-  const sync = ()=> inner.classList.toggle('off', !kb.checked);
-  kb.onchange = sync;
-  sync();
+  /* Which assistants it may use, ticked here as well as at the moment a code
+     is minted — the same control in the same words, so a screen's grant is
+     read where every other thing about it is read. */
+  const ends = document.createElement('div');
+  ends.className = 'newends';
+  const elab = document.createElement('label');
+  elab.className = 'bklab';
+  elab.textContent = 'AI';
+  ends.appendChild(elab);
+  const gl = grantList(d, false);
+  ends.appendChild(gl.el);
+  box.appendChild(ends);
 
   const said = document.createElement('div');
   said.className = 'note';
@@ -8229,7 +8319,12 @@ function kioskBlock(d){
     said.textContent = 'saving…';
     try{
       const j = await api('/displays/kiosk', {method:'POST', body: JSON.stringify({
-        id: d.id, kiosk: kb.checked, kiosk_profile: sel.value})});
+        id: d.id,
+        /* One picker, two stored fields — NONE is "not a display-mode screen",
+           DEFAULT is "one that names no profile". */
+        kiosk: sel.value !== '__off',
+        kiosk_profile: sel.value === '__off' ? '' : sel.value,
+        endpoints: gl.ticks.filter(c=> c.checked).map(c=> c.dataset.r)})});
       /* The cache, not the list. Rebuilding the rows here would throw away the
          row somebody has open and this message with it, and nothing else on
          screen draws these two values. */
@@ -8268,9 +8363,10 @@ function kioskBlock(d){
     /* Back to what the server holds for THIS row, read off the record the list
        was drawn from rather than re-fetched — a revert undoes what is on
        screen, it does not go looking for what changed elsewhere meanwhile. */
-    kb.checked = !!d.kiosk;
-    sel.value = d.kiosk_profile || '';
-    sync();
+    sel.value = d.kiosk ? (d.kiosk_profile || '') : '__off';
+    gl.ticks.forEach(c=>{
+      c.checked = (d.granted || []).indexOf(c.dataset.r) >= 0;
+    });
     said.className = 'note';
     said.textContent = 'back to what is saved';
   };
@@ -8386,6 +8482,28 @@ function dispBucket(d){
   return person ? 'waiting' : 'enrol';
 }
 
+/* The name somebody put on the request form, for the field that names their
+   row. Which answer that is cannot be looked up: the form is the admin's, its
+   labels are whatever they typed — the live one has a field called "Rquested
+   access Reason" — and nothing in a field marks it as the person's name.
+
+   So the rule is the one this list already uses to decide what a shut row
+   shows: the MESSAGE field is the long reason, and everything else is what
+   identifies somebody at a glance. The first of those with anything in it is
+   the closest thing to a name the form can offer, and on a form that opens
+   with "Name" it is exactly that. Not a guess dressed as a fact: the admin
+   sees it in an editable field and it is committed only if they approve.
+
+   Capped where the server caps a name, so what is shown is what would be
+   stored rather than a value the save silently shortens. */
+function askedName(d){
+  const msg = ((DPCFG && DPCFG.form) || [])
+    .filter(f=> f.message).map(f=> f.label);
+  const a = (d.answers || [])
+    .filter(x=> msg.indexOf(x.label) < 0 && (x.value || '').trim())[0];
+  return a ? a.value.trim().slice(0, 40) : '';
+}
+
 /* Every running row clock. The list is rebuilt on every action, and an
    interval whose element is no longer in the document is a timer that runs
    until the tab is closed — a dozen of them after a busy morning. */
@@ -8467,6 +8585,11 @@ async function refreshDisplays(){
     if (!conn) return;                  // that tab is not in the document
     seen[bucket] = true;
     const st = dispState(d);
+    /* A row asking for a decision. It is the same test the APPROVE/REFUSE
+       pair is drawn from, deliberately: what a row offers and what it looks
+       like are the same question asked twice. Resolved up here because the
+       name field below it needs the answer too. */
+    const undecided = d.enrolled && (st === 'asked' || st === 'waiting');
     const row = document.createElement('div');
     /* Greyed where nothing is happening — but a row holding a LIVE CODE is
        not that. It is mid-enrolment, which on this tab is the state everything
@@ -8532,7 +8655,21 @@ async function refreshDisplays(){
     };
 
     const nm = document.createElement('input');
-    nm.type = 'text'; nm.className = 'nmedit'; nm.value = d.name || '';
+    /* WHAT THEY CALLED THEMSELVES, IN THE FIELD THAT NAMES THE ROW. Somebody
+       asking for access typed a name into the form; the box that decides what
+       this row is called opened empty, so approving without noticing produced
+       a row named after the browser's declared name or after nothing at all —
+       and the one place their name was written was two lines further down,
+       under "what they told you".
+
+       Filled rather than merely shown: it is the admin's field and stays
+       editable, and pressing APPROVE commits whatever is in it. Only while a
+       decision is pending — on a row already decided, an empty box means "this
+       has no name of its own, follow what the device declares", and prefilling
+       it there would turn that into a name nobody chose the moment somebody
+       tabbed through the field. */
+    nm.type = 'text'; nm.className = 'nmedit';
+    nm.value = d.name || (undecided ? askedName(d) : '');
     nm.placeholder = d.asked || 'unnamed display';
     nm.spellcheck = false;
     nm.onclick = (e)=> e.stopPropagation();   // typing must not shut the row
@@ -8566,10 +8703,6 @@ async function refreshDisplays(){
        a row about to stop existing in this list anyway. Everything a device
        has to say about itself it says once it is connected. */
     const waiting = st === 'code' || st === 'stale';
-    /* A row asking for a decision. It is the same test the APPROVE/REFUSE
-       pair is drawn from, deliberately: what a row offers and what it looks
-       like are the same question asked twice. */
-    const undecided = d.enrolled && (st === 'asked' || st === 'waiting');
     /* No kiosk block while a row is undecided. What this screen will BE is a
        question about a device you have let in, and this one is not in yet —
        so SAVE and REVERT beside a picker are a commit against a row whose
@@ -8600,12 +8733,26 @@ async function refreshDisplays(){
     const r = document.createElement('div'); r.className = 'acts';
     /* Deciding is for a device that turned up on its own. A row created here
        was approved by being created, and has no device yet to decide about. */
-    const deciding = d.enrolled && (st === 'asked' || st === 'waiting');
+    const deciding = undecided;
+    /* Every row that can be granted anything gets the ticks, drawn above the
+       buttons — a row asking now, and one refused or expired that could be let
+       back in. Built once per row and read when a button is pressed, so what
+       APPROVE grants is whatever is ticked at that moment. */
+    const canGrant = d.enrolled
+                  && (undecided || st === 'denied' || st === 'expired');
+    const gl = canGrant ? grantList(d) : null;
     const grant = (label)=>{
       const b = document.createElement('button');
       b.textContent = label;
       b.className = 'act-save';
-      b.onclick = ()=> decide(d, true, nm.value.trim(), row);
+      /* ONE PRESS. The ticks are already on the row, so there is nothing left
+         to open and nothing left to confirm — the word on the button is the
+         thing it does. */
+      b.onclick = ()=> displayAction('/displays/decide', {
+        id: d.id, approved: true, name: nm.value.trim(),
+        endpoints: gl ? gl.ticks.filter(c=> c.checked).map(c=> c.dataset.r) : [],
+        reason: '', note: '', repeat: true,
+      });
       r.appendChild(b);
     };
     if (deciding){
@@ -8616,13 +8763,13 @@ async function refreshDisplays(){
       const no = document.createElement('button');
       no.textContent = 'REFUSE';
       no.className = 'act-danger';
-      no.onclick = ()=> decide(d, false, nm.value.trim(), row);
+      no.onclick = ()=> decide(d, nm.value.trim(), row);
       r.appendChild(no);
     }else if (d.enrolled && d.approved){
       const flip = document.createElement('button');
       flip.className = 'act-warn';
       flip.textContent = 'WITHDRAW';
-      flip.onclick = ()=> decide(d, false, nm.value.trim(), row);
+      flip.onclick = ()=> decide(d, nm.value.trim(), row);
       r.appendChild(flip);
     }else if (d.enrolled && (st === 'denied' || st === 'expired')){
       grant(st === 'expired' ? 'RENEW' : 'APPROVE');
@@ -8796,6 +8943,11 @@ async function refreshDisplays(){
     /* Under the facts and above the buttons that end the row's life. A screen
        can be told what it will look like before it has ever been switched on,
        the same way its endpoints can be ticked before it arrives. */
+    /* The grant, directly above the buttons that commit it. Reading down the
+       open row is now the whole decision in the order it is made: who they say
+       they are, what they typed, what they would be given, and the two
+       answers. */
+    if (gl) row.appendChild(gl.el);
     /* Last in the row: whether it may be here on the left, what it is and
        whether that is saved on the right. */
     row.appendChild(r);
@@ -8814,6 +8966,40 @@ async function refreshDisplays(){
      list you can see the whole of is a sentence describing what is directly
      underneath it. */
   paintBulk();
+  watchEnrolments();
+}
+
+/* A CODE IS SPENT SOMEWHERE ELSE. Every other change on this page is something
+   the admin did, so repainting after their own action was enough — but
+   enrolment finishes at the television, in another room, minutes later. Until
+   then the panel went on showing a row waiting for a code that had already
+   been used, and the only way to find out was to press something.
+
+   So it watches, and ONLY while there is something to watch: a code is live on
+   this tab. No pending code, or another tab, and the timer is not running at
+   all. That is the whole of why this is not a general poll — a panel that
+   refetches for ever because it was left open is a cost with no reader. */
+let enrolWatch = 0;
+const ENROL_WATCH_MS = 5000;
+function watchEnrolments(){
+  clearInterval(enrolWatch);
+  enrolWatch = 0;
+  if (CURRENT_TAB !== 'enrol') return;
+  const pending = (DISPLAYS || []).some(d=> dispState(d) === 'code');
+  if (!pending) return;
+  enrolWatch = setInterval(()=>{
+    if (CURRENT_TAB !== 'enrol' || signedOut || !ME){
+      clearInterval(enrolWatch); enrolWatch = 0; return;
+    }
+    /* NOT UNDER SOMEBODY'S CURSOR. This rebuilds every row, so a refresh
+       landing while an admin is naming a screen or ticking its endpoints
+       would take the control away mid-keystroke — the same rule the request
+       form follows. The next tick five seconds later will do it. */
+    const a = document.activeElement;
+    if (a && a.closest && a.closest('#panel')
+        && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) return;
+    refreshDisplays();                 // …which re-arms or stops this timer
+  }, ENROL_WATCH_MS);
 }
 
 /* ---- applying one profile to many devices ----
@@ -8880,8 +9066,8 @@ $('b_bulkapply').addEventListener('click', async ()=>{
    lists are drawn from. Repainted with it, so a profile added on another tab
    is offered here without a reload. */
 function paintNewSetup(){
-  const tick = $('dp_newkiosk'), prof = $('dp_newprofile'), net = $('dp_newnet');
-  if (!tick || !prof || !net) return;
+  const prof = $('dp_newprofile'), ends = $('dp_newends');
+  if (!prof || !ends) return;
   const fill = (sel, rows, blank)=>{
     const had = sel.value;
     sel.innerHTML = '';
@@ -8895,24 +9081,40 @@ function paintNewSetup(){
     });
     sel.value = had;
   };
-  const kd = ((DPCFG && DPCFG.kiosks) || [])
-             .filter(k=> k.id === (DPCFG && DPCFG.kiosk_default))[0];
-  fill(prof, (DPCFG && DPCFG.kiosks) || [],
-       kd ? 'DEFAULT — ' + kd.name : 'DEFAULT — none set yet');
-  const nd = ((DPCFG && DPCFG.networks) || [])
-             .filter(n=> n.id === (DPCFG && DPCFG.network_default))[0];
-  fill(net, (DPCFG && DPCFG.networks) || [],
-       nd ? 'DEFAULT — ' + nd.name : 'DEFAULT');
-  /* The profile picker belongs to the tick above it and means nothing without
-     it, so it goes away with it rather than sitting there inert. */
-  prof.hidden = !tick.checked;
+  /* NONE, first and default: a screen is an ordinary display unless somebody
+     says otherwise, and the blank option is now the whole of saying nothing
+     rather than "inherit the default profile" — which was a third state you
+     could only reach by ticking a box and leaving the picker alone. */
+  fill(prof, (DPCFG && DPCFG.kiosks) || [], 'NONE');
+  /* Ticked already, kept. This repaints whenever the display list is
+     refetched — which happens on a timer and after every action — and a form
+     somebody is halfway through filling in must not be emptied underneath
+     them by a refresh they did not ask for. */
+  const had = new Set([...ends.querySelectorAll('input:checked')]
+                        .map(c=> c.dataset.r));
+  ends.innerHTML = '';
+  if (!(DPEND || []).length){
+    const none = document.createElement('div');
+    none.className = 'note';
+    none.textContent = 'No endpoints configured yet — CONNECTIONS ▸ AI.';
+    ends.appendChild(none);
+    return;
+  }
+  DPEND.forEach(e=>{
+    const lab = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.dataset.r = e.id;
+    cb.checked = had.has(e.id);
+    lab.appendChild(cb);
+    /* The same sentence the row's own ticks carry: an endpoint open to any
+       display is reachable already, and ticking it grants nothing. */
+    lab.appendChild(document.createTextNode(
+      ' ' + e.name + (e.restricted ? '' : ' — open to all anyway')));
+    ends.appendChild(lab);
+  });
 }
-$('dp_newkiosk').addEventListener('change', ()=>{
-  $('dp_newprofile').hidden = !$('dp_newkiosk').checked;
-});
-
 $('b_adddisp').addEventListener('click', async ()=>{
-  const el = $('dp_name'), note = $('dispnote'), out = $('dispcode');
+  const el = $('dp_name'), note = $('dispnote');
   const name = (el.value || '').trim();
   /* Cleared on the way in, every time. It used to be written on the way out
      and never taken back, so the complaint about a missing name was still on
@@ -8921,8 +9123,6 @@ $('b_adddisp').addEventListener('click', async ()=>{
      that nobody knew they had made. */
   note.className = 'note';
   note.textContent = '';
-  out.classList.remove('on');
-  out.textContent = '';
   if (!name){
     note.className = 'note bad';
     note.textContent = 'give it a name first — it is what the row is called '
@@ -8933,132 +9133,118 @@ $('b_adddisp').addEventListener('click', async ()=>{
   el.value = '';
   const j = await displayAction('/displays/new', {
     name,
-    kiosk: $('dp_newkiosk').checked,
-    kiosk_profile: $('dp_newkiosk').checked ? $('dp_newprofile').value : '',
-    network: $('dp_newnet').value,
+    /* One control, two fields: choosing a profile IS switching display mode
+       on, and NONE is both "no profile" and "not a display-mode screen".
+       There is no way to say "on, but whichever profile is default" from here
+       any more — that was the state nobody could see they were in. */
+    kiosk: !!$('dp_newprofile').value,
+    kiosk_profile: $('dp_newprofile').value,
+    /* However many were ticked. The row's own grant list is the same set in
+       the same words, so this is the first half of one control rather than a
+       second way of saying it. */
+    endpoints: [...$('dp_newends').querySelectorAll('input:checked')]
+                 .map(c=> c.dataset.r),
   });
-  if (!j || !j.code) return;              // displayAction has said why
-  /* The whole thing somebody has to type, on its own line and big enough to
-     read from across a room while typing it into a television with a remote.
-     The address as well as the code: nobody is typing half a URL. */
-  showCode(name, j.code, j.code_forever ? 0 : (j.code_left || 0));
+  /* Nothing is drawn here. displayAction opens the row it just made, and that
+     row carries the whole of it — the address and the code big enough to read
+     from across a room, with the minutes left counting down beside them. */
 });
 
-/* A code is only worth anything for ten minutes, so the ten minutes are on
-   screen and moving. It was a sentence saying "the code lasts ten minutes",
-   which tells you the rule and not the answer — and the answer changes every
-   second you spend walking to the screen. */
-let codeTick = 0;
-function showCode(name, code, left){
-  const out = $('dispcode');
-  clearInterval(codeTick);
-  const until = Date.now() + left * 1000;
-  const line = document.createElement('div');
-  line.textContent = ENROL_BASE + dispCode(code);
-  const sub = document.createElement('span');
-  out.innerHTML = '';
-  out.appendChild(line);
-  out.appendChild(sub);
-  out.classList.add('on');
-  if (!left){                           // the clock is switched off entirely
-    sub.textContent = '“' + name + '” · does not expire · works once · type it '
-                    + 'into the screen, or into the box on its page';
-    return;
-  }
-  const paint = ()=>{
-    const s = Math.max(0, Math.round((until - Date.now()) / 1000));
-    if (!s){
-      clearInterval(codeTick);
-      out.classList.add('dead');
-      sub.textContent = '“' + name + '” · this code has expired — REISSUE the '
-                      + 'row under CONNECTIONS ▸ NODES for another';
-      return;
-    }
-    out.classList.remove('dead');
-    sub.textContent = '“' + name + '” · ' + Math.floor(s / 60) + ':'
-                    + String(s % 60).padStart(2, '0') + ' left · works once · '
-                    + 'type it into the screen, or into the box on its page';
-  };
-  paint();
-  codeTick = setInterval(paint, 1000);
-}
 $('dp_name').addEventListener('keydown', e=>{
   if (e.key === 'Enter') $('b_adddisp').click();
 });
 
-/* Approving is granting, so both happen in one gesture. Two steps in two
-   places was the wrong shape: the reason to approve somebody at all is to give
-   them a particular assistant, and an approval that grants nothing is a row
-   that changed colour.
+/* WHICH ENDPOINTS, ON THE ROW ITSELF. Approving is granting — the reason to
+   approve somebody at all is to give them a particular assistant, and an
+   approval that grants nothing is a row that changed colour — so the ticks
+   have to be part of deciding rather than a thing you find afterwards.
 
-   Refusing opens the same panel with the two messages instead — one they read,
-   one for whoever comes back to this row in six months. */
-function decide(d, approve, name, row){
+   They used to arrive on a panel that APPROVE opened, with a second APPROVE
+   under them. That made one decision take two presses of the same word, and
+   the first press looked like it had already done something. The ticks come up
+   with the request now, above the buttons, and APPROVE means approve.
+
+   Returns the element and its checkboxes, because the button that commits them
+   is built elsewhere and has to read them at the moment it is pressed. */
+function grantList(d, heading){
+  const grant = document.createElement('div');
+  grant.className = 'grant';
+  /* Its own heading where it stands alone on a row being decided, and none
+     where it sits under one — the settings block names it Assistant, and two
+     titles over one list is the list being introduced twice. */
+  if (heading !== false){
+    const b = document.createElement('b');
+    b.textContent = 'Which endpoints it may use';
+    grant.appendChild(b);
+  }
+  const cks = document.createElement('div');
+  cks.className = 'cks';
+  DPEND.forEach(e=>{
+    const lab = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.dataset.r = e.id;
+    /* Off the ROW, not off RT.routes. RT is the endpoints document, and it is
+       fetched by the AI tab — so on the two tabs that actually draw these
+       ticks it is an empty array, and every box was drawn unticked no matter
+       what had been granted. A grant made when the code was minted was stored
+       correctly, applied correctly, and invisible on the page that exists to
+       show it. */
+    cb.checked = (d.granted || []).indexOf(e.id) >= 0;
+    /* The row opens and shuts on a click anywhere that is not a control, and
+       these are controls somebody is going to click several of. */
+    lab.onclick = (ev)=> ev.stopPropagation();
+    lab.appendChild(cb);
+    /* An endpoint open to any display needs no tick to be reachable, and
+       ticking it grants nothing — say so rather than let somebody believe
+       the tick is what did it. */
+    lab.appendChild(document.createTextNode(
+      ' ' + e.name + (e.restricted ? '' : ' — open to all anyway')));
+    cks.appendChild(lab);
+  });
+  grant.appendChild(cks);
+  return {el: grant, ticks: [...cks.querySelectorAll('input')]};
+}
+
+/* Refusing still opens a panel, and for a reason approving does not have: it
+   collects two messages that do not exist until you write them — one shown on
+   their screen, one for whoever comes back to this row in six months — plus
+   whether they may ask again. There is nothing to prefill and nothing to
+   default to, so there is no version of this that is one press. */
+function decide(d, name, row){
   const old = row.querySelector('.decide');
   if (old){ old.remove(); return; }              // pressing it again closes it
   const box = document.createElement('div');
   box.className = 'decide';
 
-  let ticks = [];
-  if (approve){
-    const grant = document.createElement('div');
-    grant.className = 'grant';
-    const b = document.createElement('b');
-    b.textContent = 'Which endpoints it may use';
-    grant.appendChild(b);
-    const cks = document.createElement('div');
-    cks.className = 'cks';
-    DPEND.forEach(e=>{
-      const lab = document.createElement('label');
-      const cb = document.createElement('input');
-      cb.type = 'checkbox'; cb.dataset.r = e.id;
-      cb.checked = (RT.routes || []).some(x=> x.id === e.id && x.restricted
-                                           && (x.displays || []).indexOf(d.id) >= 0);
-      lab.appendChild(cb);
-      /* An endpoint open to any display needs no tick to be reachable, and
-         ticking it grants nothing — say so rather than let somebody believe
-         the tick is what did it. */
-      lab.appendChild(document.createTextNode(
-        ' ' + e.name + (e.restricted ? '' : ' — open to all anyway')));
-      cks.appendChild(lab);
-    });
-    grant.appendChild(cks);
-    box.appendChild(grant);
-    ticks = [...cks.querySelectorAll('input')];
-  }
-
-  let reason, note, repeat;
-  if (!approve){
-    const deny = document.createElement('div');
-    deny.className = 'deny';
-    reason = document.createElement('input');
-    reason.type = 'text'; reason.placeholder = 'what they are told — shown on their screen';
-    note = document.createElement('input');
-    note.type = 'text'; note.placeholder = 'your own note — never leaves this panel';
-    deny.appendChild(reason); deny.appendChild(note);
-    repeat = document.createElement('label');
-    const cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.checked = true;
-    repeat.appendChild(cb);
-    repeat.appendChild(document.createTextNode(' may ask again'));
-    repeat.style.cssText = 'display:flex;align-items:center;gap:5px;'
-                         + 'font-size:calc(8.5px * var(--fs));'
-                         + 'color:rgba(var(--paper),.72)';
-    deny.appendChild(repeat);
-    box.appendChild(deny);
-  }
+  const deny = document.createElement('div');
+  deny.className = 'deny';
+  const reason = document.createElement('input');
+  reason.type = 'text'; reason.placeholder = 'what they are told — shown on their screen';
+  const note = document.createElement('input');
+  note.type = 'text'; note.placeholder = 'your own note — never leaves this panel';
+  deny.appendChild(reason); deny.appendChild(note);
+  const repeat = document.createElement('label');
+  const cb = document.createElement('input');
+  cb.type = 'checkbox'; cb.checked = true;
+  repeat.appendChild(cb);
+  repeat.appendChild(document.createTextNode(' may ask again'));
+  repeat.style.cssText = 'display:flex;align-items:center;gap:5px;'
+                       + 'font-size:calc(8.5px * var(--fs));'
+                       + 'color:rgba(var(--paper),.72)';
+  deny.appendChild(repeat);
+  box.appendChild(deny);
 
   const acts = document.createElement('div');
   acts.className = 'acts';
   const go = document.createElement('button');
-  go.textContent = approve ? 'APPROVE' : 'REFUSE';
-  go.className = approve ? 'act-save' : 'act-danger';
+  go.textContent = 'REFUSE';
+  go.className = 'act-danger';
   go.onclick = ()=> displayAction('/displays/decide', {
-    id: d.id, approved: approve, name,
-    endpoints: ticks.filter(c=> c.checked).map(c=> c.dataset.r),
-    reason: reason ? reason.value.trim() : '',
-    note: note ? note.value.trim() : '',
-    repeat: repeat ? repeat.querySelector('input').checked : true,
+    id: d.id, approved: false, name,
+    endpoints: [],
+    reason: reason.value.trim(),
+    note: note.value.trim(),
+    repeat: repeat.querySelector('input').checked,
   });
   const cancel = document.createElement('button');
   cancel.textContent = 'CANCEL';
@@ -9066,7 +9252,7 @@ function decide(d, approve, name, row){
   acts.appendChild(go); acts.appendChild(cancel);
   box.appendChild(acts);
   row.appendChild(box);
-  if (!approve) reason.focus();
+  reason.focus();
 }
 
 /* The four lists are on three tabs, and every one of them can act on a row.

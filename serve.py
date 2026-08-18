@@ -2887,6 +2887,9 @@ def validate_kiosk(obj, rec, kiosks):
             return None, ("that kiosk profile no longer exists — reload the "
                           "panel to see the current list")
         out["kiosk_profile"] = pid
+    # There is no "network" here. A screen does not choose a port: it is
+    # loaded from the port its endpoints answer on, which display_network
+    # reads back off the grant.
     return out, None
 
 
@@ -3041,12 +3044,52 @@ def new_display(asked, hint):
     return did + "." + secret, dict(rec, id=did)
 
 
-def enrol_base_for(rec, host, secure):
-    """Where the code for this row is typed. The network profile it names, or
-    the server's own listener where it names none — an address and a port,
-    because a code without them is six characters and no idea where to put
-    them."""
-    nid = str((rec or {}).get("network") or "")
+def display_network(did, doc=None):
+    """WHICH PORT A SCREEN BELONGS ON, derived rather than set.
+
+    It was a field on the display row, chosen when the code was minted, and it
+    was the second setting in this product called "network" — one on the screen
+    and one on the endpoint, meaning different things. A row could say HA
+    Display while every endpoint answered on Default, so the screen loaded, drew
+    correctly, and answered to nothing: a port carries the endpoints that NAME
+    it, and nothing a display says about itself changes that.
+
+    So there is one setting now, on the endpoint, and this reads it back: the
+    profile named by the endpoints this display is granted. Returns (nid, clash)
+    — `clash` is the set of profiles when the grant spans more than one, which
+    is a screen that cannot be loaded from a single address and is refused
+    where it is made rather than discovered later."""
+    doc = doc or read_routes()
+    nids = {str(r.get("network") or "")
+            for r in doc["routes"].values()
+            if did in (r.get("displays") or [])}
+    if len(nids) > 1:
+        return "", nids
+    return (nids.pop() if nids else ""), None
+
+
+def display_network_clash(rids, doc=None):
+    """The message for a grant that spans two ports, or "" where it does not.
+
+    One screen is one address. Two endpoints on two ports cannot both be
+    reached from it, so this is refused at the moment the ticks are made — the
+    alternative is a code that works and an assistant that silently never
+    answers, which is the failure this whole setting was renamed away from."""
+    doc = doc or read_routes()
+    seen = {str((doc["routes"].get(rid) or {}).get("network") or "")
+            for rid in rids or []}
+    if len(seen) < 2:
+        return ""
+    # His words, and short on purpose: the panel is not the place to teach the
+    # port model, and the ticks that caused it are on screen above the message.
+    return "Unable to use AI Assistants that run on different network ports"
+
+
+def enrol_base_for(rec, host, secure, nid=""):
+    """Where the code for this row is typed — an address and a port, because a
+    code without them is six characters and no idea where to put them. The
+    profile comes from display_network: what this screen was granted decides
+    where it is loaded from."""
     if nid:
         prof = net_profile(nid)
         vals = (prof or {}).get("values") or {}
@@ -3091,7 +3134,8 @@ def invite_display(name, by, setup=None):
     if isinstance(setup, dict):
         rec["kiosk"] = bool(setup.get("kiosk"))
         rec["kiosk_profile"] = str(setup.get("kiosk_profile") or "")[:16]
-        rec["network"] = str(setup.get("network") or "")[:16]
+        # `network` is NOT set here any more. Where a screen is loaded from is
+        # derived from the endpoints it is granted — see display_network.
     displays[did] = rec
     write_displays(displays)
     return dict(rec, id=did), None
@@ -3360,6 +3404,16 @@ def admin_displays():
     out = []
     displays = read_displays()
     now_ = int(time.time())
+    # WHICH ENDPOINTS EACH ROW IS ON, read once for the whole list. It lives on
+    # the endpoint rather than on the display — an allow-list is a property of
+    # the thing being protected — so a panel drawing a row had to have the
+    # routes document to know, and the tabs that draw these rows never fetch
+    # it. The grant was made, stored and invisible: ticks that could only ever
+    # be empty on the one page that shows a device's settings.
+    granted = {}
+    for rid, rrec in read_routes()["routes"].items():
+        for member in (rrec.get("displays") or []):
+            granted.setdefault(member, []).append(rid)
     for did, rec in sorted(displays.items(), key=lambda kv: kv[1]["created"]):
         row = {k: rec.get(k) for k in
                ("name", "asked", "approved", "hint", "created", "last_seen",
@@ -3393,7 +3447,14 @@ def admin_displays():
                    code_forever=bool(live and not deadline),
                    refused=ref[0] if ref else 0,
                    refused_at=ref[1] if ref else 0,
-                   refused_from=ref[2] if ref else "")
+                   refused_from=ref[2] if ref else "",
+                   # Named as granted whether or not the endpoint is currently
+                   # restricted: this says what is STORED about this row. What
+                   # a grant is worth on an endpoint open to everybody is said
+                   # beside the tick, in words, rather than by drawing it
+                   # empty — a tick that goes back to unticked when you save is
+                   # a control arguing with the file.
+                   granted=granted.get(did, []))
         out.append(row)
     return out
 
@@ -6768,7 +6829,8 @@ class Handler(SimpleHTTPRequestHandler):
                                     # base for the whole list stopped being
                                     # the truth the moment one could differ.
                                     "enrol_bases": {d["id"]: enrol_base_for(
-                                        read_displays().get(d["id"]), host, secure)
+                                        None, host, secure,
+                                        display_network(d["id"], doc)[0])
                                         for d in admin_displays()},
                                     "enrol_base": "%s://%s:%d/e/"
                                                   % ("https" if secure else "http", host,
@@ -8354,12 +8416,44 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(400, {"error": "that network profile no "
                                                  "longer exists — reload the "
                                                  "panel to see the list"})
+            # The endpoints this screen is for — several, because a wall panel
+            # answering to a house name and a model is the ordinary case.
+            # Validated the same way and for the same reason as the profiles
+            # above: an id that no longer exists would be a grant that
+            # silently landed nowhere.
+            known = read_routes()["routes"]
+            eps = [str(r)[:16] for r in (obj.get("endpoints") or [])][:20]
+            if any(e not in known for e in eps):
+                return self._json(400, {"error": "one of those endpoints no "
+                                                 "longer exists — reload the "
+                                                 "panel to see the list"})
+            # A screen is loaded from ONE address, so a grant spanning two
+            # ports is a screen that cannot exist. Refused here, where the
+            # ticks are, rather than handed out as a code pointing at a port
+            # where half the grant is unreachable.
+            clash = display_network_clash(eps)
+            if clash:
+                return self._json(400, {"error": clash})
+
             rec, err = invite_display(str(obj.get("name") or "").strip()[:40],
                                       s["user"],
                                       {"kiosk": obj.get("kiosk"),
                                        "kiosk_profile": kp, "network": nw})
             if err:
                 return self._json(400, {"error": err})
+            # Granted through the same call the row's own ticks use, so there
+            # is one way a display comes to be on an allow-list rather than two
+            # that have to agree. That call treats its argument as the WHOLE
+            # truth and clears the row from every other list — which is right
+            # for ticks and would be wrong here, except that this row was made
+            # three lines ago and is on no list to be cleared from. Anything
+            # that ever calls this for an existing row has to pass the full
+            # set.
+            if eps:
+                set_display_endpoints(rec["id"], eps)
+                print("display %s invited with endpoint%s %s by %s"
+                      % (rec["id"], "" if len(eps) == 1 else "s",
+                         ", ".join(eps), s["user"]), flush=True)
             print("display %s (%s) invited by %s — code issued"
                   % (rec["id"], display_label(rec), s["user"]), flush=True)
             # …and how long it is worth anything for, so the panel can count
@@ -8458,6 +8552,28 @@ class Handler(SimpleHTTPRequestHandler):
             fields, err = validate_kiosk(obj, displays[did], cfg["kiosks"])
             if err:
                 return self._json(400, {"error": err})
+            # WHICH ASSISTANTS, where they are named. It is a different
+            # document — the allow-list lives on the endpoint, not on the
+            # display — but it is one gesture for whoever pressed SAVE, and a
+            # second button for it would be two ways to describe one screen.
+            # Absent means "not being set", which is not the same as an empty
+            # list meaning "none of them": a caller that does not carry the
+            # field must not clear a grant it never showed.
+            if isinstance(obj.get("endpoints"), list):
+                known = read_routes()["routes"]
+                eps = [str(r)[:16] for r in obj["endpoints"]][:20]
+                if any(e not in known for e in eps):
+                    return self._json(400, {"error": "one of those endpoints "
+                                                     "no longer exists — "
+                                                     "reload the panel"})
+            # A screen is loaded from ONE address, so a grant spanning two
+            # ports is a screen that cannot exist. Refused here, where the
+            # ticks are, rather than handed out as a code pointing at a port
+            # where half the grant is unreachable.
+            clash = display_network_clash(eps)
+            if clash:
+                return self._json(400, {"error": clash})
+                set_display_endpoints(did, eps)
             displays[did].update(fields)
             write_displays(displays)
             return self._json(200, {"ok": True, "id": did,
