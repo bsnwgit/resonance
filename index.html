@@ -4292,7 +4292,7 @@ const Wake = {
     if (switching){ forgetConversation(); this.convo = ''; }
     this.awake = true; this.route = h.route.id;
     this.touch(); syncTalk(); syncWake();
-    if (h.fuzzy)
+    if (h.fuzzy){
       micNote('woke on "' + h.fuzzy + '" (near “' + h.word + '”) — ' + h.route.name);
       /* Already worked out, and until now thrown away with the note that
          showed it. It is the only way to find out that two wake words are
@@ -4300,6 +4300,7 @@ const Wake = {
          in one house. */
       Events.add('wake_fuzzy', {level:'info', route: h.route.name,
                                 detail: 'heard "' + h.fuzzy + '" near "' + h.word + '"'});
+    }
     else if (switching)
       micNote('now talking to ' + h.route.name);
     if (!h.rest){                            // just the name — say hello back

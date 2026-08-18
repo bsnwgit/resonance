@@ -48,6 +48,29 @@ Deploy to the test server and confirm it works **before** pushing or opening
 the PR, not after. The visualiser, the microphone and the voice pipeline can
 only really be judged live.
 
+Parse first, deploy second:
+
+```bash
+./check.sh
+```
+
+There is no build step here, so nothing reads these files between saving them
+and a browser running them. `check.sh` puts both pages' inline scripts through
+node's parser and both Python modules through Python's, and reports the line
+number of the **HTML file** rather than of the extracted script. It ends a
+script where a browser ends it — at the first `</script`, wherever that falls —
+so a page it passes is the page a browser will actually run. It only parses: a
+page that parses can still be wrong, but a page that does not parse is one
+where *nothing* runs, and that reads as several unrelated pieces of the
+interface missing at once rather than as a syntax error.
+
+It needs `node` on the machine you deploy **from** — for parsing only, nothing
+is installed and nothing about the server changes. A missing parser is a
+failure rather than a skip, so it cannot pass quietly on a machine that cannot
+run it.
+
+Then deploy:
+
 ```bash
 rsync -az --exclude=.git --exclude-from=.gitignore ./ <host>:<path>/
 ssh <host> '<path>/serve.sh stop && <path>/serve.sh start'
@@ -98,8 +121,10 @@ Deliberately flat — this is a single page plus a single server file.
 | `index.html` | the display: visualiser and chat surface. No controls. |
 | `admin.html` | the configuration interface, served only on the admin port |
 | `serve.py` | static serving, `/stt`, `/tts`, `/settings`, `/app`, accounts and sessions |
+| `manual.py` | the in-app manual's registry, and its dependency-free PDF writer |
 | `serve.sh` | start/stop, resolving the PID from the port |
 | `make-cert.sh` | self-signed certificate for the HTTPS listener |
+| `check.sh` | parses both pages and both modules; run it before a deploy |
 
 Resist splitting `index.html` until the visualiser is extracted as a package —
 at that point the split should be *core vs demo shell*, not an arbitrary

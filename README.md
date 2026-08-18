@@ -1028,6 +1028,19 @@ still balanced, the JavaScript still parsed, and CSS has no error to report:
 it simply continues to the next block. The check that catches it is that no
 comma-terminated selector line may be followed by a comment or a blank line.
 
+**A script that does not parse is a page where nothing runs**, and it does not
+present as a syntax error. It presents as several unrelated pieces of the
+interface being absent at once — here the visualiser, the enrolment box, the
+request form and the PIN box, leaving the static markup alone on screen — which
+reads as four faults rather than one, and sends you looking at four features
+instead of at the parser. The cause was a statement added under a brace-less
+`if`, which pushed it out of the body and orphaned the `else` below it. With no
+build step, nothing between saving the file and a browser opening it ever reads
+it, so this shipped and deployed clean; `check.sh` is the answer, and it must
+end the script where a browser does — at the FIRST `</script`, in a string or a
+comment or anywhere else — because reading to the last one hands the parser a
+file no browser will run.
+
 ## Contributing
 
 Branch off `main`, deploy and verify live, then open a PR — see
@@ -2272,6 +2285,36 @@ on a desk. A tablet bolted to a wall, answering a household, moves them:
 ## Progress log
 
 Newest first.
+
+### 2026-08-18 — a page that did not parse
+
+Not a phase. One statement in the wrong place, and the display page stopped
+running entirely — found by opening it on a machine that had not had it open
+before.
+
+- **A note gained a second line and took the whole page with it.** The wake-word
+  instrumentation added an `Events.add` under `if (h.fuzzy)`, which carried no
+  braces because it had only ever held one statement. The new call landed
+  outside the body, the `else if` below it lost the `if` it belonged to, and
+  the script stopped parsing.
+- **It did not look like a syntax error.** An inline script that does not parse
+  is not a broken feature — it is a page where NOTHING runs. What a browser
+  showed was the static markup alone: the composer and the buttons beside it,
+  over an empty frame. No visualiser, no enrolment code box, no request form,
+  no PIN box. Four unrelated things missing at once is a shape worth knowing,
+  because it points at the parser rather than at any of the four.
+- **It survived a deploy because nothing reads these files.** The zero-build-step
+  decision is right and it costs this: between saving and a browser, no parser
+  sees the page. Hence `check.sh` — both pages' scripts through node, both
+  modules through Python, line numbers mapped back onto the HTML file, and a
+  missing parser is a failure rather than a skip. It cannot tell you the page
+  works; it can tell you it runs.
+- **Every brace-less body in both pages was swept for the same shape** — a
+  second statement sitting after the one the header owns. This was the only
+  one. Of the seven other `Events.add` sites that commit added, six sit inside
+  braces and the seventh, `stt_slow`, is a brace-less `if` holding a single
+  statement, which is the shape that is safe: what follows it sits at the
+  header's indent, not at the body's.
 
 ### 2026-08-17 — the panel stopped being a filing cabinet
 
