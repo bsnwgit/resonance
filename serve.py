@@ -180,12 +180,24 @@ APP_DEFAULTS = {
     # supervises this process, so a setting that only stopped the server would
     # be a setting that ended the service at three in the morning.
     "restart_at": "",
+    # ---- what the panel reads back ----
+    # How much of the log the panel shows. A setting rather than the constant
+    # it was, because the right amount is a property of the deployment: a house
+    # with three screens wants the lot, and a building with forty wants the
+    # last screenful of a file that is mostly check-ins. It bounds the ANSWER,
+    # not the file — see LOG_TAIL_BYTES, which bounds the read.
+    "log_lines": 800,
 }
-#: (low, high) for the numbers above. A poll faster than a couple of seconds is
-#: a denial of service somebody configured by accident; one slower than five
-#: minutes is a screen that stays dead through a lunch break.
+#: (low, high) for the numbers above — the ones CLAMPED rather than refused,
+#: because a number outside the range is somebody nudging a field rather than a
+#: configuration that would stop the server coming up. A poll faster than a
+#: couple of seconds is a denial of service somebody configured by accident;
+#: one slower than five minutes is a screen that stays dead through a lunch
+#: break. The log's floor is a screenful and its ceiling is what a browser will
+#: render without becoming the reason the panel is slow.
 UNATTENDED_LIMITS = {"poll_seconds": (2, 300), "retry_attempts": (1, 10),
-                     "retry_seconds": (1, 60), "refresh_stagger": (0, 240)}
+                     "retry_seconds": (1, 60), "refresh_stagger": (0, 240),
+                     "log_lines": (50, 5000)}
 PORT_MIN, PORT_MAX = 1024, 65535     # below 1024 needs root; this runs as you
 SESSION_MIN, SESSION_MAX = 5, 480    # minutes: below 5 is unusable, above 8h absurd
 BIND_MODES = ("loopback", "address", "everything")
@@ -3665,8 +3677,28 @@ ALERT_KINDS = {
 LOG_PATH = os.path.join(ROOT, "server.log")
 #: Bytes read from the end. Enough to cover a start and a busy hour after it,
 #: small enough that asking for it is never the thing that makes a server slow.
+#: This one is NOT a setting: it bounds what this process reads off a disk,
+#: which is a property of the machine rather than a preference, and a field
+#: that could be set to a gigabyte would be a field that stalls the panel.
 LOG_TAIL_BYTES = 256 * 1024
+#: How many of those lines are answered with, when nothing is configured. The
+#: live number is app.json's `log_lines`; this is its default and its floor if
+#: the file says something impossible.
 LOG_MAX_LINES = 800
+
+
+def log_max_lines():
+    """The configured tail length, or the default if it is unreadable.
+
+    Clamped to the same pair the panel's save is clamped to, and read from that
+    pair rather than from a second copy of the numbers: what arrives through
+    the panel cannot be out of range, but app.json is a file on a disk and
+    somebody editing it by hand is exactly who would put a million in it."""
+    lo, hi = UNATTENDED_LIMITS["log_lines"]
+    try:
+        return min(hi, max(lo, int(read_app().get("log_lines", LOG_MAX_LINES))))
+    except (TypeError, ValueError):
+        return LOG_MAX_LINES
 
 
 def read_log_tail(match=""):
@@ -3688,8 +3720,9 @@ def read_log_tail(match=""):
     if match:
         m = match.lower()
         lines = [ln for ln in lines if m in ln.lower()]
-    cut = len(lines) > LOG_MAX_LINES
-    return lines[-LOG_MAX_LINES:], cut, size
+    keep = log_max_lines()
+    cut = len(lines) > keep
+    return lines[-keep:], cut, size
 
 
 def read_alerts():
@@ -6805,7 +6838,7 @@ class Handler(SimpleHTTPRequestHandler):
             q = parse_qs(urlparse(self.path).query)
             lines, cut, size = read_log_tail((q.get("q") or [""])[0][:80])
             return self._json(200, {"lines": lines, "truncated": cut,
-                                    "bytes": size, "max": LOG_MAX_LINES})
+                                    "bytes": size, "max": log_max_lines()})
         if path == "/alerts":
             if not self._require("admin"):
                 return

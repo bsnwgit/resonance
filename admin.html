@@ -43,6 +43,12 @@
        FILLED control that has to hold white letters and read as warm against a
        cold panel, which a pale wash cannot do. */
     --rust:176,84,44;
+    /* HOME's own, and it is the SAME green act-save spends rather than a
+       second one: a panel with two greens has no green. Named for the colour
+       like --rust beside it, because what wears it will move — it was ice
+       until STATUS arrived and needed the one colour on this bar that says
+       "the live thing", which is what a page of health, alerts and log is. */
+    --green:122,201,160;
 
     /* Typography — the same three faces and three sizes the display has,
        kept identical to the block in index.html on purpose: the panel is
@@ -838,19 +844,45 @@
      dash rather than a border. */
   #whorole{font-size:calc(8.5px * var(--fs));letter-spacing:.12em;white-space:nowrap;
            color:rgba(var(--paper),.72)}
-  /* The pair at the ends of the bar are the two things that move the WHOLE
-     panel, so both are filled rather than outlined — and they are filled in
-     different colours because they are opposites. Ice takes you back to the
-     start; rust ends the session. */
-  #b_home{
+  /* The three at this end of the bar are the things that move the WHOLE panel,
+     so all three are filled rather than outlined, and each is filled in its
+     own colour because they are three different acts. Green goes back to the
+     start; ice goes to what the screens are doing; rust ends the session.
+
+     The shape is shared and only the colour differs — one rule for the
+     geometry, one line each for the tint. Written as three tokens rather than
+     three literals so that which control wears which colour is a one-word
+     change, which it has already been once: HOME was ice until STATUS wanted
+     it. */
+  #b_home, #tab_status, #b_signout{
     font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.12em;white-space:nowrap;
     padding:3px 7px;cursor:pointer;
     color:#fff;
-    border:1px solid rgba(var(--pal-ice),.85);
-    background:rgba(var(--pal-ice),.22);
+    border:1px solid;
+  }
+  #b_home{
+    border-color:rgba(var(--green),.85);
+    background:rgba(var(--green),.22);
   }
   #b_home:hover{
+    border-color:rgb(var(--green));background:rgba(var(--green),.38);color:#fff;
+  }
+  /* Ice, which HOME wore until this arrived. It is a tab as well as a filled
+     control — the only one on this bar that is — so it needs the state the
+     links in #navlinks get from a rule and a colour, and it cannot borrow
+     theirs: a filled control cannot show "you are here" by going brighter
+     when it is already the brightest thing beside it. It goes SOLID instead,
+     which is the same idea one step further on. */
+  #tab_status{
+    border-color:rgba(var(--pal-ice),.85);
+    background:rgba(var(--pal-ice),.22);
+  }
+  #tab_status:hover{
     border-color:rgb(var(--pal-ice));background:rgba(var(--pal-ice),.38);color:#fff;
+  }
+  #tab_status.on{
+    border-color:rgb(var(--pal-ice));background:rgba(var(--pal-ice),.62);
+    color:#06121a;
   }
   /* The one control on this bar that ENDS something. Everything else here goes
      somewhere; this one takes the session away, and it should not be telling
@@ -858,10 +890,7 @@
      shaded, with the letters at full brightness — the only warm thing on a
      cold panel, which is what makes it findable without being an alarm. */
   #b_signout{
-    font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.12em;white-space:nowrap;
-    padding:3px 7px;cursor:pointer;
-    color:#fff;
-    border:1px solid rgba(var(--rust),.85);
+    border-color:rgba(var(--rust),.85);
     background:rgba(var(--rust),.30);
   }
   #b_signout:hover{
@@ -1840,6 +1869,13 @@
            than a connection: who gets in, on what terms, and into which
            group. -->
       <button id="tab_security" data-tab="security">SECURITY</button>
+      <!-- What the server does when a screen goes wrong: where alerts are
+           sent, how much log is kept back, and how long what screens report
+           is held. All three are settings, which is what puts them here and
+           not on STATUS — that is where the same three subjects are READ.
+           One is configured, the other is watched, and a page that did both
+           would be a page you cannot safely leave open. -->
+      <button id="tab_alerts" data-tab="alerts">ALERT</button>
       <!-- The gap is what says these are a different subject. Everything left
            of it is the server; everything right of it is how something comes
            to be here. -->
@@ -1853,6 +1889,24 @@
       <button id="tab_enrol" data-tab="enrol">DEVICE</button>
     </span>
     <span class="right" id="whobox">
+      <!-- What the screens are DOING, as opposed to how they are configured —
+           health, the alerts they raised, and the server's own log. It sits
+           here rather than in #navlinks because it is not a subject you
+           administer: those three are the same page under different names,
+           and every one of them is read rather than set.
+
+           Beside HOME on purpose, and BEFORE it. Both are whole-panel moves
+           and neither is a setting, which is what the left of the bar is for;
+           and this is the one you want from wherever you happen to be standing
+           when something has gone wrong. HOME sits between it and your name
+           because going back to the start is the neighbour of signing out —
+           both end what you were doing — where this one starts something.
+
+           It IS a tab for all that: see #tab_status in the stylesheet, which
+           has to draw a selected state a filled control cannot get by
+           brightening. -->
+      <button id="tab_status" data-tab="status"
+              title="what the screens are reporting — health, alerts and the log">STATUS</button>
       <!-- Back to the start, and it reloads rather than just putting the mark
            back up: "like it was when I opened it" means the lists refetched and
            every half-finished edit gone as well as the page cleared, and a
@@ -2876,7 +2930,7 @@ Deleting a profile clears it from every device that named it, the same way
 deleting a display clears it from every endpoint. Nothing keeps drifting to
 numbers that are no longer here.
 
-<b>On a device</b>, in DEVICES, tick <b>Kiosk mode</b> and pick which of these
+<b>On a device</b>, in DEVICES, tick <b>Display mode</b> and pick which of these
 profiles it is. Untick it and the screen goes back to being an ordinary page;
 what you chose is kept, so putting it back up restores it.
 
@@ -3093,7 +3147,7 @@ NODES, filed with the other people.</div>
       <select id="dp_newnet" class="ppick"></select>
     </div>
     <div class="setuprow">
-      <label class="vo"><input type="checkbox" id="dp_newkiosk"> Kiosk mode</label>
+      <label class="vo"><input type="checkbox" id="dp_newkiosk"> Display mode</label>
       <select id="dp_newprofile" class="ppick" hidden></select>
     </div>
   </div>
@@ -3127,13 +3181,17 @@ of them is one tick.</div>
     </div>
   </section>
 
+  <!-- Titled for the link that opens it. It read "Connections" — the name of
+       the ROW the link sits in — so pressing NODES opened a box called
+       something else, which is the one place a title has a job to do. The
+       other two links in that row open boxes named for themselves. -->
   <section class="grp bare proflist" data-tab="devices">
-    <div class="barehead"><span class="listtitle">Connections</span></div>
+    <div class="barehead"><span class="listtitle">Nodes</span></div>
     <div class="grpbody">
   <!-- Named for what it does. It was a row of controls with no title, so the
        only way to find out what APPLY TO SELECTED applied was to press it. -->
   <div class="bulkbar" id="bulkbar" hidden>
-    <span class="bulktitle">Kiosk assignment</span>
+    <span class="bulktitle">Display mode assignment</span>
     <label><input type="checkbox" id="bulkall"> ALL</label>
     <span id="bulkcount">nothing selected</span>
     <span class="spacer"></span>
@@ -3183,7 +3241,42 @@ code for do not, and never will.
   <!-- The push half. Diagnostics is somewhere you go and look; this is what
        comes and finds you, and the list is where acknowledgement lives —
        which is why it is the one channel that is not optional. -->
-  <section class="grp bare proflist" data-tab="devices">
+  <!-- ============================================================ STATUS
+       What the screens are DOING. Three sections, one subject: a screen says
+       it is unwell, that raises an alert, and the log is where the server's
+       own account of it is. They were on NODES, under the register of what a
+       screen IS — which is a different question, asked at a different time,
+       by somebody in a different frame of mind. Configuring any of this is
+       SETTINGS ▸ ALERT; nothing here writes anything.
+
+       Health first, because it is the one that says WHICH screen. -->
+  <section class="grp bare proflist" data-tab="status">
+    <div class="barehead"><span class="listtitle">Health</span></div>
+    <div class="grpbody">
+  <div class="note" id="evnote"></div>
+  <div id="evlist"></div>
+  <div class="barehead" style="margin-top:14px">
+    <span class="listtitle">What was said to them</span>
+  </div>
+  <div id="turnlist"></div>
+  <div class="seg actrow"><button id="b_evclear" class="act-undo">CLEAR ALL</button></div>
+  <div class="note help">A screen with a fault cannot tell anybody. This is
+where it says so: a microphone that would not open, a browser with no recorder
+at all, transcription running long, the neural voice quietly falling back to
+the browser's, and the wake word it actually matched on.
+
+<b>Most of this was already worked out and thrown away.</b> The display says
+<b>woke on “hows” (near “house”)</b> as a note that fades — which on a wall
+nobody is ever there to read. Kept here, it is also the only way to find out
+that two wake words are cross-triggering.
+
+<b>CLEAR</b> on a row forgets what one screen reported without taking it off
+the wall — for a fault that has been fixed.</div>
+    </div>
+  </section>
+
+  <!-- What health turned into when nobody was looking at it. -->
+  <section class="grp bare proflist" data-tab="status">
     <div class="barehead"><span class="listtitle">Alerts</span></div>
     <div class="grpbody">
   <div id="alertlist"></div>
@@ -3191,6 +3284,61 @@ code for do not, and never will.
   <div class="seg actrow">
     <button id="b_ackall" class="act-save">ACKNOWLEDGE READ</button>
   </div>
+  <div class="note help">An alert has four states, not two: open or resolved,
+acknowledged or not. The one that matters is <b>resolved but unread</b> — a
+screen that dropped off at two in the morning and came back four minutes later
+leaves something here until a person sees it. Self-healing nobody ever hears
+about is indistinguishable from nothing having happened, and a display that
+heals itself every night is a fault rather than a success.
+
+<b>Resolving is automatic; acknowledging is not.</b> A screen that comes back
+resolves its own alert, and it stays in this list until you press the button.
+Anything both resolved and acknowledged has nothing left to say and leaves.
+
+One of these depends on nothing else here: <b>a device asking to be let in</b>
+arrives the moment it asks, because it is the only alert with a person attached
+to it — somebody is standing at a screen waiting.</div>
+    </div>
+  </section>
+
+  <!-- The server's own log, read here rather than over SSH. A TAIL through
+       the admin listener, never a served file: the reason SERVABLE is an
+       allow-list at all is that this used to be handed out by the base class,
+       unauthenticated, on every interface. -->
+  <section class="grp bare proflist" data-tab="status">
+    <div class="barehead"><span class="listtitle">Server log</span></div>
+    <div class="grpbody">
+  <div class="findrow">
+    <input id="logfind" type="search" spellcheck="false" autocomplete="off"
+           placeholder="filter the log…">
+    <button id="b_logrefresh" class="act-save">REFRESH</button>
+  </div>
+  <div class="note" id="lognote"></div>
+  <pre id="logbox"></pre>
+  <div class="note help">The end of it, newest last. The file is truncated
+every time the server starts, so this is what has happened since — and only the
+tail of that, because reading a whole file to show the last screenful is the
+kind of thing that works until the day it matters.
+
+It is not a live feed. Press REFRESH, or filter for a word: a display id, a
+route name, <b>ALERT</b>, <b>refused</b>.</div>
+    </div>
+  </section>
+
+  <!-- ====================================================== ALERT SETTINGS
+       The same three subjects as STATUS, from the other side: where an alert
+       goes, how much log is answered with, and how long what screens report
+       is kept. Dressed as a settings tab rather than as the list pages above
+       — a titleonly header and wide sections under h4 headings — because that
+       is what every other tab in this bar is, and a page that is half one and
+       half the other is a page somebody has to learn twice. -->
+  <section class="grp bare titleonly" data-tab="alerts">
+    <div class="barehead"><span class="listtitle">Alert settings</span></div>
+  </section>
+
+  <section class="grp wide" data-tab="alerts">
+    <h4>Alerts</h4>
+    <div class="grpbody">
   <div class="setuprow">
     <label class="vo"><input type="checkbox" id="sl_on"> Also send alerts to syslog</label>
   </div>
@@ -3314,53 +3462,32 @@ long something has gone unsaid, not how long since a message that may have
 carried nothing. It is also what makes quiet hours a hold rather than a drop:
 nothing goes out during the quiet, and it all arrives afterwards. A device
 asking to be let in ignores this too.</div>
-
-  <div class="note help">An alert has four states, not two: open or resolved,
-acknowledged or not. The one that matters is <b>resolved but unread</b> — a
-screen that dropped off at two in the morning and came back four minutes later
-leaves something here until a person sees it. Self-healing nobody ever hears
-about is indistinguishable from nothing having happened, and a display that
-heals itself every night is a fault rather than a success.
-
-<b>Resolving is automatic; acknowledging is not.</b> A screen that comes back
-resolves its own alert, and it stays in this list until you press the button.
-Anything both resolved and acknowledged has nothing left to say and leaves.
-
-One of these depends on nothing else here: <b>a device asking to be let in</b>
-arrives the moment it asks, because it is the only alert with a person attached
-to it — somebody is standing at a screen waiting.</div>
     </div>
   </section>
 
-  <!-- The server's own log, read here rather than over SSH. A TAIL through
-       the admin listener, never a served file: the reason SERVABLE is an
-       allow-list at all is that this used to be handed out by the base class,
-       unauthenticated, on every interface. -->
-  <section class="grp bare proflist" data-tab="devices">
-    <div class="barehead"><span class="listtitle">Server log</span></div>
+  <section class="grp wide" data-tab="alerts">
+    <h4>Server log</h4>
     <div class="grpbody">
-  <div class="findrow">
-    <input id="logfind" type="search" spellcheck="false" autocomplete="off"
-           placeholder="filter the log…">
-    <button id="b_logrefresh" class="act-save">REFRESH</button>
+  <div class="setuprow">
+    <label class="bklab" for="ap_loglines">Show the last (lines)</label>
+    <input id="ap_loglines" class="num" type="number" inputmode="numeric"
+           min="50" max="5000">
+    <button id="b_loglines" class="act-save">SAVE</button>
   </div>
-  <div class="note" id="lognote"></div>
-  <pre id="logbox"></pre>
-  <div class="note help">The end of it, newest last. The file is truncated
-every time the server starts, so this is what has happened since — and only the
-tail of that, because reading a whole file to show the last screenful is the
-kind of thing that works until the day it matters.
+  <div class="note" id="logcfgnote"></div>
+  <div class="note help">How much of the log STATUS answers with. It bounds the
+ANSWER and not the read: the server always seeks the last 256KB off the end of
+the file, so asking for more lines cannot turn opening a page into the thing
+that makes the server slow — and asking for fewer does not make it faster.
 
-It is not a live feed. Press REFRESH, or filter for a word: a display id, a
-route name, <b>ALERT</b>, <b>refused</b>.</div>
+Worth turning down where a building of screens checks in every twenty seconds
+and the interesting line is always the last one; worth turning up on a house
+with three, where the whole file is worth reading.</div>
     </div>
   </section>
 
-  <!-- What the screens have been reporting, beside the list of what they are.
-       Per DEVICE, because the useful question is which screen is failing
-       rather than how many faults there have been. -->
-  <section class="grp bare proflist" data-tab="devices">
-    <div class="barehead"><span class="listtitle">Health</span></div>
+  <section class="grp wide" data-tab="alerts">
+    <h4>Health</h4>
     <div class="grpbody">
   <div class="setuprow">
     <label class="bklab" for="ev_days">Keep what screens report for (days)</label>
@@ -3368,32 +3495,14 @@ route name, <b>ALERT</b>, <b>refused</b>.</div>
            min="1" max="90">
     <button id="b_evdays" class="act-save">SAVE</button>
   </div>
-  <div class="note" id="evnote"></div>
-  <div id="evlist"></div>
-  <div class="barehead" style="margin-top:14px">
-    <span class="listtitle">What was said to them</span>
-  </div>
-  <div id="turnlist"></div>
-  <div class="seg actrow"><button id="b_evclear" class="act-undo">CLEAR ALL</button></div>
-  <div class="note help">A screen with a fault cannot tell anybody. This is
-where it says so: a microphone that would not open, a browser with no recorder
-at all, transcription running long, the neural voice quietly falling back to
-the browser's, and the wake word it actually matched on.
-
-<b>Most of this was already worked out and thrown away.</b> The display says
-<b>woke on “hows” (near “house”)</b> as a note that fades — which on a wall
-nobody is ever there to read. Kept here, it is also the only way to find out
-that two wake words are cross-triggering.
-
-<b>Retention is the control, and it is short on purpose.</b> This holds what
+  <div class="note" id="evcfgnote"></div>
+  <div class="note help"><b>Retention is the control, and it is short on purpose.</b> This holds what
 was addressed to a screen, so a generous default would be a decision made on
 somebody's behalf about their household. Nothing outside a conversation is
-recorded, and nothing at all until somebody says a wake word.
-
-<b>CLEAR</b> on a row forgets what one screen reported without taking it off
-the wall — for a fault that has been fixed.</div>
+recorded, and nothing at all until somebody says a wake word.</div>
     </div>
   </section>
+
 
   <!-- Laid out like the endpoints on AI, because it is the same kind of list:
        a set of named things, each of which is one line until you want it, and
@@ -4525,6 +4634,14 @@ async function loadApp(){
     Object.keys(APP_TEXT).forEach(id=>{
       const el = $(id); if (el) el.value = j.app[APP_TEXT[id]] || '';
     });
+    /* The log length lives in the same document and is painted here for that
+       reason, but it is deliberately NOT in APP_FIELDS: that map is what the
+       ADMIN tab's SAVE posts, and this field is on another tab with a SAVE of
+       its own. In the map, an edit left uncommitted over here would be
+       committed by pressing SAVE over there — a control writing a value its
+       page is not showing. */
+    const ll = $('ap_loglines');
+    if (ll) ll.value = j.app.log_lines;
     /* Offer the addresses this machine actually has. Typing one by hand is a
        way to configure a server that will not start — and the one place you
        cannot recover from is the one that takes the admin page with it. */
@@ -6168,7 +6285,22 @@ async function refreshEvents(){
   if (!box || ME.role !== 'admin'){ if (box) box.textContent = ''; return; }
   try{
     EVENTS = await api('/events');
-  }catch(e){ evNote(e.message, true); return; }
+  }catch(e){
+    /* Both notes, because this one fetch now feeds two pages: the list on
+       STATUS and every sink field on SETTINGS ▸ ALERT. Reported to one of them
+       only, the other tab shows a form at its defaults and says nothing at all
+       about why — which is the failure that ends with somebody pressing SAVE
+       on it. */
+    evNote(e.message, true);
+    evCfgNote(e.message, true);
+    /* …and under the sinks, which are the fields most worth NOT trusting when
+       this fetch fails. Written directly because #slnote has no helper: it is
+       the one note on that tab whose only other writer is the save beside
+       it. */
+    const sl = $('slnote');
+    if (sl){ sl.className = 'note bad'; sl.textContent = e.message; }
+    return;
+  }
   const days = $('ev_days');
   if (days && document.activeElement !== days) days.value = EVENTS.days;
   paintSyslog(EVENTS.settings);
@@ -6317,14 +6449,48 @@ function paintTurns(){
   });
 }
 
+/* Retention is set on SETTINGS ▸ ALERT and the list it governs is read on
+   STATUS, so this says so where the button is rather than where the list is:
+   evNote writes to #evnote, which is now on the other page, and a confirmation
+   nobody can see is a save that looks like it did nothing. */
+function evCfgNote(m, bad){
+  const el = $('evcfgnote');
+  if (!el) return;
+  el.className = 'note' + (bad ? ' bad' : '');
+  el.textContent = m || '';
+}
 const bevd = $('b_evdays');
 if (bevd) bevd.addEventListener('click', async ()=>{
   try{
     await api('/displays/settings', {method:'POST', body: JSON.stringify(
       {event_days: parseInt($('ev_days').value, 10)})});
-    evNote('saved');
+    evCfgNote('saved');
     refreshEvents();
-  }catch(e){ evNote(e.message, true); }
+  }catch(e){ evCfgNote(e.message, true); }
+});
+
+/* How much log STATUS answers with. Its own SAVE rather than the ADMIN tab's,
+   because it is drawn on this tab and a control commits where it is drawn —
+   and a partial POST is safe here: validate_app starts from what is stored and
+   applies only the keys it was sent, so this cannot blank a port. */
+function logCfgNote(m, bad){
+  const el = $('logcfgnote');
+  if (!el) return;
+  el.className = 'note' + (bad ? ' bad' : '');
+  el.textContent = m || '';
+}
+const bll = $('b_loglines');
+if (bll) bll.addEventListener('click', async ()=>{
+  try{
+    const j = await api('/app', {method:'POST', body: JSON.stringify(
+      {log_lines: parseInt($('ap_loglines').value, 10)})});
+    /* Read back rather than assumed: the server CLAMPS this one instead of
+       refusing it, so a number outside the range comes home changed and the
+       field has to show what was actually stored. */
+    if (j.app) $('ap_loglines').value = j.app.log_lines;
+    logCfgNote('saved · showing the last ' + $('ap_loglines').value + ' lines');
+    refreshLog();
+  }catch(e){ logCfgNote(e.message, true); }
 });
 const bevc = $('b_evclear');
 if (bevc) bevc.addEventListener('click', async ()=>{
@@ -8003,14 +8169,14 @@ function kioskBlock(d){
   const kb = document.createElement('input');
   kb.type = 'checkbox'; kb.checked = !!d.kiosk;
   l.appendChild(kb);
-  l.appendChild(document.createTextNode('Kiosk mode'));
+  l.appendChild(document.createTextNode('Display mode'));
   box.appendChild(l);
 
   const inner = document.createElement('div');
   inner.className = 'kioskon';
 
-  /* No label beside it. The tick immediately above says Kiosk mode, and a
-     second "Kiosk" on the line under it is the same word twice. */
+  /* No label beside it. The tick immediately above says Display mode, and a
+     second "Display" on the line under it is the same word twice. */
   const sel = document.createElement('select');
   sel.className = 'kpick';
 
@@ -8118,7 +8284,7 @@ function kioskBlock(d){
   const named = kiosks.filter(k=> k.id === (d.kiosk_profile || ''))[0]
               || (defOne || null);
   const label = !d.kiosk ? '—'
-              : 'KIOSK' + (named ? ' · ' + named.name : '');
+              : 'DISPLAY MODE' + (named ? ' · ' + named.name : '');
   return {box: box, save: save, undo: undo, said: said, label: label};
 }
 
@@ -8164,11 +8330,11 @@ function paintBulk(){
     sel.innerHTML = '';
     ((DPCFG && DPCFG.kiosks) || []).forEach(k=>{
       const o = document.createElement('option');
-      o.value = k.id; o.textContent = 'Kiosk mode · ' + k.name;
+      o.value = k.id; o.textContent = 'Display mode · ' + k.name;
       sel.appendChild(o);
     });
     const off = document.createElement('option');
-    off.value = '__off'; off.textContent = 'Not a kiosk';
+    off.value = '__off'; off.textContent = 'No display mode';
     sel.appendChild(off);
     sel.value = want || sel.value;
   }
@@ -8198,6 +8364,25 @@ function dispBucket(d){
      screens is on the wall" are two doors, not two populations. */
   const person = d.arrived === 'asked';
   if (dispState(d) === 'live') return person ? 'users' : 'devices';
+  /* NOBODY IS WAITING UNTIL THEY HAVE ASKED. A row is minted the moment any
+     browser opens the display page — that is where its token comes from, and
+     it has to happen before anyone decides anything — but opening a page is
+     not a request. Filed as one, every passer-by, every link somebody
+     followed once and every device of your own you happened to look at it on
+     arrived in the queue as a person to APPROVE or REFUSE, which is a decision
+     nobody asked for about somebody who wants nothing.
+
+     `requested_at` is the moment the form was submitted, and it is the only
+     thing here that somebody deliberately did. Until then the row exists,
+     holds an approved-nothing token, and is shown in no list. It is not lost:
+     the moment they fill the form in, it appears with what they typed.
+
+     Answers count as having asked even without the timestamp. They cannot be
+     there without somebody typing them, and a row from before that field was
+     recorded must not disappear out of a queue on an upgrade — the one thing
+     worse than a queue full of people who want nothing is a queue missing
+     somebody who does. */
+  if (person && !d.requested_at && !((d.answers || []).length)) return null;
   return person ? 'waiting' : 'enrol';
 }
 
@@ -8268,8 +8453,9 @@ async function refreshDisplays(){
       || (b.last_seen || 0) - (a.last_seen || 0)
       || (b.created || 0) - (a.created || 0));
   const EMPTY = {
-    waiting: 'Nobody is waiting. A person who opens the display page and asks '
-             + 'for access appears here.',
+    waiting: 'Nobody is waiting. A person appears here when they fill in the '
+             + 'form and press REQUEST ACCESS — opening the display page is '
+             + 'not a request and puts nobody in this queue.',
     enrol: 'No devices being set up. Name one above to get a code.',
     users: 'No people connected yet.',
     devices: 'No devices connected yet. One appears here the moment it takes '
@@ -8284,8 +8470,17 @@ async function refreshDisplays(){
     const row = document.createElement('div');
     /* Greyed where nothing is happening — but a row holding a LIVE CODE is
        not that. It is mid-enrolment, which on this tab is the state everything
-       else is waiting for, and dimming it said the opposite of what is true. */
-    row.className = 'erow' + (st === 'live' || st === 'code' ? '' : ' off');
+       else is waiting for, and dimming it said the opposite of what is true.
+
+       Nor is a row ASKING FOR ACCESS. Somebody is standing at a screen waiting
+       on you, and it was drawn at half strength — the buttons that decide it
+       and the words they typed to persuade you, both dimmed like a row nothing
+       is happening on. It is the one row on this list with something happening,
+       and now the only ones dimmed are the ones that are genuinely inert:
+       refused, expired, and a device that has gone quiet. */
+    row.className = 'erow'
+      + (st === 'live' || st === 'code' || st === 'asked' || st === 'waiting'
+         ? '' : ' off');
 
     /* Shut unless it is the one being looked at. A list of fifty devices is a
        register, and a register you scroll through is a register nobody reads —
@@ -8371,7 +8566,17 @@ async function refreshDisplays(){
        a row about to stop existing in this list anyway. Everything a device
        has to say about itself it says once it is connected. */
     const waiting = st === 'code' || st === 'stale';
-    const kb = waiting ? null : kioskBlock(d);
+    /* A row asking for a decision. It is the same test the APPROVE/REFUSE
+       pair is drawn from, deliberately: what a row offers and what it looks
+       like are the same question asked twice. */
+    const undecided = d.enrolled && (st === 'asked' || st === 'waiting');
+    /* No kiosk block while a row is undecided. What this screen will BE is a
+       question about a device you have let in, and this one is not in yet —
+       so SAVE and REVERT beside a picker are a commit against a row whose
+       next press might refuse it. Left out here rather than disabled: a
+       control that cannot do anything yet is one more thing to read on the
+       page where there is exactly one thing to do. */
+    const kb = (waiting || undecided) ? null : kioskBlock(d);
     /* What they told you, on the shut row. The labels are the admin's own, so
        there is nothing to hard-code here: everything except the message field
        — the long one, which is the reason and is kept for the open row — is
@@ -8461,21 +8666,34 @@ async function refreshDisplays(){
        refusing, withdrawing, reissuing — and it stays left. What follows is
        committing what the row says and ending it, and those go right. The
        spacer is the whole split. */
-    const gap = document.createElement('span');
-    gap.className = 'spacer';
-    r.appendChild(gap);
-    if (kb){ r.appendChild(kb.save); r.appendChild(kb.undo); }
-    const del = document.createElement('button');
-    del.textContent = 'DELETE';
-    del.className = 'act-danger';
-    del.onclick = ()=>{
-      if (confirm('Delete "' + d.label + '"? Its token stops working '
-                  + 'immediately, and it is removed from every endpoint that '
-                  + 'names it. If the device is still on the wall it will '
-                  + 'come back as a new row, unapproved.'))
-        displayAction('/displays/delete', {id: d.id});
-    };
-    r.appendChild(del);
+    /* NOTHING RIGHT OF THE SPACER WHILE A ROW IS UNDECIDED — no commit, no
+       revert, and no DELETE. There are two answers to somebody asking to be
+       here and REFUSE is the other one: it gives them a message, leaves you a
+       note for whoever reads this row in six months, and records whether they
+       may ask again. DELETE does none of that. It drops the row silently, and
+       the device on the other end — still on a wall, still checking in — comes
+       straight back as a new row with everything they typed gone, which reads
+       as the request having been ignored twice.
+
+       So the spacer goes too. A rule dividing a row into two halves, with
+       nothing in the second, is a line drawn to separate one thing. */
+    if (!undecided){
+      const gap = document.createElement('span');
+      gap.className = 'spacer';
+      r.appendChild(gap);
+      if (kb){ r.appendChild(kb.save); r.appendChild(kb.undo); }
+      const del = document.createElement('button');
+      del.textContent = 'DELETE';
+      del.className = 'act-danger';
+      del.onclick = ()=>{
+        if (confirm('Delete "' + d.label + '"? Its token stops working '
+                    + 'immediately, and it is removed from every endpoint that '
+                    + 'names it. If the device is still on the wall it will '
+                    + 'come back as a new row, unapproved.'))
+          displayAction('/displays/delete', {id: d.id});
+      };
+      r.appendChild(del);
+    }
 
     /* The whole thing somebody has to type, on its own line and big enough to
        read from across a room while typing it into a television with a
@@ -9789,7 +10007,20 @@ function panelNav(){
     if (tab === 'security'){ refreshGroups(); loadApp(); }
     if (tab === 'displays' || tab === 'devices' || tab === 'security'
         || tab === 'enrol') refreshDisplays();
-    if (tab === 'devices'){ refreshEvents(); refreshAlerts(); refreshLog(); }
+    /* STATUS is three fetches because it is three sections, and it needs the
+       display register too: every row in the health list and every alert names
+       a screen, and without it they name an id. */
+    if (tab === 'status'){
+      refreshDisplays(); refreshEvents(); refreshAlerts(); refreshLog();
+    }
+    /* ALERT settings fetches the same /events as STATUS does, and that is not
+       redundancy: paintSyslog — every sink field on this tab — is called from
+       refreshEvents and from nowhere else. Arriving here without it draws the
+       whole form at its DEFAULTS, which is the worst failure available on this
+       page: an admin ticks a box on a form that only looks loaded, presses
+       SAVE, and writes blanks over a working configuration. loadApp is the
+       same story for the log length, which lives in the app document. */
+    if (tab === 'alerts'){ refreshEvents(); loadApp(); }
     // Its own list and its own fetch: it shares the tab with the request
     // queue but nothing else, and a person is not a row in the display file.
     if (tab === 'displays') refreshIdentities();
@@ -9935,6 +10166,14 @@ function start(){
   // stops being empty: everything a person is made of here is minted, granted
   // or revoked, and none of those is a thing a read-only account does.
   $('tab_users').style.display = admin ? '' : 'none';
+  /* /log, /alerts and /events are all admin-only on the server, so a viewer
+     pressing either of these would get a page of empty lists and live-looking
+     buttons — the same reason /app is not offered above. STATUS is the one
+     that would be missed, so it is worth saying why it goes: it is not that a
+     viewer may not KNOW a screen is unwell, it is that this server has no
+     answer to give them yet. */
+  $('tab_status').style.display = admin ? '' : 'none';
+  $('tab_alerts').style.display = admin ? '' : 'none';
   /* The accounts tab stays, because Groups live on it and a group has nothing
      to do with signing in. What goes, where there is no sign-in, is the three
      sections about accounts themselves: they would manage a set of people who

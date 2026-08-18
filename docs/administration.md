@@ -80,6 +80,13 @@ a URL and talks to the display.
   how long a grant lasts, how many devices and waiting requests there may be —
   and the **groups** access is granted to. ENROLLMENTS ▸ USER answers who is
   waiting; this is whether anybody is asked in the first place.
+- **ALERT** — what the server does when a screen goes wrong: where alerts are
+  **sent** (syslog, a webhook, Home Assistant, email), **quiet hours** and the
+  **digest**, how much of the **server log** is answered with, and how long
+  what screens report is **kept**. All of it is configuration. What it
+  configures is read on **STATUS**, which is a different page on purpose: one
+  is set and the other is watched, and a page doing both is a page you cannot
+  safely leave open.
 
 **ENROLLMENTS** — how something comes to be here, as opposed to everything left
 of it, which configures the server.
@@ -89,8 +96,18 @@ of it, which configures the server.
 - **DEVICE** — where a screen is set up: named, given a code, and watched until
   it takes it.
 
-At the right of the same bar: your own name, your role, **SIGN OUT**, and the
-**?**. One side of the bar is where you are going, the other is who you are.
+At the right of the same bar: **STATUS**, **HOME**, your own name, your role,
+**SIGN OUT**, and the **?**. One side of the bar is where you are going, the
+other is who you are.
+
+**STATUS** is what the screens are *doing*: health, the alerts they raised, and
+the server's own log. It sits out here rather than in a boxed group because it
+is not a subject you administer — nothing on it writes anything — and because
+it is the page you want from wherever you happen to be standing when something
+has gone wrong. **HOME** goes back to the start and reloads the panel — every
+list refetched and every half-finished edit gone, which is what "like it was
+when I opened it" has to mean. The three are coloured apart: STATUS ice, HOME
+green, SIGN OUT rust — the last being the only one that ends something.
 
 **There is one ?**, at the far end past SIGN OUT, and it opens these documents.
 It used to be a mark inside each boxed label, which said the labels had manuals
@@ -123,7 +140,8 @@ you administer about it:
 - **AI** — the endpoints, each naming a speech profile, a model profile and a
   network profile.
 - **NODES** — everything currently connected, in two areas: the people you
-  approved, and the devices that took a code.
+  approved, and the devices that took a code. What those devices are
+  *reporting* is not here — that is STATUS.
 - **EMBEDS** — keys that let another application frame this interface.
 
 **SEARCH** shares that bottom row, on the right third of it. Type to search
@@ -1058,7 +1076,13 @@ rights to run or restart. From the directory it is installed in:
 
 A screen with a fault cannot tell anybody. It is on a wall, it shows nobody
 anything, and the note explaining what went wrong fades in front of an empty
-room. **CONNECTIONS ▸ NODES** is where it says so instead, in three sections.
+room. **STATUS**, beside HOME at the right of the bar, is where it says so
+instead, in three sections.
+
+Everything on STATUS is read rather than set. What governs it — where an alert
+is sent, how much log is answered with, how long what screens report is kept —
+is **SETTINGS ▸ ALERT**, and each of the three sections below names the setting
+that belongs to it.
 
 ### Health
 
