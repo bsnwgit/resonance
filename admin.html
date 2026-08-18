@@ -3163,6 +3163,34 @@ code for do not, and never will.
     </div>
   </section>
 
+  <!-- The push half. Diagnostics is somewhere you go and look; this is what
+       comes and finds you, and the list is where acknowledgement lives —
+       which is why it is the one channel that is not optional. -->
+  <section class="grp bare proflist" data-tab="devices">
+    <div class="barehead"><span class="listtitle">Alerts</span></div>
+    <div class="grpbody">
+  <div id="alertlist"></div>
+  <div class="note" id="alertnote"></div>
+  <div class="seg actrow">
+    <button id="b_ackall" class="act-save">ACKNOWLEDGE READ</button>
+  </div>
+  <div class="note help">An alert has four states, not two: open or resolved,
+acknowledged or not. The one that matters is <b>resolved but unread</b> — a
+screen that dropped off at two in the morning and came back four minutes later
+leaves something here until a person sees it. Self-healing nobody ever hears
+about is indistinguishable from nothing having happened, and a display that
+heals itself every night is a fault rather than a success.
+
+<b>Resolving is automatic; acknowledging is not.</b> A screen that comes back
+resolves its own alert, and it stays in this list until you press the button.
+Anything both resolved and acknowledged has nothing left to say and leaves.
+
+One of these depends on nothing else here: <b>a device asking to be let in</b>
+arrives the moment it asks, because it is the only alert with a person attached
+to it — somebody is standing at a screen waiting.</div>
+    </div>
+  </section>
+
   <!-- What the screens have been reporting, beside the list of what they are.
        Per DEVICE, because the useful question is which screen is failing
        rather than how many faults there have been. -->
@@ -5730,6 +5758,91 @@ $('b_idnew').addEventListener('click', async ()=>{
 });
 $('id_name').addEventListener('keydown', e=>{
   if (e.key === 'Enter') $('b_idnew').click();
+});
+
+/* ------------------------------------------------------------ alerts
+   The push half, and the list is the baseline channel because the
+   acknowledgement model has to live somewhere. */
+let ALERTS = null;
+
+async function refreshAlerts(){
+  const box = $('alertlist');
+  if (!box || ME.role !== 'admin'){ if (box) box.textContent = ''; return; }
+  try{ ALERTS = await api('/alerts'); }
+  catch(e){ box.className = 'note bad'; box.textContent = e.message; return; }
+  const rows = ALERTS.alerts || [];
+  box.innerHTML = '';
+  const note = $('alertnote');
+  if (note)
+    note.textContent = rows.length
+      ? ALERTS.open + ' still true · ' + ALERTS.unread + ' resolved and unread'
+      : '';
+  if (!rows.length){
+    box.className = 'note';
+    box.textContent = 'Nothing to report. Every screen is checking in and '
+                    + 'nothing has asked to be let in.';
+    return;
+  }
+  box.className = '';
+  rows.forEach(a=>{
+    const row = document.createElement('div');
+    row.className = 'erow shut';
+    const top = document.createElement('div'); top.className = 'top';
+    const nm = document.createElement('span');
+    nm.className = 'nm';
+    nm.textContent = (a.label || a.did || 'this server') + ' ' + a.words;
+    top.appendChild(nm);
+    const st = document.createElement('span');
+    /* The state, in the words that describe what to do about it rather than
+       what the record says. RESOLVED · UNREAD is the cell this list exists
+       for, so it is the one that keeps a colour. */
+    st.className = 'badge' + (!a.resolved && a.level === 'error' ? ' warn'
+                            : a.resolved && !a.acked ? ' warn' : '');
+    st.textContent = !a.resolved ? 'OPEN'
+                   : a.acked ? 'RESOLVED' : 'RESOLVED · UNREAD';
+    top.appendChild(st);
+    if (a.n > 1){
+      const c = document.createElement('span');
+      c.className = 'badge';
+      c.textContent = '×' + a.n;
+      top.appendChild(c);
+    }
+    top.onclick = ()=>{
+      const opening = row.classList.contains('shut');
+      box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+      row.classList.toggle('shut', !opening);
+    };
+    row.appendChild(top);
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    [['First seen', evWhen(a.opened)],
+     ['Last', evWhen(a.last)],
+     a.resolved ? ['Resolved', evWhen(a.resolved)] : null,
+     a.detail ? ['Detail', a.detail] : null].filter(Boolean).forEach(([k, v])=>{
+      const el = document.createElement('div');
+      const bb = document.createElement('b');
+      bb.textContent = k + ' ';
+      el.appendChild(bb);
+      el.appendChild(document.createTextNode(v));
+      meta.appendChild(el);
+    });
+    row.appendChild(meta);
+    box.appendChild(row);
+  });
+}
+
+const backall = $('b_ackall');
+if (backall) backall.addEventListener('click', async ()=>{
+  const ids = ((ALERTS && ALERTS.alerts) || []).filter(a=> !a.acked)
+                                               .map(a=> a.id);
+  if (!ids.length) return;
+  try{
+    await api('/alerts/ack', {method:'POST', body: JSON.stringify({ids})});
+    refreshAlerts();
+  }catch(e){
+    const n = $('alertnote');
+    if (n){ n.className = 'note bad'; n.textContent = e.message; }
+  }
 });
 
 /* ------------------------------------------------------------ health
@@ -9383,7 +9496,7 @@ function panelNav(){
     if (tab === 'security'){ refreshGroups(); loadApp(); }
     if (tab === 'displays' || tab === 'devices' || tab === 'security'
         || tab === 'enrol') refreshDisplays();
-    if (tab === 'devices') refreshEvents();
+    if (tab === 'devices'){ refreshEvents(); refreshAlerts(); }
     // Its own list and its own fetch: it shares the tab with the request
     // queue but nothing else, and a person is not a row in the display file.
     if (tab === 'displays') refreshIdentities();

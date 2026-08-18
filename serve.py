@@ -3086,6 +3086,10 @@ def request_access(did, answers):
     if answers is not None:
         rec["answers"] = answers
     write_displays(displays)
+    # The one alert with a PERSON attached: somebody is standing at a screen
+    # waiting to be let in. It depends on nothing this phase collects, and it
+    # is why it arrives immediately rather than in a digest.
+    raise_alert("asked_in", did, display_label(rec))
     return dict(rec, id=did), None
 
 
@@ -3470,6 +3474,191 @@ def prune_events():
     if len(keep) != len(rows):
         write_events(keep)
     return len(rows) - len(keep)
+
+
+# -------------------------------------------------------------------- alerts
+# Diagnostics is a PULL — events collected, a health view somebody goes and
+# looks at. An alert is a PUSH: it comes and finds you. Those are genuinely
+# different things, and the only reason they are one entry is that building a
+# health view and then separately building the thing that watches it is two
+# passes over the same data.
+#
+# FOUR STATES, NOT TWO: open or resolved, acknowledged or not. The cell that
+# matters is resolved-but-unacknowledged — a screen that dropped off at two in
+# the morning and came back four minutes later leaves something in the list
+# until a person reads it. Self-healing nobody ever hears about is
+# indistinguishable from nothing having happened, and a display that heals
+# itself every night is a fault rather than a success.
+ALERTS_PATH = os.path.join(ROOT, "alerts.json")
+_alerts_lock = threading.RLock()
+MAX_ALERTS = 300
+
+#: What can raise one, and what it means. `once` fires a single time per
+#: device however often the fact is reported — no recorder in this browser
+#: will be just as true tomorrow.
+ALERT_KINDS = {
+    "offline":      {"level": "error", "words": "has not checked in"},
+    "still_gone":   {"level": "error", "words": "did not come back after a reload"},
+    "mic_denied":   {"level": "error", "words": "its microphone was refused"},
+    "no_recorder":  {"level": "error", "words": "has no recorder at all", "once": True},
+    "stt_slow":     {"level": "warn",  "words": "transcription is running long"},
+    "tts_fallback": {"level": "warn",  "words": "fell back to the browser voice"},
+    "wake_fuzzy":   {"level": "warn",  "words": "is waking on near misses"},
+    "no_intent":    {"level": "warn",  "words": "is being asked for what it cannot do"},
+    "backend_error": {"level": "error", "words": "the assistant it uses is failing"},
+    # The one that depends on none of the rest and could have shipped alone: a
+    # device asking to be here is already recorded by the displays entry. It
+    # arrives immediately rather than in a digest, because it is the only
+    # alert with a person attached — somebody is standing at a screen waiting
+    # to be let in.
+    "asked_in":     {"level": "warn",  "words": "is asking to be let in",
+                     "now": True},
+}
+
+
+def read_alerts():
+    try:
+        with open(ALERTS_PATH) as fh:
+            doc = json.load(fh)
+        rows = doc.get("alerts") if isinstance(doc, dict) else None
+    except (OSError, ValueError):
+        return []
+    return [r for r in rows if isinstance(r, dict) and r.get("kind") in ALERT_KINDS] \
+        if isinstance(rows, list) else []
+
+
+def write_alerts(rows):
+    with _alerts_lock:
+        tmp = ALERTS_PATH + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump({"version": 1, "alerts": rows[-MAX_ALERTS:]}, fh)
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, ALERTS_PATH)
+
+
+def raise_alert(kind, did="", detail=""):
+    """Open one, or touch the one already open.
+
+    An alert has an IDENTITY — its kind and its device — rather than being a
+    row appended per occurrence. A screen offline for a day is one alert that
+    has been true for a day, not two hundred and forty of them, and a list that
+    said otherwise would be a list nobody reads to the bottom of."""
+    spec = ALERT_KINDS.get(kind)
+    if not spec:
+        return None
+    now_ = int(time.time())
+    with _alerts_lock:
+        rows = read_alerts()
+        for r in rows:
+            if r["kind"] == kind and r["did"] == did and not r["resolved"]:
+                r["last"], r["n"] = now_, r.get("n", 1) + 1
+                if detail:
+                    r["detail"] = str(detail)[:300]
+                write_alerts(rows)
+                return r
+            # A fact fires once per device, ever — even after somebody has
+            # acknowledged and it has been resolved.
+            if spec.get("once") and r["kind"] == kind and r["did"] == did:
+                return None
+        row = {"id": "a" + secrets.token_hex(5), "kind": kind, "did": did,
+               "level": spec["level"], "detail": str(detail or "")[:300],
+               "opened": now_, "last": now_, "n": 1,
+               "resolved": 0, "acked": 0, "sent": 0}
+        rows.append(row)
+        write_alerts(rows)
+        print("ALERT %s %s%s" % (kind, did or "(server)",
+                                 ": " + detail if detail else ""), flush=True)
+        return row
+
+
+def clear_alert(kind, did=""):
+    """It stopped being true. RESOLVED, not gone: it stays in the list until
+    somebody has read it, because a fault that healed itself unobserved is
+    indistinguishable from one that never happened."""
+    now_ = int(time.time())
+    with _alerts_lock:
+        rows, hit = read_alerts(), False
+        for r in rows:
+            if r["kind"] == kind and r["did"] == did and not r["resolved"]:
+                r["resolved"], hit = now_, True
+        if hit:
+            write_alerts(rows)
+            print("alert cleared: %s %s" % (kind, did or "(server)"), flush=True)
+        return hit
+
+
+#: How many missed polls before a screen is called gone. Three rather than one:
+#: a single dropped poll is a network hiccup, and an alert that fires on one is
+#: an alert somebody turns off in a week.
+ALERT_MISSES = 3
+#: How many of a thing inside the window before it is worth telling somebody.
+#: A near miss now and then is how speech works; a rate of them is two wake
+#: words cross-triggering.
+ALERT_RATES = {"stt_slow": 5, "tts_fallback": 3, "wake_fuzzy": 5,
+               "no_intent": 5, "backend_error": 3}
+#: The window those rates are counted over.
+ALERT_WINDOW = 3600
+
+
+def evaluate_alerts():
+    """Everything worth a threshold, judged from what is already collected.
+
+    Called from the poll, which is the only clock this server has that a
+    display keeps wound — and the poll is also the fact that liveness is read
+    from, so the thing being measured and the thing doing the measuring arrive
+    together."""
+    now_ = int(time.time())
+    app = read_app()
+    every = int(app.get("poll_seconds") or APP_DEFAULTS["poll_seconds"])
+    gone_after = every * ALERT_MISSES
+    displays = read_displays()
+
+    for did, rec in displays.items():
+        # Only screens that ever worked. An invited row that has never taken
+        # its code is not a screen that has gone quiet; it is a screen that was
+        # never switched on, and it is already visible as one.
+        if not (rec.get("approved") and rec.get("hash")):
+            continue
+        seen = int(rec.get("last_seen") or 0)
+        if seen and now_ - seen > gone_after:
+            raise_alert("offline", did,
+                        "last seen %d seconds ago" % (now_ - seen))
+        else:
+            # RETURNED. Resolving is what makes the resolved-but-unread cell
+            # exist, which is the one that matters: a screen that dropped at
+            # two in the morning and came back leaves something to read.
+            clear_alert("offline", did)
+
+    rows = [r for r in read_events() if r["at"] >= now_ - ALERT_WINDOW]
+    counts = {}
+    for r in rows:
+        counts[(r["kind"], r["did"])] = counts.get((r["kind"], r["did"]), 0) + 1
+    for (kind, did), n in counts.items():
+        if kind in ("mic_denied", "no_recorder"):
+            # Hard faults, not rates. One is enough: a microphone that will not
+            # open is not a thing that gets better by happening less often.
+            raise_alert(kind, did, "reported %d time(s) in the last hour" % n)
+        elif kind in ALERT_RATES and n >= ALERT_RATES[kind]:
+            raise_alert(kind, did, "%d in the last hour" % n)
+    # …and the ones that stopped happening.
+    for kind in list(ALERT_RATES) + ["mic_denied"]:
+        for did in displays:
+            if counts.get((kind, did), 0) == 0:
+                clear_alert(kind, did)
+
+
+def ack_alerts(ids):
+    """Read by a person. An alert that is both resolved and acknowledged has
+    nothing left to say, so it leaves — everything else stays visible."""
+    now_ = int(time.time())
+    with _alerts_lock:
+        rows = read_alerts()
+        for r in rows:
+            if r["id"] in ids and not r["acked"]:
+                r["acked"] = now_
+        keep = [r for r in rows if not (r["resolved"] and r["acked"])]
+        write_alerts(keep)
+        return len(rows) - len(keep)
 
 
 # ---------------------------------------------------------------- identities
@@ -5425,6 +5614,7 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/displays/decide", "/displays/settings", "/displays/kiosk",
                      "/groups", "/groups/save", "/groups/delete", "/groups/sets",
                      "/app/pin",
+                     "/alerts", "/alerts/ack",
                      "/events", "/events/clear",
                      "/identities/wake", "/identities/wake/check",
                      "/identities", "/identities/new", "/identities/rename",
@@ -6174,6 +6364,22 @@ class Handler(SimpleHTTPRequestHandler):
             skip = (q.get("id") or [""])[0]
             bad = check_wake_word(word, skip_pid=skip)
             return self._json(200, {"ok": not bad, "why": bad})
+        if path == "/alerts":
+            if not self._require("admin"):
+                return
+            displays = read_displays()
+            rows = []
+            for a in sorted(read_alerts(), key=lambda a: (-a["last"],)):
+                spec = ALERT_KINDS.get(a["kind"]) or {}
+                rows.append(dict(a, words=spec.get("words", a["kind"]),
+                                 label=display_label(displays[a["did"]])
+                                 if a.get("did") in displays else ""))
+            return self._json(200, {
+                "alerts": rows,
+                # The two numbers a list like this is read against: what is
+                # still true, and what is over but unread.
+                "open": len([a for a in rows if not a["resolved"]]),
+                "unread": len([a for a in rows if a["resolved"] and not a["acked"]])})
         if path == "/events":
             # The health view's data: what each screen has been reporting, and
             # the raw tail underneath it. Per device, because the useful
@@ -6988,6 +7194,10 @@ class Handler(SimpleHTTPRequestHandler):
             if obj.get("events") and take_events(disp["id"], obj.get("events")):
                 prune_events()
                 prune_turns()
+            # Judged here because this is the only clock a display keeps wound,
+            # and because liveness is read from this very request — the thing
+            # measured and the thing measuring arrive together.
+            evaluate_alerts()
             try:
                 req = int(disp.get("reload_req") or 0)
             except (TypeError, ValueError):
@@ -7284,6 +7494,17 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(400, {"error": bad})
             print("the panel PIN was set by %s" % s["user"], flush=True)
             return self._json(200, {"ok": True, "has_pin": True})
+
+        if parsed.path == "/alerts/ack":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            ids = [str(i)[:16] for i in (obj.get("ids") or [])]
+            gone = ack_alerts(ids)
+            return self._json(200, {"ok": True, "closed": gone})
 
         if parsed.path == "/events/clear":
             s = self._require("admin")
@@ -7603,6 +7824,9 @@ class Handler(SimpleHTTPRequestHandler):
             # refusal leaves whatever group it was already in alone, because
             # groups are how you address a set of things and not a record of
             # who is currently allowed.
+            # Decided, so it is no longer asking. Resolved either way — the
+            # alert was "somebody is waiting", and they are not any more.
+            clear_alert("asked_in", did)
             if approve:
                 file_display(did, by=s["user"])
             # The allow-lists, whichever way it went: a refusal has to take
