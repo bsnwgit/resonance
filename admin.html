@@ -218,6 +218,23 @@
     font-size:calc(8px * var(--fs));letter-spacing:.08em;
     color:rgba(var(--paper),.55);
   }
+  /* The server's log, as text. Monospace it already is; what it needs is a
+     ceiling and its own scroll, because a panel section that grows to eight
+     hundred lines is a panel you cannot get past. */
+  #logbox{
+    margin:6px 0 2px;padding:8px 10px;max-height:340px;overflow:auto;
+    background:rgba(0,0,0,.45);border:1px solid rgba(var(--glass),.22);
+    font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.02em;
+    line-height:1.55;color:rgba(var(--paper),.82);
+    white-space:pre-wrap;word-break:break-word;
+  }
+  #logfind{
+    flex:1;min-width:0;margin:0;font:inherit;font-size:calc(9.5px * var(--fs));
+    padding:5px 7px;background:rgba(0,0,0,.5);color:var(--text);
+    border:1px solid rgba(var(--glass),.18);outline:0;
+    -webkit-appearance:none;appearance:none;
+  }
+  #logfind::placeholder{color:rgba(var(--paper),.62)}
   .docmore{
     font-size:calc(8.5px * var(--fs));letter-spacing:.1em;
     color:rgba(var(--paper),.5);margin:5px 0 0;padding-left:11px;
@@ -3174,6 +3191,34 @@ code for do not, and never will.
   <div class="seg actrow">
     <button id="b_ackall" class="act-save">ACKNOWLEDGE READ</button>
   </div>
+  <div class="setuprow">
+    <label class="vo"><input type="checkbox" id="sl_on"> Also send alerts to syslog</label>
+  </div>
+  <div class="setuprow" id="sl_where">
+    <label class="bklab" for="sl_host">Host (blank for this machine's own daemon)</label>
+    <input id="sl_host" type="text" spellcheck="false" autocomplete="off"
+           placeholder="logs.example">
+    <label class="bklab" for="sl_port">Port</label>
+    <input id="sl_port" class="num" type="number" inputmode="numeric"
+           min="1" max="65535">
+    <label class="bklab" for="sl_fac">Facility</label>
+    <select id="sl_fac" class="ppick"></select>
+    <button id="b_slsave" class="act-save">SAVE</button>
+  </div>
+  <div class="note" id="slnote"></div>
+  <div class="note help">Cheapest reach after this list, by a distance: the
+standard library speaks it, every operator already has somewhere it goes, and
+it costs one socket and no credentials.
+
+Sent when an alert opens <b>and again when it resolves</b> — a screen that came
+back at four in the morning is exactly what somebody reading a log at nine
+wants to see beside the line saying it went. Severity follows the alert:
+errors as <b>err</b>, warnings as <b>warning</b>, recoveries as <b>info</b>.
+
+<b>Fire and forget.</b> Nothing here retries or blocks, because a sink that did
+would turn reporting a fault into a second fault — and the alert it failed to
+send is still in the list above, which is why that one is not optional.</div>
+
   <div class="note help">An alert has four states, not two: open or resolved,
 acknowledged or not. The one that matters is <b>resolved but unread</b> — a
 screen that dropped off at two in the morning and came back four minutes later
@@ -3188,6 +3233,30 @@ Anything both resolved and acknowledged has nothing left to say and leaves.
 One of these depends on nothing else here: <b>a device asking to be let in</b>
 arrives the moment it asks, because it is the only alert with a person attached
 to it — somebody is standing at a screen waiting.</div>
+    </div>
+  </section>
+
+  <!-- The server's own log, read here rather than over SSH. A TAIL through
+       the admin listener, never a served file: the reason SERVABLE is an
+       allow-list at all is that this used to be handed out by the base class,
+       unauthenticated, on every interface. -->
+  <section class="grp bare proflist" data-tab="devices">
+    <div class="barehead"><span class="listtitle">Server log</span></div>
+    <div class="grpbody">
+  <div class="findrow">
+    <input id="logfind" type="search" spellcheck="false" autocomplete="off"
+           placeholder="filter the log…">
+    <button id="b_logrefresh" class="act-save">REFRESH</button>
+  </div>
+  <div class="note" id="lognote"></div>
+  <pre id="logbox"></pre>
+  <div class="note help">The end of it, newest last. The file is truncated
+every time the server starts, so this is what has happened since — and only the
+tail of that, because reading a whole file to show the last screenful is the
+kind of thing that works until the day it matters.
+
+It is not a live feed. Press REFRESH, or filter for a word: a display id, a
+route name, <b>ALERT</b>, <b>refused</b>.</div>
     </div>
   </section>
 
@@ -5760,6 +5829,32 @@ $('id_name').addEventListener('keydown', e=>{
   if (e.key === 'Enter') $('b_idnew').click();
 });
 
+/* --------------------------------------------------------------- log
+   The server's own, read here rather than over SSH. A tail, on demand: not a
+   live feed, because a panel that polls a log is a panel that keeps a server
+   busy telling it nothing changed. */
+async function refreshLog(){
+  const box = $('logbox'), note = $('lognote');
+  if (!box || ME.role !== 'admin') return;
+  try{
+    const q = ($('logfind').value || '').trim();
+    const j = await api('/log' + (q ? '?q=' + encodeURIComponent(q) : ''));
+    box.textContent = (j.lines || []).join('\n') || '(nothing yet)';
+    /* Scrolled to the end, because the end is the part somebody came for. */
+    box.scrollTop = box.scrollHeight;
+    note.className = 'note';
+    note.textContent = (j.lines || []).length + ' line(s)'
+      + (j.truncated ? ' — the oldest are cut, filter to narrow it' : '')
+      + ' · ' + Math.round((j.bytes || 0) / 1024) + 'KB on disk';
+  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+}
+const blogr = $('b_logrefresh');
+if (blogr) blogr.addEventListener('click', refreshLog);
+const logf = $('logfind');
+if (logf) logf.addEventListener('keydown', e=>{
+  if (e.key === 'Enter') refreshLog();
+});
+
 /* ------------------------------------------------------------ alerts
    The push half, and the list is the baseline channel because the
    acknowledgement model has to live somewhere. */
@@ -5831,6 +5926,47 @@ async function refreshAlerts(){
   });
 }
 
+/* ---- syslog, the one sink that costs nothing to reach ---- */
+const SYSLOG_FACILITIES = ['user', 'local0', 'local1', 'local2', 'local3',
+                           'local4', 'local5', 'local6', 'local7'];
+function paintSyslog(cfg){
+  if (!cfg || !$('sl_on')) return;
+  $('sl_on').checked = !!cfg.syslog_on;
+  $('sl_host').value = cfg.syslog_host || '';
+  $('sl_port').value = cfg.syslog_port || 514;
+  const sel = $('sl_fac');
+  if (sel && !sel.options.length)
+    SYSLOG_FACILITIES.forEach(f=>{
+      const o = document.createElement('option');
+      o.value = f; o.textContent = f;
+      sel.appendChild(o);
+    });
+  if (sel) sel.value = cfg.syslog_facility || 'user';
+  syncSyslog();
+}
+function syncSyslog(){
+  const where = $('sl_where');
+  /* The address only means something once it is switched on. */
+  if (where) where.style.display = $('sl_on').checked ? '' : 'none';
+}
+const slon = $('sl_on');
+if (slon) slon.addEventListener('change', syncSyslog);
+const bsl = $('b_slsave');
+if (bsl) bsl.addEventListener('click', async ()=>{
+  const note = $('slnote');
+  try{
+    await api('/displays/settings', {method:'POST', body: JSON.stringify({
+      syslog_on: $('sl_on').checked ? 1 : 0,
+      syslog_host: ($('sl_host').value || '').trim(),
+      syslog_port: parseInt($('sl_port').value, 10) || 514,
+      syslog_facility: $('sl_fac').value,
+    })});
+    note.className = 'note';
+    note.textContent = $('sl_on').checked
+      ? 'saved — alerts also go to syslog' : 'saved — syslog is off';
+  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+});
+
 const backall = $('b_ackall');
 if (backall) backall.addEventListener('click', async ()=>{
   const ids = ((ALERTS && ALERTS.alerts) || []).filter(a=> !a.acked)
@@ -5879,6 +6015,7 @@ async function refreshEvents(){
   }catch(e){ evNote(e.message, true); return; }
   const days = $('ev_days');
   if (days && document.activeElement !== days) days.value = EVENTS.days;
+  paintSyslog(EVENTS.settings);
   box.innerHTML = '';
   const rows = EVENTS.health || [];
   if (!rows.length){
@@ -9496,7 +9633,7 @@ function panelNav(){
     if (tab === 'security'){ refreshGroups(); loadApp(); }
     if (tab === 'displays' || tab === 'devices' || tab === 'security'
         || tab === 'enrol') refreshDisplays();
-    if (tab === 'devices'){ refreshEvents(); refreshAlerts(); }
+    if (tab === 'devices'){ refreshEvents(); refreshAlerts(); refreshLog(); }
     // Its own list and its own fetch: it shares the tab with the request
     // queue but nothing else, and a person is not a row in the display file.
     if (tab === 'displays') refreshIdentities();

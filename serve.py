@@ -54,7 +54,7 @@ longer running. This sends no-store on everything instead.
 """
 import base64, contextlib, functools, hashlib, hmac, http.cookies, inspect, \
        json, os, re, \
-       secrets, ssl, subprocess, sys, tempfile, threading, time
+       secrets, socket, ssl, subprocess, sys, tempfile, threading, time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 import manual                            # the manual, and its PDF writer
@@ -1781,6 +1781,13 @@ DISPLAY_SETTINGS = {
     # holds what was said to a display, and a generous default is a decision
     # made on somebody's behalf about their household.
     "event_days": EVENT_DAYS_DEFAULT,
+    # Where alerts go besides the list. Off by default: a server that started
+    # posting somewhere on first run would be making a decision about somebody
+    # else's network.
+    "syslog_on": 0,
+    "syslog_host": "",                   # blank means the local daemon
+    "syslog_port": 514,
+    "syslog_facility": "user",
     # Kept so an existing document round-trips rather than losing a key on the
     # first save. `user` was the second DISPLAY kind and folded into `device`;
     # nothing reads this now, and nothing writes it either.
@@ -2112,6 +2119,25 @@ def validate_display_settings(obj, current):
     if cfg["max_pending"] > cfg["max_displays"]:
         return None, ("more waiting than there is room for — the waiting limit "
                       "cannot exceed the total")
+    # The syslog sink. Its own block because none of it is a range: a switch, a
+    # host that may be blank on purpose, a port, and a name from a fixed list.
+    if "syslog_on" in obj:
+        cfg["syslog_on"] = 1 if obj["syslog_on"] else 0
+    if "syslog_host" in obj:
+        cfg["syslog_host"] = str(obj["syslog_host"] or "").strip()[:120]
+    if "syslog_port" in obj:
+        try:
+            port = int(obj["syslog_port"])
+        except (TypeError, ValueError):
+            return None, "the syslog port must be a whole number"
+        if not (1 <= port <= 65535):
+            return None, "the syslog port must be between 1 and 65535"
+        cfg["syslog_port"] = port
+    if "syslog_facility" in obj:
+        f = str(obj["syslog_facility"] or "").strip()
+        if f not in SYSLOG_FACILITIES:
+            return None, "facility must be one of: " + ", ".join(SYSLOG_FACILITIES)
+        cfg["syslog_facility"] = f
     if "form" in obj:
         if not isinstance(obj["form"], (list, tuple)):
             return None, "the request form must be a list of fields"
@@ -3516,6 +3542,40 @@ ALERT_KINDS = {
 }
 
 
+#: The server's own log, as an admin reads it. NOT a served file — the whole
+#: reason SERVABLE is an allow-list is that this used to be handed out by the
+#: base class, unauthenticated, on every interface. This reads a bounded tail
+#: through the admin listener, behind the same session as everything else.
+LOG_PATH = os.path.join(ROOT, "server.log")
+#: Bytes read from the end. Enough to cover a start and a busy hour after it,
+#: small enough that asking for it is never the thing that makes a server slow.
+LOG_TAIL_BYTES = 256 * 1024
+LOG_MAX_LINES = 800
+
+
+def read_log_tail(match=""):
+    """The end of the log, newest last. Returns (lines, truncated, size).
+
+    Seeks rather than reads: this file is truncated at every start but a busy
+    day still puts megabytes in it, and reading the whole thing to show the
+    last screenful is the kind of thing that works until the day it matters."""
+    try:
+        size = os.path.getsize(LOG_PATH)
+        with open(LOG_PATH, "rb") as fh:
+            if size > LOG_TAIL_BYTES:
+                fh.seek(size - LOG_TAIL_BYTES)
+                fh.readline()                # drop the half line seeking landed in
+            raw = fh.read()
+    except OSError:
+        return [], False, 0
+    lines = raw.decode("utf-8", "replace").splitlines()
+    if match:
+        m = match.lower()
+        lines = [ln for ln in lines if m in ln.lower()]
+    cut = len(lines) > LOG_MAX_LINES
+    return lines[-LOG_MAX_LINES:], cut, size
+
+
 def read_alerts():
     try:
         with open(ALERTS_PATH) as fh:
@@ -3568,7 +3628,10 @@ def raise_alert(kind, did="", detail=""):
         write_alerts(rows)
         print("ALERT %s %s%s" % (kind, did or "(server)",
                                  ": " + detail if detail else ""), flush=True)
-        return row
+    # Outside the lock: a sink is a network call, and holding the alert file
+    # while one of them times out would stop every other alert being written.
+    deliver_alert(row)
+    return row
 
 
 def clear_alert(kind, did=""):
@@ -3584,7 +3647,85 @@ def clear_alert(kind, did=""):
         if hit:
             write_alerts(rows)
             print("alert cleared: %s %s" % (kind, did or "(server)"), flush=True)
-        return hit
+    if hit:
+        # Recovery is news too. A screen that came back at four in the morning
+        # is exactly what somebody reading a log at nine wants to see beside
+        # the line saying it went.
+        for r in rows:
+            if r["kind"] == kind and r["did"] == did and r["resolved"] == now_:
+                deliver_alert(r, resolved=True)
+                break
+    return hit
+
+
+# ------------------------------------------------------------- alert sinks
+# CHEAPEST REACH FIRST. The admin list is the baseline and is not optional,
+# because acknowledgement has to live somewhere. Syslog is the next cheapest by
+# a distance: the standard library speaks it, every operator already has
+# somewhere it goes, and it costs one socket and no credentials — which is more
+# than can be said for anything else on this list.
+#
+# It is FIRE AND FORGET on purpose. A sink that raises, retries or blocks would
+# make reporting a fault into a second fault, and the alert it failed to send
+# is still sitting in the panel where acknowledgement lives.
+SYSLOG_FACILITIES = ("user", "local0", "local1", "local2", "local3",
+                     "local4", "local5", "local6", "local7")
+#: alert level -> syslog severity, by name rather than number so the mapping is
+#: readable where it is decided rather than in a table somewhere else.
+SYSLOG_SEVERITY = {"error": 3, "warn": 4, "info": 6}   # err, warning, info
+
+
+def syslog_send(level, text):
+    """One line, to wherever an admin pointed it. Silent on every failure: this
+    is called from the path that IS the fault being reported."""
+    cfg = display_settings()
+    if not cfg.get("syslog_on"):
+        return
+    host = str(cfg.get("syslog_host") or "").strip()
+    try:
+        fac = SYSLOG_FACILITIES.index(cfg.get("syslog_facility") or "user")
+        fac = 1 if fac == 0 else 15 + fac        # user=1, local0..7 = 16..23
+        pri = fac * 8 + SYSLOG_SEVERITY.get(level, 6)
+        line = "<%d>resonance: %s" % (pri, str(text)[:900])
+        if host:
+            port = int(cfg.get("syslog_port") or 514)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                sock.settimeout(1.0)
+                sock.sendto(line.encode("utf-8", "replace"), (host, port))
+            finally:
+                sock.close()
+        else:
+            # The local daemon. Two names because they differ by platform and
+            # trying both is cheaper than asking which one this is.
+            for path in ("/dev/log", "/var/run/syslog"):
+                if not os.path.exists(path):
+                    continue
+                sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+                try:
+                    sock.connect(path)
+                    sock.send(line.encode("utf-8", "replace"))
+                    return
+                except OSError:
+                    continue
+                finally:
+                    sock.close()
+    except Exception:                            # noqa: BLE001
+        pass
+
+
+def deliver_alert(row, resolved=False):
+    """Out to every sink that is switched on. The list is not one of them: it
+    already has the row, which is how it can be the thing that is never
+    missed."""
+    displays = read_displays()
+    who = display_label(displays[row["did"]]) if row.get("did") in displays \
+        else (row.get("did") or "this server")
+    spec = ALERT_KINDS.get(row["kind"]) or {}
+    syslog_send("info" if resolved else row.get("level", "info"),
+                "%s %s%s%s" % (who, spec.get("words", row["kind"]),
+                               " — RESOLVED" if resolved else "",
+                               (": " + row["detail"]) if row.get("detail") else ""))
 
 
 #: How many missed polls before a screen is called gone. Three rather than one:
@@ -5614,7 +5755,7 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/displays/decide", "/displays/settings", "/displays/kiosk",
                      "/groups", "/groups/save", "/groups/delete", "/groups/sets",
                      "/app/pin",
-                     "/alerts", "/alerts/ack",
+                     "/log", "/alerts", "/alerts/ack",
                      "/events", "/events/clear",
                      "/identities/wake", "/identities/wake/check",
                      "/identities", "/identities/new", "/identities/rename",
@@ -6364,6 +6505,16 @@ class Handler(SimpleHTTPRequestHandler):
             skip = (q.get("id") or [""])[0]
             bad = check_wake_word(word, skip_pid=skip)
             return self._json(200, {"ok": not bad, "why": bad})
+        if path == "/log":
+            # Read through the panel rather than over SSH. Admin only, and a
+            # tail rather than the file: this is a window onto a running
+            # server, not a download.
+            if not self._require("admin"):
+                return
+            q = parse_qs(urlparse(self.path).query)
+            lines, cut, size = read_log_tail((q.get("q") or [""])[0][:80])
+            return self._json(200, {"lines": lines, "truncated": cut,
+                                    "bytes": size, "max": LOG_MAX_LINES})
         if path == "/alerts":
             if not self._require("admin"):
                 return
@@ -6408,6 +6559,12 @@ class Handler(SimpleHTTPRequestHandler):
                                if r.get("did") in displays else "")
                           for r in sorted(read_turns(), key=lambda r: -r["at"])[:120]],
                 "days": event_window_days(),
+                # The sink's settings ride with the data it reports on, so the
+                # panel fills that box from the same fetch rather than a second
+                # one that can disagree with it.
+                "settings": {k: display_settings().get(k)
+                             for k in ("syslog_on", "syslog_host",
+                                       "syslog_port", "syslog_facility")},
                 "limits": {"event_days": EVENT_DAYS_LIMITS},
                 "kinds": list(EVENT_KINDS), "total": len(rows)})
         if path == "/identities":
