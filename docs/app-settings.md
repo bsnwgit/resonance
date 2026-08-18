@@ -11,7 +11,7 @@ both starts lying the moment somebody changes half of it — "personal" would
 still read personal after the binding moved to every interface on the machine.
 
 They are two topics for the same reason, and they now sit on two tabs:
-**IP Address**, under ADMIN SETTINGS, holds where the server can be reached
+**IP Address**, under ADMIN, holds where the server can be reached
 from; **Sign in**, under SECURITY, holds what it takes to get past the door —
 with the rest of who-gets-in, which is what that tab is about. **Sessions**
 went with it, since how long a session lasts is the same subject.
@@ -69,20 +69,34 @@ changed on the day that matters.
 A firewall rule, which is outside this application entirely, does more than
 anything inside it.
 
-### A single PIN — not built yet
+### A single PIN
 
-One number for the whole display, no accounts, no admin sign-in. The middle
-rung, and the right answer for a home server: it keeps a guest's phone or a
-smart television out without turning a house into an enterprise. It is the PIN
-machinery from identity pointed at a display rather than at a named person, so
-it arrives with that work rather than being built twice. The button is present
-and disabled so the omission is visible rather than silent.
+One number for the whole panel, no accounts and no account management. The
+middle rung, and the right answer for a deployment with one administrator:
+accounts exist to tell people apart, and telling one person apart from
+themselves is a login screen charging rent.
+
+**Set the PIN before switching to it.** The switch is refused otherwise —
+saving it and restarting is how a panel ends up in a mode whose only key was
+never cut, and the way back from that is a text editor on the box. The field
+for it is directly under the choice.
+
+It is held to the same rules as a person's PIN: digits only, at least as many
+as the PIN policy asks for, and runs, repeats and anything reading as a year
+refused where they are chosen. Guessing backs off geometrically, the same as a
+password does. Setting it does not sign anybody out; locking yourself out of
+the panel from inside the panel is not a security property.
+
+**What it costs is the log.** Everything an account does is recorded against a
+name. Everything done behind the PIN is recorded as **(single PIN)**, because
+that is all this rung knows about who is there. If it ever has to matter who
+did something, this is not the rung for it.
 
 ### Accounts and roles
 
 The default, because the safe default is the one that assumes it can be
 reached. With sign-in set to nothing there are no accounts to manage: the
-sections under ADMIN USERS are not offered, and the account routes refuse
+sections under IDENTITY ▸ ADMIN are not offered, and the account routes refuse
 rather than quietly writing to a file nothing consults.
 
 ## Ports

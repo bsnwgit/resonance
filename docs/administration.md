@@ -24,61 +24,142 @@ it out; the delay is per address and clears on its own.
 
 ## How the panel is laid out
 
+**It opens on nothing.** The first thing you see is the mark, at three quarters
+of the panel's width, and the menus — no topics, no box, and no tab lit,
+because none of them is where you are yet. Press anything and it steps back to
+a watermark behind the work, where it stays for the rest of the session.
+
+**HOME**, immediately left of your name, brings the whole panel back to that
+state. It reloads: every list refetched, and nothing half-edited still sitting
+in a field on a tab you can no longer see. Anything you typed and did not save
+goes with it. Your sign-in does not — the session is a cookie, not something
+the page is holding.
+
+HOME and **SIGN OUT** are the only two filled controls on that bar, because
+they are the only two that move the whole panel, and they are filled in
+opposite colours: ice takes you back to the start, rust ends the session.
+Beside them your name reads as one phrase — name, dash, level — rather than a
+name with a badge after it.
+
 The left column is the whole interface. It is organised as a set of topics,
 and **one topic is open at a time**: opening another closes the one before it,
 so the column stays short enough to take in at a glance rather than becoming a
 wall to scroll through. Clicking the open one closes it, which is a legitimate
 state to leave it in.
 
-**In the bar across the top**, beside the SETTINGS title, are the places this
-panel can take you — links rather than tabs, because they do not switch which
-controls you are editing, they change the subject entirely:
+**In the bar across the top** are three boxed labels, each naming the links
+beside it. A label is not somewhere you can go — nothing happens when you press
+one. It says what the links after it have in common, and the large space before
+the next label is what separates one subject from the next. The links are links
+rather than tabs, because they do not switch which controls you are editing;
+they change the subject entirely.
 
-- **ADMIN SETTINGS** — how the server itself is wired: where it can be reached
-  from, maintenance, and the admin portal's own port. What the app answers on
-  is a network profile, not here; signing in and session lifetime are on
-  SECURITY, with the rest of who-gets-in.
-- **ADMIN USERS** — the accounts that can sign in to this panel.
+**Every label is shaded from the display's own palette**, a colour per subject
+— the three in the bar in **blue**, PROFILES and CONNECTIONS in **ice**, SEARCH
+in **milk**. They are the same five colours a display can be set to, taken from
+the same values rather than matched by eye, so the panel and the thing it
+configures are not two people's idea of one palette. The colour is there to
+tell the rows apart at a glance; it is not saying anything you have to decode.
+
+**IDENTITY** — who this server knows about. Two populations that are not one
+list: one signs in with a password to configure the server, the other picks up
+a URL and talks to the display.
+
+- **ADMIN** — the accounts that can sign in to this panel.
+- **USER** — a person the display side knows about. Empty for now.
+
+**SETTINGS** — how the server itself is run.
+
+- **ADMIN** — how the server is wired: where it can be reached from,
+  maintenance, and the admin portal's own port. What the app answers on is a
+  network profile, not here; signing in and session lifetime are on SECURITY,
+  with the rest of who-gets-in.
 - **SECURITY** — who gets in and on what terms: **signing in** and how long an
   admin session lasts, how long an **enrolment code** is worth anything for,
   **AI Requires Permission** — whether a general user needs approval at all,
   how long a grant lasts, how many devices and waiting requests there may be —
-  and the **groups** access is granted to. ENROLLMENTS ▸ USER answers who is waiting;
-  this is whether anybody is asked in the first place.
-- **?** — these documents. It is blue, and it is the same blue as every ?
-  beside a topic heading, so help is one colour wherever you meet it.
-- At the right: your own name, your role, and **SIGN OUT**. One side of that
-  bar is where you are going, the other is who you are.
+  and the **groups** access is granted to. ENROLLMENTS ▸ USER answers who is
+  waiting; this is whether anybody is asked in the first place.
+- **ALERT** — what the server does when a screen goes wrong: where alerts are
+  **sent** (syslog, a webhook, Home Assistant, email), **quiet hours** and the
+  **digest**, how much of the **server log** is answered with, and how long
+  what screens report is **kept**. All of it is configuration. What it
+  configures is read on **STATUS**, which is a different page on purpose: one
+  is set and the other is watched, and a page doing both is a page you cannot
+  safely leave open.
 
-**ENROLLMENTS**, after a gap and a rule in the same bar, is how something comes
-to be here — as opposed to everything left of it, which configures the server:
+**ENROLLMENTS** — how something comes to be here, as opposed to everything left
+of it, which configures the server.
 
-- **USER** — the request form, and everybody who has asked to be here and not
-  yet been decided about.
+- **USER** — the people you have minted a URL for, the request form, and
+  everybody who has asked to be here and not yet been decided about.
 - **DEVICE** — where a screen is set up: named, given a code, and watched until
   it takes it.
-- **?** — these documents again. It belongs to that title the way the first one
-  belongs to SETTINGS.
 
-Below it:
+At the right of the same bar: **STATUS**, **HOME**, your own name, your role,
+**SIGN OUT**, and the **?**. One side of the bar is where you are going, the
+other is who you are.
 
-- **filter settings** — type to search across every topic in every tab at
-  once. This is the fastest way to find a control when you know roughly what
-  it is called but not which tab it lives under.
-- **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER / MODELS / NETWORK /
-  DISPLAY** — the profile settings group. Each is a list of profiles, and the
-  controls for one appear inside it when you open it. MODELS and NETWORK are
-  the two halves of an endpoint that are not the endpoint: what it speaks to,
-  and what it answers on.
+**STATUS** is what the screens are *doing*: health, the alerts they raised, and
+the server's own log. It sits out here rather than in a boxed group because it
+is not a subject you administer — nothing on it writes anything — and because
+it is the page you want from wherever you happen to be standing when something
+has gone wrong. **HOME** goes back to the start and reloads the panel — every
+list refetched and every half-finished edit gone, which is what "like it was
+when I opened it" has to mean. The three are coloured apart: STATUS ice, HOME
+green, SIGN OUT rust — the last being the only one that ends something.
 
-**At the foot**, what this server is wired to, as opposed to what you
-administer about it:
+**There is one ?**, at the far end past SIGN OUT, and it opens these documents.
+It used to be a mark inside each boxed label, which said the labels had manuals
+of their own when there has only ever been the one. It is blue, and it is the
+same blue as every ? beside a topic heading, so help is one colour wherever you
+meet it.
+
+It opens a page rather than a container: every document on its shelf — using
+it, administration, the display, assistants and integration — and a search
+across all of them at the top. **The search reads the documents themselves, not
+their titles.** What comes back is the line that matched and the heading it
+sits under, so you can tell which of six mentions is the one you want before
+opening anything, and opening a result lands you on that line rather than at
+the top. Two characters or more; code blocks are not searched, because matching
+a word against a key inside an example sends you to a line that cannot answer
+you. Whether it found anything is said directly under the field.
+
+Below the bar, two more rows built the same way — a boxed label, then links
+marked by colour and a rule underneath rather than by a box of their own:
+
+- **PROFILES** — and after it **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER /
+  MODELS / NETWORK / DISPLAY**. Each is a list of profiles, and the controls
+  for one appear inside it when you open it. MODELS and NETWORK are the two
+  halves of an endpoint that are not the endpoint: what it speaks to, and what
+  it answers on.
+
+**CONNECTIONS**, at the foot — what this server is wired to, as opposed to what
+you administer about it:
 
 - **AI** — the endpoints, each naming a speech profile, a model profile and a
   network profile.
-- **CONNECTIONS** — everything currently connected, in two areas: the
-  people you approved, and the devices that took a code.
+- **NODES** — everything currently connected, in two areas: the people you
+  approved, and the devices that took a code. What those devices are
+  *reporting* is not here — that is STATUS.
 - **EMBEDS** — keys that let another application frame this interface.
+
+**SEARCH** shares that bottom row, on the right third of it. Type to search
+across every topic in every tab at once — the fastest way to find a control
+when you know roughly what it is called but not which tab it lives under. It
+searches a topic's whole text, including the prose behind its **?**, and a
+topic that matched only on hidden help opens with that help showing rather than
+looking like it has nothing to do with what you typed.
+
+**It is there at all times, the opening screen included**, and it is the one
+thing that works from there: it looks across every tab, so it is how you get
+somewhere without knowing which tab to press. Typing takes the panel off that
+screen, because the matches have to land somewhere. Emptying it puts the mark
+back if you never chose a tab, and returns you to the tab you were on if you
+did.
+
+The red **✕** at the end empties it in one press. A field left filtered with no
+obvious way out is how somebody concludes the panel has lost half its settings.
 
 **Your own account is behind your name.** Click it for the box that changes
 your password. It is the one thing on this page you do to yourself, so it sits
@@ -130,7 +211,7 @@ Each of these writes a different document, so each has its own button:
 | SAVE, on SECURITY | who has to be approved, what a grant is worth, how long a code lasts | immediately |
 | SAVE, inside Sign in | how you get in | only after a restart |
 | SAVE, inside Sessions | how long an admin session lasts | only after a restart |
-| SAVE, on ADMIN SETTINGS | the admin port, binding, maintenance | only after a restart, except maintenance |
+| SAVE, on ADMIN | the admin port, binding, maintenance | only after a restart, except maintenance |
 
 Offering one button that meant all of them is how somebody presses the wrong
 one. The AI tab has no tab-wide save because each endpoint saves itself from
@@ -177,12 +258,46 @@ through.** A person opens the display page and asks; a device is named here
 and takes a code to the screen. They have almost nothing in common except
 that both end up connected, so neither has to read the other's queue.
 
-**USER** (under ENROLLMENTS) — people, and only people:
+**PERSON** (under ENROLLMENTS) — people, and only people:
 
 | | |
 |---|---|
+| **People** | the people you have minted a URL for |
 | **The request form** | what a request asks for |
 | **Waiting for approval** | everybody who has asked and not been decided about |
+
+### A person, as against a device
+
+A device is one screen standing in one room. A person moves between a phone, a
+laptop and a borrowed browser and is the same person in all three, so they are
+not the same kind of row and they are not created the same way.
+
+**You mint a person; they do not sign themselves up.** Name one under **People**
+and you are handed a URL to give them. There is no self-registration here — no
+email, no verification and nothing to vouch for a name — so anybody who could
+create their own identity could create somebody else's.
+
+**The URL is the credential, and it is shown once.** It carries an unguessable
+component rather than being spelled out of their name: a name is guessable, and
+a guessable address that grants anything is a password written on a wall. What
+is stored is a hash of it, so the panel cannot show it to you a second time —
+hand it over before you leave the row. Opening it sets a cookie and drops the
+secret out of the address bar, so what stays in their browser history no longer
+carries anything.
+
+**REISSUE** mints a new one and kills the old the moment you press it. It is
+for a URL that has got somewhere it should not have — pasted into a chat, left
+in a browser somebody else uses — where deleting the person would take
+everything they own with them.
+
+**A session is a person or a device, never both, and the URL decides which.** A
+device you approved operates as a device; opening a person's URL on one is
+refused where it is attempted, and the URL is not spent by the refusal. Signing
+a person in at a screen several people share is deliberately not built yet, and
+a kiosk is the case it is least for.
+
+The badge on a row says whether the URL was ever picked up, which is the
+question this list is read to answer.
 
 **DEVICE** (under ENROLLMENTS) — a screen, from naming it to the moment it works:
 
@@ -802,15 +917,32 @@ needed rather than shipped, and an existing group of the right kind is adopted
 before a second is created — so an install that never uses groups never grows
 two it did not ask for.
 
-**Two kinds, and they do not mix.** They answer separate questions — *the
-physics department* and *the screens in the east wing* — so a group holds one
-population or the other, and its kind cannot be changed once it exists.
+**Two kinds, and they do not mix.**
 
-**Which population a row is in is set on the row**, wherever that row is
-currently listed: *It is a* — DEVICE, PERSON, or WORK IT OUT. Changing it moves
-the row into that population's group, and where you have more than one group of
-that kind a picker appears beside the control to say which. It is hidden where
-there is one, because one is not a choice.
+- **USERS** holds the people created under ENROLLMENTS ▸ USER. A person
+  reaches an endpoint from whatever machine they open their URL on, so a grant
+  made here follows the human rather than the hardware.
+- **DEVICES** holds displays — every screen and every laptop, however it got
+  here.
+
+There was briefly a third, separating the machines that *asked* from the ones
+an admin *invited*. That is how a row enrolled, not which population it is in:
+both are a browser on one machine, so both are displays. It is written on the
+row now, where it describes without sorting — which means a group holding a
+wall screen and somebody's laptop is a perfectly good group, where before it
+could not exist.
+
+**Groups stored under the old kind read back as DEVICES**, keeping their
+members and the names you gave them. Nothing was rewritten on disk.
+
+The two that remain cannot mix, and the reason is concrete rather than tidy:
+they are different files whose ids are minted independently. That is also why
+**a group's kind cannot change once it exists** — a kind that changed would not
+filter the group's members, it would fail to find any of them.
+
+**How a display got here is shown on the row**, not chosen: *created here and
+enrolled with a code*, or *arrived by opening the display page and asking*. The
+control that used to set it is gone with the distinction it was setting.
 
 **Left at WORK IT OUT it follows how the row arrived** — recorded when the row
 was made and never changed after. A code you minted is a **device**; a browser
@@ -836,10 +968,14 @@ member.
 its own is reachable by everyone in the group plus that device. Being in a
 group never takes away a grant made individually.
 
-**A group is not approval.** Somebody in a group who has not been approved is
-still refused, and so is somebody whose access has run out. The group says
-*which* endpoints they may reach; approval says whether they may reach anything
-at all.
+**A group is not approval** — for a display. A device in a group that has not
+been approved is still refused, and so is one whose access has run out. The
+group says *which* endpoints it may reach; approval says whether it may reach
+anything at all.
+
+**A person has no equivalent test.** An identity exists only because you made
+it, so creating one *is* the approval and there is no way to turn up asking to
+be one. Withdrawing it is deleting the person, or reissuing their URL.
 
 **Deleting a group** removes it from every endpoint that named it. Nothing in
 it is deleted — a group is a way of referring to people and devices, not a
@@ -858,7 +994,7 @@ effect:
 
 1. **Put the wall displays on their own VLAN** and let nothing else onto it.
    A device that cannot open a connection needs no other control.
-2. **Bind to one address** rather than every interface, in ADMIN SETTINGS →
+2. **Bind to one address** rather than every interface, in ADMIN →
    Reach & sign-in. A machine that later joins another network then does not
    follow you onto it.
 3. **Firewall the display ports** to the addresses that should have them.
@@ -935,3 +1071,131 @@ rights to run or restart. From the directory it is installed in:
 
 `stop` waits for the process to actually exit before returning, so
 `stop && start` is safe and will not race itself for the listening ports.
+
+## When a screen goes wrong
+
+A screen with a fault cannot tell anybody. It is on a wall, it shows nobody
+anything, and the note explaining what went wrong fades in front of an empty
+room. **STATUS**, beside HOME at the right of the bar, is where it says so
+instead, in three sections.
+
+Everything on STATUS is read rather than set. What governs it — where an alert
+is sent, how much log is answered with, how long what screens report is kept —
+is **SETTINGS ▸ ALERT**, and each of the three sections below names the setting
+that belongs to it.
+
+### Health
+
+What each screen has been reporting, worst first, so twenty of them can be read
+down rather than opened one at a time. A microphone that would not open, a
+browser with no recorder at all, transcription erroring or running long, the
+neural voice quietly falling back to the browser's, and the wake word it
+actually matched on.
+
+Most of this was already being worked out and thrown away. The display says
+*woke on "hows" (near "house")* as a note nobody on a wall is ever there to
+read; kept, it is the only way to find out that two wake words are
+cross-triggering.
+
+Slow is reported and ordinary is not — a screen doing its job in half a second
+has nothing to say, and a store of ordinary timings is a store nobody reads.
+**CLEAR** on a row forgets what one screen reported without taking it off the
+wall, for a fault that has been fixed.
+
+### What was said to them
+
+The conversation record, and the decision trail beside it. This is where *"it
+didn't work"* becomes *the recogniser heard "hows" and matched it fuzzily to
+the house route*, which is a thing you can act on.
+
+Each row shows what was heard **before the wake word was stripped**, what was
+sent, what came back, which route matched and whether it matched exactly or on
+a near miss, how long it took, and any error verbatim.
+
+**What is kept, precisely.** What was addressed to the device — from the wake
+word to the end of that conversation — and the routing decision that followed,
+for the retention window. Nothing outside an active conversation is recorded,
+and nothing at all until somebody says a wake word.
+
+This is a boundary that moved, so it is written down rather than left implied:
+an earlier version of this promised no conversation content at all. The reason
+it changed is that a voice-only display shows nobody anything, so when it
+mishears there is no record and nothing to fix — and what is captured is
+exactly what already leaves the machine, since it goes to a house or a model
+regardless. It adds retention, not disclosure.
+
+**Retention is the only control there is, and it is short on purpose.** Seven
+days by default. A generous default would be a decision made on somebody's
+behalf about their household.
+
+### Alerts
+
+Diagnostics is somewhere you go and look. An alert comes and finds you.
+
+**Four states, not two:** open or resolved, acknowledged or not. The one that
+matters is **resolved but unread** — a screen that dropped off at two in the
+morning and came back four minutes later leaves something in the list until a
+person sees it. Self-healing nobody ever hears about is indistinguishable from
+nothing having happened, and a display that heals itself every night is a fault
+rather than a success.
+
+Resolving is automatic; acknowledging is not. Anything both resolved and
+acknowledged has nothing left to say and leaves the list.
+
+An alert has an identity — its kind and its device — rather than a row per
+occurrence. A screen offline for a day is one alert that has been true for a
+day, not two hundred and forty of them.
+
+**What raises one.** Liveness, from the poll: three missed check-ins rather
+than one, because a single drop is a hiccup and an alert that fires on one gets
+switched off in a week. Hard faults, which are not rates: a microphone that
+will not open does not get better by happening less often. And rates, which are:
+near misses, slow transcription, a voice falling back, a house being asked for
+what it cannot do. Screens that never worked raise nothing — an invited row
+that has not taken its code has not gone quiet, it was never switched on.
+
+One alert depends on none of that: **a device asking to be let in** arrives the
+moment it asks, because it is the only one with a person attached to it.
+
+### Where alerts go
+
+The list is the baseline and is not optional, because acknowledgement has to
+live somewhere. Everything else is in addition to it, cheapest reach first.
+
+- **Syslog** — the standard library speaks it and every operator already has
+  somewhere it goes. One socket, no credentials. Errors as `err`, warnings as
+  `warning`, recoveries as `info`.
+- **A webhook** — one JSON POST, which reaches ntfy, Slack, Discord, Gotify and
+  whatever else you run.
+- **Home Assistant** — the strongest here, because it can speak: a screen that
+  dies gets announced by the building it is part of. It has **its own
+  connection** rather than borrowing an endpoint's, since alerting hung off a
+  route would vanish the day somebody deleted that route.
+- **Email** — last, and not by accident. No dependency, but it wants a server
+  and credentials and it fails somewhere this process cannot see more often
+  than the others.
+
+Every sink is **fire and forget**. Nothing retries or blocks, because a sink
+that did would turn reporting a fault into a second fault — and whatever failed
+to send is still in the list.
+
+**Quiet hours** run on this machine's clock, the same one dark hours use, and
+span midnight the way a night does: 22 until 7 is a night, not nineteen hours
+of daylight. Nothing is dropped, only held — announcing a dead hallway screen
+through the house speakers at three in the morning is how alerting gets
+switched off in its first week.
+
+**A digest** gathers what is held into one message, timed from the oldest thing
+waiting rather than from the last digest: what matters is how long something has
+gone unsaid, not how long since a message that may have carried nothing.
+
+Two exceptions, both deliberate: **syslog ignores quiet hours**, because a log
+with a hole in it every night is useless for the fault that only happens at
+night; and **a device asking to be let in comes through regardless** of quiet
+hours and digest mode both, because somebody is standing at a screen waiting.
+
+### The server log
+
+Readable from the panel rather than over SSH — the end of it, newest last,
+filtered on a word. It is a tail through the admin listener and never a served
+file. Not a live feed: press REFRESH.

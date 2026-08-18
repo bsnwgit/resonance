@@ -52,8 +52,9 @@ Plain `python3 -m http.server` also honours conditional GETs, so a browser can
 sit on a cached copy of index.html and you end up debugging code that is no
 longer running. This sends no-store on everything instead.
 """
-import base64, functools, hashlib, hmac, http.cookies, inspect, json, os, re, \
-       secrets, ssl, subprocess, sys, tempfile, threading, time
+import base64, contextlib, functools, hashlib, hmac, http.cookies, inspect, \
+       json, os, re, \
+       secrets, socket, ssl, subprocess, sys, tempfile, threading, time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 import manual                            # the manual, and its PDF writer
@@ -61,6 +62,11 @@ import manual                            # the manual, and its PDF writer
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SETTINGS_PATH = os.path.join(ROOT, "settings.json")
 USERS_PATH = os.path.join(ROOT, "users.json")
+#: The panel's own PIN, for the middle rung. Its own file rather than a key in
+#: app.json, because that document is handed to the panel whole on /app and a
+#: credential — even a hashed one — has no business riding along with the
+#: ports and the bind address.
+PANEL_PIN_PATH = os.path.join(ROOT, "panel_pin.json")
 APP_PATH = os.path.join(ROOT, "app.json")
 BACKEND_PATH = os.path.join(ROOT, "backend.json")
 _settings_lock = threading.Lock()
@@ -174,20 +180,38 @@ APP_DEFAULTS = {
     # supervises this process, so a setting that only stopped the server would
     # be a setting that ended the service at three in the morning.
     "restart_at": "",
+    # ---- what the panel reads back ----
+    # How much of the log the panel shows. A setting rather than the constant
+    # it was, because the right amount is a property of the deployment: a house
+    # with three screens wants the lot, and a building with forty wants the
+    # last screenful of a file that is mostly check-ins. It bounds the ANSWER,
+    # not the file — see LOG_TAIL_BYTES, which bounds the read.
+    "log_lines": 800,
 }
-#: (low, high) for the numbers above. A poll faster than a couple of seconds is
-#: a denial of service somebody configured by accident; one slower than five
-#: minutes is a screen that stays dead through a lunch break.
+#: (low, high) for the numbers above — the ones CLAMPED rather than refused,
+#: because a number outside the range is somebody nudging a field rather than a
+#: configuration that would stop the server coming up. A poll faster than a
+#: couple of seconds is a denial of service somebody configured by accident;
+#: one slower than five minutes is a screen that stays dead through a lunch
+#: break. The log's floor is a screenful and its ceiling is what a browser will
+#: render without becoming the reason the panel is slow.
 UNATTENDED_LIMITS = {"poll_seconds": (2, 300), "retry_attempts": (1, 10),
-                     "retry_seconds": (1, 60), "refresh_stagger": (0, 240)}
+                     "retry_seconds": (1, 60), "refresh_stagger": (0, 240),
+                     "log_lines": (50, 5000)}
 PORT_MIN, PORT_MAX = 1024, 65535     # below 1024 needs root; this runs as you
 SESSION_MIN, SESSION_MAX = 5, 480    # minutes: below 5 is unusable, above 8h absurd
 BIND_MODES = ("loopback", "address", "everything")
-# "pin" — one number for the whole display, no accounts — is the middle rung
-# and is not here yet. It is the identity work's PIN machinery pointed at the
-# display rather than at a named person, so it lands with that rather than
-# being built twice. Named here so the omission is deliberate and visible.
-AUTH_MODES = ("none", "accounts")
+#: THREE RUNGS. Nothing at the door, one number for the whole panel, or
+#: accounts with roles. The middle one is the identity work's PIN machinery
+#: pointed at the panel rather than at a named person — which is why it waited
+#: for that rather than being built twice.
+#:
+#: What it is FOR is the deployment with one administrator: accounts exist to
+#: tell people apart, and telling one person apart from themselves is a login
+#: screen charging rent. What it is NOT for is a deployment where the log has
+#: to say who did a thing. A single PIN cannot, and the log says "(single PIN)"
+#: rather than implying somebody.
+AUTH_MODES = ("none", "pin", "accounts")
 LOOPBACK = "127.0.0.1"
 
 
@@ -830,6 +854,12 @@ ROUTE_DEFAULTS.update({
     # read that way next year, and flattening it at the point of saving would
     # turn it into twelve ids nobody can maintain.
     "groups": [],
+    # The people it names. A THIRD list rather than more ids in the first,
+    # because a display and a person are different populations reached by
+    # different sessions — the same reason groups refuse to mix the two kinds
+    # — and one list holding either would be a list nobody could audit. Empty
+    # on every existing route, so an upgrade grants nobody anything.
+    "identities": [],
 })
 MAX_ROUTES = 24                  # a household, not a directory service
 
@@ -900,6 +930,8 @@ def read_routes():
                                    (rec.get("displays") or [])][:MAX_ALLOW]
                 out["groups"] = [str(g)[:32] for g in
                                  (rec.get("groups") or [])][:MAX_GROUPS]
+                out["identities"] = [str(p)[:32] for p in
+                                     (rec.get("identities") or [])][:MAX_ALLOW]
                 out["created"] = rec.get("created")
                 out["created_by"] = rec.get("created_by")
                 doc["routes"][str(rid)] = out
@@ -1003,7 +1035,7 @@ def _speech_default():
         return ""
 
 
-def public_routes(doc, disp=None):
+def public_routes(doc, disp=None, ident=None):
     """The two halves a browser may see. The connection half is not omitted
     from the serialisation by accident — it is enumerated the other way
     round, so a field added to a route later is private until somebody
@@ -1042,8 +1074,13 @@ def public_routes(doc, disp=None):
             row["greeting"] = prof["greetings"]
         if not row.get("voice") and prof.get("ttsvoice"):
             row["voice"] = prof["ttsvoice"]
-        row.update(id=rid, allowed=display_may(disp, rec))
-        if disp:
+        row.update(id=rid, allowed=subject_may(rec, disp, ident))
+        # A PERSON gets the routing half on the same terms a display does. The
+        # wake gate runs in the browser, so a session that is handed no wake
+        # words cannot drop an utterance it should drop — it simply never
+        # recognises one, which is the fault this half exists to prevent,
+        # arriving through the door marked "we only thought about devices".
+        if disp or ident:
             row.update({k: rec[k] for k in ROUTE_ROUTING})
             # …and the words come from the speech profile now, not from the
             # route's own record. An endpoint names a profile; the profile says
@@ -1058,6 +1095,17 @@ def public_routes(doc, disp=None):
                                   if a.strip()]
             if "wakestrict" in prof:
                 row["strict"] = bool(prof.get("wakestrict"))
+            # A PERSON'S OWN WORD, on the endpoint a question goes to when
+            # nothing named one. It is added rather than substituted: the
+            # shared word still works on their device, because taking it away
+            # would mean somebody who set a personal word could no longer join
+            # in when a room says the house's name.
+            #
+            # Only theirs. Every other browser is handed the shared words
+            # alone, which is the whole mechanism — the collision stops because
+            # nobody else's device has ever heard of it.
+            if ident and ident.get("wakeword") and rid == doc.get("default"):
+                row["aliases"] = list(row.get("aliases") or []) + [ident["wakeword"]]
         out.append(row)
     return out
 
@@ -1242,6 +1290,18 @@ def validate_route(obj, current, doc, rid=None):
                 seen.add(g)
                 out.append(g)
         rec["groups"] = out[:MAX_GROUPS]
+    if "identities" in obj:
+        # Same treatment as the displays above, and for the same reason: an id
+        # for somebody who has been deleted must not sit in an allow-list
+        # looking like a grant to a person.
+        known = read_identities()
+        seen, out = set(), []
+        for p in (obj["identities"] or []):
+            p = str(p)[:32]
+            if p in known and p not in seen:
+                seen.add(p)
+                out.append(p)
+        rec["identities"] = out[:MAX_ALLOW]
     if "wakeword" in obj:
         rec["wakeword"] = _keep_word(obj["wakeword"])[:40]
     # No longer required on the route. The word lives in the speech profile the
@@ -1358,12 +1418,14 @@ def validate_app(obj, current):
     if "auth" in obj:
         v = str(obj["auth"] or "").strip()
         if v not in AUTH_MODES:
-            # The rung that is specified but not built. Saying so beats a
-            # generic "not one of" that reads like a typo in the request.
-            if v == "pin":
-                return None, ("a single PIN with no accounts is not built yet — "
-                              "it arrives with identity")
             return None, "sign-in must be one of: " + ", ".join(AUTH_MODES)
+        if v == "pin" and not has_panel_pin():
+            # Refused HERE rather than at the restart that would apply it.
+            # Saving this and restarting is how a panel ends up in a mode whose
+            # only key was never cut, and the way back is a text editor on the
+            # box.
+            return None, ("set the panel PIN first — switching to it with none "
+                          "set would leave no way in")
         cfg["auth"] = v
     if "session_idle_minutes" in obj:
         try:
@@ -1456,12 +1518,11 @@ def note_code_failure(ip):
 
 DISPLAY_DEFAULTS = {
     "name": "",                  # what an admin called it
-    # Which population this row belongs to when a group is drawn from one:
-    # "user", "device", or blank for "work it out". Set by an admin, because
-    # the inference below can only see how the row ARRIVED — and asking for
-    # access is something a browser on one machine does, which describes a
-    # device rather than a person. A person is an identity that carries from a
-    # phone to a laptop, and nothing here issues one yet.
+    # An admin's override of which display population this row was in, back
+    # when there were two of them. There is one now — a display is a display,
+    # and how it enrolled is `origin` below, which describes the row instead of
+    # sorting it. Kept so an existing document round-trips rather than losing a
+    # key on its first save; nothing reads it and nothing writes it.
     "kind": "",
     "asked": "",                 # the ?display= name it announced itself with
     "approved": False,
@@ -1529,7 +1590,7 @@ DISPLAY_DEFAULTS = {
     # HOW THIS ROW GOT HERE: "code" for one an admin named and minted a code
     # for, "page" for one that arrived because somebody opened the display
     # page. Empty on rows that predate the field, which fall back to a guess —
-    # see group_kind_of.
+    # see enrolled_as.
     #
     # Recorded at creation because it is the one thing about a row that is
     # true from the start and never changes. It used to be inferred from
@@ -1612,6 +1673,18 @@ MAX_LOOKS = 8
 
 #: The displays document's own settings, as opposed to the rows in it. Set in
 #: the panel, and none of them needs a restart.
+#: Six digits is a low bar that rate limiting carries, and it is the number a
+#: person keys into a screen. An admin can raise it where the room deserves
+#: more; below four is not a secret, above twelve is a password with the wrong
+#: keyboard.
+PIN_MIN_DEFAULT = 6
+#: Days. Long enough to still be there on Monday for a fault somebody noticed
+#: on Saturday, short enough that it is not a record of a household.
+EVENT_DAYS_DEFAULT = 7
+EVENT_DAYS_LIMITS = (1, 90)
+PIN_LIMITS = (4, 12)
+PIN_MAX = 32
+
 DISPLAY_SETTINGS = {
     # May a device nobody invited ask for access at all?
     #
@@ -1705,12 +1778,69 @@ DISPLAY_SETTINGS = {
     # Which group each population lands in when it starts working. Minted on
     # first need rather than shipped, so an install that never uses groups
     # never grows two it did not ask for — see default_group.
-    "user_group": "",
     "device_group": "",
+    "identity_group": "",
+    # Set once ensure_system_groups has had its one chance to correct a name it
+    # had shipped and since changed. After that a default group's name is the
+    # admin's, including if they choose the old one back.
+    "group_names_done": 0,
+    # The fewest digits a PIN may have. Raising it does not revoke anything —
+    # it marks every PIN below it, and those are made to conform at the next
+    # unlock. See identity_pin_state.
+    "pin_min": PIN_MIN_DEFAULT,
+    # How long a technical event and its conversation record are kept. SHORT
+    # on purpose: retention is the only control there is over a store that
+    # holds what was said to a display, and a generous default is a decision
+    # made on somebody's behalf about their household.
+    "event_days": EVENT_DAYS_DEFAULT,
+    # Where alerts go besides the list. Off by default: a server that started
+    # posting somewhere on first run would be making a decision about somebody
+    # else's network.
+    "syslog_on": 0,
+    "syslog_host": "",                   # blank means the local daemon
+    "syslog_port": 514,
+    "syslog_facility": "user",
+    # A JSON POST, which is what ntfy, Slack, Discord and Gotify all take.
+    "hook_on": 0,
+    "hook_url": "",
+    # ITS OWN CONNECTION, not a route's. Home Assistant is the strongest sink
+    # in this deployment — already connected, and a thing that can speak
+    # through the house, so a screen that dies gets announced by the building
+    # it is part of. But hanging alerting off a ROUTE means alerting
+    # disappears when somebody deletes that route, which is a surprising way
+    # to lose the thing that tells you a screen is dead.
+    "ha_on": 0,
+    "ha_url": "",
+    "ha_token": "",
+    # Anything HA will call. persistent_notification.create always exists and
+    # needs nothing configured, so it is the default; notify.notify or a
+    # tts service is the one that actually speaks, and is a field rather than
+    # an assumption because which of them exists is the deployment's business.
+    "ha_service": "persistent_notification/create",
+    # LAST, and last for a reason. smtplib costs no dependency, but email wants
+    # a server and credentials and fails silently more often than anything else
+    # here — a queue somewhere else decides whether this was ever delivered.
+    "mail_on": 0,
+    "mail_host": "", "mail_port": 587, "mail_tls": 1,
+    "mail_user": "", "mail_pass": "",
+    "mail_from": "", "mail_to": "",
+    # Immediate, or gathered up and sent on a timer. Alerts marked `now` — the
+    # one with a person standing at a screen — ignore this entirely.
+    "digest_on": 0,
+    "digest_minutes": 60,
+    # The house asleep, on the device clock — the same clock dark hours use.
+    "quiet_on": 0,
+    "quiet_from": 22,
+    "quiet_to": 7,
+    # Kept so an existing document round-trips rather than losing a key on the
+    # first save. `user` was the second DISPLAY kind and folded into `device`;
+    # nothing reads this now, and nothing writes it either.
+    "user_group": "",
 }
 MAX_FORM_FIELDS = 5
 #: (low, high) for each number the panel can set
-DISPLAY_LIMITS = {"max_displays": (2, 5000), "max_pending": (1, 1000),
+DISPLAY_LIMITS = {"pin_min": PIN_LIMITS, "event_days": EVENT_DAYS_LIMITS,
+                  "max_displays": (2, 5000), "max_pending": (1, 1000),
                   "guest_days": (1, 3650),
                   # 0 is off — see code_minutes. A week is the top because a
                   # code good for longer than anybody remembers issuing it is
@@ -2011,6 +2141,11 @@ def panel_settings():
         row["values"] = vals
         out.append(row)
     cfg["models"] = out
+    # The alert sink's token, by the same rule: the panel is told WHETHER one
+    # is set, which is what tells a configured sink from an unconfigured one,
+    # and never the token.
+    cfg["ha_has_token"] = bool(cfg.pop("ha_token", ""))
+    cfg["mail_has_pass"] = bool(cfg.pop("mail_pass", ""))
     return cfg
 
 
@@ -2033,6 +2168,104 @@ def validate_display_settings(obj, current):
     if cfg["max_pending"] > cfg["max_displays"]:
         return None, ("more waiting than there is room for — the waiting limit "
                       "cannot exceed the total")
+    # The syslog sink. Its own block because none of it is a range: a switch, a
+    # host that may be blank on purpose, a port, and a name from a fixed list.
+    if "syslog_on" in obj:
+        cfg["syslog_on"] = 1 if obj["syslog_on"] else 0
+    if "syslog_host" in obj:
+        cfg["syslog_host"] = str(obj["syslog_host"] or "").strip()[:120]
+    if "syslog_port" in obj:
+        try:
+            port = int(obj["syslog_port"])
+        except (TypeError, ValueError):
+            return None, "the syslog port must be a whole number"
+        if not (1 <= port <= 65535):
+            return None, "the syslog port must be between 1 and 65535"
+        cfg["syslog_port"] = port
+    if "syslog_facility" in obj:
+        f = str(obj["syslog_facility"] or "").strip()
+        if f not in SYSLOG_FACILITIES:
+            return None, "facility must be one of: " + ", ".join(SYSLOG_FACILITIES)
+        cfg["syslog_facility"] = f
+    if "ha_on" in obj:
+        cfg["ha_on"] = 1 if obj["ha_on"] else 0
+    if "ha_url" in obj:
+        u = str(obj["ha_url"] or "").strip()[:200]
+        if u and not u.startswith(("http://", "https://")):
+            return None, "Home Assistant needs its full http:// or https:// address"
+        cfg["ha_url"] = u
+    if "ha_token" in obj:
+        # Blank means LEAVE IT, not clear it. A panel that is never sent the
+        # token cannot send it back, so an empty field on a save is the field
+        # it was never given rather than an instruction to forget.
+        t = str(obj["ha_token"] or "").strip()
+        if t:
+            cfg["ha_token"] = t[:400]
+    if "ha_clear_token" in obj and obj["ha_clear_token"]:
+        cfg["ha_token"] = ""
+    if "ha_service" in obj:
+        sv = str(obj["ha_service"] or "").strip()[:80]
+        if sv and not re.fullmatch(r"[a-z0-9_]+[./][a-z0-9_]+", sv):
+            return None, "a service reads like notify.notify or notify/notify"
+        cfg["ha_service"] = sv or "persistent_notification/create"
+    if cfg.get("ha_on") and not (cfg.get("ha_url") and cfg.get("ha_token")):
+        return None, ("Home Assistant needs its address and a long-lived token "
+                      "before it can be switched on")
+    if "hook_on" in obj:
+        cfg["hook_on"] = 1 if obj["hook_on"] else 0
+    if "hook_url" in obj:
+        u = str(obj["hook_url"] or "").strip()[:400]
+        if u and not u.startswith(("http://", "https://")):
+            return None, "a webhook needs a full http:// or https:// address"
+        cfg["hook_url"] = u
+    if cfg.get("hook_on") and not cfg.get("hook_url"):
+        return None, "give the webhook an address before switching it on"
+    if "mail_on" in obj:
+        cfg["mail_on"] = 1 if obj["mail_on"] else 0
+    for k, cap in (("mail_host", 200), ("mail_user", 200),
+                   ("mail_from", 200), ("mail_to", 400)):
+        if k in obj:
+            cfg[k] = str(obj[k] or "").strip()[:cap]
+    if "mail_pass" in obj:
+        # Blank keeps what is stored, the same rule the HA token follows.
+        pw = str(obj["mail_pass"] or "")
+        if pw:
+            cfg["mail_pass"] = pw[:200]
+    if "mail_clear_pass" in obj and obj["mail_clear_pass"]:
+        cfg["mail_pass"] = ""
+    if "mail_tls" in obj:
+        cfg["mail_tls"] = 1 if obj["mail_tls"] else 0
+    if "mail_port" in obj:
+        try:
+            mp = int(obj["mail_port"])
+        except (TypeError, ValueError):
+            return None, "the mail port must be a whole number"
+        if not (1 <= mp <= 65535):
+            return None, "the mail port must be between 1 and 65535"
+        cfg["mail_port"] = mp
+    if cfg.get("mail_on") and not (cfg.get("mail_host") and cfg.get("mail_to")):
+        return None, "mail needs a server and somewhere to send to"
+    if "digest_on" in obj:
+        cfg["digest_on"] = 1 if obj["digest_on"] else 0
+    if "digest_minutes" in obj:
+        try:
+            dm = int(obj["digest_minutes"])
+        except (TypeError, ValueError):
+            return None, "the digest interval is a whole number of minutes"
+        if not (5 <= dm <= 1440):
+            return None, "the digest interval runs from 5 minutes to a day"
+        cfg["digest_minutes"] = dm
+    if "quiet_on" in obj:
+        cfg["quiet_on"] = 1 if obj["quiet_on"] else 0
+    for k in ("quiet_from", "quiet_to"):
+        if k in obj:
+            try:
+                h = int(obj[k])
+            except (TypeError, ValueError):
+                return None, "quiet hours are whole hours"
+            if not (0 <= h <= 23):
+                return None, "quiet hours run 0 to 23"
+            cfg[k] = h
     if "form" in obj:
         if not isinstance(obj["form"], (list, tuple)):
             return None, "the request form must be a list of fields"
@@ -2654,6 +2887,9 @@ def validate_kiosk(obj, rec, kiosks):
             return None, ("that kiosk profile no longer exists — reload the "
                           "panel to see the current list")
         out["kiosk_profile"] = pid
+    # There is no "network" here. A screen does not choose a port: it is
+    # loaded from the port its endpoints answer on, which display_network
+    # reads back off the grant.
     return out, None
 
 
@@ -2808,12 +3044,52 @@ def new_display(asked, hint):
     return did + "." + secret, dict(rec, id=did)
 
 
-def enrol_base_for(rec, host, secure):
-    """Where the code for this row is typed. The network profile it names, or
-    the server's own listener where it names none — an address and a port,
-    because a code without them is six characters and no idea where to put
-    them."""
-    nid = str((rec or {}).get("network") or "")
+def display_network(did, doc=None):
+    """WHICH PORT A SCREEN BELONGS ON, derived rather than set.
+
+    It was a field on the display row, chosen when the code was minted, and it
+    was the second setting in this product called "network" — one on the screen
+    and one on the endpoint, meaning different things. A row could say HA
+    Display while every endpoint answered on Default, so the screen loaded, drew
+    correctly, and answered to nothing: a port carries the endpoints that NAME
+    it, and nothing a display says about itself changes that.
+
+    So there is one setting now, on the endpoint, and this reads it back: the
+    profile named by the endpoints this display is granted. Returns (nid, clash)
+    — `clash` is the set of profiles when the grant spans more than one, which
+    is a screen that cannot be loaded from a single address and is refused
+    where it is made rather than discovered later."""
+    doc = doc or read_routes()
+    nids = {str(r.get("network") or "")
+            for r in doc["routes"].values()
+            if did in (r.get("displays") or [])}
+    if len(nids) > 1:
+        return "", nids
+    return (nids.pop() if nids else ""), None
+
+
+def display_network_clash(rids, doc=None):
+    """The message for a grant that spans two ports, or "" where it does not.
+
+    One screen is one address. Two endpoints on two ports cannot both be
+    reached from it, so this is refused at the moment the ticks are made — the
+    alternative is a code that works and an assistant that silently never
+    answers, which is the failure this whole setting was renamed away from."""
+    doc = doc or read_routes()
+    seen = {str((doc["routes"].get(rid) or {}).get("network") or "")
+            for rid in rids or []}
+    if len(seen) < 2:
+        return ""
+    # His words, and short on purpose: the panel is not the place to teach the
+    # port model, and the ticks that caused it are on screen above the message.
+    return "Unable to use AI Assistants that run on different network ports"
+
+
+def enrol_base_for(rec, host, secure, nid=""):
+    """Where the code for this row is typed — an address and a port, because a
+    code without them is six characters and no idea where to put them. The
+    profile comes from display_network: what this screen was granted decides
+    where it is loaded from."""
     if nid:
         prof = net_profile(nid)
         vals = (prof or {}).get("values") or {}
@@ -2830,10 +3106,16 @@ def enrol_base_for(rec, host, secure):
 
 def invite_display(name, by, setup=None):
     """A row created from the panel, before the device it is for has ever been
-    switched on. Approved from the moment it exists — an admin naming a screen
-    and ticking the endpoints it may use IS the approval — but holding no
-    token, so nothing can BE it until somebody types the code into the screen
-    itself."""
+    switched on. It holds a code and NOTHING ELSE: no token, and not approved.
+
+    It used to be approved from the moment it existed, on the reasoning that an
+    admin naming a screen and ticking its endpoints IS the approval. That reads
+    well and it is wrong in the one place it matters — the row then sits
+    `approved` with no device behind it, so anything asking "is this a display
+    that works" is told yes about a television nobody has switched on. It gets
+    offered as a member of a group, and it would be counted as a grant that had
+    landed. Enrolment is what completes it, so enrolment is what approves it:
+    see redeem_code."""
     displays = read_displays()
     limit = display_settings()["max_displays"]
     if len(displays) >= limit:
@@ -2842,7 +3124,9 @@ def invite_display(name, by, setup=None):
     did = "d" + secrets.token_hex(6)
     now_ = int(time.time())
     rec = dict(DISPLAY_DEFAULTS)
-    rec.update(name=name, approved=True, approved_by=by, approved_at=now_,
+    # `approved_by` is who INVITED it, recorded now because that is when it is
+    # known; `approved_at` waits for the moment it is true.
+    rec.update(name=name, approved=False, approved_by=by, approved_at=0,
                created=now_, code=new_code(), code_expires=code_deadline(now_),
                origin="code")
     # What the admin already knows about the screen, set while creating it
@@ -2850,7 +3134,8 @@ def invite_display(name, by, setup=None):
     if isinstance(setup, dict):
         rec["kiosk"] = bool(setup.get("kiosk"))
         rec["kiosk_profile"] = str(setup.get("kiosk_profile") or "")[:16]
-        rec["network"] = str(setup.get("network") or "")[:16]
+        # `network` is NOT set here any more. Where a screen is loaded from is
+        # derived from the endpoints it is granted — see display_network.
     displays[did] = rec
     write_displays(displays)
     return dict(rec, id=did), None
@@ -2872,7 +3157,10 @@ def reissue_display(did):
     if not rec:
         return None, "no such display"
     now_ = int(time.time())
-    rec.update(salt="", hash="", approved=True,
+    # Back to an invitation: no token, and not approved until the new code is
+    # used. The row is the place and keeps its name and its grants, but it is
+    # not a working display again until a device is behind it.
+    rec.update(salt="", hash="", approved=False, approved_at=0,
                code=new_code(), code_expires=code_deadline(now_))
     write_displays(displays)
     return dict(rec, id=did), None
@@ -2911,8 +3199,10 @@ def redeem_code(raw):
         # Spent. The code is gone from the record before the token exists
         # anywhere else, so the same six characters cannot enrol a second
         # device however quickly somebody types them.
+        # Approved HERE, because this is the moment the row becomes a device.
+        # Before it, the code was an invitation nobody had taken up.
         rec.update(salt=salt, hash=dk, code="", code_expires=0,
-                   last_seen=now_, approved=True)
+                   last_seen=now_, approved=True, approved_at=now_)
         write_displays(displays)
         return did + "." + secret, dict(rec, id=did)
     return None, "unknown"
@@ -2994,6 +3284,10 @@ def request_access(did, answers):
     if answers is not None:
         rec["answers"] = answers
     write_displays(displays)
+    # The one alert with a PERSON attached: somebody is standing at a screen
+    # waiting to be let in. It depends on nothing this phase collects, and it
+    # is why it arrives immediately rather than in a digest.
+    raise_alert("asked_in", did, display_label(rec))
     return dict(rec, id=did), None
 
 
@@ -3052,18 +3346,36 @@ def guest_path_broken(doc):
     return not display_settings()["guest_requests"] and not open_default(doc)
 
 
-def display_may(disp, route):
-    """May this display use this endpoint?
+def subject_may(route, disp=None, ident=None):
+    """May this caller use this endpoint?
+
+    The caller is a DEVICE or a PERSON, never both — see `_subject`, which is
+    where that is decided — so this takes one of the two and answers about it.
+    A person's grant is their own and does not depend on what the machine they
+    are sitting at was approved for; a device's is the machine's and owes
+    nothing to whoever happens to be standing in front of it.
 
     An endpoint with no allow-list is reachable by anything that can reach the
     port, which is what every endpoint was before displays existed — so an
     upgrade changes nothing until somebody restricts one, and the restriction
     is a thing you can see rather than a default nobody was told about.
 
-    Where there IS one: approval is the floor. An unapproved device holding a
-    freshly minted token is exactly the phone somebody typed the URL into."""
+    Where there IS one: approval is the floor for a device. An unapproved one
+    holding a freshly minted token is exactly the phone somebody typed the URL
+    into. A person has no equivalent test, because an identity only exists at
+    all if an admin made it — creation IS the approval, and there is no way to
+    turn up asking to be one."""
     if not route.get("restricted"):
         return True
+    if ident:
+        # Named directly, or named by a group of people. Grants add up here
+        # exactly as they do for a display, and only GROUPS OF PEOPLE count: a
+        # group of screens on the same allow-list says nothing about who may
+        # use this, and the two files mint ids independently.
+        if ident["id"] in (route.get("identities") or []):
+            return True
+        return ident["id"] in group_members(route.get("groups"),
+                                            kinds=IDENTITY_GROUP_KINDS)
     if not disp:
         return False
     # The preview is the panel. It is already signed in as an admin, who can
@@ -3078,8 +3390,11 @@ def display_may(disp, route):
         return False
     if disp["id"] in (route.get("displays") or []):
         return True
-    # Grants add up: named directly, or named by a group it is in.
-    return disp["id"] in group_members(route.get("groups"))
+    # Grants add up: named directly, or named by a group it is in — and only
+    # by a group of DISPLAYS. Both of those kinds hold display rows; the third
+    # holds people, and a screen is not let through by a grant made to them.
+    return disp["id"] in group_members(route.get("groups"),
+                                       kinds=DISPLAY_GROUP_KINDS)
 
 
 def admin_displays():
@@ -3089,6 +3404,16 @@ def admin_displays():
     out = []
     displays = read_displays()
     now_ = int(time.time())
+    # WHICH ENDPOINTS EACH ROW IS ON, read once for the whole list. It lives on
+    # the endpoint rather than on the display — an allow-list is a property of
+    # the thing being protected — so a panel drawing a row had to have the
+    # routes document to know, and the tabs that draw these rows never fetch
+    # it. The grant was made, stored and invisible: ticks that could only ever
+    # be empty on the one page that shows a device's settings.
+    granted = {}
+    for rid, rrec in read_routes()["routes"].items():
+        for member in (rrec.get("displays") or []):
+            granted.setdefault(member, []).append(rid)
     for did, rec in sorted(displays.items(), key=lambda kv: kv[1]["created"]):
         row = {k: rec.get(k) for k in
                ("name", "asked", "approved", "hint", "created", "last_seen",
@@ -3111,7 +3436,7 @@ def admin_displays():
                    # What it was SET to, and what it resolves to. The panel
                    # needs both: one is the control's value, the other is the
                    # answer a blank control is currently getting.
-                   kind=str(rec.get("kind") or ""), group_kind=group_kind_of(rec),
+                   kind=str(rec.get("kind") or ""), arrived=enrolled_as(rec),
                    # Three states, and the panel needs to tell them apart:
                    # INVITED is a row waiting for somebody to type its code
                    # into a screen, WAITING is a device that turned up on its
@@ -3122,9 +3447,1206 @@ def admin_displays():
                    code_forever=bool(live and not deadline),
                    refused=ref[0] if ref else 0,
                    refused_at=ref[1] if ref else 0,
-                   refused_from=ref[2] if ref else "")
+                   refused_from=ref[2] if ref else "",
+                   # Named as granted whether or not the endpoint is currently
+                   # restricted: this says what is STORED about this row. What
+                   # a grant is worth on an endpoint open to everybody is said
+                   # beside the tick, in words, rather than by drawing it
+                   # empty — a tick that goes back to unticked when you save is
+                   # a control arguing with the file.
+                   granted=granted.get(did, []))
         out.append(row)
     return out
+
+
+# --------------------------------------------------------------- diagnostics
+# TECHNICAL EVENTS, KEYED TO A DEVICE. The microphone would not open,
+# transcription took four seconds, the voice service returned an error, this
+# browser has no recorder at all. The useful key is the screen with the failing
+# microphone, not whoever happened to be standing at it.
+#
+# Most of this is already computed and thrown away. The display says
+# `woke on "hows" (near "house")` as a note that fades, and on a wall tablet
+# nobody is ever there to read it. A good deal of this is "stop discarding
+# that" plus somewhere to put it.
+#
+# ITS OWN FILE, and a small one. It is the only document here that grows on its
+# own — everything else grows when an admin does something — so it is capped
+# two ways: a hard ceiling on rows, and a window in days that an admin sets.
+EVENTS_PATH = os.path.join(ROOT, "events.json")
+_events_lock = threading.RLock()
+#: The hard ceiling, and not a setting. It stops the file becoming a problem
+#: of its own on a busy day; the WINDOW is the control an admin has, and it is
+#: the one that decides what is kept rather than how much.
+MAX_EVENTS = 2000
+#: What a display may send in one poll. A screen with a broken microphone
+#: generates the same event every second it tries, and the cap is what stops
+#: one fault filling the store before anybody reads it.
+MAX_EVENTS_PER_POLL = 12
+#: Kinds this server will store. An ALLOW-list for the same reason the served
+#: files are one: this is written by a browser, and a document shaped by
+#: whatever a page decided to send is one nobody can reason about later.
+EVENT_KINDS = (
+    "mic_denied",        # the microphone would not open
+    "no_recorder",       # this browser has no recorder at all — a fact, once
+    "stt_slow",          # transcription took longer than it should
+    "stt_error",         # the recogniser returned an error
+    "tts_fallback",      # the neural voice fell back to the browser's
+    "wake_fuzzy",        # woke on a near miss, and on which word
+    "no_intent",         # the house was asked for something it cannot do
+    "backend_error",     # what answers a route returned an error
+    "backend_slow",      # …or took longer than that route allows for
+)
+#: Where an event came from. A display sends its own; the server records the
+#: legs it can see, which a browser cannot.
+EVENT_LEVELS = ("info", "warn", "error")
+
+
+def read_events():
+    try:
+        with open(EVENTS_PATH) as fh:
+            doc = json.load(fh)
+        rows = doc.get("events") if isinstance(doc, dict) else None
+    except (OSError, ValueError):
+        return []
+    if not isinstance(rows, list):
+        return []
+    out = []
+    for r in rows:
+        if isinstance(r, dict) and r.get("kind") in EVENT_KINDS:
+            out.append(r)
+    return out
+
+
+def write_events(rows):
+    with _events_lock:
+        tmp = EVENTS_PATH + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump({"version": 1, "events": rows[-MAX_EVENTS:]}, fh)
+        os.chmod(tmp, 0o600)          # it holds what was said to a display
+        os.replace(tmp, EVENTS_PATH)
+
+
+def event_window_days():
+    return int(display_settings().get("event_days") or EVENT_DAYS_DEFAULT)
+
+
+def note_event(kind, did="", level="info", detail="", route="", ms=0):
+    """One event, kept. Silent about anything it does not recognise rather than
+    refusing: this is called from the paths that ARE the fault being reported,
+    and a diagnostic that raises inside a failure is a second fault on top of
+    the first."""
+    if kind not in EVENT_KINDS:
+        return
+    with _events_lock:
+        rows = read_events()
+        rows.append({"kind": kind, "did": str(did or "")[:32],
+                     "level": level if level in EVENT_LEVELS else "info",
+                     "detail": str(detail or "")[:300],
+                     "route": str(route or "")[:60],
+                     "ms": max(0, int(ms or 0)), "at": int(time.time())})
+        write_events(rows)
+
+
+def take_events(did, rows):
+    """Events a display sent up with its poll. Returns how many were kept.
+
+    Capped per poll, because a screen whose microphone is broken produces the
+    same event every second it tries and one fault must not fill the store
+    before anybody reads it. The device id comes from the TOKEN, never from the
+    body: a display saying which display it is would be a display able to file
+    a fault against another one."""
+    if not isinstance(rows, list):
+        return 0
+    kept = 0
+    with _events_lock:
+        have = read_events()
+        for r in rows[:MAX_EVENTS_PER_POLL]:
+            if not isinstance(r, dict) or r.get("kind") not in EVENT_KINDS:
+                continue
+            have.append({"kind": r["kind"], "did": did,
+                         "level": r.get("level") if r.get("level") in EVENT_LEVELS
+                                  else "info",
+                         "detail": str(r.get("detail") or "")[:300],
+                         "route": str(r.get("route") or "")[:60],
+                         "ms": max(0, min(600000, int(r.get("ms") or 0))),
+                         "at": int(time.time())})
+            kept += 1
+        if kept:
+            write_events(have)
+    return kept
+
+
+def display_health(did, rows=None, now_=None):
+    """What this screen has been reporting, summarised. The list an admin
+    reads is per device, because the useful question is which screen is
+    failing rather than how many faults there were."""
+    rows = read_events() if rows is None else rows
+    now_ = int(time.time()) if now_ is None else now_
+    mine = [r for r in rows if r.get("did") == did]
+    by_kind = {}
+    for r in mine:
+        k = by_kind.setdefault(r["kind"], {"kind": r["kind"], "n": 0, "last": 0,
+                                           "level": "info", "detail": ""})
+        k["n"] += 1
+        if r["at"] >= k["last"]:
+            k["last"], k["level"], k["detail"] = r["at"], r["level"], r["detail"]
+    worst = "info"
+    for k in by_kind.values():
+        if k["level"] == "error" or (k["level"] == "warn" and worst == "info"):
+            worst = k["level"]
+    return {"events": sorted(by_kind.values(), key=lambda k: -k["last"]),
+            "n": len(mine), "worst": worst if mine else "",
+            "last": max([r["at"] for r in mine], default=0)}
+
+
+# THE CONVERSATION RECORD. This entry used to promise "no conversation
+# content", and that boundary has moved — stated plainly rather than quietly
+# broken, because a promise like that is worth only what it is kept to:
+#
+#   What was addressed to the device — from the wake word to the end of the
+#   conversation — and the routing decision that followed, retained for a
+#   window. Nothing outside an active conversation is recorded.
+#
+# The reasoning: a voice-only display shows nobody anything, so when it
+# mishears there is no record at all and nothing to fix. And the captured text
+# is exactly what already leaves the machine — it goes to a house or a model
+# regardless — so this adds retention, not disclosure. Nothing is captured
+# unless somebody said a wake word.
+#
+# THE WORDS ARE THE LEAST USEFUL PART. What makes a voice fault diagnosable is
+# the decision trail beside them, and "it didn't work" resolves into: the
+# recogniser heard "hows" and matched it fuzzily to the house route.
+TURNS_PATH = os.path.join(ROOT, "turns.json")
+_turns_lock = threading.RLock()
+MAX_TURNS = 500
+
+
+def read_turns():
+    try:
+        with open(TURNS_PATH) as fh:
+            doc = json.load(fh)
+        rows = doc.get("turns") if isinstance(doc, dict) else None
+    except (OSError, ValueError):
+        return []
+    return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+
+
+def write_turns(rows):
+    with _turns_lock:
+        tmp = TURNS_PATH + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump({"version": 1, "turns": rows[-MAX_TURNS:]}, fh)
+        os.chmod(tmp, 0o600)          # it holds what was said to a display
+        os.replace(tmp, TURNS_PATH)
+
+
+def note_turn(did, route, heard, sent, reply, trail=None, ms=0, error="",
+              fell_to=""):
+    """One turn, with the trail that explains it. Only ever called where an
+    utterance has already been decided to be this screen's business."""
+    if not did:
+        # A turn with no screen to attach it to is a turn nobody can act on,
+        # and the embed is not a screen. Recording it would be collecting for
+        # its own sake.
+        return
+    t = trail if isinstance(trail, dict) else {}
+    with _turns_lock:
+        rows = read_turns()
+        rows.append({
+            "did": str(did)[:32], "route": str(route or "")[:60],
+            # BEFORE the wake word came off, which is the whole point: it is
+            # the only field that can show a near miss.
+            "heard": str(heard or "")[:400],
+            "sent": str(sent or "")[:400],
+            "reply": str(reply or "")[:400],
+            "via": str(t.get("via") or "")[:12],
+            "word": str(t.get("word") or "")[:40],
+            "as": str(t.get("as") or "")[:40],
+            "ms": max(0, int(ms or 0)), "error": str(error or "")[:300],
+            "fell_to": str(fell_to or "")[:60],
+            "at": int(time.time()),
+        })
+        write_turns(rows)
+
+
+def prune_turns():
+    cutoff = int(time.time()) - event_window_days() * 86400
+    rows = read_turns()
+    keep = [r for r in rows if int(r.get("at") or 0) >= cutoff]
+    if len(keep) != len(rows):
+        write_turns(keep)
+    return len(rows) - len(keep)
+
+
+def prune_events():
+    """Past the window, gone. Read at startup and after each poll that wrote
+    anything, which is often enough on a server that only grows this file when
+    a display is talking to it."""
+    cutoff = int(time.time()) - event_window_days() * 86400
+    rows = read_events()
+    keep = [r for r in rows if int(r.get("at") or 0) >= cutoff]
+    if len(keep) != len(rows):
+        write_events(keep)
+    return len(rows) - len(keep)
+
+
+# -------------------------------------------------------------------- alerts
+# Diagnostics is a PULL — events collected, a health view somebody goes and
+# looks at. An alert is a PUSH: it comes and finds you. Those are genuinely
+# different things, and the only reason they are one entry is that building a
+# health view and then separately building the thing that watches it is two
+# passes over the same data.
+#
+# FOUR STATES, NOT TWO: open or resolved, acknowledged or not. The cell that
+# matters is resolved-but-unacknowledged — a screen that dropped off at two in
+# the morning and came back four minutes later leaves something in the list
+# until a person reads it. Self-healing nobody ever hears about is
+# indistinguishable from nothing having happened, and a display that heals
+# itself every night is a fault rather than a success.
+ALERTS_PATH = os.path.join(ROOT, "alerts.json")
+_alerts_lock = threading.RLock()
+MAX_ALERTS = 300
+
+#: What can raise one, and what it means. `once` fires a single time per
+#: device however often the fact is reported — no recorder in this browser
+#: will be just as true tomorrow.
+ALERT_KINDS = {
+    "offline":      {"level": "error", "words": "has not checked in"},
+    "still_gone":   {"level": "error", "words": "did not come back after a reload"},
+    "mic_denied":   {"level": "error", "words": "its microphone was refused"},
+    "no_recorder":  {"level": "error", "words": "has no recorder at all", "once": True},
+    "stt_slow":     {"level": "warn",  "words": "transcription is running long"},
+    "tts_fallback": {"level": "warn",  "words": "fell back to the browser voice"},
+    "wake_fuzzy":   {"level": "warn",  "words": "is waking on near misses"},
+    "no_intent":    {"level": "warn",  "words": "is being asked for what it cannot do"},
+    "backend_error": {"level": "error", "words": "the assistant it uses is failing"},
+    # The one that depends on none of the rest and could have shipped alone: a
+    # device asking to be here is already recorded by the displays entry. It
+    # arrives immediately rather than in a digest, because it is the only
+    # alert with a person attached — somebody is standing at a screen waiting
+    # to be let in.
+    "asked_in":     {"level": "warn",  "words": "is asking to be let in",
+                     "now": True},
+}
+
+
+#: The server's own log, as an admin reads it. NOT a served file — the whole
+#: reason SERVABLE is an allow-list is that this used to be handed out by the
+#: base class, unauthenticated, on every interface. This reads a bounded tail
+#: through the admin listener, behind the same session as everything else.
+LOG_PATH = os.path.join(ROOT, "server.log")
+#: Bytes read from the end. Enough to cover a start and a busy hour after it,
+#: small enough that asking for it is never the thing that makes a server slow.
+#: This one is NOT a setting: it bounds what this process reads off a disk,
+#: which is a property of the machine rather than a preference, and a field
+#: that could be set to a gigabyte would be a field that stalls the panel.
+LOG_TAIL_BYTES = 256 * 1024
+#: How many of those lines are answered with, when nothing is configured. The
+#: live number is app.json's `log_lines`; this is its default and its floor if
+#: the file says something impossible.
+LOG_MAX_LINES = 800
+
+
+def log_max_lines():
+    """The configured tail length, or the default if it is unreadable.
+
+    Clamped to the same pair the panel's save is clamped to, and read from that
+    pair rather than from a second copy of the numbers: what arrives through
+    the panel cannot be out of range, but app.json is a file on a disk and
+    somebody editing it by hand is exactly who would put a million in it."""
+    lo, hi = UNATTENDED_LIMITS["log_lines"]
+    try:
+        return min(hi, max(lo, int(read_app().get("log_lines", LOG_MAX_LINES))))
+    except (TypeError, ValueError):
+        return LOG_MAX_LINES
+
+
+def read_log_tail(match=""):
+    """The end of the log, newest last. Returns (lines, truncated, size).
+
+    Seeks rather than reads: this file is truncated at every start but a busy
+    day still puts megabytes in it, and reading the whole thing to show the
+    last screenful is the kind of thing that works until the day it matters."""
+    try:
+        size = os.path.getsize(LOG_PATH)
+        with open(LOG_PATH, "rb") as fh:
+            if size > LOG_TAIL_BYTES:
+                fh.seek(size - LOG_TAIL_BYTES)
+                fh.readline()                # drop the half line seeking landed in
+            raw = fh.read()
+    except OSError:
+        return [], False, 0
+    lines = raw.decode("utf-8", "replace").splitlines()
+    if match:
+        m = match.lower()
+        lines = [ln for ln in lines if m in ln.lower()]
+    keep = log_max_lines()
+    cut = len(lines) > keep
+    return lines[-keep:], cut, size
+
+
+def read_alerts():
+    try:
+        with open(ALERTS_PATH) as fh:
+            doc = json.load(fh)
+        rows = doc.get("alerts") if isinstance(doc, dict) else None
+    except (OSError, ValueError):
+        return []
+    return [r for r in rows if isinstance(r, dict) and r.get("kind") in ALERT_KINDS] \
+        if isinstance(rows, list) else []
+
+
+def write_alerts(rows):
+    with _alerts_lock:
+        tmp = ALERTS_PATH + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump({"version": 1, "alerts": rows[-MAX_ALERTS:]}, fh)
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, ALERTS_PATH)
+
+
+def raise_alert(kind, did="", detail=""):
+    """Open one, or touch the one already open.
+
+    An alert has an IDENTITY — its kind and its device — rather than being a
+    row appended per occurrence. A screen offline for a day is one alert that
+    has been true for a day, not two hundred and forty of them, and a list that
+    said otherwise would be a list nobody reads to the bottom of."""
+    spec = ALERT_KINDS.get(kind)
+    if not spec:
+        return None
+    now_ = int(time.time())
+    with _alerts_lock:
+        rows = read_alerts()
+        for r in rows:
+            if r["kind"] == kind and r["did"] == did and not r["resolved"]:
+                r["last"], r["n"] = now_, r.get("n", 1) + 1
+                if detail:
+                    r["detail"] = str(detail)[:300]
+                write_alerts(rows)
+                return r
+            # A fact fires once per device, ever — even after somebody has
+            # acknowledged and it has been resolved.
+            if spec.get("once") and r["kind"] == kind and r["did"] == did:
+                return None
+        row = {"id": "a" + secrets.token_hex(5), "kind": kind, "did": did,
+               "level": spec["level"], "detail": str(detail or "")[:300],
+               "opened": now_, "last": now_, "n": 1,
+               "resolved": 0, "acked": 0, "sent": 0}
+        rows.append(row)
+        write_alerts(rows)
+        print("ALERT %s %s%s" % (kind, did or "(server)",
+                                 ": " + detail if detail else ""), flush=True)
+    # Outside the lock: a sink is a network call, and holding the alert file
+    # while one of them times out would stop every other alert being written.
+    if deliver_alert(row):
+        mark_sent([row["id"]])
+    return row
+
+
+def clear_alert(kind, did=""):
+    """It stopped being true. RESOLVED, not gone: it stays in the list until
+    somebody has read it, because a fault that healed itself unobserved is
+    indistinguishable from one that never happened."""
+    now_ = int(time.time())
+    with _alerts_lock:
+        rows, hit = read_alerts(), False
+        for r in rows:
+            if r["kind"] == kind and r["did"] == did and not r["resolved"]:
+                r["resolved"], hit = now_, True
+        if hit:
+            write_alerts(rows)
+            print("alert cleared: %s %s" % (kind, did or "(server)"), flush=True)
+    if hit:
+        # Recovery is news too. A screen that came back at four in the morning
+        # is exactly what somebody reading a log at nine wants to see beside
+        # the line saying it went.
+        for r in rows:
+            if r["kind"] == kind and r["did"] == did and r["resolved"] == now_:
+                deliver_alert(r, resolved=True)
+                break
+    return hit
+
+
+# ------------------------------------------------------------- alert sinks
+# CHEAPEST REACH FIRST. The admin list is the baseline and is not optional,
+# because acknowledgement has to live somewhere. Syslog is the next cheapest by
+# a distance: the standard library speaks it, every operator already has
+# somewhere it goes, and it costs one socket and no credentials — which is more
+# than can be said for anything else on this list.
+#
+# It is FIRE AND FORGET on purpose. A sink that raises, retries or blocks would
+# make reporting a fault into a second fault, and the alert it failed to send
+# is still sitting in the panel where acknowledgement lives.
+SYSLOG_FACILITIES = ("user", "local0", "local1", "local2", "local3",
+                     "local4", "local5", "local6", "local7")
+#: alert level -> syslog severity, by name rather than number so the mapping is
+#: readable where it is decided rather than in a table somewhere else.
+SYSLOG_SEVERITY = {"error": 3, "warn": 4, "info": 6}   # err, warning, info
+
+
+def syslog_send(level, text):
+    """One line, to wherever an admin pointed it. Silent on every failure: this
+    is called from the path that IS the fault being reported."""
+    cfg = display_settings()
+    if not cfg.get("syslog_on"):
+        return
+    host = str(cfg.get("syslog_host") or "").strip()
+    try:
+        fac = SYSLOG_FACILITIES.index(cfg.get("syslog_facility") or "user")
+        fac = 1 if fac == 0 else 15 + fac        # user=1, local0..7 = 16..23
+        pri = fac * 8 + SYSLOG_SEVERITY.get(level, 6)
+        line = "<%d>resonance: %s" % (pri, str(text)[:900])
+        if host:
+            port = int(cfg.get("syslog_port") or 514)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                sock.settimeout(1.0)
+                sock.sendto(line.encode("utf-8", "replace"), (host, port))
+            finally:
+                sock.close()
+        else:
+            # The local daemon. Two names because they differ by platform and
+            # trying both is cheaper than asking which one this is.
+            for path in ("/dev/log", "/var/run/syslog"):
+                if not os.path.exists(path):
+                    continue
+                sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+                try:
+                    sock.connect(path)
+                    sock.send(line.encode("utf-8", "replace"))
+                    return
+                except OSError:
+                    continue
+                finally:
+                    sock.close()
+    except Exception:                            # noqa: BLE001
+        pass
+
+
+def in_quiet_hours(now_=None):
+    """Whether the house is asleep, on the DEVICE clock — the same clock dark
+    hours already run on, and for the same reason. Announcing a dead hallway
+    screen through the house speakers at three in the morning is how alerting
+    gets switched off in its first week.
+
+    Spans midnight, because that is the only shape anybody ever sets: 22 to 7
+    is a night, and read as a plain range it would be nineteen hours of
+    daylight and no quiet at all."""
+    cfg = display_settings()
+    if not cfg.get("quiet_on"):
+        return False
+    # `or` would be wrong here and was: midnight is 0, which is falsy, so a
+    # night set to start at 00 silently became 22 — the one hour a quiet
+    # period is most likely to involve, quietly replaced by a default.
+    def _hour(key, fallback):
+        try:
+            return int(cfg[key]) % 24
+        except (KeyError, TypeError, ValueError):
+            return fallback
+    start, end = _hour("quiet_from", 22), _hour("quiet_to", 7)
+    hour = time.localtime(now_ or time.time()).tm_hour
+    if start == end:
+        return False                       # a zero-length night is no night
+    # Inclusive of the start hour, exclusive of the end, both ways round.
+    # They disagreed once: the wrapping branch counted 22:30 as quiet for a
+    # night starting at 22 while the plain one did not count 09:30 as quiet for
+    # one starting at 09 — the same setting meaning two things.
+    return start <= hour < end if start < end else (hour >= start or hour < end)
+
+
+def post_home_assistant(text, level, row):
+    """Announced by the building the screen is part of.
+
+    One service call, and which service is the deployment's business:
+    persistent_notification.create needs nothing configured and always exists,
+    notify.notify or a tts service is the one that actually speaks. Both take
+    a title and a message, so one body serves either."""
+    cfg = display_settings()
+    base = str(cfg.get("ha_url") or "").strip()
+    token = str(cfg.get("ha_token") or "").strip()
+    if not (cfg.get("ha_on") and base and token):
+        return
+    svc = str(cfg.get("ha_service") or "persistent_notification/create").strip()
+    svc = svc.replace(".", "/").strip("/")
+    try:
+        _post_json(ha_url(base, "/api/services/" + svc),
+                   {"title": "Resonance", "message": text},
+                   {"Authorization": "Bearer " + token}, 5)
+    except Exception as exc:                     # noqa: BLE001
+        print("home assistant alert failed: %s" % exc, flush=True)
+
+
+def send_mail(subject, body):
+    """One message, or nothing. Costs no dependency and is still last on the
+    list: it wants a server and credentials, and when it fails it usually
+    fails somewhere this process cannot see."""
+    cfg = display_settings()
+    host = str(cfg.get("mail_host") or "").strip()
+    to = [a.strip() for a in str(cfg.get("mail_to") or "").split(",") if a.strip()]
+    if not (cfg.get("mail_on") and host and to):
+        return
+    frm = str(cfg.get("mail_from") or "").strip() or "resonance@localhost"
+    try:
+        import smtplib
+        from email.message import EmailMessage
+        msg = EmailMessage()
+        msg["Subject"] = subject[:200]
+        msg["From"] = frm
+        msg["To"] = ", ".join(to)
+        msg.set_content(body)
+        port = int(cfg.get("mail_port") or 587)
+        with smtplib.SMTP(host, port, timeout=10) as sm:
+            if cfg.get("mail_tls"):
+                sm.starttls()
+            user = str(cfg.get("mail_user") or "").strip()
+            if user:
+                sm.login(user, str(cfg.get("mail_pass") or ""))
+            sm.send_message(msg)
+    except Exception as exc:                     # noqa: BLE001
+        print("mail failed: %s" % exc, flush=True)
+
+
+def post_webhook(text, level, row):
+    """One JSON POST. Reaches ntfy, Slack, Discord, Gotify and whatever else
+    somebody already runs — the most reach per line of code available here,
+    because they all accept a body with a message in it."""
+    cfg = display_settings()
+    url = str(cfg.get("hook_url") or "").strip()
+    if not cfg.get("hook_on") or not url:
+        return
+    try:
+        _post_json(url, {"text": text, "message": text, "content": text,
+                         "title": "Resonance",
+                         "level": level, "kind": row.get("kind"),
+                         "device": row.get("did") or "",
+                         "at": row.get("last") or int(time.time())},
+                   {}, 5)
+    except Exception as exc:                     # noqa: BLE001
+        # Said once, in the log, and never retried. A sink that retried would
+        # be a fault reporting a fault.
+        print("webhook failed: %s" % exc, flush=True)
+
+
+def deliver_alert(row, resolved=False):
+    """Out to every sink that is switched on. The list is not one of them: it
+    already has the row, which is how it can be the thing that is never
+    missed."""
+    displays = read_displays()
+    who = display_label(displays[row["did"]]) if row.get("did") in displays \
+        else (row.get("did") or "this server")
+    spec = ALERT_KINDS.get(row["kind"]) or {}
+    level = "info" if resolved else row.get("level", "info")
+    text = "%s %s%s%s" % (who, spec.get("words", row["kind"]),
+                          " — RESOLVED" if resolved else "",
+                          (": " + row["detail"]) if row.get("detail") else "")
+    # SYSLOG IGNORES QUIET HOURS. It is a file somebody reads later, not a
+    # thing that makes a noise in a house at three in the morning — and a log
+    # with a hole in it every night is worse than useless for the one fault
+    # that only ever happens at night.
+    syslog_send(level, text)
+    # HELD, NOT DROPPED — and this is where the difference is made real. Quiet
+    # hours and digest mode both leave the row unsent; flush_digest carries it
+    # at a civilised hour, or on the timer. The exception is the alert with a
+    # person standing at a screen: they are waiting now, whatever time it is.
+    cfg = display_settings()
+    if not spec.get("now") and (in_quiet_hours() or cfg.get("digest_on")):
+        return False
+    post_webhook(text, level, row)
+    post_home_assistant(text, level, row)
+    send_mail("Resonance: " + text[:120], text)
+    return True
+
+
+#: How many missed polls before a screen is called gone. Three rather than one:
+#: a single dropped poll is a network hiccup, and an alert that fires on one is
+#: an alert somebody turns off in a week.
+ALERT_MISSES = 3
+#: How many of a thing inside the window before it is worth telling somebody.
+#: A near miss now and then is how speech works; a rate of them is two wake
+#: words cross-triggering.
+ALERT_RATES = {"stt_slow": 5, "tts_fallback": 3, "wake_fuzzy": 5,
+               "no_intent": 5, "backend_error": 3}
+#: The window those rates are counted over.
+ALERT_WINDOW = 3600
+
+
+def evaluate_alerts():
+    """Everything worth a threshold, judged from what is already collected.
+
+    Called from the poll, which is the only clock this server has that a
+    display keeps wound — and the poll is also the fact that liveness is read
+    from, so the thing being measured and the thing doing the measuring arrive
+    together."""
+    now_ = int(time.time())
+    app = read_app()
+    every = int(app.get("poll_seconds") or APP_DEFAULTS["poll_seconds"])
+    gone_after = every * ALERT_MISSES
+    displays = read_displays()
+
+    for did, rec in displays.items():
+        # Only screens that ever worked. An invited row that has never taken
+        # its code is not a screen that has gone quiet; it is a screen that was
+        # never switched on, and it is already visible as one.
+        if not (rec.get("approved") and rec.get("hash")):
+            continue
+        seen = int(rec.get("last_seen") or 0)
+        if seen and now_ - seen > gone_after:
+            raise_alert("offline", did,
+                        "last seen %d seconds ago" % (now_ - seen))
+        else:
+            # RETURNED. Resolving is what makes the resolved-but-unread cell
+            # exist, which is the one that matters: a screen that dropped at
+            # two in the morning and came back leaves something to read.
+            clear_alert("offline", did)
+
+    rows = [r for r in read_events() if r["at"] >= now_ - ALERT_WINDOW]
+    counts = {}
+    for r in rows:
+        counts[(r["kind"], r["did"])] = counts.get((r["kind"], r["did"]), 0) + 1
+    for (kind, did), n in counts.items():
+        if kind in ("mic_denied", "no_recorder"):
+            # Hard faults, not rates. One is enough: a microphone that will not
+            # open is not a thing that gets better by happening less often.
+            raise_alert(kind, did, "reported %d time(s) in the last hour" % n)
+        elif kind in ALERT_RATES and n >= ALERT_RATES[kind]:
+            raise_alert(kind, did, "%d in the last hour" % n)
+    # …and the ones that stopped happening.
+    for kind in list(ALERT_RATES) + ["mic_denied"]:
+        for did in displays:
+            if counts.get((kind, did), 0) == 0:
+                clear_alert(kind, did)
+
+
+def mark_sent(ids):
+    with _alerts_lock:
+        rows = read_alerts()
+        now_ = int(time.time())
+        hit = False
+        for r in rows:
+            if r["id"] in ids and not r.get("sent"):
+                r["sent"], hit = now_, True
+        if hit:
+            write_alerts(rows)
+
+
+def flush_digest(force=False):
+    """Everything held, in one message.
+
+    This is what makes quiet hours a HOLD rather than a drop, and what digest
+    mode is. Nothing goes out during the quiet: the whole point is that the
+    house is asleep, and a digest that fired at three would be the thing it
+    exists to prevent."""
+    cfg = display_settings()
+    if in_quiet_hours():
+        return 0
+    waiting = [r for r in read_alerts() if not r.get("sent")]
+    if not waiting:
+        return 0
+    if not force:
+        every = max(5, int(cfg.get("digest_minutes") or 60)) * 60
+        oldest = min(r["last"] for r in waiting)
+        # Counted from the OLDEST held thing rather than from the last digest:
+        # what matters is how long something has gone unsaid, not how long it
+        # has been since a message that may have carried nothing.
+        if int(time.time()) - oldest < every:
+            return 0
+    displays = read_displays()
+    lines = []
+    for r in sorted(waiting, key=lambda r: r["last"]):
+        spec = ALERT_KINDS.get(r["kind"]) or {}
+        who = display_label(displays[r["did"]]) if r.get("did") in displays \
+            else (r.get("did") or "this server")
+        lines.append("%s %s%s%s" % (who, spec.get("words", r["kind"]),
+                                    " — RESOLVED" if r["resolved"] else "",
+                                    (": " + r["detail"]) if r.get("detail") else ""))
+    text = "%d thing%s to report:\n" % (len(lines), "" if len(lines) == 1 else "s")
+    text += "\n".join("  · " + ln for ln in lines)
+    worst = "error" if any(r["level"] == "error" for r in waiting) else "warn"
+    post_webhook(text, worst, waiting[0])
+    post_home_assistant(text, worst, waiting[0])
+    send_mail("Resonance: %d thing%s to report"
+              % (len(lines), "" if len(lines) == 1 else "s"), text)
+    mark_sent([r["id"] for r in waiting])
+    print("digest sent: %d alert(s)" % len(waiting), flush=True)
+    return len(waiting)
+
+
+def ack_alerts(ids):
+    """Read by a person. An alert that is both resolved and acknowledged has
+    nothing left to say, so it leaves — everything else stays visible."""
+    now_ = int(time.time())
+    with _alerts_lock:
+        rows = read_alerts()
+        for r in rows:
+            if r["id"] in ids and not r["acked"]:
+                r["acked"] = now_
+        keep = [r for r in rows if not (r["resolved"] and r["acked"])]
+        write_alerts(keep)
+        return len(rows) - len(keep)
+
+
+# ---------------------------------------------------------------- identities
+# A PERSON, as distinct from a place. A display is one physical object standing
+# in one room; an identity is somebody who moves between a phone, a laptop and
+# a borrowed browser and is the same person in all three.
+#
+# A SESSION IS A USER OR A DEVICE, NEVER BOTH, and the URL decides which. A
+# device added as a device operates as a device — a kiosk, a wall tablet — and
+# no person exists inside that session. An identity's URL travels, and the
+# machine it was opened on contributes nothing to what that session may reach.
+# They are separate namespaces for that reason: a place is named by ?display=
+# and a person by a minted path, and neither can be spelled in the other's
+# notation. One parameter holding either kind would hang everything a place
+# owns — appearance, kiosk mode, route bindings, session length — off a person,
+# who has no place to hang any of it on.
+#
+# CREATED IN THE PANEL AND NOWHERE ELSE. No email, no verification and nothing
+# here to vouch for a name, so anybody who could mint their own identity could
+# mint somebody else's.
+#
+# THE URL CARRIES A MINTED SECRET rather than a readable name. A name is
+# guessable, and a guessable URL that grants reach is a password written on a
+# wall — the same fault that made display tokens necessary, arriving through
+# the front door. The first visit exchanges it for a cookie, so the secret
+# leaves the address bar after one use and a shoulder-read of somebody's
+# browser history is spent rather than live.
+IDENTITIES_PATH = os.path.join(ROOT, "identities.json")
+_identities_lock = threading.Lock()
+IDENTITY_COOKIE = "rsn_pid"
+#: The same ten years a display gets, for the same reason: an identity is
+#: issued once and then somebody just uses it, and an expiring one would lock
+#: somebody out for a reason they could not see. Revocation is deleting the
+#: record or reissuing the URL, and both are immediate.
+IDENTITY_MAX_AGE = DISPLAY_MAX_AGE
+#: A ceiling rather than a setting. It bounds a list an admin fills in by hand
+#: and nobody creates five thousand people one at a time; if a deployment ever
+#: needs this to scale it belongs beside max_displays, where the numbers that
+#: DO scale with the deployment already live.
+MAX_IDENTITIES = 500
+
+IDENTITY_DEFAULTS = {
+    "name": "",                  # what an admin called them
+    # The URL secret, hashed the way a display token is: the id addresses the
+    # record and the secret proves it, so a wrong URL costs one hash rather
+    # than a scan of everybody in the building. SHA-256 rather than the PBKDF2
+    # the passwords get, because this secret is 32 bytes from the system
+    # generator and there is no dictionary to run against it.
+    "salt": "", "hash": "",
+    "created": 0, "last_seen": 0,
+    "created_by": "",
+    # THE PIN. PBKDF2 like an admin password and not the SHA-256 the URL gets:
+    # a URL secret is 32 bytes from the system generator with no dictionary to
+    # run, where a PIN is six digits a human chose. Stretching is the only
+    # thing standing between that and a list of a million guesses.
+    #
+    # `pin_len` is kept because the policy is a MINIMUM that can be raised
+    # later, and a hash cannot be asked how long the thing behind it was. It
+    # is the length and nothing else — it narrows the search space by a factor
+    # nobody can use without the hash, and without it raising the minimum
+    # would either do nothing to existing PINs or force everybody to reset.
+    "pin_salt": "", "pin_hash": "", "pin_len": 0, "pin_set_at": 0,
+    # PER-IDENTITY SETTINGS: the storage tier a PIN unlocks, and the one this
+    # server did not have. There was shared configuration, a per-browser
+    # preference and a per-embed grant; a setting belonging to a PERSON had
+    # nowhere to live, so it lived in whichever browser they happened to be
+    # using and did not follow them anywhere.
+    "settings": {},
+    # THEIR OWN WAKE WORD. Two people in a room with their own devices, one of
+    # them says the name that reaches the model, and both answer — route
+    # binding cannot help, because both are legitimately allowed that route.
+    # A word of their own stops the collision happening rather than
+    # reconciling it afterwards, and it is what people expect anyway: an
+    # assistant answers to a name you chose.
+    "wakeword": "",
+    # How long an unlock lasts on this person's own device, in hours. Theirs
+    # rather than the deployment's: a PIN is now entered at their own URL, not
+    # at a screen standing in a room, so there is no place carrying the risk to
+    # set it from. Zero takes the deployment default.
+    "session_hours": 0,
+}
+
+#: What a person is allowed to keep. An ALLOW-list, not a filter: this store is
+#: written from a browser, and a document shaped by whatever a page decided to
+#: send is one nobody can reason about a year from now. These three are exactly
+#: what the display has always kept per browser — push-to-talk, muted, and
+#: whether the transcript is showing.
+IDENTITY_PREF_KEYS = ("ptt", "muted", "text")
+#: Hours, where an identity names none. Long enough that somebody is not asked
+#: again in a working day, short enough to matter on a machine they borrowed.
+SESSION_HOURS_DEFAULT = 12
+SESSION_HOURS_LIMITS = (1, 720)
+#: A browser that has unlocked. Its own cookie, because the identity cookie is
+#: the URL secret and every device that person owns holds the same one —
+#: unlocking on the laptop would unlock the phone, which is not what entering a
+#: PIN on one machine means. In memory, like the admin sessions: a restart asks
+#: again, and that is the same bargain the rest of this server makes.
+_pin_sessions = {}               # token -> {"pid": str, "expires": float}
+_pin_lock = threading.Lock()
+PIN_COOKIE = "rsn_pinq"
+
+
+def clean_identity_settings(obj):
+    """Only the keys that exist, only as booleans. Everything a person may keep
+    today is a switch; the day one is not, this is where that is decided rather
+    than wherever the page happened to send it."""
+    out = {}
+    if isinstance(obj, dict):
+        for k in IDENTITY_PREF_KEYS:
+            if k in obj:
+                out[k] = bool(obj[k])
+    return out
+
+
+def identity_settings(pid):
+    rec = read_identities().get(pid)
+    return clean_identity_settings((rec or {}).get("settings"))
+
+
+def write_identity_settings(pid, obj):
+    rows = read_identities()
+    if pid not in rows:
+        return None
+    rows[pid]["settings"] = clean_identity_settings(obj)
+    write_identities(rows)
+    return rows[pid]["settings"]
+
+
+def identity_hours(rec):
+    h = int(rec.get("session_hours") or 0)
+    return h if h > 0 else SESSION_HOURS_DEFAULT
+
+
+def open_pin_session(pid, hours):
+    token = secrets.token_urlsafe(32)
+    with _pin_lock:
+        # Swept here rather than on a timer: this runs when somebody unlocks,
+        # which is the only moment the map grows.
+        now_ = time.time()
+        for t in [t for t, v in _pin_sessions.items() if v["expires"] <= now_]:
+            _pin_sessions.pop(t, None)
+        _pin_sessions[token] = {"pid": pid, "expires": now_ + hours * 3600}
+    return token
+
+
+def pin_session_pid(token):
+    """Which person this browser has unlocked, or "". Expiry is read HERE
+    rather than swept on a clock, so a session that has run out is over the
+    moment it is asked about rather than whenever a timer next fired."""
+    rec = _pin_sessions.get(str(token or ""))
+    if not rec:
+        return ""
+    if rec["expires"] <= time.time():
+        _pin_sessions.pop(str(token), None)
+        return ""
+    return rec["pid"]
+
+
+def close_pin_sessions(pid):
+    """Every unlocked browser for one person, ended. Called where their PIN
+    changes hands — an admin clearing it, or the person setting a new one —
+    because a session opened by a secret that no longer exists is a door left
+    open behind a lock somebody just changed."""
+    with _pin_lock:
+        for t in [t for t, v in _pin_sessions.items() if v["pid"] == pid]:
+            _pin_sessions.pop(t, None)
+
+#: Guessing is per IDENTITY rather than per address. A six-digit PIN is small
+#: enough that the thing to slow down is attempts against one person, and an
+#: attacker who changes address between guesses must not get a fresh budget.
+#: Its own ledger, so somebody fumbling their PIN cannot lock an admin out of
+#: the panel — the same reason the embed keys keep theirs.
+_pin_fails = {}                  # identity id -> [count, blocked_until]
+
+
+def pin_blocked(pid):
+    rec = _pin_fails.get(pid)
+    return bool(rec and rec[1] > time.time())
+
+
+def note_pin_failure(pid):
+    rec = _pin_fails.setdefault(pid, [0, 0])
+    rec[0] += 1
+    if rec[0] >= 5:
+        rec[1] = time.time() + min(300, 15 * (2 ** (rec[0] - 5)))
+
+
+def weak_pin(pin):
+    """The guesses anybody would try first, refused where they are chosen
+    rather than left for the back-off to absorb. A run, a repeat, or the year
+    somebody was born is most of what a keypad ever sees, and rate limiting is
+    what makes six digits survivable — it should not be spending its budget on
+    111111."""
+    if len(set(pin)) == 1:
+        return "that is one digit repeated"
+    runs = "0123456789" * 2
+    if pin in runs or pin in runs[::-1]:
+        return "that is a run of digits"
+    if len(pin) == 4 and pin.startswith(("19", "20")):
+        return "that reads as a year"
+    return ""
+
+
+def check_pin(pin, minimum=None):
+    """What is wrong with this PIN, or "" if nothing is. Digits only: it is
+    keyed into a screen, often with a remote, and a PIN that needed letters
+    would be a password with the wrong name."""
+    pin = str(pin or "")
+    low = PIN_MIN_DEFAULT if minimum is None else minimum
+    if not pin.isdigit():
+        return "a PIN is digits only"
+    if len(pin) > PIN_MAX:
+        return "that is longer than a PIN needs to be"
+    if len(pin) < low:
+        return "a PIN needs at least %d digits here" % low
+    return weak_pin(pin)
+
+
+def set_identity_pin(pid, pin, minimum=None):
+    """Set or replace somebody's PIN. Returns "" or the reason it was refused."""
+    rows = read_identities()
+    if pid not in rows:
+        return "no such identity"
+    bad = check_pin(pin, minimum)
+    if bad:
+        return bad
+    salt, dk = hash_password(str(pin))
+    rows[pid].update(pin_salt=salt, pin_hash=dk, pin_len=len(str(pin)),
+                     pin_set_at=int(time.time()))
+    write_identities(rows)
+    _pin_fails.pop(pid, None)
+    close_pin_sessions(pid)
+    return ""
+
+
+def clear_identity_pin(pid):
+    """An admin resetting a forgotten one. With no email here this is the only
+    recovery path, which is why it exists in the first version — and it does
+    not set a new PIN, it removes the old one: an admin who chose somebody's
+    PIN would know it."""
+    rows = read_identities()
+    if pid not in rows:
+        return False
+    rows[pid].update(pin_salt="", pin_hash="", pin_len=0, pin_set_at=0)
+    write_identities(rows)
+    _pin_fails.pop(pid, None)
+    close_pin_sessions(pid)
+    return True
+
+
+def verify_identity_pin(pid, pin):
+    """True where it matches. Compared HERE and never in the browser, and the
+    back-off is charged on the way out rather than the way in, so a correct PIN
+    entered after four wrong ones still works."""
+    rec = read_identities().get(pid)
+    if not rec or not rec.get("pin_hash"):
+        return False
+    ok = verify_password(str(pin or ""), rec["pin_salt"], rec["pin_hash"])
+    if ok:
+        _pin_fails.pop(pid, None)
+    else:
+        note_pin_failure(pid)
+    return bool(ok)
+
+
+def wake_words_in_use(skip_pid=""):
+    """Every word that already wakes something, as (word, what it belongs to).
+
+    Both populations, because a collision does not care which list it came
+    from: a person whose word is near the house's is a person who turns the
+    lights off by saying their own name."""
+    out = []
+    doc = read_routes()
+    for rid in route_order(doc):
+        rec = doc["routes"][rid]
+        prof = find_look(str(rec.get("speech") or ""), _speech_pool()) \
+               or find_look(_speech_default(), _speech_pool()) or {}
+        for w in [prof.get("wakeword") or rec.get("wakeword") or ""] \
+                 + list(prof.get("aliases") or rec.get("aliases") or []):
+            if w:
+                out.append((w, rec.get("name") or rid))
+    for pid, rec in read_identities().items():
+        if pid != skip_pid and rec.get("wakeword"):
+            out.append((rec["wakeword"], identity_label(rec)))
+    return out
+
+
+def check_wake_word(word, skip_pid=""):
+    """"" if this word is somebody's to take, or why it is not.
+
+    Refused HERE, against the matcher that does the waking, rather than by
+    comparing strings: a word acoustically close to the house name puts you
+    back where you started, and it would pass any comparison of letters. What
+    gets through is exactly what will not cross-trigger, because the same
+    rules decided both."""
+    w = wake_norm(word)
+    if not w:
+        return "give them a word"
+    if len(w) < 3:
+        return "too short to hear reliably — three letters or more"
+    if len(w.split(" ")) > 2:
+        return "one word, or two at most"
+    for other, whose in wake_words_in_use(skip_pid):
+        if wake_collides(w, other):
+            same = wake_norm(other) == w
+            return ('"%s" is already %s\'s word' % (other, whose) if same else
+                    '"%s" is too close to "%s", which is %s\'s — they would '
+                    'wake each other' % (word.strip(), other, whose))
+    return ""
+
+
+def set_identity_wake(pid, word):
+    rows = read_identities()
+    if pid not in rows:
+        return "no such identity"
+    w = str(word or "").strip()
+    if not w:                                    # clearing it is always allowed
+        rows[pid]["wakeword"] = ""
+        write_identities(rows)
+        return ""
+    bad = check_wake_word(w, skip_pid=pid)
+    if bad:
+        return bad
+    rows[pid]["wakeword"] = wake_norm(w)
+    write_identities(rows)
+    return ""
+
+
+def identity_pin_state(rec, minimum=None):
+    """none, ok, or short. SHORT is a PIN that was legal when it was set and is
+    below a minimum raised since — marked rather than revoked, because the
+    person still has to be able to unlock in order to change it."""
+    low = PIN_MIN_DEFAULT if minimum is None else minimum
+    if not rec.get("pin_hash"):
+        return "none"
+    return "ok" if (rec.get("pin_len") or 0) >= low else "short"
+
+
+def read_identities():
+    try:
+        with open(IDENTITIES_PATH) as fh:
+            doc = json.load(fh)
+        stored = doc.get("identities", {}) if isinstance(doc, dict) else {}
+    except (OSError, ValueError):
+        return {}
+    out = {}
+    for pid, rec in stored.items():
+        if not isinstance(rec, dict):
+            continue
+        row = dict(IDENTITY_DEFAULTS)
+        row.update({k: v for k, v in rec.items() if k in IDENTITY_DEFAULTS})
+        out[str(pid)] = row
+    return out
+
+
+def write_identities(rows):
+    with _identities_lock:
+        tmp = IDENTITIES_PATH + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump({"version": 1, "identities": rows}, fh,
+                      indent=2, sort_keys=True)
+        os.chmod(tmp, 0o600)                     # URL secret hashes
+        os.replace(tmp, IDENTITIES_PATH)
+
+
+def identity_label(rec):
+    return rec.get("name") or "unnamed person"
+
+
+def new_identity(name, by):
+    """Mint one, and hand back (url token, record) — or (None, error).
+
+    The token is shown once, in the URL an admin hands over. What is stored is
+    its hash, so a panel that has been closed cannot show it again and a copy
+    of this file cannot be read back into a working URL."""
+    name = str(name or "").strip()[:60]
+    if not name:
+        return None, "a name is required"
+    rows = read_identities()
+    if len(rows) >= MAX_IDENTITIES:
+        return None, ("that is %d identities already — remove one first"
+                      % MAX_IDENTITIES)
+    if any(r["name"].lower() == name.lower() for r in rows.values()):
+        # Not a security property: the URL is the credential, and two people
+        # called Sam would still be told apart by it. It is that a list with
+        # two identical rows is one an admin cannot act on.
+        return None, "there is already an identity with that name"
+    pid = "p" + secrets.token_hex(6)
+    secret = secrets.token_urlsafe(32)
+    salt, dk = hash_key(secret)
+    rows[pid] = dict(IDENTITY_DEFAULTS, name=name, salt=salt, hash=dk,
+                     created=int(time.time()), created_by=str(by or "")[:60])
+    write_identities(rows)
+    # Filed with their own population the moment they exist, and the group is
+    # minted if there is not one — the same rule every other kind follows. A
+    # row belonging to no group is one an allow-list cannot name, so the first
+    # grant to everybody would be a tick per person, which is the data entry
+    # groups exist to remove.
+    join_group(pid, default_group("identity", by))
+    return pid + "." + secret, dict(rows[pid], id=pid)
+
+
+def reissue_identity(pid):
+    """A new secret, and the old URL stops working the moment this returns.
+    What it is for is a URL that got somewhere it should not have — pasted
+    into a chat, left in a browser somebody else uses — where deleting the
+    person would take everything they own with it."""
+    rows = read_identities()
+    rec = rows.get(pid)
+    if not rec:
+        return None
+    secret = secrets.token_urlsafe(32)
+    rec["salt"], rec["hash"] = hash_key(secret)
+    write_identities(rows)
+    return pid + "." + secret
+
+
+def find_identity(token):
+    """The person this token belongs to, or None. Same shape as a display
+    token and an embed key: id, a dot, and the secret."""
+    pid, _, secret = str(token or "").partition(".")
+    if not pid or not secret:
+        return None
+    rec = read_identities().get(pid)
+    if not rec or not rec.get("hash"):
+        return None
+    try:
+        ok = hmac.compare_digest(
+            hash_key(secret, bytes.fromhex(rec["salt"]))[1], rec["hash"])
+    except (KeyError, TypeError, ValueError):
+        return None                              # a record edited by hand
+    return dict(rec, id=pid) if ok else None
+
+
+def note_identity_seen(pid):
+    """Last seen, at most once every SEEN_INTERVAL. A person's browser talks to
+    this server as often as a display's does, and writing on every request
+    would make a list nobody is reading the busiest file on the box."""
+    rows = read_identities()
+    rec = rows.get(pid)
+    now_ = int(time.time())
+    if not rec or now_ - int(rec.get("last_seen") or 0) < SEEN_INTERVAL:
+        return
+    rec["last_seen"] = now_
+    write_identities(rows)
+
+
+def admin_identities():
+    """The list, less the credential. What a URL secret IS never leaves this
+    server after the one moment it was minted."""
+    rows = read_identities()
+    low = display_settings()["pin_min"]
+    # The STATE of a PIN, never the PIN. Whether somebody has one, and whether
+    # theirs is below a minimum raised since they set it, is what an admin has
+    # to be able to see — the rollout of a tightened policy is otherwise a
+    # thing you assume rather than watch.
+    return [dict({k: rec.get(k) for k in
+                  ("name", "created", "last_seen", "created_by", "pin_set_at")},
+                 id=pid, label=identity_label(rec),
+                 wakeword=rec.get("wakeword") or "",
+                 pin=identity_pin_state(rec, low))
+            for pid, rec in sorted(rows.items(), key=lambda kv: kv[1]["created"])]
 
 
 # -------------------------------------------------------------------- groups
@@ -3142,8 +4664,35 @@ def admin_displays():
 # which is the point of them living in a file of their own rather than inside
 # the thing that currently uses them.
 GROUPS_PATH = os.path.join(ROOT, "groups.json")
-_groups_lock = threading.Lock()
-GROUP_KINDS = ("user", "device")
+#: Re-entrant, because a mutation holds it across read-modify-WRITE and
+#: write_groups takes it again on the way out.
+_groups_lock = threading.RLock()
+#: THREE populations now, and the third is the only one that is not a display.
+#: `user` and `device` both hold DISPLAY rows — one arrived by asking, the
+#: other by taking a code — which is what "people" meant here while a refusal
+#: was per device and nothing issued a person anything. `identity` holds people
+#: proper: rows from identities.json, reached by their own URL from whatever
+#: machine they open it on.
+#:
+#: The obvious move was to repurpose `user` and it is the one to refuse. A
+#: group's kind is fixed at creation BECAUSE changing it silently empties it,
+#: and repurposing the kind does that to every existing group of it at once, on
+#: upgrade, with nothing to migrate into — the identities those laptops belong
+#: to do not exist. So the third kind is added beside them and nothing empties.
+GROUP_KINDS = ("device", "identity")
+#: Whose members are display rows, and whose are people. A route names groups
+#: without caring what is in them, so the answer depends on who is asking: a
+#: device must not be let through by a group of people that happens to sit on
+#: the same allow-list, and a person must not be let through by a group of
+#: screens.
+DISPLAY_GROUP_KINDS = ("device",)
+IDENTITY_GROUP_KINDS = ("identity",)
+#: Read-time only, and it never rewrites the file. `user` was a second kind of
+#: DISPLAY group — the machines that asked rather than the ones an admin
+#: invited — which is how a row ENROLLED and not which population it is in. It
+#: folds into `device` because both were always display rows, so no group loses
+#: a member and no admin loses a name.
+LEGACY_GROUP_KINDS = {"user": "device"}
 MAX_GROUPS = 200
 
 
@@ -3158,12 +4707,18 @@ def read_groups():
     for gid, rec in stored.items():
         if not isinstance(rec, dict):
             continue
-        kind = rec.get("kind")
+        kind = LEGACY_GROUP_KINDS.get(rec.get("kind"), rec.get("kind"))
         out[str(gid)] = {
             "name": str(rec.get("name") or "")[:60],
             "kind": kind if kind in GROUP_KINDS else "device",
-            "members": [str(m)[:32] for m in (rec.get("members") or [])][:MAX_ALLOW],
+            # NOT truncated on read. A system group legitimately holds the
+            # whole deployment, and cutting the stored list here would drop
+            # members on the next write of a document that was never too long.
+            "members": [str(m)[:32] for m in (rec.get("members") or [])],
             "created": rec.get("created"), "created_by": rec.get("created_by"),
+            # One per kind, made by the server and not deletable. See
+            # ensure_system_groups.
+            "system": bool(rec.get("system")),
         }
     return out
 
@@ -3176,79 +4731,185 @@ def write_groups(groups):
         os.replace(tmp, GROUPS_PATH)
 
 
-def group_kind_of(rec):
-    """Which population a display row belongs to.
+def enrolled_as(rec):
+    """HOW a display row got here: "asked" or "invited".
 
-    What an admin said it is, where they have said. Otherwise HOW IT ARRIVED,
-    which is recorded when the row is made and never changes: a code an admin
-    minted is a device, and a browser that opened the display page is a person
-    until somebody says otherwise.
+    It was `group_kind_of`, and it decided which of two display populations a
+    row belonged to — which was the wrong question. Both happen in a browser on
+    one machine, so both describe a device; what differed was only the door
+    they came through. A person is an identity that carries from a phone to a
+    laptop, and that is a different FILE rather than a different flavour of
+    this one.
 
-    It used to ask whether the row had ever pressed REQUEST ACCESS — a field
-    kept for deciding whether a grant expires, borrowed for this because it
-    was there. That is a different question: somebody looking at the request
-    form has not pressed it yet, and filing them under the code process until
-    they do put them on the one page that has nothing to do with them.
+    So this is an attribute now. It labels a row and nothing more: it does not
+    pick a group, it cannot keep two rows out of the same group, and there is
+    no control to override it. A screen an admin minted a code for is
+    "invited"; a browser that opened the display page and asked is "asked".
 
     Rows that predate `origin` are read from what only an admin's invitation
-    leaves behind: an approver's name on a row that never asked for anything.
-    A guess, but the same guess the row's own history supports, and it costs
-    no migration."""
-    k = str(rec.get("kind") or "")
-    if k in GROUP_KINDS:
-        return k
+    leaves behind — an approver's name on a row that never asked for anything.
+    A guess, and the same guess the row's own history supports."""
     origin = str(rec.get("origin") or "")
-    if origin in ("code", "page"):
-        return "device" if origin == "code" else "user"
-    if is_guest(rec):
-        return "user"
-    return "device" if rec.get("approved_by") else "user"
+    if origin:
+        return "invited" if origin == "code" else "asked"
+    return "invited" if (rec.get("approved_by") and not rec.get("requested_at")) \
+           else "asked"
 
 
 #: What the group each population lands in is called when this server has to
 #: make one. Named for what is in them rather than for how they arrived, since
 #: an admin will rename them long before they remember which is which.
-DEFAULT_GROUP_NAME = {"user": "People", "device": "Devices"}
+#: The auto-created group per kind. `user` is named for what it has always
+#: actually held — the personal machines that asked to be here — now that
+#: "People" means people. Renaming the constant does NOT rename a group that
+#: already exists: those are somebody's data, and an upgrade that renamed them
+#: would be editing a list an admin wrote. The kind's LABEL in the panel is
+#: what changes for them.
+DEFAULT_GROUP_NAME = {"device": "Devices", "identity": "Users"}
+#: Names these groups used to be created with. A system group still carrying
+#: one is corrected to the current name — it was the server's word, not an
+#: admin's, and leaving it means an install renamed by a day's timing. Only
+#: these exact strings; anything else is a name somebody chose and is theirs.
+SUPERSEDED_GROUP_NAMES = {"identity": ("People",)}
+
+
+def system_group(kind):
+    """The permanent group for a population, by id, or "" if it is somehow
+    missing. Never mints: ensure_system_groups does that, once, at startup."""
+    for gid, rec in sorted(read_groups().items()):
+        if rec["kind"] == kind and rec["system"]:
+            return gid
+    return ""
+
+
+def ensure_default_membership():
+    """Everything that works is in its default group, and put back if it is
+    not. That group is the root — a custom group is somewhere a row is ALSO
+    put, never somewhere it moves to — so a row missing from it is a row an
+    older rule took out, and it is the one membership nobody chose.
+
+    Rows that do not work yet are left alone: they join when they start
+    working, which is the same rule at the other end."""
+    displays, idents = read_displays(), read_identities()
+    groups = read_groups()
+    added = 0
+    for kind, ids in (("device", [d for d, r in displays.items()
+                                  if r.get("approved") and r.get("hash")]),
+                      ("identity", list(idents))):
+        gid = next((g for g, r in groups.items()
+                    if r["kind"] == kind and r["system"]), "")
+        if not gid:
+            continue
+        for i in ids:
+            if i not in groups[gid]["members"] and add_member(groups[gid], i):
+                added += 1
+    if added:
+        write_groups(groups)
+        print("put %d row(s) back in their default group" % added, flush=True)
+
+
+def migrate_unenrolled_invites():
+    """Rows invited before enrolment was what approved them.
+
+    They sit `approved` with no token and a code still waiting, which is a
+    screen nobody has switched on being counted as one that works. Corrected
+    once, here, because the alternative is every reader of `approved` carrying
+    an "…and does it have a token" clause forever.
+
+    Only that exact shape. A row with a token is working and is left alone; a
+    row with neither is one whose code ran out, and its approval is not this
+    function's business."""
+    displays = read_displays()
+    fixed = [d for d, r in displays.items()
+             if r.get("approved") and not r.get("hash") and r.get("code")]
+    for did in fixed:
+        displays[did]["approved"] = False
+        displays[did]["approved_at"] = 0
+    if fixed:
+        write_displays(displays)
+        print("corrected %d invited row(s) that were approved before enrolling: %s"
+              % (len(fixed), ", ".join(fixed)), flush=True)
+
+
+def ensure_system_groups(by="the server"):
+    """The two groups that always exist: one for displays, one for people.
+
+    They are made HERE, in code, rather than on first need, and they cannot be
+    deleted. A default that an admin can delete is not a default — everything
+    enrolling afterwards has nowhere to land, and the version of this that
+    minted on demand made that worse rather than better: it adopted any
+    existing group of the right kind before creating one, so deleting "Devices"
+    while a group called "East wing" existed sent every screen that arrived
+    afterwards silently into East wing.
+
+    An install that already has a default from that era keeps it — the group
+    the settings key names is adopted, with its name and its members, rather
+    than left beside a second one meaning the same thing. Only where there is
+    nothing to adopt is one created.
+    """
+    groups = read_groups()
+    cfg = display_settings()
+    changed = cfg_changed = False
+    for kind in GROUP_KINDS:
+        mine = [g for g, r in groups.items() if r["kind"] == kind and r["system"]]
+        if mine:
+            # There is one. Correct its name only where it still carries a
+            # default this server has since stopped using.
+            # ONCE, not at every startup. An admin may rename a default group
+            # — the name is theirs, only its membership is the server's — and
+            # "People" is a name somebody might legitimately choose. Running
+            # this on every start would take it back off them a restart later,
+            # which is the thing DEFAULT_GROUP_NAME's own comment says must not
+            # happen.
+            for g in (mine if not cfg.get("group_names_done") else []):
+                if groups[g]["name"] in SUPERSEDED_GROUP_NAMES.get(kind, ()):
+                    was = groups[g]["name"]
+                    groups[g]["name"] = DEFAULT_GROUP_NAME[kind]
+                    changed = True
+                    print("group %s renamed %s -> %s (it was still on the old "
+                          "default)" % (g, was, DEFAULT_GROUP_NAME[kind]),
+                          flush=True)
+            continue
+        gid = str(cfg.get(kind + "_group") or "")
+        # ONLY a group this server named. That settings key was written by an
+        # older default_group which fell back to "the first group of this kind"
+        # whenever it was blank — so on an upgraded install it routinely names
+        # a group an ADMIN created and named. Adopting that makes their group
+        # permanent, fills it with the whole estate, and leaves no way back:
+        # its members cannot be edited, it cannot be deleted, and no other
+        # group can be nominated. A name this server chose is the only safe
+        # evidence that the group was ever meant to be the default.
+        ours = (DEFAULT_GROUP_NAME[kind],) + SUPERSEDED_GROUP_NAMES.get(kind, ())
+        if gid in groups and groups[gid]["kind"] == kind \
+           and groups[gid]["name"] in ours:
+            groups[gid]["system"] = True          # adopt what is already there
+            print("group %s (%s) is now the permanent %s group"
+                  % (gid, groups[gid]["name"], kind), flush=True)
+        else:
+            gid = "g" + secrets.token_hex(4)
+            groups[gid] = {"name": DEFAULT_GROUP_NAME[kind], "kind": kind,
+                           "members": [], "created": int(time.time()),
+                           "created_by": by, "system": True}
+            print("group %s (%s) created as the permanent %s group"
+                  % (gid, DEFAULT_GROUP_NAME[kind], kind), flush=True)
+        changed = True
+        if cfg.get(kind + "_group") != gid:
+            cfg[kind + "_group"] = gid
+            cfg_changed = True
+    if not cfg.get("group_names_done"):
+        cfg["group_names_done"] = 1
+        cfg_changed = True
+    if changed:
+        write_groups(groups)
+    if cfg_changed:
+        write_display_settings(cfg)
 
 
 def default_group(kind, by="the server"):
-    """The group a row joins the moment it starts working, minting one if there
-    is not one yet.
-
-    A row that belongs to no group is a row an endpoint's allow-list cannot
-    name, so every grant has to be made device by device — which is the data
-    entry a group exists to remove. Landing somewhere by default means the
-    first grant to a whole population is one tick rather than twelve.
-
-    Stored by id, not "the first group of this kind": reordering a list, or
-    somebody adding a second group of people, must not silently change where
-    everything arriving tomorrow ends up."""
-    if kind not in GROUP_KINDS:
-        return ""
-    cfg = display_settings()
-    key = kind + "_group"
-    gid = str(cfg.get(key) or "")
-    groups = read_groups()
-    if gid and gid in groups and groups[gid]["kind"] == kind:
-        return gid
-    # Blank, or naming one that was deleted. Adopt an existing group of this
-    # kind before making a second one — an admin who has already made "Staff"
-    # and nothing else meant that one.
-    for g, rec in sorted(groups.items()):
-        if rec["kind"] == kind:
-            gid = g
-            break
-    else:
-        gid = "g" + secrets.token_hex(4)
-        groups[gid] = {"name": DEFAULT_GROUP_NAME[kind], "kind": kind,
-                       "members": [], "created": int(time.time()),
-                       "created_by": by}
-        write_groups(groups)
-        print("group %s (%s) created for arriving %ss"
-              % (gid, DEFAULT_GROUP_NAME[kind], kind), flush=True)
-    cfg[key] = gid
-    write_display_settings(cfg)
-    return gid
+    """Where a row lands when it starts working. One answer per kind, and it is
+    the permanent group — never "the first one of this kind I found", which is
+    how a screen ended up in a group somebody built for something else."""
+    return system_group(kind) if kind in GROUP_KINDS else ""
 
 
 def join_group(did, gid):
@@ -3257,12 +4918,92 @@ def join_group(did, gid):
     screen, and a failure to file it is not a reason to refuse the screen."""
     if not gid:
         return
-    groups = read_groups()
-    rec = groups.get(gid)
-    if not rec or did in rec["members"]:
+    with group_edit() as groups:
+      rec = groups.get(gid)
+      if not rec or did in rec["members"]:
         return
-    rec["members"] = (rec["members"] + [did])[:MAX_ALLOW]
-    write_groups(groups)
+      if not add_member(rec, did):
+        print("group %s is full (%d) — %s was NOT filed into it"
+              % (gid, MAX_ALLOW, did), flush=True)
+        return
+      write_groups(groups)
+
+
+def drop_from_groups(row_id):
+    """Take a deleted row out of every group. Returns the names it was in.
+
+    The opposite of join_group, and it was missing: deleting a display or a
+    person cleared it from every endpoint's allow-list and left it sitting in
+    its groups. That reads as harmless — admin_groups filters to rows that
+    still exist, so nothing phantom is ever shown — and it is not, for one
+    reason. A group's member list is capped at MAX_ALLOW and join_group appends
+    before it truncates, so a group filled with dead ids silently stops
+    accepting live ones: the new member is the element that gets cut. The
+    screen enrols, appears to work, and is simply not in the group."""
+    with group_edit() as groups:
+        was = []
+        for rec in groups.values():
+            if row_id in rec["members"]:
+                rec["members"] = [m for m in rec["members"] if m != row_id]
+                was.append(rec["name"])
+        if was:
+            write_groups(groups)
+        return was
+
+
+def _rows_readable(path, key):
+    """(readable, ids). The distinction read_displays cannot make: it answers
+    {} for a file with no rows AND for one that could not be read at all, which
+    is the right shape for a caller that wants to carry on and a catastrophe
+    for one that DELETES what is missing from it."""
+    try:
+        with open(path) as fh:
+            doc = json.load(fh)
+    except FileNotFoundError:
+        return True, set()                       # nothing here yet, genuinely
+    except (OSError, ValueError):
+        return False, set()                      # unreadable, malformed, denied
+    rows = doc.get(key)
+    if not isinstance(rows, dict):
+        return False, set()
+    return True, set(rows)
+
+
+def prune_group_members():
+    """Ids in groups that belong to no row at all — left by every delete that
+    happened before drop_from_groups existed.
+
+    GUARDED, because it deletes from one file based on the contents of two
+    others. A truncated displays.json, a hand edit with a trailing comma, or a
+    restart under an account that cannot read a 0600 file all look exactly like
+    "there are no displays" — and this would then strip every display from
+    every group. The system groups would be refilled at the next healthy
+    startup, which is what would hide it; a custom group has no repopulation
+    path and would be gone for good."""
+    ok_d, dids = _rows_readable(DISPLAYS_PATH, "displays")
+    ok_i, pids = _rows_readable(IDENTITIES_PATH, "identities")
+    if not (ok_d and ok_i):
+        print("not pruning groups: %s could not be read"
+              % (", ".join(n for n, ok in (("displays.json", ok_d),
+                                           ("identities.json", ok_i)) if not ok)),
+              flush=True)
+        return
+    live = dids | pids
+    groups = read_groups()
+    if not live and any(r["members"] for r in groups.values()):
+        # Every row gone and groups still full is a state to look at, not one
+        # to tidy up after.
+        print("not pruning groups: no rows exist at all, which is not a thing "
+              "to act on unprompted", flush=True)
+        return
+    gone = 0
+    for rec in groups.values():
+        keep = [m for m in rec["members"] if m in live]
+        gone += len(rec["members"]) - len(keep)
+        rec["members"] = keep
+    if gone:
+        write_groups(groups)
+        print("pruned %d member(s) of no row from groups" % gone, flush=True)
 
 
 def file_display(rec_or_id, kind=None, by="the server"):
@@ -3272,40 +5013,110 @@ def file_display(rec_or_id, kind=None, by="the server"):
     request approved — because those are the two ways in, and neither of them
     used to leave the row anywhere an allow-list could find it."""
     did = rec_or_id if isinstance(rec_or_id, str) else rec_or_id["id"]
-    if kind is None:
-        displays = read_displays()
-        rec = displays.get(did)
-        if not rec:
-            return
-        kind = group_kind_of(rec)
-    join_group(did, default_group(kind, by))
+    # One display population now, so there is nothing to work out: every screen
+    # and every laptop is a display. How it enrolled is still on the row, where
+    # it describes the row rather than deciding which list it may be put in.
+    join_group(did, default_group("device", by))
 
 
 def clean_members(ids, kind):
-    """Only rows that exist, and only of this group's own kind. A member that
-    is neither is dropped rather than refused — the panel sends the list it was
-    shown, and a display deleted in another tab between the two is not a
-    mistake worth making somebody retype a form over."""
-    displays = read_displays()
+    """Only rows that exist, out of this kind's own FILE. A member that is not
+    there is dropped rather than refused — the panel sends the list it was
+    shown, and a row deleted in another tab between the two is not a mistake
+    worth making somebody retype a form over.
+
+    There is no longer a test on how a display enrolled. That was the second
+    display kind, and enrolment is a property of a row rather than a
+    population: a group holding a wall screen and somebody's laptop is a
+    perfectly good group, and refusing to let one exist was the split saying
+    something about the rows that the rows already said themselves.
+
+    What remains is the one distinction that is real — WHICH FILE the ids come
+    out of. Displays and people are minted independently, so their ids are not
+    interchangeable, and that is why a kind still cannot change under an
+    existing group: it would not filter the members, it would fail to find any
+    of them."""
     seen, out = set(), []
+    if kind in IDENTITY_GROUP_KINDS:
+        known = read_identities()
+        for pid in (ids or []):
+            pid = str(pid)[:32]
+            if pid in known and pid not in seen:
+                seen.add(pid)
+                out.append(pid)
+        return out[:MAX_ALLOW]
+    displays = read_displays()
     for did in (ids or []):
         did = str(did)[:32]
-        rec = displays.get(did)
-        if rec and did not in seen and group_kind_of(rec) == kind:
+        if did in displays and did not in seen:
             seen.add(did)
             out.append(did)
     return out[:MAX_ALLOW]
 
 
-def group_members(gids, groups=None):
-    """Every display id named by these groups, flattened. Grants ADD UP: this
-    is unioned with an endpoint's individually named displays, and being in a
-    group never takes an individual grant away."""
+@contextlib.contextmanager
+def group_edit():
+    """Read, change, write — with nothing else writing in between.
+
+    Every mutator used to read the whole document, change one row and write the
+    whole document back, with the lock held only around the write itself. This
+    is a threading server and displays enrol on their own schedule, so those
+    interleave for real: the last writer wins wholesale and the loser's change
+    is gone with no error and no log line. The dangerous one is join_group,
+    which is fire-and-forget by design — a screen enrols, is told nothing went
+    wrong, and is not in its group."""
+    with _groups_lock:
+        groups = read_groups()
+        yield groups
+
+
+def group_cap(rec):
+    """How many members this group may hold, or None for no bound.
+
+    MAX_ALLOW bounds a HAND-WRITTEN list: an admin ticking devices into a
+    group, or naming them on an endpoint, and nobody does that five thousand
+    times. The default group is not that. It holds the whole deployment by
+    construction — everything that enrols is in it — so bounding it by a number
+    meant for a curated list makes the cap a limit on the installation, and
+    MAX_IDENTITIES is 500, exactly MAX_ALLOW, so the Users group could not hold
+    the maximum number of people even with nothing ever deleted.
+
+    What bounds a system group is what bounds the population: max_displays and
+    MAX_IDENTITIES, enforced where rows are created."""
+    return None if rec.get("system") else MAX_ALLOW
+
+
+def add_member(rec, row_id):
+    """Put a row in a group, and say whether it actually went in.
+
+    Every add used to be `(members + [id])[:MAX_ALLOW]` — append, then keep the
+    FIRST cap-many — so a full group discarded the element just added and every
+    caller reported success. A screen enrolled, got a token, showed as approved,
+    and was refused by every endpoint naming its group, with nothing anywhere
+    saying why. Truncation is not a way to report a failure."""
+    if row_id in rec["members"]:
+        return True
+    cap = group_cap(rec)
+    if cap is not None and len(rec["members"]) >= cap:
+        return False
+    rec["members"] = rec["members"] + [row_id]
+    return True
+
+
+def group_members(gids, groups=None, kinds=None):
+    """Every member id named by these groups, flattened. Grants ADD UP: this
+    is unioned with an endpoint's individually named rows, and being in a group
+    never takes an individual grant away.
+
+    `kinds` narrows it to one population. Without it a route naming both a
+    group of screens and a group of people would answer for either — and since
+    the two files mint ids independently, that is not merely wrong, it is
+    wrong in a way nobody would see until two ids happened to collide."""
     groups = read_groups() if groups is None else groups
     out = set()
     for gid in (gids or []):
         rec = groups.get(gid)
-        if rec:
+        if rec and (kinds is None or rec["kind"] in kinds):
             out.update(rec["members"])
     return out
 
@@ -3320,24 +5131,53 @@ def validate_group(obj, current):
         k = str(obj["kind"] or "").strip()
         if k not in GROUP_KINDS:
             return None, "a group is either people or devices"
-        rec["kind"] = k
+        # ONLY on a group being created. On an existing one the kind is fixed,
+        # and taking the requested one here made it decide which FILE the
+        # members below were resolved against — so a save that switched the
+        # kind had its members validated as the other population, and the
+        # handler then put the kind back and kept them. The group ended up
+        # holding ids it could never show, never grant and never be rid of,
+        # still counting against its cap.
+        if not current.get("kind"):
+            rec["kind"] = k
     if "members" in obj:
         rec["members"] = clean_members(obj["members"], rec["kind"])
+    # Never off the wire. Which group is permanent is this server's to decide,
+    # not something a panel can hand back having lost it in a round trip.
+    rec["system"] = bool(current.get("system"))
+    if rec["system"]:
+        # THE DEFAULT GROUP IS THE ROOT. Everything that enrols is in it and
+        # stays in it; a custom group is somewhere a row is ALSO put, never
+        # somewhere it moves to. So its membership is not a panel's to edit —
+        # enrolling adds, deleting the row removes, and nothing else touches
+        # it. A name is still the admin's.
+        rec["members"] = list(current.get("members") or [])
     return rec, None
 
 
 def admin_groups():
     groups = read_groups()
     displays = read_displays()
+    idents = read_identities()
     out = []
+    # The two the server keeps come first, always, whatever they are called.
+    # They are where everything lands, so they are the two an admin looks for —
+    # and sorting them in among the custom ones by name would move them every
+    # time somebody made a group starting with an earlier letter.
     for gid, rec in sorted(groups.items(),
-                           key=lambda kv: (kv[1]["kind"], kv[1]["name"].lower())):
-        # Named rows only. A member whose display was deleted is not shown as a
+                           key=lambda kv: (not kv[1]["system"], kv[1]["kind"],
+                                           kv[1]["name"].lower())):
+        # Named rows only. A member whose row was deleted is not shown as a
         # phantom — it is simply gone, the same way a deleted display leaves an
-        # endpoint's allow-list.
-        live = [m for m in rec["members"] if m in displays]
-        out.append(dict(rec, id=gid, members=live,
-                        labels=[display_label(displays[m]) for m in live]))
+        # endpoint's allow-list. Which FILE the name comes out of is the
+        # group's kind: a group of people is the one that is not displays.
+        if rec["kind"] in IDENTITY_GROUP_KINDS:
+            live = [m for m in rec["members"] if m in idents]
+            labels = [identity_label(idents[m]) for m in live]
+        else:
+            live = [m for m in rec["members"] if m in displays]
+            labels = [display_label(displays[m]) for m in live]
+        out.append(dict(rec, id=gid, members=live, labels=labels))
     return out
 
 
@@ -3503,6 +5343,183 @@ def hash_password(password, salt=None):
     salt = salt or secrets.token_bytes(16)
     dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, PBKDF2_ROUNDS)
     return salt.hex(), dk.hex()
+
+
+# ------------------------------------------------------------ wake matching
+# A PORT of the display's own matcher — index.html, Wake._tryWord and the two
+# helpers above it. It is here because a collision has to be refused where the
+# word is STORED and not only where it is typed: a panel that checked in the
+# browser would be a check an API call walks straight past, and the word that
+# got in that way is the one that cross-triggers.
+#
+# THE COUPLING IS REAL AND IS NAMED HERE. Waking happens in the browser and
+# always will — it has to be instant and it is what drops an utterance before
+# it is anybody's business — so these two implementations must agree, and
+# nothing in the language makes them. wake_conformance() below is the corpus
+# they are both held to; change one and run it.
+def wake_norm(s):
+    s = re.sub(r"[^a-z0-9\s]", " ", str(s or "").lower())
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def wake_skel(x):
+    """Consonant skeleton. Vowels are what a small model gets wrong, so two
+    spellings of one spoken word collapse together: berth and birth both go
+    to brth."""
+    x = re.sub(r"[^a-z]", "", x)
+    return x[:1] + re.sub(r"[aeiouy]", "", x[1:]) if x else x
+
+
+def wake_lev(a, b):
+    if a == b:
+        return 0
+    m, n = len(a), len(b)
+    if not m or not n:
+        return m or n
+    prev = list(range(n + 1))
+    for i in range(1, m + 1):
+        cur = [i] + [0] * n
+        for j in range(1, n + 1):
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1,
+                         prev[j - 1] + (0 if a[i - 1] == b[j - 1] else 1))
+        prev = cur
+    return prev[n]
+
+
+def wake_hit(spoken, word, strict=False):
+    """Would this utterance wake that word? The same rules the display uses."""
+    word = wake_norm(word)
+    toks = [t for t in wake_norm(spoken).split(" ") if t]
+    if not word or not toks:
+        return False
+    if len(word.split(" ")) > 1:                 # a multi-word alias
+        return word in " ".join(toks)
+    tol = 0 if strict else (2 if len(word) >= 7 else 1 if len(word) >= 4 else 0)
+    skel = wake_skel(word)
+    for k, t in enumerate(toks):
+        if t == word:
+            return True
+        # the transcriber often splits a compound: "goodbye" -> "good bye"
+        if k + 1 < len(toks) and t + toks[k + 1] == word:
+            return True
+        if strict:
+            continue
+        if t.startswith(word) and len(t) - len(word) <= 2:
+            return True
+        if tol and wake_lev(t, word) <= tol:
+            return True
+        if len(t) >= 3 and abs(len(t) - len(word)) <= 2 and wake_skel(t) == skel:
+            return True
+    return False
+
+
+def wake_collides(candidate, existing):
+    """Whether a proposed word would cross-trigger with one already in use, or
+    the other way round. BOTH directions, because waking is not symmetric: a
+    prefix rule fires for "orbital" said at "orbit" and not the reverse, and a
+    word nobody can use without also waking somebody else is exactly as broken
+    as one that steals theirs."""
+    a, b = wake_norm(candidate), wake_norm(existing)
+    if not a or not b:
+        return False
+    return a == b or wake_hit(a, b) or wake_hit(b, a)
+
+
+#: The corpus both matchers are held to. Captured by running this port and the
+#: shipping JS — index.html, Wake._tryWord — over the same cases and checking
+#: they agreed on every one; they did, 368 of 368. What is kept here is the
+#: subset that pins the behaviour worth not losing: near misses, a compound the
+#: transcriber split, a prefix, a consonant skeleton, and strict mode refusing
+#: all of it. Change either matcher and run wake_conformance().
+WAKE_CORPUS = (
+    ('orbit', 'orbit', False, True),
+    ('orbit', 'orbit', True, True),
+    ('orbital', 'orbit', False, True),
+    ('orbital', 'orbit', True, False),
+    ('orbits', 'orbit', False, True),
+    ('orbits', 'orbit', True, False),
+    ('orbet', 'orbit', False, True),
+    ('orbet', 'orbit', True, False),
+    ('beak on', 'beacon', False, False),
+    ('beak on', 'beacon', True, False),
+    ('bacon', 'beacon', False, True),
+    ('bacon', 'beacon', True, False),
+    ('good bye', 'goodbye', False, True),
+    ('good bye', 'goodbye', True, True),
+    ('commuter', 'computer', False, True),
+    ('commuter', 'computer', True, False),
+    ('hey computer', 'computer', False, True),
+    ('hey computer', 'computer', True, True),
+    ('sara', 'sarah', False, True),
+    ('sara', 'sarah', True, False),
+    ('saran wrap', 'sarah', False, True),
+    ('saran wrap', 'sarah', True, False),
+    ('adder', 'ada', False, False),
+    ('adder', 'ada', True, False),
+    ('aida', 'ada', False, True),
+    ('aida', 'ada', True, False),
+    ('haus', 'house', False, True),
+    ('haus', 'house', True, False),
+    ('resonate', 'resonance', False, True),
+    ('resonate', 'resonance', True, False),
+    ('turn off the couch lamps', 'house', False, False),
+    ('turn off the couch lamps', 'house', True, False),
+    ('', 'orbit', False, False),
+    ('', 'orbit', True, False),
+)
+
+
+def wake_conformance():
+    """Every case, or the ones that no longer hold. Returns [] when the port
+    still behaves as it did the day it was checked against the browser's."""
+    return [(sp, w, st, want, serve_got)
+            for sp, w, st, want in WAKE_CORPUS
+            for serve_got in (wake_hit(sp, w, st),) if serve_got != want]
+
+
+def read_panel_pin():
+    try:
+        with open(PANEL_PIN_PATH) as fh:
+            doc = json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    return doc if isinstance(doc, dict) else {}
+
+
+def has_panel_pin():
+    d = read_panel_pin()
+    return bool(d.get("hash") and d.get("salt"))
+
+
+def set_panel_pin(pin, minimum=None):
+    """The panel's PIN. Returns "" or the reason it was refused.
+
+    Stretched with the same PBKDF2 as an account password and held to the same
+    rules as a person's PIN — a run or a repeat is refused where it is chosen,
+    because rate limiting is what makes a short secret survivable and it should
+    not spend its budget on 111111.
+
+    Setting it does NOT end the sessions it protects, unlike a person's. Those
+    are one human's own browsers, and locking yourself out of the panel from
+    the panel is not a security property."""
+    bad = check_pin(pin, minimum)
+    if bad:
+        return bad
+    salt, dk = hash_password(str(pin))
+    tmp = PANEL_PIN_PATH + ".tmp"
+    with open(tmp, "w") as fh:
+        json.dump({"version": 1, "salt": salt, "hash": dk,
+                   "set": int(time.time())}, fh)
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, PANEL_PIN_PATH)
+    return ""
+
+
+def verify_panel_pin(pin):
+    d = read_panel_pin()
+    if not (d.get("salt") and d.get("hash")):
+        return False
+    return verify_password(str(pin or ""), d["salt"], d["hash"])
 
 
 def verify_password(password, salt_hex, hash_hex):
@@ -4121,10 +6138,22 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/displays", "/displays/approve", "/displays/rename",
                      "/displays/delete", "/displays/new", "/displays/reissue",
                      "/displays/decide", "/displays/settings", "/displays/kiosk",
-                     "/groups", "/groups/save", "/groups/delete")
+                     "/groups", "/groups/save", "/groups/delete", "/groups/sets",
+                     "/app/pin",
+                     "/log", "/alerts", "/alerts/ack",
+                     "/events", "/events/clear",
+                     "/identities/wake", "/identities/wake/check",
+                     "/identities", "/identities/new", "/identities/rename",
+                     "/identities/delete", "/identities/reissue",
+                     "/identities/pin")
 #: where an enrolment code is typed. On the display listeners only — it hands
 #: out a display's token, and the admin listener is not a display.
 ENROL_PREFIX = "/e/"
+#: where a person's minted URL is spent. On the display listeners only, and for
+#: the same reason /display/hello is: it hands out an identity's cookie, and
+#: the admin listener is not somewhere anybody stands and uses this. Everything
+#: an ADMIN does to an identity sits under /identities, well away from it.
+PERSON_PREFIX = "/p/"
 #: the other half of the embed API: reachable from the display listeners,
 #: because that is where a host server and a host browser can actually get to
 EMBED_ROUTES = ("/embed", "/embed/session")
@@ -4331,6 +6360,79 @@ class Handler(SimpleHTTPRequestHandler):
         morsel = jar.get(DISPLAY_COOKIE)
         return find_display(morsel.value) if morsel else None
 
+    def _identity(self):
+        """Which person is calling, or None. Same mechanism as `_display`, in a
+        cookie of its own — and a browser may hold both, because somebody can
+        have opened a display URL on the machine they later spend their own URL
+        on. Which of the two a request IS is decided by the URL, not by what is
+        in the jar: see the precedence at /display/hello."""
+        if self.admin_port:
+            # The panel's live preview is an admin looking at a display. It is
+            # not somebody's personal session and must never borrow one.
+            return None
+        raw = self.headers.get("Cookie")
+        if not raw:
+            return None
+        try:
+            jar = http.cookies.SimpleCookie(raw)
+        except http.cookies.CookieError:
+            return None
+        morsel = jar.get(IDENTITY_COOKIE)
+        return find_identity(morsel.value) if morsel else None
+
+    def _subject(self):
+        """Which caller this request IS: `(display, identity)`, never both.
+
+        The precedence `/display/hello` applies, in the other two places it
+        matters. An approved display is a device whatever else is in the cookie
+        jar — a kiosk stays a kiosk, which is the whole of why signing a person
+        into one is refused at the door. Below that line a person's cookie wins
+        over a token nobody approved, because such a token is somebody who once
+        opened this page rather than a screen anybody hung.
+
+        Returning a pair rather than a tagged object because both callers want
+        to pass them straight through to `subject_may`, and a wrapper would be
+        unpacked at every one of them."""
+        disp = self._display()
+        if disp and disp.get("approved"):
+            return disp, None
+        ident = self._identity()
+        if ident:
+            return None, ident
+        return disp, None
+
+    def _pin_pid(self):
+        """Which person this browser has UNLOCKED, or "". Distinct from
+        `_identity`, which says who it claims to be: the cookie is the claim,
+        this is the claim having been proved."""
+        raw = self.headers.get("Cookie")
+        if not raw or self.admin_port:
+            return ""
+        try:
+            jar = http.cookies.SimpleCookie(raw)
+        except http.cookies.CookieError:
+            return ""
+        m = jar.get(PIN_COOKIE)
+        return pin_session_pid(m.value) if m else ""
+
+    def _set_pin_cookie(self, token, hours):
+        bits = ["%s=%s" % (PIN_COOKIE, token), "Path=/", "HttpOnly",
+                "SameSite=Strict", "Max-Age=%d" % int(hours * 3600)]
+        if isinstance(self.connection, ssl.SSLSocket):
+            bits.insert(3, "Secure")
+        self.send_header("Set-Cookie", "; ".join(bits))
+
+    def _set_identity_cookie(self, token):
+        # Same reasoning as the display cookie: Secure only where the
+        # connection actually is, because bound to loopback this server is the
+        # whole product over plain HTTP and a cookie the browser refused to
+        # store would leave a personal install unable to hold an identity.
+        bits = ["%s=%s" % (IDENTITY_COOKIE, token), "Path=/", "HttpOnly",
+                "SameSite=Strict", "Max-Age=%d" % IDENTITY_MAX_AGE]
+        if isinstance(self.connection, ssl.SSLSocket):
+            bits.insert(3, "Secure")
+        self.send_header("Set-Cookie", "; ".join(bits))
+
     def _display_state(self, rec):
         """Everything the display page needs to know about itself, in one
         object: whether it may use anything, whether it may ask, what the form
@@ -4445,6 +6547,12 @@ class Handler(SimpleHTTPRequestHandler):
                                     # not. `/display/hello` is one letter and a
                                     # whole boundary away, and unaffected.
                                     or path.startswith("/displays/")
+                                    # Same belt-and-braces as /displays/ above,
+                                    # applied when the section was new rather
+                                    # than after one of its routes announced
+                                    # itself with a 401. `/p/` is one letter
+                                    # and a whole boundary away, and unaffected.
+                                    or path.startswith("/identities/")
                                     or path.startswith("/auth/")
                                     or path == "/docs"
                                     or path.startswith("/docs/")):
@@ -4457,6 +6565,16 @@ class Handler(SimpleHTTPRequestHandler):
             if not self._require():
                 return
             return self._json(200, {"docs": manual.doc_index()})
+        if path == "/docs/search":
+            # Ahead of the /docs/<id> lookup below, which would take "search"
+            # for a document id and answer 404. It costs one reserved id in a
+            # registry we own, and keeps the search under the path it searches
+            # rather than off in a name of its own.
+            if not self._require():
+                return
+            q = (parse_qs(urlparse(self.path).query).get("q") or [""])[0]
+            return self._json(200, {"q": q, "results": manual.search(q),
+                                    "min": manual.SEARCH_MIN})
         if path.startswith("/docs/"):
             if not self._require():
                 return
@@ -4542,6 +6660,47 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             return
 
+        if path.startswith(PERSON_PREFIX):
+            # A person's minted URL, being spent. A GET, because it is a link
+            # somebody was handed and clicked, and the redirect is the point
+            # rather than a courtesy: it takes the secret out of the address
+            # bar, so what is left in the history is a URL that no longer
+            # carries anything.
+            #
+            # No back-off here, unlike an enrolment code. That one is six typed
+            # characters and needs four rules around it to be safe; this is 32
+            # bytes from the system generator, and a rate limit on guessing it
+            # would be a control against nothing.
+            if self.admin_port:
+                return self._json(404, {"error": "not found"})
+            token = path[len(PERSON_PREFIX):]
+            here = self._display()
+            if here and here.get("approved"):
+                # A DEVICE IS A DEVICE. Signing a person into a screen several
+                # people share is the middle ground this phase deliberately
+                # leaves for later, and a kiosk is the case it is explicitly
+                # NOT for — so it is refused where it was attempted, visibly,
+                # rather than accepted here and quietly ignored on some later
+                # request. The URL is not spent by this: it still works
+                # everywhere it should.
+                self.send_response(303)
+                self.send_header("Location", "/?person=isdevice")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            rec = find_identity(token)
+            self.send_response(303)
+            self.send_header("Location", "/?person=" + ("ok" if rec else "bad"))
+            self.send_header("Content-Length", "0")
+            if rec:
+                note_identity_seen(rec["id"])
+                print("identity %s (%s) spent its URL from %s"
+                      % (rec["id"], identity_label(rec), self.address_string()),
+                      flush=True)
+                self._set_identity_cookie(token)
+            self.end_headers()
+            return
+
         if path == "/embed":
             token = (parse_qs(urlparse(self.path).query).get("t") or [""])[0]
             s = get_embed_session(token)
@@ -4570,7 +6729,11 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/auth/me":
             s = self._session()
             if not s:
-                return self._json(401, {"error": "not signed in"})
+                # WHICH DOOR. The gate cannot know whether to ask for a
+                # username and a password or for one number, and guessing wrong
+                # is a form somebody fills in twice.
+                return self._json(401, {"error": "not signed in",
+                                        "mode": AUTH_MODE})
             # The panel needs to tell "signed in as an admin" from "there is no
             # sign-in here" — they grant the same access and want different
             # words, and one of them has no account to offer or to sign out of.
@@ -4595,7 +6758,7 @@ class Handler(SimpleHTTPRequestHandler):
             # page that draws correctly and answers to nothing. The connection
             # half is not here at all, at any tier.
             doc = read_routes()
-            rows = public_routes(doc, self._display())
+            rows = public_routes(doc, *self._subject())
             if self.pinned_net:
                 # This port carries its own endpoints and no others. They are
                 # not filtered out of a list the browser then ignores — they
@@ -4666,7 +6829,8 @@ class Handler(SimpleHTTPRequestHandler):
                                     # base for the whole list stopped being
                                     # the truth the moment one could differ.
                                     "enrol_bases": {d["id"]: enrol_base_for(
-                                        read_displays().get(d["id"]), host, secure)
+                                        None, host, secure,
+                                        display_network(d["id"], doc)[0])
                                         for d in admin_displays()},
                                     "enrol_base": "%s://%s:%d/e/"
                                                   % ("https" if secure else "http", host,
@@ -4674,19 +6838,146 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/groups":
             if not self._require("admin"):
                 return
-            # The two populations a group can be drawn from, so the panel can
-            # offer the right one rather than every row it has ever seen.
-            displays = read_displays()
-            people, devices = [], []
-            for did, rec in sorted(displays.items(),
-                                   key=lambda kv: display_label(kv[1]).lower()):
-                row = {"id": did, "label": display_label(rec),
-                       "approved": bool(rec.get("approved"))}
-                (people if group_kind_of(rec) == "user" else devices).append(row)
+            # The two populations a group can be drawn from — the two FILES,
+            # which is the only split that is real. Every display is offered
+            # for a group of devices whatever way it enrolled; that fact is on
+            # the row and says nothing about which list it may be put in.
+            #
+            # WORKING ONLY, which is approval AND a token. Approval alone is
+            # not enough: an admin who names a screen and mints a code for it
+            # has approved a row that does not exist yet as a device, and it
+            # sits there `approved` with nothing behind it until somebody
+            # carries the code to the television. Offering it invites a grant
+            # to a screen that has never been switched on.
+            #
+            # The same pair the gate itself requires, and the same pair the
+            # register draws its three states from: INVITED is a code waiting,
+            # WAITING is a browser waiting on a decision, and neither is a
+            # thing a group should be able to name. Rows join a group when they
+            # start working; this is that rule at the other end of the list.
+            #
+            # …plus anything already IN a group, approved or not. Refusing a
+            # display deliberately leaves it in whatever groups it was in — a
+            # group is how you address a set of things, not a record of who is
+            # currently allowed — so a refused member that stopped being
+            # offered would be silently dropped by the next save of that group,
+            # which is that decision being undone by a rendering detail.
+            in_a_group = set()
+            for rec in read_groups().values():
+                if rec["kind"] in DISPLAY_GROUP_KINDS:
+                    in_a_group.update(rec["members"])
+            devices = [{"id": did, "label": display_label(rec),
+                        "approved": bool(rec.get("approved")),
+                        "arrived": enrolled_as(rec)}
+                       for did, rec in sorted(read_displays().items(),
+                                              key=lambda kv: display_label(kv[1]).lower())
+                       if (rec.get("approved") and rec.get("hash"))
+                       or did in in_a_group]
+            idents = [{"id": p["id"], "label": p["label"], "approved": True}
+                      for p in admin_identities()]
             return self._json(200, {"groups": admin_groups(),
-                                    "people": people, "devices": devices,
+                                    "devices": devices, "identities": idents,
                                     "kinds": list(GROUP_KINDS),
                                     "max": MAX_GROUPS})
+        if path == "/identities/wake/check":
+            # Answered as it is TYPED rather than on save. A word is refused
+            # for a reason somebody has to be able to act on — "too close to
+            # the house" tells them to pick another one; a form that only says
+            # so after they commit tells them they wasted their time.
+            if not self._require("admin"):
+                return
+            q = parse_qs(urlparse(self.path).query)
+            word = (q.get("w") or [""])[0]
+            skip = (q.get("id") or [""])[0]
+            bad = check_wake_word(word, skip_pid=skip)
+            return self._json(200, {"ok": not bad, "why": bad})
+        if path == "/log":
+            # Read through the panel rather than over SSH. Admin only, and a
+            # tail rather than the file: this is a window onto a running
+            # server, not a download.
+            if not self._require("admin"):
+                return
+            q = parse_qs(urlparse(self.path).query)
+            lines, cut, size = read_log_tail((q.get("q") or [""])[0][:80])
+            return self._json(200, {"lines": lines, "truncated": cut,
+                                    "bytes": size, "max": log_max_lines()})
+        if path == "/alerts":
+            if not self._require("admin"):
+                return
+            displays = read_displays()
+            rows = []
+            for a in sorted(read_alerts(), key=lambda a: (-a["last"],)):
+                spec = ALERT_KINDS.get(a["kind"]) or {}
+                rows.append(dict(a, words=spec.get("words", a["kind"]),
+                                 label=display_label(displays[a["did"]])
+                                 if a.get("did") in displays else ""))
+            return self._json(200, {
+                "alerts": rows,
+                # The two numbers a list like this is read against: what is
+                # still true, and what is over but unread.
+                "open": len([a for a in rows if not a["resolved"]]),
+                "unread": len([a for a in rows if a["resolved"] and not a["acked"]])})
+        if path == "/events":
+            # The health view's data: what each screen has been reporting, and
+            # the raw tail underneath it. Per device, because the useful
+            # question is which screen is failing rather than how many faults
+            # there were in total.
+            if not self._require("admin"):
+                return
+            rows = read_events()
+            displays = read_displays()
+            now_ = int(time.time())
+            health = []
+            for did in sorted(displays, key=lambda d: display_label(displays[d]).lower()):
+                h = display_health(did, rows, now_)
+                if h["n"]:
+                    health.append(dict(h, id=did, label=display_label(displays[did])))
+            return self._json(200, {
+                "health": health,
+                # Newest first, and bounded: this is a tail to read, not a
+                # dataset to page through.
+                "recent": [dict(r, label=display_label(displays[r["did"]])
+                                if r.get("did") in displays else "")
+                           for r in sorted(rows, key=lambda r: -r["at"])[:200]],
+                # The conversation record, newest first. Bounded the same way
+                # the events are: a tail to read, not a dataset to page.
+                "turns": [dict(r, label=display_label(displays[r["did"]])
+                               if r.get("did") in displays else "")
+                          for r in sorted(read_turns(), key=lambda r: -r["at"])[:120]],
+                "days": event_window_days(),
+                # The sink's settings ride with the data it reports on, so the
+                # panel fills that box from the same fetch rather than a second
+                # one that can disagree with it.
+                "settings": {k: panel_settings().get(k)
+                             for k in ("syslog_on", "syslog_host",
+                                       "syslog_port", "syslog_facility",
+                                       "hook_on", "hook_url",
+                                       "ha_on", "ha_url", "ha_service",
+                                       "ha_has_token",
+                                       "mail_on", "mail_host", "mail_port",
+                                       "mail_tls", "mail_user", "mail_from",
+                                       "mail_to", "mail_has_pass",
+                                       "digest_on", "digest_minutes",
+                                       "quiet_on", "quiet_from", "quiet_to")},
+                "limits": {"event_days": EVENT_DAYS_LIMITS},
+                "kinds": list(EVENT_KINDS), "total": len(rows)})
+        if path == "/identities":
+            if not self._require("admin"):
+                return
+            # The host the panel is being read on, for the same reason the
+            # enrolment base uses it: an admin is about to hand this address to
+            # somebody, so it has to be whole rather than a path they finish by
+            # guessing. A stored hostname would be this server's opinion of
+            # where it lives; the Host header is where somebody actually is.
+            host = re.sub(r":\d+$", "", self.headers.get("Host") or "") or LOOPBACK
+            secure = RUNNING.get("https_port")
+            return self._json(200, {"identities": admin_identities(),
+                                    "max": MAX_IDENTITIES,
+                                    "pin_min": display_settings()["pin_min"],
+                                    "base": "%s://%s:%d%s"
+                                            % ("https" if secure else "http", host,
+                                               secure or RUNNING.get("http_port") or 0,
+                                               PERSON_PREFIX)})
         if path == "/app":
             if not self._require("admin"):
                 return
@@ -4705,7 +6996,12 @@ class Handler(SimpleHTTPRequestHandler):
                                                "session_min": SESSION_MIN,
                                                "session_max": SESSION_MAX,
                                                "bind_modes": list(BIND_MODES),
-                                               "auth_modes": list(AUTH_MODES)}})
+                                               "auth_modes": list(AUTH_MODES),
+                                               # Whether the middle rung can be
+                                               # switched to at all. The panel
+                                               # says so rather than letting a
+                                               # save come back refused.
+                                               "has_panel_pin": has_panel_pin()}})
         if path == "/users":
             if not self._require("admin"):
                 return
@@ -4820,6 +7116,26 @@ class Handler(SimpleHTTPRequestHandler):
             obj = self._json_body()
             if obj is None:
                 return
+            if AUTH_MODE == "pin":
+                # One number, no account to name. The session is an admin
+                # because there is nobody else it could be: this rung exists
+                # for the deployment with one administrator, and a role system
+                # with one member is a role system pretending.
+                if not verify_panel_pin(obj.get("pin")):
+                    note_login_failure(ip)
+                    print("failed PIN sign-in from %s" % ip, flush=True)
+                    return self._json(401, {"error": "that is not the PIN"})
+                clear_login_failures(ip)
+                name, role = "(single PIN)", "admin"
+                token = new_session(name, role)
+                body = json.dumps({"ok": True, "user": name, "role": role}).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self._set_cookie(token)
+                self.end_headers()
+                print("signed in with the panel PIN", flush=True)
+                return self.wfile.write(body)
             name = str(obj.get("username") or "").strip()
             users = read_users()
             u = users.get(name)
@@ -5303,6 +7619,45 @@ class Handler(SimpleHTTPRequestHandler):
                     return self._json(401, {"error": "not signed in"})
                 return self._json(200, {"display": dict(PREVIEW_DISPLAY)})
             disp = self._display()
+            # A SESSION IS A USER OR A DEVICE, AND THE URL DECIDES WHICH.
+            # A declared name means this browser is standing somewhere, and an
+            # approved token means somebody hung it there — either way it is a
+            # device, whatever else is in the cookie jar. Below that line a
+            # person wins: a browser holding an unapproved token is somebody
+            # who once looked at this page, not a screen on a wall.
+            #
+            # It must not fall through to minting a display, or everybody who
+            # ever opened their own URL would leave a stray row in the panel
+            # for an admin to wonder about.
+            if not asked and not (disp and disp.get("approved")):
+                who = self._identity()
+                if who:
+                    note_identity_seen(who["id"])
+                    open_for = self._pin_pid()
+                    # THREE STATES, and the page needs all three. `none` is
+                    # somebody with no PIN, who keeps their preferences in this
+                    # browser exactly as the display always has. `locked` is a
+                    # PIN set and this browser not having entered it. `open` is
+                    # the durable tier, and the only one whose settings come
+                    # from the server rather than from localStorage.
+                    pin = ("open" if open_for == who["id"]
+                           else "locked" if who.get("pin_hash") else "none")
+                    low = display_settings()["pin_min"]
+                    out = {"id": who["id"], "name": who["name"], "pin": pin,
+                           "pin_min": low}
+                    if pin == "open":
+                        out["settings"] = identity_settings(who["id"])
+                        # A PIN that was legal when it was set and is below a
+                        # minimum raised since. Marked rather than revoked:
+                        # they still have to be able to unlock in order to
+                        # change it, and this is what says the change is owed.
+                        out["conform"] = identity_pin_state(who, low) == "short"
+                    elif pin == "locked":
+                        # Said plainly rather than left for a failed unlock to
+                        # reveal: somebody who is locked out should stop, not
+                        # keep typing into a box that looks like it is working.
+                        out["blocked"] = pin_blocked(who["id"])
+                    return self._json(200, {"person": out})
             if disp:
                 note_display_seen(disp["id"], asked=asked or None,
                                   hint=hint or None)
@@ -5382,6 +7737,21 @@ class Handler(SimpleHTTPRequestHandler):
             cfg["refresh_offset"] = refresh_offset(disp["id"],
                                                    cfg["refresh_stagger"])
             note_display_seen(disp["id"])
+            # Whatever it has been keeping since its last poll, filed against
+            # the TOKEN's display and nothing else — a screen naming which
+            # screen it is would be a screen able to file a fault against
+            # another one. After `disp` on purpose: an unapproved browser has
+            # no row to file against, and its poll returns above.
+            if obj.get("events") and take_events(disp["id"], obj.get("events")):
+                prune_events()
+                prune_turns()
+            # Judged here because this is the only clock a display keeps wound,
+            # and because liveness is read from this very request — the thing
+            # measured and the thing measuring arrive together.
+            evaluate_alerts()
+            # The poll is the only clock, so it is also what releases anything
+            # being held — by quiet hours, or by the digest timer.
+            flush_digest()
             try:
                 req = int(disp.get("reload_req") or 0)
             except (TypeError, ValueError):
@@ -5521,6 +7891,354 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"ok": True, "id": gid,
                                     "groups": admin_groups()})
 
+        if parsed.path == "/identities/new":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            token, rec = new_identity(obj.get("name"), s["user"])
+            if not token:                        # `rec` is the reason
+                return self._json(409, {"error": rec})
+            print("identity %s (%s) created by %s"
+                  % (rec["id"], identity_label(rec), s["user"]), flush=True)
+            # The URL is handed back ONCE and never again: what is stored is
+            # its hash, so a panel that has been closed cannot show it a second
+            # time. Same contract an embed key already has, and for the same
+            # reason — a secret a panel can re-display is a secret sitting in
+            # every browser that ever had that page open.
+            return self._json(200, {"ok": True, "token": token,
+                                    "identities": admin_identities()})
+
+        if parsed.path == "/person/unlock":
+            # A PIN, entered by the person it belongs to, at their own URL.
+            #
+            # HTTPS ONLY, and refused rather than degraded: a PIN typed over
+            # plain HTTP is a PIN somebody else has. The loopback case is the
+            # exception the whole server already makes — bound there it is the
+            # only listener and there is nothing between the two ends.
+            if self.admin_port:
+                return self._json(404, {"error": "not found"})
+            if not self._same_origin():
+                return self._json(403, {"error": "cross-origin request refused"})
+            if not isinstance(self.connection, ssl.SSLSocket) \
+               and exposed(read_app()):
+                return self._json(400, {"error": "a PIN needs a secure "
+                                                 "connection"})
+            who = self._identity()
+            if not who:
+                return self._json(401, {"error": "open your own URL first"})
+            obj = self._json_body()
+            if obj is None:
+                return
+            pid = who["id"]
+            if pin_blocked(pid):
+                # The number is not given: "wait 47 seconds" is a clock an
+                # attacker can read, and the person who typed it wrong twice
+                # needs to know to stop rather than to know when.
+                return self._json(429, {"error": "too many attempts — wait a "
+                                                 "little and try again"})
+            rec = read_identities()[pid]
+            if not rec.get("pin_hash"):
+                return self._json(400, {"error": "there is no PIN on this "
+                                                 "identity"})
+            if not verify_identity_pin(pid, obj.get("pin")):
+                print("PIN refused for %s from %s" % (pid, self.address_string()),
+                      flush=True)
+                return self._json(401, {"error": "that is not the PIN"})
+            hours = identity_hours(rec)
+            token = open_pin_session(pid, hours)
+            print("identity %s unlocked for %dh" % (pid, hours), flush=True)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self._set_pin_cookie(token, hours)
+            body = json.dumps({"ok": True, "hours": hours,
+                               "settings": identity_settings(pid)}).encode()
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if parsed.path == "/person/pin":
+            # A person choosing their OWN PIN. An admin never sets one — they
+            # clear it, and this is the other half of that: the only way a PIN
+            # comes to exist.
+            #
+            # Two doors, and which one applies is whether there is a PIN
+            # already. With none, the URL is the credential and holding it is
+            # the whole claim. With one, the OLD PIN authenticates the change —
+            # which means an unlocked session, because that is what having
+            # entered it looks like a moment later. Anything else would let
+            # somebody who found an open browser change the lock on it.
+            if self.admin_port:
+                return self._json(404, {"error": "not found"})
+            if not self._same_origin():
+                return self._json(403, {"error": "cross-origin request refused"})
+            if not isinstance(self.connection, ssl.SSLSocket) \
+               and exposed(read_app()):
+                return self._json(400, {"error": "a PIN needs a secure "
+                                                 "connection"})
+            who = self._identity()
+            if not who:
+                return self._json(401, {"error": "open your own URL first"})
+            obj = self._json_body()
+            if obj is None:
+                return
+            pid = who["id"]
+            has = bool(read_identities()[pid].get("pin_hash"))
+            if has and self._pin_pid() != pid:
+                return self._json(401, {"error": "enter your current PIN first"})
+            low = display_settings()["pin_min"]
+            bad = set_identity_pin(pid, obj.get("pin"), low)
+            if bad:
+                return self._json(400, {"error": bad})
+            # set_identity_pin ended every session this person had, including
+            # this browser's — a PIN changing hands closes the doors the old
+            # one opened. So a fresh one is issued here, or somebody would set
+            # a PIN and be asked for it in the same breath.
+            hours = identity_hours(read_identities()[pid])
+            token = open_pin_session(pid, hours)
+            print("identity %s %s its PIN" % (pid, "changed" if has else "set"),
+                  flush=True)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self._set_pin_cookie(token, hours)
+            body = json.dumps({"ok": True, "hours": hours,
+                               "settings": identity_settings(pid)}).encode()
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if parsed.path == "/person/settings":
+            # What a person keeps. Only for a browser that has UNLOCKED: the
+            # identity cookie says who this claims to be, and a claim is not
+            # what durable storage hangs off. Without a PIN the display keeps
+            # its own preferences in the browser, exactly as it always has.
+            if self.admin_port:
+                return self._json(404, {"error": "not found"})
+            if not self._same_origin():
+                return self._json(403, {"error": "cross-origin request refused"})
+            pid = self._pin_pid()
+            if not pid:
+                return self._json(401, {"error": "not unlocked"})
+            obj = self._json_body()
+            if obj is None:
+                return
+            saved = write_identity_settings(pid, obj.get("settings"))
+            if saved is None:
+                return self._json(404, {"error": "no such identity"})
+            return self._json(200, {"ok": True, "settings": saved})
+
+        if parsed.path == "/app/pin":
+            # The panel's own PIN, set from the panel. Admin only, and there is
+            # no "old PIN" gate on it: reaching this route already required a
+            # session, which in PIN mode means having just entered the current
+            # one. Asking for it again would be asking somebody to prove twice
+            # what one door already proved.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            bad = set_panel_pin(obj.get("pin"), display_settings()["pin_min"])
+            if bad:
+                return self._json(400, {"error": bad})
+            print("the panel PIN was set by %s" % s["user"], flush=True)
+            return self._json(200, {"ok": True, "has_pin": True})
+
+        if parsed.path == "/alerts/ack":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            ids = [str(i)[:16] for i in (obj.get("ids") or [])]
+            gone = ack_alerts(ids)
+            return self._json(200, {"ok": True, "closed": gone})
+
+        if parsed.path == "/events/clear":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            did = str(obj.get("id") or "")
+            rows = read_events()
+            # One screen's, or all of them. Deleting what a display reported is
+            # not deleting the display: a screen whose fault has been fixed
+            # should be able to start clean without being taken off the wall.
+            keep = [r for r in rows if r.get("did") != did] if did else []
+            write_events(keep)
+            # The conversation record goes with it. They are one window and one
+            # control; clearing what a screen reported while keeping what was
+            # said to it would be the surprising half of the pair.
+            turns = read_turns()
+            tkeep = [r for r in turns if r.get("did") != did] if did else []
+            write_turns(tkeep)
+            print("%d event(s) and %d turn(s) cleared by %s%s"
+                  % (len(rows) - len(keep), len(turns) - len(tkeep), s["user"],
+                     " for " + did if did else " (all)"), flush=True)
+            return self._json(200, {"ok": True,
+                                    "cleared": len(rows) - len(keep),
+                                    "turns": len(turns) - len(tkeep)})
+
+        if parsed.path == "/identities/wake":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            pid = str(obj.get("id") or "")
+            bad = set_identity_wake(pid, obj.get("word"))
+            if bad == "no such identity":
+                return self._json(404, {"error": bad})
+            if bad:
+                return self._json(409, {"error": bad})
+            print("identity %s wake word set to %r by %s"
+                  % (pid, str(obj.get("word") or "").strip(), s["user"]), flush=True)
+            return self._json(200, {"ok": True, "identities": admin_identities()})
+
+        if parsed.path == "/identities/pin":
+            # An admin CLEARS a PIN; they never choose one. With no email here
+            # this is the only recovery path, which is why it is in the first
+            # version — and clearing rather than setting is the difference
+            # between giving somebody their account back and knowing their PIN.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            pid = str(obj.get("id") or "")
+            if not clear_identity_pin(pid):
+                return self._json(404, {"error": "no such identity"})
+            print("identity %s had its PIN cleared by %s" % (pid, s["user"]),
+                  flush=True)
+            return self._json(200, {"ok": True, "identities": admin_identities()})
+
+        if parsed.path == "/identities/reissue":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            token = reissue_identity(str(obj.get("id") or ""))
+            if not token:
+                return self._json(404, {"error": "no such identity"})
+            print("identity %s reissued by %s" % (obj.get("id"), s["user"]),
+                  flush=True)
+            # The old URL stopped working the moment that returned. Anything
+            # holding a cookie from it keeps that cookie and it no longer
+            # resolves, which is the same revocation an embed key gets.
+            return self._json(200, {"ok": True, "token": token,
+                                    "identities": admin_identities()})
+
+        if parsed.path == "/identities/rename":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            rows = read_identities()
+            pid = str(obj.get("id") or "")
+            if pid not in rows:
+                return self._json(404, {"error": "no such identity"})
+            name = str(obj.get("name") or "").strip()[:60]
+            if not name:
+                return self._json(400, {"error": "a name is required"})
+            if any(p != pid and r["name"].lower() == name.lower()
+                   for p, r in rows.items()):
+                return self._json(409, {"error": "there is already an identity "
+                                                 "with that name"})
+            rows[pid]["name"] = name
+            write_identities(rows)
+            return self._json(200, {"ok": True, "identities": admin_identities()})
+
+        if parsed.path == "/identities/delete":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            rows = read_identities()
+            pid = str(obj.get("id") or "")
+            if pid not in rows:
+                return self._json(404, {"error": "no such identity"})
+            name = identity_label(rows.pop(pid))
+            write_identities(rows)
+            left = drop_from_groups(pid)
+            # An allow-list holding somebody who no longer exists is a
+            # permission nobody can see and nobody can withdraw. Cleared here,
+            # exactly as a deleted display's is.
+            doc = read_routes()
+            touched = [r for r, o in doc["routes"].items()
+                       if pid in (o.get("identities") or [])]
+            for r in touched:
+                doc["routes"][r]["identities"] = [
+                    p for p in doc["routes"][r]["identities"] if p != pid]
+            if touched:
+                write_routes(doc)
+            print("identity %s (%s) deleted by %s%s%s"
+                  % (pid, name, s["user"],
+                     " — removed from %d endpoint(s)" % len(touched)
+                     if touched else "",
+                     "; out of " + ", ".join(left) if left else ""), flush=True)
+            return self._json(200, {"ok": True, "identities": admin_identities()})
+
+        if parsed.path == "/groups/sets":
+            # Which CUSTOM groups a row is in, set from the row rather than
+            # from each group in turn. It replaces /groups/move, which took the
+            # row out of every other group first — a single-select control's
+            # rule, not the model's. A group is a grant and grants add up: a
+            # television is allowed to be physics department kit and a
+            # television at the same time.
+            #
+            # The default group is not in this list and cannot be. It is the
+            # root: enrolling put the row there and only deleting the row takes
+            # it out.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            did = str(obj.get("id") or "")
+            people = did in read_identities()
+            if not people and did not in read_displays():
+                return self._json(404, {"error": "no such row"})
+            kinds = IDENTITY_GROUP_KINDS if people else DISPLAY_GROUP_KINDS
+            want = {str(g)[:32] for g in (obj.get("groups") or [])}
+            groups = read_groups()
+            touched = []
+            for gid, rec in groups.items():
+                if rec["system"] or rec["kind"] not in kinds:
+                    continue                      # not this control's business
+                here, should = did in rec["members"], gid in want
+                if here == should:
+                    continue
+                if should:
+                    if not add_member(rec, did):
+                        return self._json(409, {"error": '"%s" is full — it '
+                                                         "holds %d already"
+                                                         % (rec["name"], MAX_ALLOW)})
+                else:
+                    rec["members"] = [m for m in rec["members"] if m != did]
+                touched.append(rec["name"])
+            if touched:
+                write_groups(groups)
+                print("row %s regrouped by %s: %s"
+                      % (did, s["user"], ", ".join(touched)), flush=True)
+            return self._json(200, {"ok": True, "groups": admin_groups()})
+
         if parsed.path == "/groups/delete":
             s = self._require("admin")
             if not s:
@@ -5532,6 +8250,13 @@ class Handler(SimpleHTTPRequestHandler):
             gid = str(obj.get("id") or "")
             if gid not in groups:
                 return self._json(404, {"error": "no such group"})
+            if groups[gid]["system"]:
+                # A default an admin can delete is not a default: everything
+                # enrolling afterwards would have nowhere to land.
+                return self._json(400, {"error": "this group cannot be deleted "
+                                                 "— it is where new %ss land"
+                                                 % ("person" if groups[gid]["kind"]
+                                                    == "identity" else "display")})
             name = groups.pop(gid)["name"]
             write_groups(groups)
             # An endpoint naming a group that no longer exists is a permission
@@ -5653,6 +8378,9 @@ class Handler(SimpleHTTPRequestHandler):
             # refusal leaves whatever group it was already in alone, because
             # groups are how you address a set of things and not a record of
             # who is currently allowed.
+            # Decided, so it is no longer asking. Resolved either way — the
+            # alert was "somebody is waiting", and they are not any more.
+            clear_alert("asked_in", did)
             if approve:
                 file_display(did, by=s["user"])
             # The allow-lists, whichever way it went: a refusal has to take
@@ -5688,12 +8416,44 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(400, {"error": "that network profile no "
                                                  "longer exists — reload the "
                                                  "panel to see the list"})
+            # The endpoints this screen is for — several, because a wall panel
+            # answering to a house name and a model is the ordinary case.
+            # Validated the same way and for the same reason as the profiles
+            # above: an id that no longer exists would be a grant that
+            # silently landed nowhere.
+            known = read_routes()["routes"]
+            eps = [str(r)[:16] for r in (obj.get("endpoints") or [])][:20]
+            if any(e not in known for e in eps):
+                return self._json(400, {"error": "one of those endpoints no "
+                                                 "longer exists — reload the "
+                                                 "panel to see the list"})
+            # A screen is loaded from ONE address, so a grant spanning two
+            # ports is a screen that cannot exist. Refused here, where the
+            # ticks are, rather than handed out as a code pointing at a port
+            # where half the grant is unreachable.
+            clash = display_network_clash(eps)
+            if clash:
+                return self._json(400, {"error": clash})
+
             rec, err = invite_display(str(obj.get("name") or "").strip()[:40],
                                       s["user"],
                                       {"kiosk": obj.get("kiosk"),
                                        "kiosk_profile": kp, "network": nw})
             if err:
                 return self._json(400, {"error": err})
+            # Granted through the same call the row's own ticks use, so there
+            # is one way a display comes to be on an allow-list rather than two
+            # that have to agree. That call treats its argument as the WHOLE
+            # truth and clears the row from every other list — which is right
+            # for ticks and would be wrong here, except that this row was made
+            # three lines ago and is on no list to be cleared from. Anything
+            # that ever calls this for an existing row has to pass the full
+            # set.
+            if eps:
+                set_display_endpoints(rec["id"], eps)
+                print("display %s invited with endpoint%s %s by %s"
+                      % (rec["id"], "" if len(eps) == 1 else "s",
+                         ", ".join(eps), s["user"]), flush=True)
             print("display %s (%s) invited by %s — code issued"
                   % (rec["id"], display_label(rec), s["user"]), flush=True)
             # …and how long it is worth anything for, so the panel can count
@@ -5758,6 +8518,14 @@ class Handler(SimpleHTTPRequestHandler):
                 # be called "kitchen" when the tablet moves to the hall.
                 displays[did]["name"] = name
             write_displays(displays)
+            # Approving a row that already holds a token is the moment it
+            # starts working, and everything that starts working is filed. The
+            # panel goes through /displays/decide, which does this — so without
+            # it here the invariant held only for the route the shipped UI
+            # happens to use, and a row approved through the API stayed outside
+            # its group until the next restart backfilled it.
+            if on and displays[did].get("hash"):
+                file_display(did, by=s["user"])
             print("display %s (%s) %s by %s"
                   % (did, display_label(displays[did]),
                      "approved" if on else "approval withdrawn", s["user"]),
@@ -5784,78 +8552,38 @@ class Handler(SimpleHTTPRequestHandler):
             fields, err = validate_kiosk(obj, displays[did], cfg["kiosks"])
             if err:
                 return self._json(400, {"error": err})
+            # WHICH ASSISTANTS, where they are named. It is a different
+            # document — the allow-list lives on the endpoint, not on the
+            # display — but it is one gesture for whoever pressed SAVE, and a
+            # second button for it would be two ways to describe one screen.
+            # Absent means "not being set", which is not the same as an empty
+            # list meaning "none of them": a caller that does not carry the
+            # field must not clear a grant it never showed.
+            if isinstance(obj.get("endpoints"), list):
+                known = read_routes()["routes"]
+                eps = [str(r)[:16] for r in obj["endpoints"]][:20]
+                if any(e not in known for e in eps):
+                    return self._json(400, {"error": "one of those endpoints "
+                                                     "no longer exists — "
+                                                     "reload the panel"})
+            # A screen is loaded from ONE address, so a grant spanning two
+            # ports is a screen that cannot exist. Refused here, where the
+            # ticks are, rather than handed out as a code pointing at a port
+            # where half the grant is unreachable.
+            clash = display_network_clash(eps)
+            if clash:
+                return self._json(400, {"error": clash})
+                set_display_endpoints(did, eps)
             displays[did].update(fields)
             write_displays(displays)
             return self._json(200, {"ok": True, "id": did,
                                     "displays": admin_displays()})
 
-        if parsed.path == "/displays/kind":
-            s = self._require("admin")
-            if not s:
-                return
-            obj = self._json_body()
-            if obj is None:
-                return
-            did = str(obj.get("id") or "")
-            displays = read_displays()
-            if did not in displays:
-                return self._json(404, {"error": "no such display"})
-            want = str(obj.get("kind") or "")
-            if want and want not in GROUP_KINDS:
-                return self._json(400, {"error": "kind must be one of: "
-                                                 + ", ".join(GROUP_KINDS)})
-            was = group_kind_of(displays[did])
-            displays[did]["kind"] = want
-            now = group_kind_of(displays[did])
-            write_displays(displays)
-            # A group is drawn from one population, and clean_members drops a
-            # member of the wrong one — silently, at the next save of that
-            # group. Done here instead, and counted, so moving a row between
-            # populations says what it cost rather than emptying a group
-            # somebody built weeks ago with nothing on screen about it.
-            dropped = []
-            if now != was:
-                groups = read_groups()
-                touched = False
-                for gid, g in groups.items():
-                    if g["kind"] != now and did in (g.get("members") or []):
-                        g["members"] = [m for m in g["members"] if m != did]
-                        dropped.append(g["name"])
-                        touched = True
-                if touched:
-                    write_groups(groups)
-            # …and into one of the right population, so changing what a row IS
-            # never leaves it belonging to nothing. The panel names which,
-            # where an admin has more than one to choose from; where it names
-            # none, or names one that has gone, the population's own group
-            # takes it — minted here if this is the first of its kind.
-            joined = ""
-            if now != was or obj.get("group"):
-                want_gid = str(obj.get("group") or "")
-                groups = read_groups()
-                if want_gid not in groups or groups[want_gid]["kind"] != now:
-                    want_gid = default_group(now, s["user"])
-                # Out of every other group of this kind first: "which group is
-                # it in" has one answer on this control, and a row silently in
-                # two of them is a grant somebody cannot account for.
-                groups = read_groups()
-                touched = False
-                for gid, g in groups.items():
-                    if gid != want_gid and did in (g.get("members") or []):
-                        g["members"] = [m for m in g["members"] if m != did]
-                        touched = True
-                if touched:
-                    write_groups(groups)
-                join_group(did, want_gid)
-                joined = (read_groups().get(want_gid) or {}).get("name", "")
-            print("display %s kind=%s by %s%s%s"
-                  % (did, want or "(inferred: %s)" % now, s["user"],
-                     "; dropped from " + ", ".join(dropped) if dropped else "",
-                     "; joined " + joined if joined else ""),
-                  flush=True)
-            return self._json(200, {"ok": True, "displays": admin_displays(),
-                                    "dropped": dropped, "joined": joined,
-                                    "groups": admin_groups()})
+        # /displays/kind is GONE. It moved a display row between two display
+        # populations, and there is one — how a row enrolled describes the row
+        # rather than deciding which list it may be put in. The panel control
+        # went with it; a control whose only two answers are the same answer
+        # is a control wired to nothing.
 
         if parsed.path == "/displays/reload":
             # Ask a screen to reload itself, without walking to it. What this
@@ -5911,6 +8639,7 @@ class Handler(SimpleHTTPRequestHandler):
             name = display_label(displays.pop(did))
             write_displays(displays)
             _display_refusals.pop(did, None)
+            left = drop_from_groups(did)
             # An allow-list holding the id of a display that no longer exists
             # is a permission nobody can see and nobody can withdraw. Cleared
             # here, for the same reason a deleted endpoint's fallthrough is.
@@ -5922,10 +8651,11 @@ class Handler(SimpleHTTPRequestHandler):
                                                 if d != did]
             if touched:
                 write_routes(doc)
-            print("display %s (%s) deleted by %s%s"
+            print("display %s (%s) deleted by %s%s%s"
                   % (did, name, s["user"],
                      " — removed from %d endpoint(s)" % len(touched)
-                     if touched else ""), flush=True)
+                     if touched else "",
+                     "; out of " + ", ".join(left) if left else ""), flush=True)
             # Its token still exists in a cookie jar somewhere and now matches
             # nothing, so the device it belonged to is back to being a browser
             # that has never been here. That is the revocation.
@@ -5985,11 +8715,13 @@ class Handler(SimpleHTTPRequestHandler):
             # one we shipped. An embed is not a display and does not inherit
             # one: its rights come from its key, so it reaches the endpoints
             # anything can reach and no others.
-            disp = None if emb else self._display()
-            if not (self.pinned_open or display_may(disp, cfg)):
+            disp, ident = (None, None) if emb else self._subject()
+            if not (self.pinned_open or subject_may(cfg, disp, ident)):
                 note_display_refused(disp, cfg["name"])
                 print("refused: %s may not use %s (%s)"
-                      % (disp["id"] if disp else "a display with no token",
+                      % (disp["id"] if disp else
+                         ("identity " + ident["id"] if ident else
+                          "a caller with no token"),
                          cfg["name"], rid), flush=True)
                 # The DISPLAY says nothing about this: that utterance was
                 # addressed to a different device, and one nobody was talking
@@ -6017,6 +8749,17 @@ class Handler(SimpleHTTPRequestHandler):
             except Exception as exc:                       # noqa: BLE001
                 print("ask failed (%s %s): %s"
                       % (rid, route_dest(cfg), exc), flush=True)
+                # The leg only this side can see. A display is told something
+                # went wrong and deliberately not what; the panel is where the
+                # verbatim error belongs, keyed to the screen that hit it.
+                failed_ms = int((time.time() - t0) * 1000)
+                note_event("backend_error", did=disp["id"] if disp else "",
+                           level="error", route=cfg.get("name") or rid,
+                           detail=str(exc)[:300], ms=failed_ms)
+                bad_trail = obj.get("trail") if isinstance(obj.get("trail"), dict) else None
+                note_turn(disp["id"] if disp else "", cfg.get("name") or rid,
+                          (bad_trail or {}).get("heard"), text, "", bad_trail,
+                          failed_ms, error=str(exc))
                 # The message names the route rather than the adapter. A
                 # display says this out loud, and "openai returned 401" tells
                 # the person standing in front of it nothing they can act on
@@ -6031,6 +8774,22 @@ class Handler(SimpleHTTPRequestHandler):
             # One hop, and never the target's own fallthrough: a chain of them
             # is a question travelling somewhere nobody chose, at a cost per
             # link, and two routes pointing at each other would do it for ever.
+            took_ms = int((time.time() - t0) * 1000)
+            # PER ROUTE, because one number across both never fires or never
+            # stops: a house intent answers in about a tenth of a second and a
+            # hosted model takes seconds. The route's own timeout is the only
+            # number here that already means "longer than this is wrong", so
+            # half of it is the line.
+            if took_ms >= max(2000, int(cfg.get("timeout") or 120) * 500):
+                note_event("backend_slow", did=disp["id"] if disp else "",
+                           level="warn", route=cfg.get("name") or rid,
+                           ms=took_ms, detail="%dms" % took_ms)
+            # A house being asked for things it cannot do, which is a fact
+            # about how people are speaking to it rather than a fault.
+            if out.get("code") == "no_intent_match":
+                note_event("no_intent", did=disp["id"] if disp else "",
+                           level="info", route=cfg.get("name") or rid,
+                           detail=text[:120])
             fell_to = ""
             if out.get("code") == "no_intent_match" and cfg.get("fallthrough"):
                 ft = cfg["fallthrough"]
@@ -6066,7 +8825,15 @@ class Handler(SimpleHTTPRequestHandler):
 
             ms = int((time.time() - t0) * 1000)
             reply = out.get("reply") or ""
+            # The trail comes from the display, which is the only place it ever
+            # existed: after the gate the wake word is stripped and the near
+            # miss is gone. A turn typed into the composer carries none, and
+            # gets none invented for it.
+            trail = obj.get("trail") if isinstance(obj.get("trail"), dict) else None
             if not reply:
+                note_turn(disp["id"] if disp else "", cfg.get("name") or rid,
+                          (trail or {}).get("heard"), text, "", trail, ms,
+                          error="that route returned nothing")
                 return self._json(502, dict(about, ms=ms,
                                             error="that route returned nothing"))
             print("ask ok (%s %s) %dms%s"
@@ -6077,6 +8844,9 @@ class Handler(SimpleHTTPRequestHandler):
             # window, and the server has no idea a conversation is in progress
             # between two requests. Nothing here ends one — see the note in
             # ask_homeassistant about the flag that used to.
+            note_turn(disp["id"] if disp else "", cfg.get("name") or rid,
+                      (trail or {}).get("heard"), text, reply, trail, ms,
+                      fell_to=fell_to)
             return self._json(200, dict(about, reply=reply, ms=ms,
                                         conversation_id=out.get("conversation_id") or ""))
 
@@ -6224,6 +8994,18 @@ def main():
     ensure_default_kiosk()
     migrate_models()
     migrate_networks()
+    # The two groups that always exist. Made at startup rather than on first
+    # need, so they are there before anything can enrol into them and there is
+    # no moment where a population has nowhere to land.
+    ensure_system_groups()
+    migrate_unenrolled_invites()
+    prune_group_members()
+    ensure_default_membership()
+    # Anything past the window, gone — read at startup as well as after a poll,
+    # so a server that has been down for a fortnight does not come back holding
+    # a fortnight of what was said to a screen.
+    prune_events()
+    prune_turns()
     app = read_app()
     # Environment still wins, so a one-off run on a different port needs no
     # edit to the stored configuration. Setting PORT alone moves all three,
@@ -6291,7 +9073,9 @@ def main():
     print("reachable at %s · %s" % (
         "this machine only (loopback)" if personal else
         "every interface on this machine" if host == "0.0.0.0" else host,
-        "no sign-in" if AUTH_MODE == "none" else "accounts and roles"), flush=True)
+        "no sign-in" if AUTH_MODE == "none"
+        else "one PIN, no accounts" if AUTH_MODE == "pin"
+        else "accounts and roles"), flush=True)
 
     if have_tls:
         # Pinned to the default profile, so an endpoint moved onto a port of
@@ -6401,6 +9185,8 @@ def main():
     # ceremony it forces is pure obstruction — which is exactly the install
     # this setting exists to make possible.
     if have_tls or personal:
+        # Only the accounts rung mints one. In PIN mode the key was cut before
+        # the mode could be saved, and with nothing at the door there is no key.
         first_pw = ensure_first_admin() if AUTH_MODE == "accounts" else None
         if have_tls:
             start_tls(adm_port, cert, key, admin_port=True, host=host)

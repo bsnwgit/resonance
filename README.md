@@ -182,13 +182,13 @@ The microphone requires a secure origin, so generate a certificate first:
 The first two are a **network profile** — a port under a name, carrying one
 endpoint or several — and an upgrade turns the ports an install already had
 into one called *Display*. The third is the admin portal's own, and it is the
-only port configured under ADMIN SETTINGS: it is the way back in when what is
+only port configured under ADMIN: it is the way back in when what is
 in a profile is wrong.
 
 The certificate is self-signed, so expect one browser warning.
 
 **On your own machine, none of that applies.** Set *reachable at* to **this
-machine only** in ADMIN SETTINGS and restart, and there is no certificate to
+machine only** in ADMIN and restart, and there is no certificate to
 make, no browser warning, and no first-run password to fish out of a log:
 
 | listener | purpose |
@@ -355,7 +355,7 @@ raise a permission prompt nobody asked for.
 
 ### Admin settings
 
-**ADMIN SETTINGS**, at the foot of the panel, covers how the server is wired
+**ADMIN**, at the foot of the panel, covers how the server is wired
 rather than how the interface looks: where it can be reached from, what it
 takes to sign in, how long an idle sign-in survives, and the admin portal's
 own port. It is stored in `app.json`. What the app answers on is not here — a
@@ -1028,6 +1028,19 @@ still balanced, the JavaScript still parsed, and CSS has no error to report:
 it simply continues to the next block. The check that catches it is that no
 comma-terminated selector line may be followed by a comment or a blank line.
 
+**A script that does not parse is a page where nothing runs**, and it does not
+present as a syntax error. It presents as several unrelated pieces of the
+interface being absent at once — here the visualiser, the enrolment box, the
+request form and the PIN box, leaving the static markup alone on screen — which
+reads as four faults rather than one, and sends you looking at four features
+instead of at the parser. The cause was a statement added under a brace-less
+`if`, which pushed it out of the body and orphaned the `else` below it. With no
+build step, nothing between saving the file and a browser opening it ever reads
+it, so this shipped and deployed clean; `check.sh` is the answer, and it must
+end the script where a browser does — at the FIRST `</script`, in a string or a
+comment or anywhere else — because reading to the last one hands the parser a
+file no browser will run.
+
 ## Contributing
 
 Branch off `main`, deploy and verify live, then open a PR — see
@@ -1085,10 +1098,10 @@ two people in one room with three listening microphones between them.
 | 2 | ~~**Displays, and binding a route to one**~~ **— done** | only the tablets you approved can actuate the house, whatever anyone's browser is set to | 1b | none |
 | 3 | ~~**What a wall display looks like**~~ **— done** | voice only and speak only, an appearance per place, and a screensaver that is still the product | 2 | none |
 | 4 | ~~**Staying up unattended**~~ **— done** | a tablet nobody touches for a year is still working | 3 | none · closed 2026-08-17 · alert and drop test in 8 |
-| 5 | **Identity and the PIN** | a person, as distinct from a place | 2 | **1** · whether an identity carries its own Home Assistant token |
-| 6 | **Personal wake words** | one person addressing a tablet stops triggering another person's device | 5 | none |
+| 5 | **Identity and the PIN** | a person, as distinct from a place | 2 | none · designed 2026-08-17 · mixed sign-in deferred out of it |
+| 6 | ~~**Personal wake words**~~ **— done** | one person addressing a tablet stops triggering another person's device | 5 | none · built 2026-08-18 |
 | 7 | **Memory** | conversations that mean something across sessions | 5 | **1** · what the retained unit is — deliberately left to experience |
-| 8 | **Diagnostics and alerting** | a failing screen comes and finds you, rather than the other way round | 2 | **1** · the retention default · also carries 4's network-drop test |
+| 8 | **Diagnostics and alerting** — *building* | a failing screen comes and finds you, rather than the other way round | 2 | none · window set to 7 days · still owes 4's network-drop test |
 
 The last column counts decisions that need **you**, not implementation choices
 made while building and shown afterwards. A phase reading *none* is ready to
@@ -1106,9 +1119,35 @@ beside it — decided 2026-08-16. Everything four is for works today; a display
 the server cannot reach at all is visible in the panel as one that stopped
 checking in, and what it does not yet do is come and find you.
 
-The three remaining decisions are each answerable when their own phase comes
+The two remaining decisions are each answerable when their own phase comes
 up, and one of them is deliberately waiting on experience rather than on a
 decision.
+
+**Six is built** — 2026-08-18. A person answers to a name they chose, and
+uniqueness is decided by the matcher that does the waking rather than by
+comparing letters, enforced on the server because a check in a browser is one
+an API call walks past. The port and the shipping JS were run over the same 368
+cases and agreed on all of them; a corpus of 34 is kept in `serve.py`, because
+that coupling is real and nothing in either language enforces it.
+
+**Eight is most of the way there** — 2026-08-18. Its open decision is taken:
+the retention window is **seven days**, short on purpose and admin-configurable,
+because retention is the only control over a store that holds what was said to
+a display. Built: the event store and what a screen reports, the conversation
+record and the decision trail that makes a voice fault answerable, the health
+view, the four-state alert model, and four sinks — syslog, a webhook, Home
+Assistant on its own connection, and email — with quiet hours and a digest.
+**What it still owes is the network-drop test**, which needs real hardware and
+a pulled cable, and it is the reason this phase is not closed.
+
+**Five is designed and its decision is closed** — 2026-08-17. A session is a
+user or a device and the URL decides which; guest, user without a PIN and user
+with one are three strengths of retention rather than three strengths of
+reach; identities and their URLs are created in the panel and nowhere else;
+and Home Assistant keeps one service token whoever is speaking. What came out
+of designing it is a piece deliberately left for afterwards: signing a user
+into a device several people share but which is not a kiosk. That waits for
+one-for-one to be working.
 
 **One is two deliveries rather than one.** Routes stand up on their own — demo,
 a local model and a hosted one are three destinations reachable by three
@@ -1319,9 +1358,22 @@ it. Each entry below carries its own panel scope.
 
   **Give it a non-admin HA user of its own.** A long-lived token carries that
   user's permissions and never expires, and every action appears in the
-  logbook as that user regardless of who spoke. Once identities exist, an
-  identity can carry its own token, which is the only way to make HA aware of
-  who actually asked.
+  logbook as that user regardless of who spoke.
+
+  **Not taken: an identity carrying its own HA token** — decided 2026-08-17,
+  and it closes phase five's open decision. Per-identity tokens are the only
+  way to make HA aware of who actually asked, and the price is switching tokens
+  between people while the house is being spoken to — one person's request in
+  flight while another arrives — which is a worse failure than the attribution
+  it buys. One service account, always, whoever is standing there. So HA is a
+  property of the endpoint, fixed when an admin configures it, and nothing
+  about it becomes person-scoped when identities land.
+
+  The consequence, stated here so it is not discovered later: the logbook shows
+  this server's HA user for every action, forever, and the house can never tell
+  who asked. Attribution stays on this side, where the transcript already
+  credits each line to whoever gave it and the durable version of that is the
+  conversation record in phase eight.
 
   **Timeout belongs to the route, and tracks the agent rather than "HA".**
   The two agents are orders of magnitude apart: the built-in intent engine
@@ -1785,15 +1837,61 @@ it. Each entry below carries its own panel scope.
   Maintenance section holds the four numbers, all of which are one server's
   business rather than one screen's.
 
-- **Identity, in three strengths.** How a device or person identifies itself
-  decides what may be kept, because the strength of the claim and the
-  durability of the memory should move together.
+- **Identity, in three strengths.** How somebody arrives decides what may be
+  kept, because the strength of the claim and the durability of the memory
+  should move together. Settled in person terms 2026-08-17:
 
-  | identity | what proves it | memory |
+  | | how it arrives | retention |
   | --- | --- | --- |
-  | named, no PIN | nothing, it is a place | none |
-  | token | possession of the browser | device memory, lost when browser data is cleared |
-  | named + PIN | a credential | server memory, longer retention, follows the person |
+  | **guest** | the bare address with no user in it — the default interface, usable, where security is not set to force the request form | none at all: no conversation, no data |
+  | **user, no PIN** | their own URL | limited, and short-lived |
+  | **user with PIN** | their own URL, PIN entered | longer, held server-side, and it follows the person |
+
+  **A session is a user or a device, never both, and the URL decides which.**
+  A device added as a device operates as a device — a kiosk, a wall tablet —
+  its URL is the place it stands in, and no person exists inside that session.
+  A user's URL travels: any browser on any machine, and that session is the
+  user, carrying the user's grants. What the machine underneath was approved
+  for contributes nothing to it, and a person signed in is not a device that
+  has been decorated.
+
+  So the gate stops being a question about displays. `display_may()` becomes
+  *may this subject reach this endpoint*, where a subject is one or the other,
+  and grants add up the existing way within a kind: named directly, or named
+  by a group it is in. The same rule has to reach the client, because the
+  display-side drop is what keeps an utterance from being anybody's business
+  in the first place.
+
+  **People and places are separate namespaces**, and neither can be spelled in
+  the other's notation: a place is `?display=<name>`, a person is a minted path,
+  and there is no parameter that could carry either. One that could would be
+  the list nobody could describe that groups already refused to be, and it
+  would hang everything a place owns — appearance, kiosk mode, route bindings,
+  session length — off a person, who has no place to hang any of it on.
+
+  **A device is a device, so spending a person's URL on an approved display is
+  refused** — at the moment it is attempted, with the screen saying so, rather
+  than accepted and then quietly ignored on some later request. A kiosk is
+  precisely the case signing a person in is not for, and until the middle
+  ground below exists the honest answer is no. The URL is not spent by the
+  refusal and still works everywhere it should.
+
+  Below that line a person wins: a browser holding a token nobody approved is
+  somebody who once looked at this page, not a screen on a wall. The precedence
+  in full — a declared place name, then an approved display, then an identity,
+  then an unapproved token, then a guest — is what *the URL decides which*
+  turns into where a request is actually answered.
+
+  **The user URL carries a minted, unguessable component** rather than being a
+  readable name. A name is guessable, and a guessable URL that grants reach is
+  a password written on a wall — the same fault that made display tokens
+  necessary, arriving through the front door. The first visit exchanges it for
+  a token the way a display does, so the secret leaves the address bar after
+  one use and revocation has a pattern to copy.
+
+  **Everything is created in the panel.** There is no self-registration: no
+  email, no verification and nothing here to vouch for a name, so anybody who
+  could mint their own identity could mint somebody else's.
 
   A **token** is issued by the server on first visit: random, unguessable, in
   an `HttpOnly` cookie so page script cannot read it and it rides along with
@@ -1807,15 +1905,17 @@ it. Each entry below carries its own panel scope.
   wipe and a token does not. On its own it is a bearer identifier with no
   secret: names are guessable, so a name alone can never unlock memory.
 
-  A **PIN** turns a name into a portable identity, and is the difference
-  between a place and a person — for what may be *remembered*. What may be
-  *reached*, and for how long, stays with the display it was entered at; see
-  the session paragraph below. Hashed server-side with the same PBKDF2 as the
-  admin passwords, never compared in the browser. Rate limiting and lockout
-  are what make a short PIN viable, reusing the geometric back-off already
-  built for admin sign-in, and the obvious sequences are refused. An admin
-  resets a forgotten PIN from the device list: with no email here that is the
-  only recovery path, and it has to exist in the first version.
+  A **PIN** raises what may be *remembered*: it is the difference between
+  retention that lives in one browser and retention held server-side that
+  follows the person between them. What may be *reached* does not come from
+  it — reach comes from the user, so a user without a PIN carries their grants
+  exactly the same, and the PIN buys durability rather than permission.
+  Hashed server-side with the same PBKDF2 as the admin passwords, never
+  compared in the browser. Rate limiting and lockout are what make a short PIN
+  viable, reusing the geometric back-off already built for admin sign-in, and
+  the obvious sequences are refused. An admin resets a forgotten PIN from the
+  identity list: with no email here that is the only recovery path, and it has
+  to exist in the first version.
 
   **An admin sets the required length**, so a sensitive area can demand more
   digits than the default. Raising it is not advisory — every existing PIN
@@ -1831,36 +1931,32 @@ it. Each entry below carries its own panel scope.
   still outstanding so the rollout is visible rather than assumed. Lowering
   the requirement invalidates nothing.
 
-  Unlocking grants a session — persistent on a personal device, and on
-  anything shared it must end at the conversation boundary, or the next person
-  inherits the identity along with the screen.
+  Unlocking grants a session, measured in hours and **persistent on the user's
+  own device** — which is the case one for one covers: they opened their own
+  URL in their own browser. Being asked to key a PIN in again every half hour
+  would end with the PIN switched off entirely.
 
-  **A PIN session is measured in hours, and it belongs to the display URL that
-  triggered it — not to a person, and not to one setting covering all of
-  them.** Each `?display=<name>` carries its own session length, set by an
-  admin alongside that display's other properties.
+  **Session length belongs to the user**, now that a PIN is entered at their
+  own URL rather than at a screen standing in a room. The earlier design put
+  it on the display, and the reasoning was right for the case it was written
+  for: the place carries the risk, a workshop screen nobody but the workshop
+  can reach and a reception screen in front of the street want opposite
+  answers for the same person on the same PIN, and an admin securing a room
+  can reason about that room. **That case is the deferred one below** — a
+  person signing in at a device they do not own — so the per-display number
+  waits there for it rather than being wrong here.
 
-  The place is what decides how long unlocking should last, because the place
-  is what carries the risk. A workshop screen nobody but the workshop can
-  reach and a reception screen in front of the street are the same person on
-  the same PIN and want opposite answers, and a per-person number gets both
-  of them wrong — too short to be tolerated in the workshop, too long to be
-  defensible at reception. An admin securing a room can reason about that
-  room; nobody can reason usefully about a number that follows a human
-  between the two.
+  What survives unchanged is the discipline underneath, the same as capability
+  versus chrome in the embed and binding versus authentication above:
+  **memory and session length are separate axes and get separate settings.**
+  Collapsing them would mean choosing between forgetting what it knows about
+  somebody and staying unlocked all night, when those are not the same
+  question.
 
-  It also keeps the axes apart, which is the same discipline as capability
-  versus chrome in the embed, and binding versus authentication above:
-  **memory follows the person, session length follows the URL.** They are
-  independent, so they get independent settings. Collapsing them would mean
-  choosing between a display that forgets what it knows about somebody and a
-  display that stays unlocked all night, when those are not the same question.
-
-  Separate from the admin's setting for the same reason, and the units say so:
-  an admin holds the configuration everyone else is looking at the results of
-  and is measured in minutes, while somebody who has unlocked a display is
-  standing in front of a screen doing their work. Being asked to key a PIN in
-  again every half hour would end with the PIN switched off entirely.
+  Separate from the admin's own timeout for the same reason, and the units say
+  so: an admin holds the configuration everybody else is looking at the results
+  of and is measured in minutes, while somebody who has unlocked their own
+  device is doing their work.
 
   Recorded plainly: a PIN is not a password, and this is a lightweight account
   system rather than a small feature. Six digits is a low bar that rate
@@ -1888,8 +1984,29 @@ it. Each entry below carries its own panel scope.
   belongs to a *person* has nowhere to live. Personal wake words are the first
   thing to need it and memory is the second.
 
-  *Panel:* identities, PIN policy and its minimum length, per-display session
-  length, and a PIN reset on the device list.
+  **Identities get a group kind of their own.** `GROUP_KINDS` is
+  `("user", "device")` today, and the `user` kind — labelled *People* — holds
+  display rows: the laptops and phones that arrived by opening the display
+  page. It was the closest thing to grouping a person available while a refusal
+  was still per device. Repurposing it is the obvious move and it is the one to
+  refuse — a group's kind is fixed at creation *because changing it would
+  silently empty it*, and repurposing the kind does exactly that to every
+  People group at once, on upgrade, with nothing to migrate into, since no
+  identity those devices belong to exists yet. So identities get their own
+  kind and the existing one is relabelled to the population of personal
+  *devices* it has always been. Nothing empties, and the panel stops having two
+  things called People.
+
+  **Deferred: the device shared between people that is not a community
+  device.** An office laptop or a tablet several people use, as against a
+  kiosk. One for one is built first — a URL is a user or a device, and the
+  session is whichever one opened it — and signing a user into a commonly used
+  device comes after, once there is a working thing to look at rather than a
+  whiteboard. Two pieces are already waiting there for it: the per-display
+  session length, and the middle rung above.
+
+  *Panel:* identities and their URLs, PIN policy and its minimum length,
+  per-user session length, and a PIN reset on the identity list.
 
 - **Personal wake words.** Two people in a room, both with their own devices,
   and one of them says the name that reaches the model — both devices answer.
@@ -2168,6 +2285,36 @@ on a desk. A tablet bolted to a wall, answering a household, moves them:
 ## Progress log
 
 Newest first.
+
+### 2026-08-18 — a page that did not parse
+
+Not a phase. One statement in the wrong place, and the display page stopped
+running entirely — found by opening it on a machine that had not had it open
+before.
+
+- **A note gained a second line and took the whole page with it.** The wake-word
+  instrumentation added an `Events.add` under `if (h.fuzzy)`, which carried no
+  braces because it had only ever held one statement. The new call landed
+  outside the body, the `else if` below it lost the `if` it belonged to, and
+  the script stopped parsing.
+- **It did not look like a syntax error.** An inline script that does not parse
+  is not a broken feature — it is a page where NOTHING runs. What a browser
+  showed was the static markup alone: the composer and the buttons beside it,
+  over an empty frame. No visualiser, no enrolment code box, no request form,
+  no PIN box. Four unrelated things missing at once is a shape worth knowing,
+  because it points at the parser rather than at any of the four.
+- **It survived a deploy because nothing reads these files.** The zero-build-step
+  decision is right and it costs this: between saving and a browser, no parser
+  sees the page. Hence `check.sh` — both pages' scripts through node, both
+  modules through Python, line numbers mapped back onto the HTML file, and a
+  missing parser is a failure rather than a skip. It cannot tell you the page
+  works; it can tell you it runs.
+- **Every brace-less body in both pages was swept for the same shape** — a
+  second statement sitting after the one the header owns. This was the only
+  one. Of the seven other `Events.add` sites that commit added, six sit inside
+  braces and the seventh, `stt_slow`, is a brace-less `if` holding a single
+  statement, which is the shape that is safe: what follows it sits at the
+  header's indent, not at the body's.
 
 ### 2026-08-17 — the panel stopped being a filing cabinet
 
