@@ -1086,9 +1086,9 @@ two people in one room with three listening microphones between them.
 | 3 | ~~**What a wall display looks like**~~ **— done** | voice only and speak only, an appearance per place, and a screensaver that is still the product | 2 | none |
 | 4 | ~~**Staying up unattended**~~ **— done** | a tablet nobody touches for a year is still working | 3 | none · closed 2026-08-17 · alert and drop test in 8 |
 | 5 | **Identity and the PIN** | a person, as distinct from a place | 2 | none · designed 2026-08-17 · mixed sign-in deferred out of it |
-| 6 | **Personal wake words** | one person addressing a tablet stops triggering another person's device | 5 | none |
+| 6 | ~~**Personal wake words**~~ **— done** | one person addressing a tablet stops triggering another person's device | 5 | none · built 2026-08-18 |
 | 7 | **Memory** | conversations that mean something across sessions | 5 | **1** · what the retained unit is — deliberately left to experience |
-| 8 | **Diagnostics and alerting** | a failing screen comes and finds you, rather than the other way round | 2 | **1** · the retention default · also carries 4's network-drop test |
+| 8 | **Diagnostics and alerting** — *building* | a failing screen comes and finds you, rather than the other way round | 2 | none · window set to 7 days · still owes 4's network-drop test |
 
 The last column counts decisions that need **you**, not implementation choices
 made while building and shown afterwards. A phase reading *none* is ready to
@@ -1109,6 +1109,23 @@ checking in, and what it does not yet do is come and find you.
 The two remaining decisions are each answerable when their own phase comes
 up, and one of them is deliberately waiting on experience rather than on a
 decision.
+
+**Six is built** — 2026-08-18. A person answers to a name they chose, and
+uniqueness is decided by the matcher that does the waking rather than by
+comparing letters, enforced on the server because a check in a browser is one
+an API call walks past. The port and the shipping JS were run over the same 368
+cases and agreed on all of them; a corpus of 34 is kept in `serve.py`, because
+that coupling is real and nothing in either language enforces it.
+
+**Eight is most of the way there** — 2026-08-18. Its open decision is taken:
+the retention window is **seven days**, short on purpose and admin-configurable,
+because retention is the only control over a store that holds what was said to
+a display. Built: the event store and what a screen reports, the conversation
+record and the decision trail that makes a voice fault answerable, the health
+view, the four-state alert model, and four sinks — syslog, a webhook, Home
+Assistant on its own connection, and email — with quiet hours and a digest.
+**What it still owes is the network-drop test**, which needs real hardware and
+a pulled cable, and it is the reason this phase is not closed.
 
 **Five is designed and its decision is closed** — 2026-08-17. A session is a
 user or a device and the URL decides which; guest, user without a PIN and user

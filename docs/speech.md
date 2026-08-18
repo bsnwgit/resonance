@@ -250,3 +250,48 @@ It lives here rather than on the AI tab because most of what it checks is on
 this one. It is not an AI test — each endpoint has its own **TEST**, which
 puts a question to that endpoint's own service.
 
+
+## A wake word of your own
+
+Two people in a room, both with their own devices, and one of them says the
+name that reaches the model — **both devices answer**. Route binding cannot
+help, because both are legitimately allowed that route. The fix is a word only
+one device has ever heard of.
+
+Set it on the person under **ENROLLMENTS ▸ USER**, in *Wakes to*. From then on
+their word reaches the endpoint a question goes to when nothing named one, on
+whatever machine they open their URL on — and nowhere else. That is the whole
+mechanism: the collision stops because no other browser was ever told the word
+exists.
+
+**It is added, not substituted.** The shared words still work on their device.
+Taking them away would mean somebody who set a personal word could no longer
+join in when a room says the house's name.
+
+### Why a word can be refused
+
+Uniqueness is decided by **the matcher that does the waking**, not by comparing
+letters. A word acoustically close to the house name would pass any comparison
+of spelling and put you straight back where you started, so a candidate is run
+through the real rules against every word already in use — every route, every
+alias, and every other person — and refused on a near hit.
+
+The check answers as you type, and says what it collided with and whose it is,
+because that is a thing you can act on. `orbital` is refused next to `orbit`;
+`bacon` is refused next to `beacon`.
+
+It is checked **both directions**, because waking is not symmetric: the prefix
+rule fires for "orbital" said at "orbit" but not the reverse, and a word nobody
+can use without also waking somebody else is exactly as broken as one that
+steals theirs.
+
+Enforcement is on the server rather than only in the panel — a check that lived
+in the browser is one an API call walks straight past, and the word that got in
+that way is precisely the one that cross-triggers.
+
+### One consequence to expect
+
+**A person standing at a wall tablet and saying their own word gets nothing.**
+That tablet is not their device and has never heard of the word. It is correct,
+and it will still surprise somebody the first time — which is why every display
+prints the words it actually answers to, and only the ones it may really reach.

@@ -84,7 +84,7 @@ a URL and talks to the display.
 **ENROLLMENTS** — how something comes to be here, as opposed to everything left
 of it, which configures the server.
 
-- **PERSON** — the people you have minted a URL for, the request form, and
+- **USER** — the people you have minted a URL for, the request form, and
   everybody who has asked to be here and not yet been decided about.
 - **DEVICE** — where a screen is set up: named, given a code, and watched until
   it takes it.
@@ -1053,3 +1053,125 @@ rights to run or restart. From the directory it is installed in:
 
 `stop` waits for the process to actually exit before returning, so
 `stop && start` is safe and will not race itself for the listening ports.
+
+## When a screen goes wrong
+
+A screen with a fault cannot tell anybody. It is on a wall, it shows nobody
+anything, and the note explaining what went wrong fades in front of an empty
+room. **CONNECTIONS ▸ NODES** is where it says so instead, in three sections.
+
+### Health
+
+What each screen has been reporting, worst first, so twenty of them can be read
+down rather than opened one at a time. A microphone that would not open, a
+browser with no recorder at all, transcription erroring or running long, the
+neural voice quietly falling back to the browser's, and the wake word it
+actually matched on.
+
+Most of this was already being worked out and thrown away. The display says
+*woke on "hows" (near "house")* as a note nobody on a wall is ever there to
+read; kept, it is the only way to find out that two wake words are
+cross-triggering.
+
+Slow is reported and ordinary is not — a screen doing its job in half a second
+has nothing to say, and a store of ordinary timings is a store nobody reads.
+**CLEAR** on a row forgets what one screen reported without taking it off the
+wall, for a fault that has been fixed.
+
+### What was said to them
+
+The conversation record, and the decision trail beside it. This is where *"it
+didn't work"* becomes *the recogniser heard "hows" and matched it fuzzily to
+the house route*, which is a thing you can act on.
+
+Each row shows what was heard **before the wake word was stripped**, what was
+sent, what came back, which route matched and whether it matched exactly or on
+a near miss, how long it took, and any error verbatim.
+
+**What is kept, precisely.** What was addressed to the device — from the wake
+word to the end of that conversation — and the routing decision that followed,
+for the retention window. Nothing outside an active conversation is recorded,
+and nothing at all until somebody says a wake word.
+
+This is a boundary that moved, so it is written down rather than left implied:
+an earlier version of this promised no conversation content at all. The reason
+it changed is that a voice-only display shows nobody anything, so when it
+mishears there is no record and nothing to fix — and what is captured is
+exactly what already leaves the machine, since it goes to a house or a model
+regardless. It adds retention, not disclosure.
+
+**Retention is the only control there is, and it is short on purpose.** Seven
+days by default. A generous default would be a decision made on somebody's
+behalf about their household.
+
+### Alerts
+
+Diagnostics is somewhere you go and look. An alert comes and finds you.
+
+**Four states, not two:** open or resolved, acknowledged or not. The one that
+matters is **resolved but unread** — a screen that dropped off at two in the
+morning and came back four minutes later leaves something in the list until a
+person sees it. Self-healing nobody ever hears about is indistinguishable from
+nothing having happened, and a display that heals itself every night is a fault
+rather than a success.
+
+Resolving is automatic; acknowledging is not. Anything both resolved and
+acknowledged has nothing left to say and leaves the list.
+
+An alert has an identity — its kind and its device — rather than a row per
+occurrence. A screen offline for a day is one alert that has been true for a
+day, not two hundred and forty of them.
+
+**What raises one.** Liveness, from the poll: three missed check-ins rather
+than one, because a single drop is a hiccup and an alert that fires on one gets
+switched off in a week. Hard faults, which are not rates: a microphone that
+will not open does not get better by happening less often. And rates, which are:
+near misses, slow transcription, a voice falling back, a house being asked for
+what it cannot do. Screens that never worked raise nothing — an invited row
+that has not taken its code has not gone quiet, it was never switched on.
+
+One alert depends on none of that: **a device asking to be let in** arrives the
+moment it asks, because it is the only one with a person attached to it.
+
+### Where alerts go
+
+The list is the baseline and is not optional, because acknowledgement has to
+live somewhere. Everything else is in addition to it, cheapest reach first.
+
+- **Syslog** — the standard library speaks it and every operator already has
+  somewhere it goes. One socket, no credentials. Errors as `err`, warnings as
+  `warning`, recoveries as `info`.
+- **A webhook** — one JSON POST, which reaches ntfy, Slack, Discord, Gotify and
+  whatever else you run.
+- **Home Assistant** — the strongest here, because it can speak: a screen that
+  dies gets announced by the building it is part of. It has **its own
+  connection** rather than borrowing an endpoint's, since alerting hung off a
+  route would vanish the day somebody deleted that route.
+- **Email** — last, and not by accident. No dependency, but it wants a server
+  and credentials and it fails somewhere this process cannot see more often
+  than the others.
+
+Every sink is **fire and forget**. Nothing retries or blocks, because a sink
+that did would turn reporting a fault into a second fault — and whatever failed
+to send is still in the list.
+
+**Quiet hours** run on this machine's clock, the same one dark hours use, and
+span midnight the way a night does: 22 until 7 is a night, not nineteen hours
+of daylight. Nothing is dropped, only held — announcing a dead hallway screen
+through the house speakers at three in the morning is how alerting gets
+switched off in its first week.
+
+**A digest** gathers what is held into one message, timed from the oldest thing
+waiting rather than from the last digest: what matters is how long something has
+gone unsaid, not how long since a message that may have carried nothing.
+
+Two exceptions, both deliberate: **syslog ignores quiet hours**, because a log
+with a hole in it every night is useless for the fault that only happens at
+night; and **a device asking to be let in comes through regardless** of quiet
+hours and digest mode both, because somebody is standing at a screen waiting.
+
+### The server log
+
+Readable from the panel rather than over SSH — the end of it, newest last,
+filtered on a word. It is a tail through the admin listener and never a served
+file. Not a live feed: press REFRESH.
