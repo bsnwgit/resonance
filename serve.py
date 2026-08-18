@@ -54,7 +54,7 @@ longer running. This sends no-store on everything instead.
 """
 import base64, contextlib, functools, hashlib, hmac, http.cookies, inspect, \
        json, os, re, \
-       secrets, ssl, subprocess, sys, tempfile, threading, time
+       secrets, socket, ssl, subprocess, sys, tempfile, threading, time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 import manual                            # the manual, and its PDF writer
@@ -1666,6 +1666,10 @@ MAX_LOOKS = 8
 #: more; below four is not a secret, above twelve is a password with the wrong
 #: keyboard.
 PIN_MIN_DEFAULT = 6
+#: Days. Long enough to still be there on Monday for a fault somebody noticed
+#: on Saturday, short enough that it is not a record of a household.
+EVENT_DAYS_DEFAULT = 7
+EVENT_DAYS_LIMITS = (1, 90)
 PIN_LIMITS = (4, 12)
 PIN_MAX = 32
 
@@ -1772,6 +1776,50 @@ DISPLAY_SETTINGS = {
     # it marks every PIN below it, and those are made to conform at the next
     # unlock. See identity_pin_state.
     "pin_min": PIN_MIN_DEFAULT,
+    # How long a technical event and its conversation record are kept. SHORT
+    # on purpose: retention is the only control there is over a store that
+    # holds what was said to a display, and a generous default is a decision
+    # made on somebody's behalf about their household.
+    "event_days": EVENT_DAYS_DEFAULT,
+    # Where alerts go besides the list. Off by default: a server that started
+    # posting somewhere on first run would be making a decision about somebody
+    # else's network.
+    "syslog_on": 0,
+    "syslog_host": "",                   # blank means the local daemon
+    "syslog_port": 514,
+    "syslog_facility": "user",
+    # A JSON POST, which is what ntfy, Slack, Discord and Gotify all take.
+    "hook_on": 0,
+    "hook_url": "",
+    # ITS OWN CONNECTION, not a route's. Home Assistant is the strongest sink
+    # in this deployment — already connected, and a thing that can speak
+    # through the house, so a screen that dies gets announced by the building
+    # it is part of. But hanging alerting off a ROUTE means alerting
+    # disappears when somebody deletes that route, which is a surprising way
+    # to lose the thing that tells you a screen is dead.
+    "ha_on": 0,
+    "ha_url": "",
+    "ha_token": "",
+    # Anything HA will call. persistent_notification.create always exists and
+    # needs nothing configured, so it is the default; notify.notify or a
+    # tts service is the one that actually speaks, and is a field rather than
+    # an assumption because which of them exists is the deployment's business.
+    "ha_service": "persistent_notification/create",
+    # LAST, and last for a reason. smtplib costs no dependency, but email wants
+    # a server and credentials and fails silently more often than anything else
+    # here — a queue somewhere else decides whether this was ever delivered.
+    "mail_on": 0,
+    "mail_host": "", "mail_port": 587, "mail_tls": 1,
+    "mail_user": "", "mail_pass": "",
+    "mail_from": "", "mail_to": "",
+    # Immediate, or gathered up and sent on a timer. Alerts marked `now` — the
+    # one with a person standing at a screen — ignore this entirely.
+    "digest_on": 0,
+    "digest_minutes": 60,
+    # The house asleep, on the device clock — the same clock dark hours use.
+    "quiet_on": 0,
+    "quiet_from": 22,
+    "quiet_to": 7,
     # Kept so an existing document round-trips rather than losing a key on the
     # first save. `user` was the second DISPLAY kind and folded into `device`;
     # nothing reads this now, and nothing writes it either.
@@ -1779,7 +1827,7 @@ DISPLAY_SETTINGS = {
 }
 MAX_FORM_FIELDS = 5
 #: (low, high) for each number the panel can set
-DISPLAY_LIMITS = {"pin_min": PIN_LIMITS,
+DISPLAY_LIMITS = {"pin_min": PIN_LIMITS, "event_days": EVENT_DAYS_LIMITS,
                   "max_displays": (2, 5000), "max_pending": (1, 1000),
                   "guest_days": (1, 3650),
                   # 0 is off — see code_minutes. A week is the top because a
@@ -2081,6 +2129,11 @@ def panel_settings():
         row["values"] = vals
         out.append(row)
     cfg["models"] = out
+    # The alert sink's token, by the same rule: the panel is told WHETHER one
+    # is set, which is what tells a configured sink from an unconfigured one,
+    # and never the token.
+    cfg["ha_has_token"] = bool(cfg.pop("ha_token", ""))
+    cfg["mail_has_pass"] = bool(cfg.pop("mail_pass", ""))
     return cfg
 
 
@@ -2103,6 +2156,104 @@ def validate_display_settings(obj, current):
     if cfg["max_pending"] > cfg["max_displays"]:
         return None, ("more waiting than there is room for — the waiting limit "
                       "cannot exceed the total")
+    # The syslog sink. Its own block because none of it is a range: a switch, a
+    # host that may be blank on purpose, a port, and a name from a fixed list.
+    if "syslog_on" in obj:
+        cfg["syslog_on"] = 1 if obj["syslog_on"] else 0
+    if "syslog_host" in obj:
+        cfg["syslog_host"] = str(obj["syslog_host"] or "").strip()[:120]
+    if "syslog_port" in obj:
+        try:
+            port = int(obj["syslog_port"])
+        except (TypeError, ValueError):
+            return None, "the syslog port must be a whole number"
+        if not (1 <= port <= 65535):
+            return None, "the syslog port must be between 1 and 65535"
+        cfg["syslog_port"] = port
+    if "syslog_facility" in obj:
+        f = str(obj["syslog_facility"] or "").strip()
+        if f not in SYSLOG_FACILITIES:
+            return None, "facility must be one of: " + ", ".join(SYSLOG_FACILITIES)
+        cfg["syslog_facility"] = f
+    if "ha_on" in obj:
+        cfg["ha_on"] = 1 if obj["ha_on"] else 0
+    if "ha_url" in obj:
+        u = str(obj["ha_url"] or "").strip()[:200]
+        if u and not u.startswith(("http://", "https://")):
+            return None, "Home Assistant needs its full http:// or https:// address"
+        cfg["ha_url"] = u
+    if "ha_token" in obj:
+        # Blank means LEAVE IT, not clear it. A panel that is never sent the
+        # token cannot send it back, so an empty field on a save is the field
+        # it was never given rather than an instruction to forget.
+        t = str(obj["ha_token"] or "").strip()
+        if t:
+            cfg["ha_token"] = t[:400]
+    if "ha_clear_token" in obj and obj["ha_clear_token"]:
+        cfg["ha_token"] = ""
+    if "ha_service" in obj:
+        sv = str(obj["ha_service"] or "").strip()[:80]
+        if sv and not re.fullmatch(r"[a-z0-9_]+[./][a-z0-9_]+", sv):
+            return None, "a service reads like notify.notify or notify/notify"
+        cfg["ha_service"] = sv or "persistent_notification/create"
+    if cfg.get("ha_on") and not (cfg.get("ha_url") and cfg.get("ha_token")):
+        return None, ("Home Assistant needs its address and a long-lived token "
+                      "before it can be switched on")
+    if "hook_on" in obj:
+        cfg["hook_on"] = 1 if obj["hook_on"] else 0
+    if "hook_url" in obj:
+        u = str(obj["hook_url"] or "").strip()[:400]
+        if u and not u.startswith(("http://", "https://")):
+            return None, "a webhook needs a full http:// or https:// address"
+        cfg["hook_url"] = u
+    if cfg.get("hook_on") and not cfg.get("hook_url"):
+        return None, "give the webhook an address before switching it on"
+    if "mail_on" in obj:
+        cfg["mail_on"] = 1 if obj["mail_on"] else 0
+    for k, cap in (("mail_host", 200), ("mail_user", 200),
+                   ("mail_from", 200), ("mail_to", 400)):
+        if k in obj:
+            cfg[k] = str(obj[k] or "").strip()[:cap]
+    if "mail_pass" in obj:
+        # Blank keeps what is stored, the same rule the HA token follows.
+        pw = str(obj["mail_pass"] or "")
+        if pw:
+            cfg["mail_pass"] = pw[:200]
+    if "mail_clear_pass" in obj and obj["mail_clear_pass"]:
+        cfg["mail_pass"] = ""
+    if "mail_tls" in obj:
+        cfg["mail_tls"] = 1 if obj["mail_tls"] else 0
+    if "mail_port" in obj:
+        try:
+            mp = int(obj["mail_port"])
+        except (TypeError, ValueError):
+            return None, "the mail port must be a whole number"
+        if not (1 <= mp <= 65535):
+            return None, "the mail port must be between 1 and 65535"
+        cfg["mail_port"] = mp
+    if cfg.get("mail_on") and not (cfg.get("mail_host") and cfg.get("mail_to")):
+        return None, "mail needs a server and somewhere to send to"
+    if "digest_on" in obj:
+        cfg["digest_on"] = 1 if obj["digest_on"] else 0
+    if "digest_minutes" in obj:
+        try:
+            dm = int(obj["digest_minutes"])
+        except (TypeError, ValueError):
+            return None, "the digest interval is a whole number of minutes"
+        if not (5 <= dm <= 1440):
+            return None, "the digest interval runs from 5 minutes to a day"
+        cfg["digest_minutes"] = dm
+    if "quiet_on" in obj:
+        cfg["quiet_on"] = 1 if obj["quiet_on"] else 0
+    for k in ("quiet_from", "quiet_to"):
+        if k in obj:
+            try:
+                h = int(obj[k])
+            except (TypeError, ValueError):
+                return None, "quiet hours are whole hours"
+            if not (0 <= h <= 23):
+                return None, "quiet hours run 0 to 23"
+            cfg[k] = h
     if "form" in obj:
         if not isinstance(obj["form"], (list, tuple)):
             return None, "the request form must be a list of fields"
@@ -3077,6 +3228,10 @@ def request_access(did, answers):
     if answers is not None:
         rec["answers"] = answers
     write_displays(displays)
+    # The one alert with a PERSON attached: somebody is standing at a screen
+    # waiting to be let in. It depends on nothing this phase collects, and it
+    # is why it arrives immediately rather than in a digest.
+    raise_alert("asked_in", did, display_label(rec))
     return dict(rec, id=did), None
 
 
@@ -3229,6 +3384,713 @@ def admin_displays():
                    refused_from=ref[2] if ref else "")
         out.append(row)
     return out
+
+
+# --------------------------------------------------------------- diagnostics
+# TECHNICAL EVENTS, KEYED TO A DEVICE. The microphone would not open,
+# transcription took four seconds, the voice service returned an error, this
+# browser has no recorder at all. The useful key is the screen with the failing
+# microphone, not whoever happened to be standing at it.
+#
+# Most of this is already computed and thrown away. The display says
+# `woke on "hows" (near "house")` as a note that fades, and on a wall tablet
+# nobody is ever there to read it. A good deal of this is "stop discarding
+# that" plus somewhere to put it.
+#
+# ITS OWN FILE, and a small one. It is the only document here that grows on its
+# own — everything else grows when an admin does something — so it is capped
+# two ways: a hard ceiling on rows, and a window in days that an admin sets.
+EVENTS_PATH = os.path.join(ROOT, "events.json")
+_events_lock = threading.RLock()
+#: The hard ceiling, and not a setting. It stops the file becoming a problem
+#: of its own on a busy day; the WINDOW is the control an admin has, and it is
+#: the one that decides what is kept rather than how much.
+MAX_EVENTS = 2000
+#: What a display may send in one poll. A screen with a broken microphone
+#: generates the same event every second it tries, and the cap is what stops
+#: one fault filling the store before anybody reads it.
+MAX_EVENTS_PER_POLL = 12
+#: Kinds this server will store. An ALLOW-list for the same reason the served
+#: files are one: this is written by a browser, and a document shaped by
+#: whatever a page decided to send is one nobody can reason about later.
+EVENT_KINDS = (
+    "mic_denied",        # the microphone would not open
+    "no_recorder",       # this browser has no recorder at all — a fact, once
+    "stt_slow",          # transcription took longer than it should
+    "stt_error",         # the recogniser returned an error
+    "tts_fallback",      # the neural voice fell back to the browser's
+    "wake_fuzzy",        # woke on a near miss, and on which word
+    "no_intent",         # the house was asked for something it cannot do
+    "backend_error",     # what answers a route returned an error
+    "backend_slow",      # …or took longer than that route allows for
+)
+#: Where an event came from. A display sends its own; the server records the
+#: legs it can see, which a browser cannot.
+EVENT_LEVELS = ("info", "warn", "error")
+
+
+def read_events():
+    try:
+        with open(EVENTS_PATH) as fh:
+            doc = json.load(fh)
+        rows = doc.get("events") if isinstance(doc, dict) else None
+    except (OSError, ValueError):
+        return []
+    if not isinstance(rows, list):
+        return []
+    out = []
+    for r in rows:
+        if isinstance(r, dict) and r.get("kind") in EVENT_KINDS:
+            out.append(r)
+    return out
+
+
+def write_events(rows):
+    with _events_lock:
+        tmp = EVENTS_PATH + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump({"version": 1, "events": rows[-MAX_EVENTS:]}, fh)
+        os.chmod(tmp, 0o600)          # it holds what was said to a display
+        os.replace(tmp, EVENTS_PATH)
+
+
+def event_window_days():
+    return int(display_settings().get("event_days") or EVENT_DAYS_DEFAULT)
+
+
+def note_event(kind, did="", level="info", detail="", route="", ms=0):
+    """One event, kept. Silent about anything it does not recognise rather than
+    refusing: this is called from the paths that ARE the fault being reported,
+    and a diagnostic that raises inside a failure is a second fault on top of
+    the first."""
+    if kind not in EVENT_KINDS:
+        return
+    with _events_lock:
+        rows = read_events()
+        rows.append({"kind": kind, "did": str(did or "")[:32],
+                     "level": level if level in EVENT_LEVELS else "info",
+                     "detail": str(detail or "")[:300],
+                     "route": str(route or "")[:60],
+                     "ms": max(0, int(ms or 0)), "at": int(time.time())})
+        write_events(rows)
+
+
+def take_events(did, rows):
+    """Events a display sent up with its poll. Returns how many were kept.
+
+    Capped per poll, because a screen whose microphone is broken produces the
+    same event every second it tries and one fault must not fill the store
+    before anybody reads it. The device id comes from the TOKEN, never from the
+    body: a display saying which display it is would be a display able to file
+    a fault against another one."""
+    if not isinstance(rows, list):
+        return 0
+    kept = 0
+    with _events_lock:
+        have = read_events()
+        for r in rows[:MAX_EVENTS_PER_POLL]:
+            if not isinstance(r, dict) or r.get("kind") not in EVENT_KINDS:
+                continue
+            have.append({"kind": r["kind"], "did": did,
+                         "level": r.get("level") if r.get("level") in EVENT_LEVELS
+                                  else "info",
+                         "detail": str(r.get("detail") or "")[:300],
+                         "route": str(r.get("route") or "")[:60],
+                         "ms": max(0, min(600000, int(r.get("ms") or 0))),
+                         "at": int(time.time())})
+            kept += 1
+        if kept:
+            write_events(have)
+    return kept
+
+
+def display_health(did, rows=None, now_=None):
+    """What this screen has been reporting, summarised. The list an admin
+    reads is per device, because the useful question is which screen is
+    failing rather than how many faults there were."""
+    rows = read_events() if rows is None else rows
+    now_ = int(time.time()) if now_ is None else now_
+    mine = [r for r in rows if r.get("did") == did]
+    by_kind = {}
+    for r in mine:
+        k = by_kind.setdefault(r["kind"], {"kind": r["kind"], "n": 0, "last": 0,
+                                           "level": "info", "detail": ""})
+        k["n"] += 1
+        if r["at"] >= k["last"]:
+            k["last"], k["level"], k["detail"] = r["at"], r["level"], r["detail"]
+    worst = "info"
+    for k in by_kind.values():
+        if k["level"] == "error" or (k["level"] == "warn" and worst == "info"):
+            worst = k["level"]
+    return {"events": sorted(by_kind.values(), key=lambda k: -k["last"]),
+            "n": len(mine), "worst": worst if mine else "",
+            "last": max([r["at"] for r in mine], default=0)}
+
+
+# THE CONVERSATION RECORD. This entry used to promise "no conversation
+# content", and that boundary has moved — stated plainly rather than quietly
+# broken, because a promise like that is worth only what it is kept to:
+#
+#   What was addressed to the device — from the wake word to the end of the
+#   conversation — and the routing decision that followed, retained for a
+#   window. Nothing outside an active conversation is recorded.
+#
+# The reasoning: a voice-only display shows nobody anything, so when it
+# mishears there is no record at all and nothing to fix. And the captured text
+# is exactly what already leaves the machine — it goes to a house or a model
+# regardless — so this adds retention, not disclosure. Nothing is captured
+# unless somebody said a wake word.
+#
+# THE WORDS ARE THE LEAST USEFUL PART. What makes a voice fault diagnosable is
+# the decision trail beside them, and "it didn't work" resolves into: the
+# recogniser heard "hows" and matched it fuzzily to the house route.
+TURNS_PATH = os.path.join(ROOT, "turns.json")
+_turns_lock = threading.RLock()
+MAX_TURNS = 500
+
+
+def read_turns():
+    try:
+        with open(TURNS_PATH) as fh:
+            doc = json.load(fh)
+        rows = doc.get("turns") if isinstance(doc, dict) else None
+    except (OSError, ValueError):
+        return []
+    return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+
+
+def write_turns(rows):
+    with _turns_lock:
+        tmp = TURNS_PATH + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump({"version": 1, "turns": rows[-MAX_TURNS:]}, fh)
+        os.chmod(tmp, 0o600)          # it holds what was said to a display
+        os.replace(tmp, TURNS_PATH)
+
+
+def note_turn(did, route, heard, sent, reply, trail=None, ms=0, error="",
+              fell_to=""):
+    """One turn, with the trail that explains it. Only ever called where an
+    utterance has already been decided to be this screen's business."""
+    if not did:
+        # A turn with no screen to attach it to is a turn nobody can act on,
+        # and the embed is not a screen. Recording it would be collecting for
+        # its own sake.
+        return
+    t = trail if isinstance(trail, dict) else {}
+    with _turns_lock:
+        rows = read_turns()
+        rows.append({
+            "did": str(did)[:32], "route": str(route or "")[:60],
+            # BEFORE the wake word came off, which is the whole point: it is
+            # the only field that can show a near miss.
+            "heard": str(heard or "")[:400],
+            "sent": str(sent or "")[:400],
+            "reply": str(reply or "")[:400],
+            "via": str(t.get("via") or "")[:12],
+            "word": str(t.get("word") or "")[:40],
+            "as": str(t.get("as") or "")[:40],
+            "ms": max(0, int(ms or 0)), "error": str(error or "")[:300],
+            "fell_to": str(fell_to or "")[:60],
+            "at": int(time.time()),
+        })
+        write_turns(rows)
+
+
+def prune_turns():
+    cutoff = int(time.time()) - event_window_days() * 86400
+    rows = read_turns()
+    keep = [r for r in rows if int(r.get("at") or 0) >= cutoff]
+    if len(keep) != len(rows):
+        write_turns(keep)
+    return len(rows) - len(keep)
+
+
+def prune_events():
+    """Past the window, gone. Read at startup and after each poll that wrote
+    anything, which is often enough on a server that only grows this file when
+    a display is talking to it."""
+    cutoff = int(time.time()) - event_window_days() * 86400
+    rows = read_events()
+    keep = [r for r in rows if int(r.get("at") or 0) >= cutoff]
+    if len(keep) != len(rows):
+        write_events(keep)
+    return len(rows) - len(keep)
+
+
+# -------------------------------------------------------------------- alerts
+# Diagnostics is a PULL — events collected, a health view somebody goes and
+# looks at. An alert is a PUSH: it comes and finds you. Those are genuinely
+# different things, and the only reason they are one entry is that building a
+# health view and then separately building the thing that watches it is two
+# passes over the same data.
+#
+# FOUR STATES, NOT TWO: open or resolved, acknowledged or not. The cell that
+# matters is resolved-but-unacknowledged — a screen that dropped off at two in
+# the morning and came back four minutes later leaves something in the list
+# until a person reads it. Self-healing nobody ever hears about is
+# indistinguishable from nothing having happened, and a display that heals
+# itself every night is a fault rather than a success.
+ALERTS_PATH = os.path.join(ROOT, "alerts.json")
+_alerts_lock = threading.RLock()
+MAX_ALERTS = 300
+
+#: What can raise one, and what it means. `once` fires a single time per
+#: device however often the fact is reported — no recorder in this browser
+#: will be just as true tomorrow.
+ALERT_KINDS = {
+    "offline":      {"level": "error", "words": "has not checked in"},
+    "still_gone":   {"level": "error", "words": "did not come back after a reload"},
+    "mic_denied":   {"level": "error", "words": "its microphone was refused"},
+    "no_recorder":  {"level": "error", "words": "has no recorder at all", "once": True},
+    "stt_slow":     {"level": "warn",  "words": "transcription is running long"},
+    "tts_fallback": {"level": "warn",  "words": "fell back to the browser voice"},
+    "wake_fuzzy":   {"level": "warn",  "words": "is waking on near misses"},
+    "no_intent":    {"level": "warn",  "words": "is being asked for what it cannot do"},
+    "backend_error": {"level": "error", "words": "the assistant it uses is failing"},
+    # The one that depends on none of the rest and could have shipped alone: a
+    # device asking to be here is already recorded by the displays entry. It
+    # arrives immediately rather than in a digest, because it is the only
+    # alert with a person attached — somebody is standing at a screen waiting
+    # to be let in.
+    "asked_in":     {"level": "warn",  "words": "is asking to be let in",
+                     "now": True},
+}
+
+
+#: The server's own log, as an admin reads it. NOT a served file — the whole
+#: reason SERVABLE is an allow-list is that this used to be handed out by the
+#: base class, unauthenticated, on every interface. This reads a bounded tail
+#: through the admin listener, behind the same session as everything else.
+LOG_PATH = os.path.join(ROOT, "server.log")
+#: Bytes read from the end. Enough to cover a start and a busy hour after it,
+#: small enough that asking for it is never the thing that makes a server slow.
+LOG_TAIL_BYTES = 256 * 1024
+LOG_MAX_LINES = 800
+
+
+def read_log_tail(match=""):
+    """The end of the log, newest last. Returns (lines, truncated, size).
+
+    Seeks rather than reads: this file is truncated at every start but a busy
+    day still puts megabytes in it, and reading the whole thing to show the
+    last screenful is the kind of thing that works until the day it matters."""
+    try:
+        size = os.path.getsize(LOG_PATH)
+        with open(LOG_PATH, "rb") as fh:
+            if size > LOG_TAIL_BYTES:
+                fh.seek(size - LOG_TAIL_BYTES)
+                fh.readline()                # drop the half line seeking landed in
+            raw = fh.read()
+    except OSError:
+        return [], False, 0
+    lines = raw.decode("utf-8", "replace").splitlines()
+    if match:
+        m = match.lower()
+        lines = [ln for ln in lines if m in ln.lower()]
+    cut = len(lines) > LOG_MAX_LINES
+    return lines[-LOG_MAX_LINES:], cut, size
+
+
+def read_alerts():
+    try:
+        with open(ALERTS_PATH) as fh:
+            doc = json.load(fh)
+        rows = doc.get("alerts") if isinstance(doc, dict) else None
+    except (OSError, ValueError):
+        return []
+    return [r for r in rows if isinstance(r, dict) and r.get("kind") in ALERT_KINDS] \
+        if isinstance(rows, list) else []
+
+
+def write_alerts(rows):
+    with _alerts_lock:
+        tmp = ALERTS_PATH + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump({"version": 1, "alerts": rows[-MAX_ALERTS:]}, fh)
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, ALERTS_PATH)
+
+
+def raise_alert(kind, did="", detail=""):
+    """Open one, or touch the one already open.
+
+    An alert has an IDENTITY — its kind and its device — rather than being a
+    row appended per occurrence. A screen offline for a day is one alert that
+    has been true for a day, not two hundred and forty of them, and a list that
+    said otherwise would be a list nobody reads to the bottom of."""
+    spec = ALERT_KINDS.get(kind)
+    if not spec:
+        return None
+    now_ = int(time.time())
+    with _alerts_lock:
+        rows = read_alerts()
+        for r in rows:
+            if r["kind"] == kind and r["did"] == did and not r["resolved"]:
+                r["last"], r["n"] = now_, r.get("n", 1) + 1
+                if detail:
+                    r["detail"] = str(detail)[:300]
+                write_alerts(rows)
+                return r
+            # A fact fires once per device, ever — even after somebody has
+            # acknowledged and it has been resolved.
+            if spec.get("once") and r["kind"] == kind and r["did"] == did:
+                return None
+        row = {"id": "a" + secrets.token_hex(5), "kind": kind, "did": did,
+               "level": spec["level"], "detail": str(detail or "")[:300],
+               "opened": now_, "last": now_, "n": 1,
+               "resolved": 0, "acked": 0, "sent": 0}
+        rows.append(row)
+        write_alerts(rows)
+        print("ALERT %s %s%s" % (kind, did or "(server)",
+                                 ": " + detail if detail else ""), flush=True)
+    # Outside the lock: a sink is a network call, and holding the alert file
+    # while one of them times out would stop every other alert being written.
+    if deliver_alert(row):
+        mark_sent([row["id"]])
+    return row
+
+
+def clear_alert(kind, did=""):
+    """It stopped being true. RESOLVED, not gone: it stays in the list until
+    somebody has read it, because a fault that healed itself unobserved is
+    indistinguishable from one that never happened."""
+    now_ = int(time.time())
+    with _alerts_lock:
+        rows, hit = read_alerts(), False
+        for r in rows:
+            if r["kind"] == kind and r["did"] == did and not r["resolved"]:
+                r["resolved"], hit = now_, True
+        if hit:
+            write_alerts(rows)
+            print("alert cleared: %s %s" % (kind, did or "(server)"), flush=True)
+    if hit:
+        # Recovery is news too. A screen that came back at four in the morning
+        # is exactly what somebody reading a log at nine wants to see beside
+        # the line saying it went.
+        for r in rows:
+            if r["kind"] == kind and r["did"] == did and r["resolved"] == now_:
+                deliver_alert(r, resolved=True)
+                break
+    return hit
+
+
+# ------------------------------------------------------------- alert sinks
+# CHEAPEST REACH FIRST. The admin list is the baseline and is not optional,
+# because acknowledgement has to live somewhere. Syslog is the next cheapest by
+# a distance: the standard library speaks it, every operator already has
+# somewhere it goes, and it costs one socket and no credentials — which is more
+# than can be said for anything else on this list.
+#
+# It is FIRE AND FORGET on purpose. A sink that raises, retries or blocks would
+# make reporting a fault into a second fault, and the alert it failed to send
+# is still sitting in the panel where acknowledgement lives.
+SYSLOG_FACILITIES = ("user", "local0", "local1", "local2", "local3",
+                     "local4", "local5", "local6", "local7")
+#: alert level -> syslog severity, by name rather than number so the mapping is
+#: readable where it is decided rather than in a table somewhere else.
+SYSLOG_SEVERITY = {"error": 3, "warn": 4, "info": 6}   # err, warning, info
+
+
+def syslog_send(level, text):
+    """One line, to wherever an admin pointed it. Silent on every failure: this
+    is called from the path that IS the fault being reported."""
+    cfg = display_settings()
+    if not cfg.get("syslog_on"):
+        return
+    host = str(cfg.get("syslog_host") or "").strip()
+    try:
+        fac = SYSLOG_FACILITIES.index(cfg.get("syslog_facility") or "user")
+        fac = 1 if fac == 0 else 15 + fac        # user=1, local0..7 = 16..23
+        pri = fac * 8 + SYSLOG_SEVERITY.get(level, 6)
+        line = "<%d>resonance: %s" % (pri, str(text)[:900])
+        if host:
+            port = int(cfg.get("syslog_port") or 514)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                sock.settimeout(1.0)
+                sock.sendto(line.encode("utf-8", "replace"), (host, port))
+            finally:
+                sock.close()
+        else:
+            # The local daemon. Two names because they differ by platform and
+            # trying both is cheaper than asking which one this is.
+            for path in ("/dev/log", "/var/run/syslog"):
+                if not os.path.exists(path):
+                    continue
+                sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+                try:
+                    sock.connect(path)
+                    sock.send(line.encode("utf-8", "replace"))
+                    return
+                except OSError:
+                    continue
+                finally:
+                    sock.close()
+    except Exception:                            # noqa: BLE001
+        pass
+
+
+def in_quiet_hours(now_=None):
+    """Whether the house is asleep, on the DEVICE clock — the same clock dark
+    hours already run on, and for the same reason. Announcing a dead hallway
+    screen through the house speakers at three in the morning is how alerting
+    gets switched off in its first week.
+
+    Spans midnight, because that is the only shape anybody ever sets: 22 to 7
+    is a night, and read as a plain range it would be nineteen hours of
+    daylight and no quiet at all."""
+    cfg = display_settings()
+    if not cfg.get("quiet_on"):
+        return False
+    # `or` would be wrong here and was: midnight is 0, which is falsy, so a
+    # night set to start at 00 silently became 22 — the one hour a quiet
+    # period is most likely to involve, quietly replaced by a default.
+    def _hour(key, fallback):
+        try:
+            return int(cfg[key]) % 24
+        except (KeyError, TypeError, ValueError):
+            return fallback
+    start, end = _hour("quiet_from", 22), _hour("quiet_to", 7)
+    hour = time.localtime(now_ or time.time()).tm_hour
+    if start == end:
+        return False                       # a zero-length night is no night
+    # Inclusive of the start hour, exclusive of the end, both ways round.
+    # They disagreed once: the wrapping branch counted 22:30 as quiet for a
+    # night starting at 22 while the plain one did not count 09:30 as quiet for
+    # one starting at 09 — the same setting meaning two things.
+    return start <= hour < end if start < end else (hour >= start or hour < end)
+
+
+def post_home_assistant(text, level, row):
+    """Announced by the building the screen is part of.
+
+    One service call, and which service is the deployment's business:
+    persistent_notification.create needs nothing configured and always exists,
+    notify.notify or a tts service is the one that actually speaks. Both take
+    a title and a message, so one body serves either."""
+    cfg = display_settings()
+    base = str(cfg.get("ha_url") or "").strip()
+    token = str(cfg.get("ha_token") or "").strip()
+    if not (cfg.get("ha_on") and base and token):
+        return
+    svc = str(cfg.get("ha_service") or "persistent_notification/create").strip()
+    svc = svc.replace(".", "/").strip("/")
+    try:
+        _post_json(ha_url(base, "/api/services/" + svc),
+                   {"title": "Resonance", "message": text},
+                   {"Authorization": "Bearer " + token}, 5)
+    except Exception as exc:                     # noqa: BLE001
+        print("home assistant alert failed: %s" % exc, flush=True)
+
+
+def send_mail(subject, body):
+    """One message, or nothing. Costs no dependency and is still last on the
+    list: it wants a server and credentials, and when it fails it usually
+    fails somewhere this process cannot see."""
+    cfg = display_settings()
+    host = str(cfg.get("mail_host") or "").strip()
+    to = [a.strip() for a in str(cfg.get("mail_to") or "").split(",") if a.strip()]
+    if not (cfg.get("mail_on") and host and to):
+        return
+    frm = str(cfg.get("mail_from") or "").strip() or "resonance@localhost"
+    try:
+        import smtplib
+        from email.message import EmailMessage
+        msg = EmailMessage()
+        msg["Subject"] = subject[:200]
+        msg["From"] = frm
+        msg["To"] = ", ".join(to)
+        msg.set_content(body)
+        port = int(cfg.get("mail_port") or 587)
+        with smtplib.SMTP(host, port, timeout=10) as sm:
+            if cfg.get("mail_tls"):
+                sm.starttls()
+            user = str(cfg.get("mail_user") or "").strip()
+            if user:
+                sm.login(user, str(cfg.get("mail_pass") or ""))
+            sm.send_message(msg)
+    except Exception as exc:                     # noqa: BLE001
+        print("mail failed: %s" % exc, flush=True)
+
+
+def post_webhook(text, level, row):
+    """One JSON POST. Reaches ntfy, Slack, Discord, Gotify and whatever else
+    somebody already runs — the most reach per line of code available here,
+    because they all accept a body with a message in it."""
+    cfg = display_settings()
+    url = str(cfg.get("hook_url") or "").strip()
+    if not cfg.get("hook_on") or not url:
+        return
+    try:
+        _post_json(url, {"text": text, "message": text, "content": text,
+                         "title": "Resonance",
+                         "level": level, "kind": row.get("kind"),
+                         "device": row.get("did") or "",
+                         "at": row.get("last") or int(time.time())},
+                   {}, 5)
+    except Exception as exc:                     # noqa: BLE001
+        # Said once, in the log, and never retried. A sink that retried would
+        # be a fault reporting a fault.
+        print("webhook failed: %s" % exc, flush=True)
+
+
+def deliver_alert(row, resolved=False):
+    """Out to every sink that is switched on. The list is not one of them: it
+    already has the row, which is how it can be the thing that is never
+    missed."""
+    displays = read_displays()
+    who = display_label(displays[row["did"]]) if row.get("did") in displays \
+        else (row.get("did") or "this server")
+    spec = ALERT_KINDS.get(row["kind"]) or {}
+    level = "info" if resolved else row.get("level", "info")
+    text = "%s %s%s%s" % (who, spec.get("words", row["kind"]),
+                          " — RESOLVED" if resolved else "",
+                          (": " + row["detail"]) if row.get("detail") else "")
+    # SYSLOG IGNORES QUIET HOURS. It is a file somebody reads later, not a
+    # thing that makes a noise in a house at three in the morning — and a log
+    # with a hole in it every night is worse than useless for the one fault
+    # that only ever happens at night.
+    syslog_send(level, text)
+    # HELD, NOT DROPPED — and this is where the difference is made real. Quiet
+    # hours and digest mode both leave the row unsent; flush_digest carries it
+    # at a civilised hour, or on the timer. The exception is the alert with a
+    # person standing at a screen: they are waiting now, whatever time it is.
+    cfg = display_settings()
+    if not spec.get("now") and (in_quiet_hours() or cfg.get("digest_on")):
+        return False
+    post_webhook(text, level, row)
+    post_home_assistant(text, level, row)
+    send_mail("Resonance: " + text[:120], text)
+    return True
+
+
+#: How many missed polls before a screen is called gone. Three rather than one:
+#: a single dropped poll is a network hiccup, and an alert that fires on one is
+#: an alert somebody turns off in a week.
+ALERT_MISSES = 3
+#: How many of a thing inside the window before it is worth telling somebody.
+#: A near miss now and then is how speech works; a rate of them is two wake
+#: words cross-triggering.
+ALERT_RATES = {"stt_slow": 5, "tts_fallback": 3, "wake_fuzzy": 5,
+               "no_intent": 5, "backend_error": 3}
+#: The window those rates are counted over.
+ALERT_WINDOW = 3600
+
+
+def evaluate_alerts():
+    """Everything worth a threshold, judged from what is already collected.
+
+    Called from the poll, which is the only clock this server has that a
+    display keeps wound — and the poll is also the fact that liveness is read
+    from, so the thing being measured and the thing doing the measuring arrive
+    together."""
+    now_ = int(time.time())
+    app = read_app()
+    every = int(app.get("poll_seconds") or APP_DEFAULTS["poll_seconds"])
+    gone_after = every * ALERT_MISSES
+    displays = read_displays()
+
+    for did, rec in displays.items():
+        # Only screens that ever worked. An invited row that has never taken
+        # its code is not a screen that has gone quiet; it is a screen that was
+        # never switched on, and it is already visible as one.
+        if not (rec.get("approved") and rec.get("hash")):
+            continue
+        seen = int(rec.get("last_seen") or 0)
+        if seen and now_ - seen > gone_after:
+            raise_alert("offline", did,
+                        "last seen %d seconds ago" % (now_ - seen))
+        else:
+            # RETURNED. Resolving is what makes the resolved-but-unread cell
+            # exist, which is the one that matters: a screen that dropped at
+            # two in the morning and came back leaves something to read.
+            clear_alert("offline", did)
+
+    rows = [r for r in read_events() if r["at"] >= now_ - ALERT_WINDOW]
+    counts = {}
+    for r in rows:
+        counts[(r["kind"], r["did"])] = counts.get((r["kind"], r["did"]), 0) + 1
+    for (kind, did), n in counts.items():
+        if kind in ("mic_denied", "no_recorder"):
+            # Hard faults, not rates. One is enough: a microphone that will not
+            # open is not a thing that gets better by happening less often.
+            raise_alert(kind, did, "reported %d time(s) in the last hour" % n)
+        elif kind in ALERT_RATES and n >= ALERT_RATES[kind]:
+            raise_alert(kind, did, "%d in the last hour" % n)
+    # …and the ones that stopped happening.
+    for kind in list(ALERT_RATES) + ["mic_denied"]:
+        for did in displays:
+            if counts.get((kind, did), 0) == 0:
+                clear_alert(kind, did)
+
+
+def mark_sent(ids):
+    with _alerts_lock:
+        rows = read_alerts()
+        now_ = int(time.time())
+        hit = False
+        for r in rows:
+            if r["id"] in ids and not r.get("sent"):
+                r["sent"], hit = now_, True
+        if hit:
+            write_alerts(rows)
+
+
+def flush_digest(force=False):
+    """Everything held, in one message.
+
+    This is what makes quiet hours a HOLD rather than a drop, and what digest
+    mode is. Nothing goes out during the quiet: the whole point is that the
+    house is asleep, and a digest that fired at three would be the thing it
+    exists to prevent."""
+    cfg = display_settings()
+    if in_quiet_hours():
+        return 0
+    waiting = [r for r in read_alerts() if not r.get("sent")]
+    if not waiting:
+        return 0
+    if not force:
+        every = max(5, int(cfg.get("digest_minutes") or 60)) * 60
+        oldest = min(r["last"] for r in waiting)
+        # Counted from the OLDEST held thing rather than from the last digest:
+        # what matters is how long something has gone unsaid, not how long it
+        # has been since a message that may have carried nothing.
+        if int(time.time()) - oldest < every:
+            return 0
+    displays = read_displays()
+    lines = []
+    for r in sorted(waiting, key=lambda r: r["last"]):
+        spec = ALERT_KINDS.get(r["kind"]) or {}
+        who = display_label(displays[r["did"]]) if r.get("did") in displays \
+            else (r.get("did") or "this server")
+        lines.append("%s %s%s%s" % (who, spec.get("words", r["kind"]),
+                                    " — RESOLVED" if r["resolved"] else "",
+                                    (": " + r["detail"]) if r.get("detail") else ""))
+    text = "%d thing%s to report:\n" % (len(lines), "" if len(lines) == 1 else "s")
+    text += "\n".join("  · " + ln for ln in lines)
+    worst = "error" if any(r["level"] == "error" for r in waiting) else "warn"
+    post_webhook(text, worst, waiting[0])
+    post_home_assistant(text, worst, waiting[0])
+    send_mail("Resonance: %d thing%s to report"
+              % (len(lines), "" if len(lines) == 1 else "s"), text)
+    mark_sent([r["id"] for r in waiting])
+    print("digest sent: %d alert(s)" % len(waiting), flush=True)
+    return len(waiting)
+
+
+def ack_alerts(ids):
+    """Read by a person. An alert that is both resolved and acknowledged has
+    nothing left to say, so it leaves — everything else stays visible."""
+    now_ = int(time.time())
+    with _alerts_lock:
+        rows = read_alerts()
+        for r in rows:
+            if r["id"] in ids and not r["acked"]:
+                r["acked"] = now_
+        keep = [r for r in rows if not (r["resolved"] and r["acked"])]
+        write_alerts(keep)
+        return len(rows) - len(keep)
 
 
 # ---------------------------------------------------------------- identities
@@ -5184,6 +6046,8 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/displays/decide", "/displays/settings", "/displays/kiosk",
                      "/groups", "/groups/save", "/groups/delete", "/groups/sets",
                      "/app/pin",
+                     "/log", "/alerts", "/alerts/ack",
+                     "/events", "/events/clear",
                      "/identities/wake", "/identities/wake/check",
                      "/identities", "/identities/new", "/identities/rename",
                      "/identities/delete", "/identities/reissue",
@@ -5932,6 +6796,76 @@ class Handler(SimpleHTTPRequestHandler):
             skip = (q.get("id") or [""])[0]
             bad = check_wake_word(word, skip_pid=skip)
             return self._json(200, {"ok": not bad, "why": bad})
+        if path == "/log":
+            # Read through the panel rather than over SSH. Admin only, and a
+            # tail rather than the file: this is a window onto a running
+            # server, not a download.
+            if not self._require("admin"):
+                return
+            q = parse_qs(urlparse(self.path).query)
+            lines, cut, size = read_log_tail((q.get("q") or [""])[0][:80])
+            return self._json(200, {"lines": lines, "truncated": cut,
+                                    "bytes": size, "max": LOG_MAX_LINES})
+        if path == "/alerts":
+            if not self._require("admin"):
+                return
+            displays = read_displays()
+            rows = []
+            for a in sorted(read_alerts(), key=lambda a: (-a["last"],)):
+                spec = ALERT_KINDS.get(a["kind"]) or {}
+                rows.append(dict(a, words=spec.get("words", a["kind"]),
+                                 label=display_label(displays[a["did"]])
+                                 if a.get("did") in displays else ""))
+            return self._json(200, {
+                "alerts": rows,
+                # The two numbers a list like this is read against: what is
+                # still true, and what is over but unread.
+                "open": len([a for a in rows if not a["resolved"]]),
+                "unread": len([a for a in rows if a["resolved"] and not a["acked"]])})
+        if path == "/events":
+            # The health view's data: what each screen has been reporting, and
+            # the raw tail underneath it. Per device, because the useful
+            # question is which screen is failing rather than how many faults
+            # there were in total.
+            if not self._require("admin"):
+                return
+            rows = read_events()
+            displays = read_displays()
+            now_ = int(time.time())
+            health = []
+            for did in sorted(displays, key=lambda d: display_label(displays[d]).lower()):
+                h = display_health(did, rows, now_)
+                if h["n"]:
+                    health.append(dict(h, id=did, label=display_label(displays[did])))
+            return self._json(200, {
+                "health": health,
+                # Newest first, and bounded: this is a tail to read, not a
+                # dataset to page through.
+                "recent": [dict(r, label=display_label(displays[r["did"]])
+                                if r.get("did") in displays else "")
+                           for r in sorted(rows, key=lambda r: -r["at"])[:200]],
+                # The conversation record, newest first. Bounded the same way
+                # the events are: a tail to read, not a dataset to page.
+                "turns": [dict(r, label=display_label(displays[r["did"]])
+                               if r.get("did") in displays else "")
+                          for r in sorted(read_turns(), key=lambda r: -r["at"])[:120]],
+                "days": event_window_days(),
+                # The sink's settings ride with the data it reports on, so the
+                # panel fills that box from the same fetch rather than a second
+                # one that can disagree with it.
+                "settings": {k: panel_settings().get(k)
+                             for k in ("syslog_on", "syslog_host",
+                                       "syslog_port", "syslog_facility",
+                                       "hook_on", "hook_url",
+                                       "ha_on", "ha_url", "ha_service",
+                                       "ha_has_token",
+                                       "mail_on", "mail_host", "mail_port",
+                                       "mail_tls", "mail_user", "mail_from",
+                                       "mail_to", "mail_has_pass",
+                                       "digest_on", "digest_minutes",
+                                       "quiet_on", "quiet_from", "quiet_to")},
+                "limits": {"event_days": EVENT_DAYS_LIMITS},
+                "kinds": list(EVENT_KINDS), "total": len(rows)})
         if path == "/identities":
             if not self._require("admin"):
                 return
@@ -6708,6 +7642,21 @@ class Handler(SimpleHTTPRequestHandler):
             cfg["refresh_offset"] = refresh_offset(disp["id"],
                                                    cfg["refresh_stagger"])
             note_display_seen(disp["id"])
+            # Whatever it has been keeping since its last poll, filed against
+            # the TOKEN's display and nothing else — a screen naming which
+            # screen it is would be a screen able to file a fault against
+            # another one. After `disp` on purpose: an unapproved browser has
+            # no row to file against, and its poll returns above.
+            if obj.get("events") and take_events(disp["id"], obj.get("events")):
+                prune_events()
+                prune_turns()
+            # Judged here because this is the only clock a display keeps wound,
+            # and because liveness is read from this very request — the thing
+            # measured and the thing measuring arrive together.
+            evaluate_alerts()
+            # The poll is the only clock, so it is also what releases anything
+            # being held — by quiet hours, or by the digest timer.
+            flush_digest()
             try:
                 req = int(disp.get("reload_req") or 0)
             except (TypeError, ValueError):
@@ -7005,6 +7954,44 @@ class Handler(SimpleHTTPRequestHandler):
             print("the panel PIN was set by %s" % s["user"], flush=True)
             return self._json(200, {"ok": True, "has_pin": True})
 
+        if parsed.path == "/alerts/ack":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            ids = [str(i)[:16] for i in (obj.get("ids") or [])]
+            gone = ack_alerts(ids)
+            return self._json(200, {"ok": True, "closed": gone})
+
+        if parsed.path == "/events/clear":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            did = str(obj.get("id") or "")
+            rows = read_events()
+            # One screen's, or all of them. Deleting what a display reported is
+            # not deleting the display: a screen whose fault has been fixed
+            # should be able to start clean without being taken off the wall.
+            keep = [r for r in rows if r.get("did") != did] if did else []
+            write_events(keep)
+            # The conversation record goes with it. They are one window and one
+            # control; clearing what a screen reported while keeping what was
+            # said to it would be the surprising half of the pair.
+            turns = read_turns()
+            tkeep = [r for r in turns if r.get("did") != did] if did else []
+            write_turns(tkeep)
+            print("%d event(s) and %d turn(s) cleared by %s%s"
+                  % (len(rows) - len(keep), len(turns) - len(tkeep), s["user"],
+                     " for " + did if did else " (all)"), flush=True)
+            return self._json(200, {"ok": True,
+                                    "cleared": len(rows) - len(keep),
+                                    "turns": len(turns) - len(tkeep)})
+
         if parsed.path == "/identities/wake":
             s = self._require("admin")
             if not s:
@@ -7296,6 +8283,9 @@ class Handler(SimpleHTTPRequestHandler):
             # refusal leaves whatever group it was already in alone, because
             # groups are how you address a set of things and not a record of
             # who is currently allowed.
+            # Decided, so it is no longer asking. Resolved either way — the
+            # alert was "somebody is waiting", and they are not any more.
+            clear_alert("asked_in", did)
             if approve:
                 file_display(did, by=s["user"])
             # The allow-lists, whichever way it went: a refusal has to take
@@ -7610,6 +8600,17 @@ class Handler(SimpleHTTPRequestHandler):
             except Exception as exc:                       # noqa: BLE001
                 print("ask failed (%s %s): %s"
                       % (rid, route_dest(cfg), exc), flush=True)
+                # The leg only this side can see. A display is told something
+                # went wrong and deliberately not what; the panel is where the
+                # verbatim error belongs, keyed to the screen that hit it.
+                failed_ms = int((time.time() - t0) * 1000)
+                note_event("backend_error", did=disp["id"] if disp else "",
+                           level="error", route=cfg.get("name") or rid,
+                           detail=str(exc)[:300], ms=failed_ms)
+                bad_trail = obj.get("trail") if isinstance(obj.get("trail"), dict) else None
+                note_turn(disp["id"] if disp else "", cfg.get("name") or rid,
+                          (bad_trail or {}).get("heard"), text, "", bad_trail,
+                          failed_ms, error=str(exc))
                 # The message names the route rather than the adapter. A
                 # display says this out loud, and "openai returned 401" tells
                 # the person standing in front of it nothing they can act on
@@ -7624,6 +8625,22 @@ class Handler(SimpleHTTPRequestHandler):
             # One hop, and never the target's own fallthrough: a chain of them
             # is a question travelling somewhere nobody chose, at a cost per
             # link, and two routes pointing at each other would do it for ever.
+            took_ms = int((time.time() - t0) * 1000)
+            # PER ROUTE, because one number across both never fires or never
+            # stops: a house intent answers in about a tenth of a second and a
+            # hosted model takes seconds. The route's own timeout is the only
+            # number here that already means "longer than this is wrong", so
+            # half of it is the line.
+            if took_ms >= max(2000, int(cfg.get("timeout") or 120) * 500):
+                note_event("backend_slow", did=disp["id"] if disp else "",
+                           level="warn", route=cfg.get("name") or rid,
+                           ms=took_ms, detail="%dms" % took_ms)
+            # A house being asked for things it cannot do, which is a fact
+            # about how people are speaking to it rather than a fault.
+            if out.get("code") == "no_intent_match":
+                note_event("no_intent", did=disp["id"] if disp else "",
+                           level="info", route=cfg.get("name") or rid,
+                           detail=text[:120])
             fell_to = ""
             if out.get("code") == "no_intent_match" and cfg.get("fallthrough"):
                 ft = cfg["fallthrough"]
@@ -7659,7 +8676,15 @@ class Handler(SimpleHTTPRequestHandler):
 
             ms = int((time.time() - t0) * 1000)
             reply = out.get("reply") or ""
+            # The trail comes from the display, which is the only place it ever
+            # existed: after the gate the wake word is stripped and the near
+            # miss is gone. A turn typed into the composer carries none, and
+            # gets none invented for it.
+            trail = obj.get("trail") if isinstance(obj.get("trail"), dict) else None
             if not reply:
+                note_turn(disp["id"] if disp else "", cfg.get("name") or rid,
+                          (trail or {}).get("heard"), text, "", trail, ms,
+                          error="that route returned nothing")
                 return self._json(502, dict(about, ms=ms,
                                             error="that route returned nothing"))
             print("ask ok (%s %s) %dms%s"
@@ -7670,6 +8695,9 @@ class Handler(SimpleHTTPRequestHandler):
             # window, and the server has no idea a conversation is in progress
             # between two requests. Nothing here ends one — see the note in
             # ask_homeassistant about the flag that used to.
+            note_turn(disp["id"] if disp else "", cfg.get("name") or rid,
+                      (trail or {}).get("heard"), text, reply, trail, ms,
+                      fell_to=fell_to)
             return self._json(200, dict(about, reply=reply, ms=ms,
                                         conversation_id=out.get("conversation_id") or ""))
 
@@ -7824,6 +8852,11 @@ def main():
     migrate_unenrolled_invites()
     prune_group_members()
     ensure_default_membership()
+    # Anything past the window, gone — read at startup as well as after a poll,
+    # so a server that has been down for a fortnight does not come back holding
+    # a fortnight of what was said to a screen.
+    prune_events()
+    prune_turns()
     app = read_app()
     # Environment still wins, so a one-off run on a different port needs no
     # edit to the stored configuration. Setting PORT alone moves all three,
