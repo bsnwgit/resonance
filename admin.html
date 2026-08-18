@@ -3163,6 +3163,41 @@ code for do not, and never will.
     </div>
   </section>
 
+  <!-- What the screens have been reporting, beside the list of what they are.
+       Per DEVICE, because the useful question is which screen is failing
+       rather than how many faults there have been. -->
+  <section class="grp bare proflist" data-tab="devices">
+    <div class="barehead"><span class="listtitle">Health</span></div>
+    <div class="grpbody">
+  <div class="setuprow">
+    <label class="bklab" for="ev_days">Keep what screens report for (days)</label>
+    <input id="ev_days" class="num" type="number" inputmode="numeric"
+           min="1" max="90">
+    <button id="b_evdays" class="act-save">SAVE</button>
+  </div>
+  <div class="note" id="evnote"></div>
+  <div id="evlist"></div>
+  <div class="seg actrow"><button id="b_evclear" class="act-undo">CLEAR ALL</button></div>
+  <div class="note help">A screen with a fault cannot tell anybody. This is
+where it says so: a microphone that would not open, a browser with no recorder
+at all, transcription running long, the neural voice quietly falling back to
+the browser's, and the wake word it actually matched on.
+
+<b>Most of this was already worked out and thrown away.</b> The display says
+<b>woke on “hows” (near “house”)</b> as a note that fades — which on a wall
+nobody is ever there to read. Kept here, it is also the only way to find out
+that two wake words are cross-triggering.
+
+<b>Retention is the control, and it is short on purpose.</b> This holds what
+was addressed to a screen, so a generous default would be a decision made on
+somebody's behalf about their household. Nothing outside a conversation is
+recorded, and nothing at all until somebody says a wake word.
+
+<b>CLEAR</b> on a row forgets what one screen reported without taking it off
+the wall — for a fault that has been fixed.</div>
+    </div>
+  </section>
+
   <!-- Laid out like the endpoints on AI, because it is the same kind of list:
        a set of named things, each of which is one line until you want it, and
        a new one made by adding a row rather than by filling in a permanent
@@ -5691,6 +5726,131 @@ $('b_idnew').addEventListener('click', async ()=>{
 });
 $('id_name').addEventListener('keydown', e=>{
   if (e.key === 'Enter') $('b_idnew').click();
+});
+
+/* ------------------------------------------------------------ health
+   What the screens have been reporting. Read on the tab that lists them,
+   because "which screen is failing" is answered beside "which screens are
+   there" or it is answered by scrolling between two pages. */
+let EVENTS = null;
+
+const evWhen = (ts)=> ts ? new Date(ts * 1000).toLocaleString() : '';
+const EV_WORDS = {
+  mic_denied:    'microphone refused',
+  no_recorder:   'no recorder in this browser',
+  stt_slow:      'transcription ran long',
+  stt_error:     'the recogniser errored',
+  tts_fallback:  'fell back to the browser voice',
+  wake_fuzzy:    'woke on a near miss',
+  no_intent:     'asked for something it cannot do',
+  backend_error: 'the assistant errored',
+  backend_slow:  'the assistant ran long',
+};
+
+function evNote(m, bad){
+  const el = $('evnote');
+  if (!el) return;
+  el.className = 'note' + (bad ? ' bad' : '');
+  el.textContent = m || '';
+}
+
+async function refreshEvents(){
+  const box = $('evlist');
+  if (!box || ME.role !== 'admin'){ if (box) box.textContent = ''; return; }
+  try{
+    EVENTS = await api('/events');
+  }catch(e){ evNote(e.message, true); return; }
+  const days = $('ev_days');
+  if (days && document.activeElement !== days) days.value = EVENTS.days;
+  box.innerHTML = '';
+  const rows = EVENTS.health || [];
+  if (!rows.length){
+    box.className = 'note';
+    box.textContent = 'Nothing reported. A screen with no faults says nothing, '
+                    + 'which is the answer you want.';
+    return;
+  }
+  box.className = '';
+  rows.forEach(h=>{
+    const row = document.createElement('div');
+    row.className = 'erow shut';
+    const top = document.createElement('div'); top.className = 'top';
+    const nm = document.createElement('span');
+    nm.className = 'nm';
+    nm.textContent = h.label || h.id;
+    top.appendChild(nm);
+    const b = document.createElement('span');
+    /* The worst thing it has said, so a list of twenty screens can be read
+       down rather than opened one at a time. */
+    b.className = 'badge' + (h.worst === 'error' ? ' warn' : '');
+    b.textContent = h.worst === 'error' ? 'ERRORS'
+                  : h.worst === 'warn' ? 'WARNINGS' : 'NOTES';
+    top.appendChild(b);
+    const cnt = document.createElement('span');
+    cnt.className = 'badge';
+    cnt.textContent = h.n + (h.n === 1 ? ' event' : ' events');
+    top.appendChild(cnt);
+    const last = document.createElement('span');
+    last.className = 'badge';
+    last.textContent = 'last ' + evWhen(h.last);
+    top.appendChild(last);
+    top.onclick = (e)=>{
+      if (e.target.closest('button')) return;
+      const opening = row.classList.contains('shut');
+      box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
+      row.classList.toggle('shut', !opening);
+    };
+    row.appendChild(top);
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    h.events.forEach(e=>{
+      const el = document.createElement('div');
+      const bb = document.createElement('b');
+      bb.textContent = (EV_WORDS[e.kind] || e.kind) + ' ';
+      el.appendChild(bb);
+      el.appendChild(document.createTextNode(
+        '×' + e.n + ' · ' + evWhen(e.last) + (e.detail ? ' · ' + e.detail : '')));
+      meta.appendChild(el);
+    });
+    row.appendChild(meta);
+
+    const acts = document.createElement('div');
+    acts.className = 'seg actrow';
+    const clr = document.createElement('button');
+    clr.className = 'act-undo';
+    clr.textContent = 'CLEAR THIS SCREEN';
+    clr.onclick = async ()=>{
+      try{
+        await api('/events/clear', {method:'POST',
+                                    body: JSON.stringify({id: h.id})});
+        evNote('cleared');
+        refreshEvents();
+      }catch(e){ evNote(e.message, true); }
+    };
+    acts.appendChild(clr);
+    row.appendChild(acts);
+    box.appendChild(row);
+  });
+}
+
+const bevd = $('b_evdays');
+if (bevd) bevd.addEventListener('click', async ()=>{
+  try{
+    await api('/displays/settings', {method:'POST', body: JSON.stringify(
+      {event_days: parseInt($('ev_days').value, 10)})});
+    evNote('saved');
+    refreshEvents();
+  }catch(e){ evNote(e.message, true); }
+});
+const bevc = $('b_evclear');
+if (bevc) bevc.addEventListener('click', async ()=>{
+  if (!confirm('Forget everything every screen has reported?')) return;
+  try{
+    await api('/events/clear', {method:'POST', body: JSON.stringify({})});
+    evNote('cleared');
+    refreshEvents();
+  }catch(e){ evNote(e.message, true); }
 });
 
 /* ----------------------------------------------------------- groups
@@ -9146,6 +9306,7 @@ function panelNav(){
     if (tab === 'security'){ refreshGroups(); loadApp(); }
     if (tab === 'displays' || tab === 'devices' || tab === 'security'
         || tab === 'enrol') refreshDisplays();
+    if (tab === 'devices') refreshEvents();
     // Its own list and its own fetch: it shares the tab with the request
     // queue but nothing else, and a person is not a row in the display file.
     if (tab === 'displays') refreshIdentities();

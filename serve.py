@@ -7824,6 +7824,13 @@ class Handler(SimpleHTTPRequestHandler):
             except Exception as exc:                       # noqa: BLE001
                 print("ask failed (%s %s): %s"
                       % (rid, route_dest(cfg), exc), flush=True)
+                # The leg only this side can see. A display is told something
+                # went wrong and deliberately not what; the panel is where the
+                # verbatim error belongs, keyed to the screen that hit it.
+                note_event("backend_error", did=disp["id"] if disp else "",
+                           level="error", route=cfg.get("name") or rid,
+                           detail=str(exc)[:300],
+                           ms=int((time.time() - t0) * 1000))
                 # The message names the route rather than the adapter. A
                 # display says this out loud, and "openai returned 401" tells
                 # the person standing in front of it nothing they can act on
@@ -7838,6 +7845,22 @@ class Handler(SimpleHTTPRequestHandler):
             # One hop, and never the target's own fallthrough: a chain of them
             # is a question travelling somewhere nobody chose, at a cost per
             # link, and two routes pointing at each other would do it for ever.
+            took_ms = int((time.time() - t0) * 1000)
+            # PER ROUTE, because one number across both never fires or never
+            # stops: a house intent answers in about a tenth of a second and a
+            # hosted model takes seconds. The route's own timeout is the only
+            # number here that already means "longer than this is wrong", so
+            # half of it is the line.
+            if took_ms >= max(2000, int(cfg.get("timeout") or 120) * 500):
+                note_event("backend_slow", did=disp["id"] if disp else "",
+                           level="warn", route=cfg.get("name") or rid,
+                           ms=took_ms, detail="%dms" % took_ms)
+            # A house being asked for things it cannot do, which is a fact
+            # about how people are speaking to it rather than a fault.
+            if out.get("code") == "no_intent_match":
+                note_event("no_intent", did=disp["id"] if disp else "",
+                           level="info", route=cfg.get("name") or rid,
+                           detail=text[:120])
             fell_to = ""
             if out.get("code") == "no_intent_match" and cfg.get("fallthrough"):
                 ft = cfg["fallthrough"]

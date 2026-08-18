@@ -2664,7 +2664,12 @@ const Mic = {
       micNote('BLOCKED: mic needs a secure origin. Use the https:// URL (port 9701).', true);
       return;
     }
-    if (!this.ok){ micNote('this browser exposes no getUserMedia', true); return; }
+    if (!this.ok){
+      micNote('this browser exposes no getUserMedia', true);
+      Events.add('no_recorder', {level:'error', once:true,
+                                 detail:'no getUserMedia in this browser'});
+      return;
+    }
     try{
       /* I originally forced all processing OFF to keep the dynamics the
          visualiser feeds on. That is the wrong default once a human is
@@ -2681,6 +2686,10 @@ const Mic = {
     }catch(e){
       micNote('mic refused: ' + (e && e.name ? e.name : e) +
               (e && e.name === 'NotAllowedError' ? ' — permission denied in the browser' : ''));
+      /* The one an admin most needs and can least see: a wall screen whose
+         microphone was refused looks exactly like one nobody is talking to. */
+      Events.add('mic_denied', {level:'error',
+                                detail: (e && e.name ? e.name : String(e))});
       return;
     }
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -2820,6 +2829,44 @@ function calibrate(){
    `bad` is not decoration: this line carries both "here is what happened" and
    "here is why nothing happened", and on a wall screen read from across a room
    those two need to be tellable apart without reading the words. */
+/* ================================================================ EVENTS
+   What this screen has to say about itself, held until the next poll and sent
+   up with it. Not its own request: a screen reporting a fault is a screen
+   already having a bad time, and a second connection to make is a second
+   thing to fail.
+
+   Queued rather than sent, and capped here as well as at the server: a
+   microphone that will not open produces this every time somebody presses the
+   button, and the queue must not become the fault. */
+const Events = {
+  q: [],
+  seen: {},
+  add(kind, opts){
+    if (EMBED || PREVIEW) return;          // neither is a screen on a wall
+    const o = opts || {};
+    /* A FACT rather than an event — no recorder in this browser will be just
+       as true tomorrow — so it is said once and never again. */
+    if (o.once){
+      if (this.seen[kind]) return;
+      this.seen[kind] = 1;
+    }
+    if (this.q.length >= 12) return;
+    this.q.push({kind, level: o.level || 'info',
+                 detail: (o.detail || '').slice(0, 300),
+                 route: (o.route || '').slice(0, 60),
+                 ms: Math.max(0, Math.round(o.ms || 0))});
+  },
+  /* Taken, not copied: whatever goes out is gone from the queue, so a poll
+     that fails does not send the same thing twice on the next one. What that
+     costs is a lost report on a dropped poll, which is the right way round —
+     a screen that is offline has a fault somebody will see anyway. */
+  take(){
+    const out = this.q;
+    this.q = [];
+    return out;
+  },
+};
+
 function micNote(m, bad){
   const el = $('micnote');
   if (el){ el.textContent = m; el.classList.toggle('bad', !!bad); }
@@ -2848,7 +2895,12 @@ const Listen = {
 
   start(stream){
     if (this.on || !stream) return;
-    if (!this.supported()){ micNote('no MediaRecorder in this browser', true); return; }
+    if (!this.supported()){
+      micNote('no MediaRecorder in this browser', true);
+      Events.add('no_recorder', {level:'error', once:true,
+                                 detail:'no MediaRecorder in this browser'});
+      return;
+    }
     this.on = true;
     this._arm(stream);
     syncTalk();
@@ -2891,7 +2943,9 @@ const Listen = {
         body: blob
       });
       const j = await r.json();
-      if (j.error)      micNote('stt error: ' + j.error, true);
+      if (j.error)      { micNote('stt error: ' + j.error, true);
+                          Events.add('stt_error', {level:'error',
+                                                   detail: String(j.error)}); }
       else if (j.text)  {
         if (Learn.on){ Learn.take(j.text); }
         else {
@@ -2916,6 +2970,14 @@ const Listen = {
             const trip = Math.round(performance.now() - t0);
             micNote('heard you  ·  ' + state + '  ·  ' + j.ms + 'ms decode, ' +
                     trip + 'ms round trip, +' + Math.round(S.hangover*1000) + 'ms silence wait');
+            /* Measured already and thrown away with the note. Only where it
+               ran LONG: a screen doing its job in half a second has nothing
+               to report, and a store of ordinary timings is a store nobody
+               reads. */
+            if (trip >= 3000)
+              Events.add('stt_slow', {level:'warn', ms: trip,
+                                      detail: j.ms + 'ms decode of ' + trip
+                                              + 'ms round trip'});
             submit(act);
           }
         }
@@ -2923,6 +2985,7 @@ const Listen = {
       else              micNote('nothing recognised — try speaking a little louder', true);
     }catch(e){
       micNote('stt request failed: ' + e.message, true);
+      Events.add('stt_error', {level:'error', detail: e.message});
     }
     this.busy = false; syncTalk();
   },
@@ -3076,6 +3139,9 @@ const Play = {
       src.start();
     }catch(e){
       note('neural voice failed (' + e.message + ') — falling back to the browser voice');
+      /* Silent degradation of the part people notice most, and on a wall the
+         note that says so is read by nobody. */
+      Events.add('tts_fallback', {level:'warn', detail: e.message});
       S.ttsengine = 'browser'; syncSeg('ttsengine');
       Speech.local = false;
       Speech.next();                        // retry through the browser engine
@@ -4205,6 +4271,12 @@ const Wake = {
     this.touch(); syncTalk(); syncWake();
     if (h.fuzzy)
       micNote('woke on "' + h.fuzzy + '" (near “' + h.word + '”) — ' + h.route.name);
+      /* Already worked out, and until now thrown away with the note that
+         showed it. It is the only way to find out that two wake words are
+         cross-triggering, which is the standing risk of several shared names
+         in one house. */
+      Events.add('wake_fuzzy', {level:'info', route: h.route.name,
+                                detail: 'heard "' + h.fuzzy + '" near "' + h.word + '"'});
     else if (switching)
       micNote('now talking to ' + h.route.name);
     if (!h.rest){                            // just the name — say hello back
@@ -4980,7 +5052,7 @@ const Watch = {
       const r = await fetch('display/poll', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         cache: 'no-store', signal: cut.signal,
-        body: JSON.stringify({boot: this.boot})
+        body: JSON.stringify({boot: this.boot, events: Events.take()})
       });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
