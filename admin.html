@@ -3214,6 +3214,20 @@ code for do not, and never will.
            placeholder="https://ntfy.example/resonance">
   </div>
   <div class="setuprow">
+    <label class="vo"><input type="checkbox" id="ha_on"> Announce alerts through Home Assistant</label>
+  </div>
+  <div class="setuprow" id="ha_where">
+    <label class="bklab" for="ha_url">Address</label>
+    <input id="ha_url" type="text" spellcheck="false" autocomplete="off"
+           placeholder="http://homeassistant.local:8123">
+    <label class="bklab" for="ha_token">Long-lived access token</label>
+    <input id="ha_token" type="password" autocomplete="new-password"
+           placeholder="leave blank to keep the one stored">
+    <label class="bklab" for="ha_service">Service to call</label>
+    <input id="ha_service" type="text" spellcheck="false" autocomplete="off"
+           placeholder="persistent_notification.create">
+  </div>
+  <div class="setuprow">
     <label class="vo"><input type="checkbox" id="q_on"> Quiet hours</label>
   </div>
   <div class="setuprow" id="q_when">
@@ -3239,6 +3253,17 @@ send is still in the list above, which is why that one is not optional.
 <b>A webhook</b> is one JSON POST and reaches ntfy, Slack, Discord, Gotify and
 whatever else you already run — the most reach per line of code available here,
 because they all take a body with a message in it.
+
+<b>Home Assistant is the strongest one here</b>, because it can speak: a screen
+that dies gets announced by the building it is part of. It has <b>its own
+connection</b> rather than borrowing an endpoint's — alerting that hung off a
+route would disappear the day somebody deleted that route, which is a
+surprising way to lose the thing that tells you a screen is dead.
+
+<b>persistent_notification.create</b> is the default because it always exists
+and needs nothing configured. <b>notify.notify</b>, or a tts service, is the one
+that actually speaks. The token is stored here and never sent back to this page;
+leaving the field blank keeps the one already saved.
 
 <b>Quiet hours run on this machine's clock</b>, the same one dark hours use,
 and they span midnight the way a night does: 22 until 7 is a night, not
@@ -5965,6 +5990,13 @@ function paintSyslog(cfg){
   if (!cfg || !$('sl_on')) return;
   $('hk_on').checked = !!cfg.hook_on;
   $('hk_url').value = cfg.hook_url || '';
+  $('ha_on').checked = !!cfg.ha_on;
+  $('ha_url').value = cfg.ha_url || '';
+  $('ha_service').value = cfg.ha_service || '';
+  /* Never filled in. The server does not send it, so an empty box means "the
+     one already stored" — which is also what an empty box SAVES. */
+  $('ha_token').placeholder = cfg.ha_has_token
+    ? 'a token is stored — leave blank to keep it' : 'paste the token';
   $('q_on').checked = !!cfg.quiet_on;
   /* Written out rather than `|| 22`: midnight is 0 and falsy, which is
      exactly the bug this pair had on the server. */
@@ -5985,13 +6017,14 @@ function paintSyslog(cfg){
 }
 function syncSyslog(){
   /* Each address only means something once its own switch is on. */
-  const pairs = [['sl_where', 'sl_on'], ['hk_where', 'hk_on'], ['q_when', 'q_on']];
+  const pairs = [['sl_where', 'sl_on'], ['hk_where', 'hk_on'],
+                 ['ha_where', 'ha_on'], ['q_when', 'q_on']];
   pairs.forEach(([box, sw])=>{
     const el = $(box);
     if (el) el.style.display = $(sw).checked ? '' : 'none';
   });
 }
-['sl_on', 'hk_on', 'q_on'].forEach(id=>{
+['sl_on', 'hk_on', 'ha_on', 'q_on'].forEach(id=>{
   const el = $(id);
   if (el) el.addEventListener('change', syncSyslog);
 });
@@ -6006,6 +6039,10 @@ if (bsl) bsl.addEventListener('click', async ()=>{
       syslog_facility: $('sl_fac').value,
       hook_on: $('hk_on').checked ? 1 : 0,
       hook_url: ($('hk_url').value || '').trim(),
+      ha_on: $('ha_on').checked ? 1 : 0,
+      ha_url: ($('ha_url').value || '').trim(),
+      ha_token: $('ha_token').value,
+      ha_service: ($('ha_service').value || '').trim(),
       quiet_on: $('q_on').checked ? 1 : 0,
       quiet_from: parseInt($('q_from').value, 10),
       quiet_to: parseInt($('q_to').value, 10),
@@ -6014,6 +6051,8 @@ if (bsl) bsl.addEventListener('click', async ()=>{
     const on = [];
     if ($('sl_on').checked) on.push('syslog');
     if ($('hk_on').checked) on.push('a webhook');
+    if ($('ha_on').checked) on.push('Home Assistant');
+    $('ha_token').value = '';        // never left on screen after a save
     note.textContent = 'saved — ' + (on.length ? 'also going to ' + on.join(' and ')
                                                : 'the list only')
                      + ($('q_on').checked ? ', quiet ' + $('q_from').value

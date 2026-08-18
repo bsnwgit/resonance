@@ -1791,6 +1791,20 @@ DISPLAY_SETTINGS = {
     # A JSON POST, which is what ntfy, Slack, Discord and Gotify all take.
     "hook_on": 0,
     "hook_url": "",
+    # ITS OWN CONNECTION, not a route's. Home Assistant is the strongest sink
+    # in this deployment — already connected, and a thing that can speak
+    # through the house, so a screen that dies gets announced by the building
+    # it is part of. But hanging alerting off a ROUTE means alerting
+    # disappears when somebody deletes that route, which is a surprising way
+    # to lose the thing that tells you a screen is dead.
+    "ha_on": 0,
+    "ha_url": "",
+    "ha_token": "",
+    # Anything HA will call. persistent_notification.create always exists and
+    # needs nothing configured, so it is the default; notify.notify or a
+    # tts service is the one that actually speaks, and is a field rather than
+    # an assumption because which of them exists is the deployment's business.
+    "ha_service": "persistent_notification/create",
     # The house asleep, on the device clock — the same clock dark hours use.
     "quiet_on": 0,
     "quiet_from": 22,
@@ -2104,6 +2118,10 @@ def panel_settings():
         row["values"] = vals
         out.append(row)
     cfg["models"] = out
+    # The alert sink's token, by the same rule: the panel is told WHETHER one
+    # is set, which is what tells a configured sink from an unconfigured one,
+    # and never the token.
+    cfg["ha_has_token"] = bool(cfg.pop("ha_token", ""))
     return cfg
 
 
@@ -2145,6 +2163,30 @@ def validate_display_settings(obj, current):
         if f not in SYSLOG_FACILITIES:
             return None, "facility must be one of: " + ", ".join(SYSLOG_FACILITIES)
         cfg["syslog_facility"] = f
+    if "ha_on" in obj:
+        cfg["ha_on"] = 1 if obj["ha_on"] else 0
+    if "ha_url" in obj:
+        u = str(obj["ha_url"] or "").strip()[:200]
+        if u and not u.startswith(("http://", "https://")):
+            return None, "Home Assistant needs its full http:// or https:// address"
+        cfg["ha_url"] = u
+    if "ha_token" in obj:
+        # Blank means LEAVE IT, not clear it. A panel that is never sent the
+        # token cannot send it back, so an empty field on a save is the field
+        # it was never given rather than an instruction to forget.
+        t = str(obj["ha_token"] or "").strip()
+        if t:
+            cfg["ha_token"] = t[:400]
+    if "ha_clear_token" in obj and obj["ha_clear_token"]:
+        cfg["ha_token"] = ""
+    if "ha_service" in obj:
+        sv = str(obj["ha_service"] or "").strip()[:80]
+        if sv and not re.fullmatch(r"[a-z0-9_]+[./][a-z0-9_]+", sv):
+            return None, "a service reads like notify.notify or notify/notify"
+        cfg["ha_service"] = sv or "persistent_notification/create"
+    if cfg.get("ha_on") and not (cfg.get("ha_url") and cfg.get("ha_token")):
+        return None, ("Home Assistant needs its address and a long-lived token "
+                      "before it can be switched on")
     if "hook_on" in obj:
         cfg["hook_on"] = 1 if obj["hook_on"] else 0
     if "hook_url" in obj:
@@ -3772,6 +3814,28 @@ def in_quiet_hours(now_=None):
     return start <= hour < end if start < end else (hour >= start or hour < end)
 
 
+def post_home_assistant(text, level, row):
+    """Announced by the building the screen is part of.
+
+    One service call, and which service is the deployment's business:
+    persistent_notification.create needs nothing configured and always exists,
+    notify.notify or a tts service is the one that actually speaks. Both take
+    a title and a message, so one body serves either."""
+    cfg = display_settings()
+    base = str(cfg.get("ha_url") or "").strip()
+    token = str(cfg.get("ha_token") or "").strip()
+    if not (cfg.get("ha_on") and base and token):
+        return
+    svc = str(cfg.get("ha_service") or "persistent_notification/create").strip()
+    svc = svc.replace(".", "/").strip("/")
+    try:
+        _post_json(ha_url(base, "/api/services/" + svc),
+                   {"title": "Resonance", "message": text},
+                   {"Authorization": "Bearer " + token}, 5)
+    except Exception as exc:                     # noqa: BLE001
+        print("home assistant alert failed: %s" % exc, flush=True)
+
+
 def post_webhook(text, level, row):
     """One JSON POST. Reaches ntfy, Slack, Discord, Gotify and whatever else
     somebody already runs — the most reach per line of code available here,
@@ -3817,6 +3881,7 @@ def deliver_alert(row, resolved=False):
         # a screen — they are waiting now, whatever time it is.
         return
     post_webhook(text, level, row)
+    post_home_assistant(text, level, row)
 
 
 #: How many missed polls before a screen is called gone. Three rather than one:
