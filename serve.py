@@ -1666,6 +1666,10 @@ MAX_LOOKS = 8
 #: more; below four is not a secret, above twelve is a password with the wrong
 #: keyboard.
 PIN_MIN_DEFAULT = 6
+#: Days. Long enough to still be there on Monday for a fault somebody noticed
+#: on Saturday, short enough that it is not a record of a household.
+EVENT_DAYS_DEFAULT = 7
+EVENT_DAYS_LIMITS = (1, 90)
 PIN_LIMITS = (4, 12)
 PIN_MAX = 32
 
@@ -1772,6 +1776,11 @@ DISPLAY_SETTINGS = {
     # it marks every PIN below it, and those are made to conform at the next
     # unlock. See identity_pin_state.
     "pin_min": PIN_MIN_DEFAULT,
+    # How long a technical event and its conversation record are kept. SHORT
+    # on purpose: retention is the only control there is over a store that
+    # holds what was said to a display, and a generous default is a decision
+    # made on somebody's behalf about their household.
+    "event_days": EVENT_DAYS_DEFAULT,
     # Kept so an existing document round-trips rather than losing a key on the
     # first save. `user` was the second DISPLAY kind and folded into `device`;
     # nothing reads this now, and nothing writes it either.
@@ -1779,7 +1788,7 @@ DISPLAY_SETTINGS = {
 }
 MAX_FORM_FIELDS = 5
 #: (low, high) for each number the panel can set
-DISPLAY_LIMITS = {"pin_min": PIN_LIMITS,
+DISPLAY_LIMITS = {"pin_min": PIN_LIMITS, "event_days": EVENT_DAYS_LIMITS,
                   "max_displays": (2, 5000), "max_pending": (1, 1000),
                   "guest_days": (1, 3650),
                   # 0 is off — see code_minutes. A week is the top because a
@@ -3229,6 +3238,159 @@ def admin_displays():
                    refused_from=ref[2] if ref else "")
         out.append(row)
     return out
+
+
+# --------------------------------------------------------------- diagnostics
+# TECHNICAL EVENTS, KEYED TO A DEVICE. The microphone would not open,
+# transcription took four seconds, the voice service returned an error, this
+# browser has no recorder at all. The useful key is the screen with the failing
+# microphone, not whoever happened to be standing at it.
+#
+# Most of this is already computed and thrown away. The display says
+# `woke on "hows" (near "house")` as a note that fades, and on a wall tablet
+# nobody is ever there to read it. A good deal of this is "stop discarding
+# that" plus somewhere to put it.
+#
+# ITS OWN FILE, and a small one. It is the only document here that grows on its
+# own — everything else grows when an admin does something — so it is capped
+# two ways: a hard ceiling on rows, and a window in days that an admin sets.
+EVENTS_PATH = os.path.join(ROOT, "events.json")
+_events_lock = threading.RLock()
+#: The hard ceiling, and not a setting. It stops the file becoming a problem
+#: of its own on a busy day; the WINDOW is the control an admin has, and it is
+#: the one that decides what is kept rather than how much.
+MAX_EVENTS = 2000
+#: What a display may send in one poll. A screen with a broken microphone
+#: generates the same event every second it tries, and the cap is what stops
+#: one fault filling the store before anybody reads it.
+MAX_EVENTS_PER_POLL = 12
+#: Kinds this server will store. An ALLOW-list for the same reason the served
+#: files are one: this is written by a browser, and a document shaped by
+#: whatever a page decided to send is one nobody can reason about later.
+EVENT_KINDS = (
+    "mic_denied",        # the microphone would not open
+    "no_recorder",       # this browser has no recorder at all — a fact, once
+    "stt_slow",          # transcription took longer than it should
+    "stt_error",         # the recogniser returned an error
+    "tts_fallback",      # the neural voice fell back to the browser's
+    "wake_fuzzy",        # woke on a near miss, and on which word
+    "no_intent",         # the house was asked for something it cannot do
+    "backend_error",     # what answers a route returned an error
+    "backend_slow",      # …or took longer than that route allows for
+)
+#: Where an event came from. A display sends its own; the server records the
+#: legs it can see, which a browser cannot.
+EVENT_LEVELS = ("info", "warn", "error")
+
+
+def read_events():
+    try:
+        with open(EVENTS_PATH) as fh:
+            doc = json.load(fh)
+        rows = doc.get("events") if isinstance(doc, dict) else None
+    except (OSError, ValueError):
+        return []
+    if not isinstance(rows, list):
+        return []
+    out = []
+    for r in rows:
+        if isinstance(r, dict) and r.get("kind") in EVENT_KINDS:
+            out.append(r)
+    return out
+
+
+def write_events(rows):
+    with _events_lock:
+        tmp = EVENTS_PATH + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump({"version": 1, "events": rows[-MAX_EVENTS:]}, fh)
+        os.chmod(tmp, 0o600)          # it holds what was said to a display
+        os.replace(tmp, EVENTS_PATH)
+
+
+def event_window_days():
+    return int(display_settings().get("event_days") or EVENT_DAYS_DEFAULT)
+
+
+def note_event(kind, did="", level="info", detail="", route="", ms=0):
+    """One event, kept. Silent about anything it does not recognise rather than
+    refusing: this is called from the paths that ARE the fault being reported,
+    and a diagnostic that raises inside a failure is a second fault on top of
+    the first."""
+    if kind not in EVENT_KINDS:
+        return
+    with _events_lock:
+        rows = read_events()
+        rows.append({"kind": kind, "did": str(did or "")[:32],
+                     "level": level if level in EVENT_LEVELS else "info",
+                     "detail": str(detail or "")[:300],
+                     "route": str(route or "")[:60],
+                     "ms": max(0, int(ms or 0)), "at": int(time.time())})
+        write_events(rows)
+
+
+def take_events(did, rows):
+    """Events a display sent up with its poll. Returns how many were kept.
+
+    Capped per poll, because a screen whose microphone is broken produces the
+    same event every second it tries and one fault must not fill the store
+    before anybody reads it. The device id comes from the TOKEN, never from the
+    body: a display saying which display it is would be a display able to file
+    a fault against another one."""
+    if not isinstance(rows, list):
+        return 0
+    kept = 0
+    with _events_lock:
+        have = read_events()
+        for r in rows[:MAX_EVENTS_PER_POLL]:
+            if not isinstance(r, dict) or r.get("kind") not in EVENT_KINDS:
+                continue
+            have.append({"kind": r["kind"], "did": did,
+                         "level": r.get("level") if r.get("level") in EVENT_LEVELS
+                                  else "info",
+                         "detail": str(r.get("detail") or "")[:300],
+                         "route": str(r.get("route") or "")[:60],
+                         "ms": max(0, min(600000, int(r.get("ms") or 0))),
+                         "at": int(time.time())})
+            kept += 1
+        if kept:
+            write_events(have)
+    return kept
+
+
+def display_health(did, rows=None, now_=None):
+    """What this screen has been reporting, summarised. The list an admin
+    reads is per device, because the useful question is which screen is
+    failing rather than how many faults there were."""
+    rows = read_events() if rows is None else rows
+    now_ = int(time.time()) if now_ is None else now_
+    mine = [r for r in rows if r.get("did") == did]
+    by_kind = {}
+    for r in mine:
+        k = by_kind.setdefault(r["kind"], {"kind": r["kind"], "n": 0, "last": 0,
+                                           "level": "info", "detail": ""})
+        k["n"] += 1
+        if r["at"] >= k["last"]:
+            k["last"], k["level"], k["detail"] = r["at"], r["level"], r["detail"]
+    worst = "info"
+    for k in by_kind.values():
+        if k["level"] == "error" or (k["level"] == "warn" and worst == "info"):
+            worst = k["level"]
+    return {"events": sorted(by_kind.values(), key=lambda k: -k["last"]),
+            "n": len(mine), "worst": worst if mine else "",
+            "last": max([r["at"] for r in mine], default=0)}
+
+
+def prune_events():
+    """Past the window, gone. Read at startup and after each poll that wrote
+    anything, which is often enough on a server that only grows this file when
+    a display is talking to it."""
+    cutoff = int(time.time()) - event_window_days() * 86400
+    rows = read_events()
+    keep = [r for r in rows if int(r.get("at") or 0) >= cutoff]
+    if len(keep) != len(rows):
+        write_events(keep)
+    return len(rows) - len(keep)
 
 
 # ---------------------------------------------------------------- identities
@@ -5184,6 +5346,7 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/displays/decide", "/displays/settings", "/displays/kiosk",
                      "/groups", "/groups/save", "/groups/delete", "/groups/sets",
                      "/app/pin",
+                     "/events", "/events/clear",
                      "/identities/wake", "/identities/wake/check",
                      "/identities", "/identities/new", "/identities/rename",
                      "/identities/delete", "/identities/reissue",
@@ -5932,6 +6095,31 @@ class Handler(SimpleHTTPRequestHandler):
             skip = (q.get("id") or [""])[0]
             bad = check_wake_word(word, skip_pid=skip)
             return self._json(200, {"ok": not bad, "why": bad})
+        if path == "/events":
+            # The health view's data: what each screen has been reporting, and
+            # the raw tail underneath it. Per device, because the useful
+            # question is which screen is failing rather than how many faults
+            # there were in total.
+            if not self._require("admin"):
+                return
+            rows = read_events()
+            displays = read_displays()
+            now_ = int(time.time())
+            health = []
+            for did in sorted(displays, key=lambda d: display_label(displays[d]).lower()):
+                h = display_health(did, rows, now_)
+                if h["n"]:
+                    health.append(dict(h, id=did, label=display_label(displays[did])))
+            return self._json(200, {
+                "health": health,
+                # Newest first, and bounded: this is a tail to read, not a
+                # dataset to page through.
+                "recent": [dict(r, label=display_label(displays[r["did"]])
+                                if r.get("did") in displays else "")
+                           for r in sorted(rows, key=lambda r: -r["at"])[:200]],
+                "days": event_window_days(),
+                "limits": {"event_days": EVENT_DAYS_LIMITS},
+                "kinds": list(EVENT_KINDS), "total": len(rows)})
         if path == "/identities":
             if not self._require("admin"):
                 return
@@ -6708,6 +6896,13 @@ class Handler(SimpleHTTPRequestHandler):
             cfg["refresh_offset"] = refresh_offset(disp["id"],
                                                    cfg["refresh_stagger"])
             note_display_seen(disp["id"])
+            # Whatever it has been keeping since its last poll, filed against
+            # the TOKEN's display and nothing else — a screen naming which
+            # screen it is would be a screen able to file a fault against
+            # another one. After `disp` on purpose: an unapproved browser has
+            # no row to file against, and its poll returns above.
+            if obj.get("events") and take_events(disp["id"], obj.get("events")):
+                prune_events()
             try:
                 req = int(disp.get("reload_req") or 0)
             except (TypeError, ValueError):
@@ -7004,6 +7199,25 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(400, {"error": bad})
             print("the panel PIN was set by %s" % s["user"], flush=True)
             return self._json(200, {"ok": True, "has_pin": True})
+
+        if parsed.path == "/events/clear":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            did = str(obj.get("id") or "")
+            rows = read_events()
+            # One screen's, or all of them. Deleting what a display reported is
+            # not deleting the display: a screen whose fault has been fixed
+            # should be able to start clean without being taken off the wall.
+            keep = [r for r in rows if r.get("did") != did] if did else []
+            write_events(keep)
+            print("%d event(s) cleared by %s%s"
+                  % (len(rows) - len(keep), s["user"],
+                     " for " + did if did else " (all)"), flush=True)
+            return self._json(200, {"ok": True, "cleared": len(rows) - len(keep)})
 
         if parsed.path == "/identities/wake":
             s = self._require("admin")
@@ -7824,6 +8038,10 @@ def main():
     migrate_unenrolled_invites()
     prune_group_members()
     ensure_default_membership()
+    # Anything past the window, gone — read at startup as well as after a poll,
+    # so a server that has been down for a fortnight does not come back holding
+    # a fortnight of what was said to a screen.
+    prune_events()
     app = read_app()
     # Environment still wins, so a one-off run on a different port needs no
     # edit to the stored configuration. Setting PORT alone moves all three,
