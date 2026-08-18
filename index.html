@@ -1519,6 +1519,15 @@ const Routes = {
     const r = this.current();
     return (r && r.voice) || S.ttsvoice || '';
   },
+  /* The voice of ONE route, named. current() is right while somebody is being
+     answered and wrong the moment the answer takes longer than the awake
+     window: the reply arrives, the binding has lapsed, and the endpoint that
+     did the work is spoken in the default's voice. Anything that speaks a
+     reply resolves it through here, with the id the reply came back with. */
+  voiceOf(rid){
+    const r = rid ? this.byId(rid) : null;
+    return (r && r.voice) || (rid ? (S.ttsvoice || '') : this.voice());
+  },
 };
 const FALLBACK_WAKEWORD = 'resonance';
 
@@ -3103,9 +3112,12 @@ const Play = {
     try{
       /* The route's own voice where it has one, so a room with three
          assistants in it can tell which one just answered without reading
-         anything. Resolved here rather than held: start() is reached
-         synchronously from respond(), while the route is still bound. */
-      const resp = await fetch('tts?voice=' + encodeURIComponent(Routes.voice()) +
+         anything. Resolved from the REPLY's own route: it was read off the
+         live binding on the assumption that start() is reached synchronously
+         from respond() while that binding still holds, and that assumption is
+         false for exactly the endpoint this matters most for — a slow one,
+         whose awake window ends before it answers. */
+      const resp = await fetch('tts?voice=' + encodeURIComponent(Routes.voiceOf(r.rid)) +
                                '&rate=' + encodeURIComponent(S.vrate), {
         method:'POST', headers:{'Content-Type':'text/plain; charset=utf-8'}, body:text
       });
@@ -3414,13 +3426,21 @@ function ev(s){
    somebody sitting at a desk. */
 const LOG_MAX = 200;
 
-function addMsg(who, text){
+function addMsg(who, text, rid){
   const el = document.createElement('div');
   el.className = 'msg ' + who;
   /* Stamped with the endpoint this line belongs to. Retuning the label in the
      panel still relabels the whole transcript, but each line is relabelled as
-     ITSELF rather than as whoever happens to be answering now. */
-  el.dataset.route = Routes.currentId();
+     ITSELF rather than as whoever happens to be answering now.
+
+     PASSED IN, because reading it here reads it too late. A line is built when
+     it is drawn, and a reply is drawn when the model has finished thinking —
+     by which time a slow endpoint's awake window has lapsed and currentId()
+     answers with the DEFAULT. An eleven-second answer from Sparky arrived
+     credited to Resonance, which is the one thing a room with three
+     assistants in it must never do. Falls back to the live one for anything
+     with no route of its own to name. */
+  el.dataset.route = rid || Routes.currentId();
   el.innerHTML = '<span class="who"></span><span class="body"></span>';
   el.querySelector('.who').textContent = speakerName(who, el.dataset.route);
   el.querySelector('.body').textContent = text;
@@ -3431,21 +3451,21 @@ function addMsg(who, text){
   return el.querySelector('.body');
 }
 
-function newReply(){
-  const body = addMsg('ai','');
+function newReply(rid){
+  const body = addMsg('ai', '', rid);
   const caret = document.createElement('span'); caret.className='caret';
   body.parentElement.appendChild(caret);
-  return {body, caret};
+  return {body, caret, rid};
 }
 
 /* One entry point; the source decides who drives the geometry.
    Muting only silences the VOICE — the reply still streams and the geometry
    still reacts, so the surface never looks dead just because audio is off. */
 let muted = false;
-function respond(text){
+function respond(text, rid){
   clearTimeout(streamTimer);
   Speech.stop();
-  const r = newReply();
+  const r = newReply(rid);
   if (S.src === 'tts' && Speech.supported && !muted) Speech.speak(text, r);
   else stream(text, r);
 }
@@ -3512,7 +3532,7 @@ const LOCAL_TZ = (()=>{
 /* Returns {reply} rather than the bare string it used to. Some endpoints have
    something to say about the conversation as well as in it — a house keeps a
    conversation of its own, and its id comes back beside the words. */
-async function askBackend(text, bare){
+async function askBackend(text, bare, rid){
   /* No display-wide demo switch any more. Whether an endpoint answers from
      built-in text is a property OF that endpoint — the server replies
      {demo:true} for one set to DEMO and the branch below handles it. Two
@@ -3543,7 +3563,13 @@ async function askBackend(text, bare){
          composer has no recogniser output and no wake word to have matched,
          and inventing one would put a fiction in the record. */
       body: JSON.stringify({text, history: bare ? [] : convo, tz: LOCAL_TZ,
-                            route: Routes.currentId(),
+                            /* The one passed in, where there is one. It
+                               agrees with the live binding today only because
+                               this body is built before the first await —
+                               which is a property of how this function is
+                               written rather than a rule anybody stated, and
+                               the rest of the turn stopped trusting it. */
+                            route: rid || Routes.currentId(),
                             trail: trail,
                             conversation_id: bare ? '' : Wake.convo})
     });
@@ -3560,11 +3586,16 @@ async function askBackend(text, bare){
       return {reply: '', refused: true};
     }
     // the route still being on demo is not an error, just not wired up yet
-    if (j && j.demo) return {reply: REPLIES[replyIx++ % REPLIES.length]};
+    if (j && j.demo) return {reply: REPLIES[replyIx++ % REPLIES.length],
+                             route: (j && j.route) || ''};
     if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
     if (j.ms) ev((j.name || 'reply') + ' ' + j.ms + 'ms');
     if (!bare && j.conversation_id) Wake.convo = j.conversation_id;
-    return {reply: j.reply};
+    /* Which endpoint actually answered. It has been in this response all
+       along and only the note used it; the transcript resolved the name for
+       itself, later, and got it wrong whenever the answer outlasted the
+       awake window. */
+    return {reply: j.reply, route: j.route || ''};
   }catch(e){
     /* Say something, and name whoever did not answer. A voice interface that
        goes quiet is indistinguishable from a broken one, and the person may
@@ -3582,17 +3613,37 @@ async function askBackend(text, bare){
 
 function submit(text){
   if (EMBED && !Embed.can('ask')) return;
-  addMsg('you', text);
+  /* WHO THIS WAS SAID TO, read now rather than when the answer comes back.
+     Everything below this line happens after a round trip that can take ten
+     seconds or more, and the wake binding does not survive that: the person's
+     own line, the reply, and the voice it is spoken in were all resolved
+     against whatever was current at the moment they were drawn, which for a
+     slow endpoint is the default. The whole turn belongs to the endpoint that
+     was addressed when it was spoken. */
+  const rid = Routes.currentId();
+  addMsg('you', text, rid);
   remember('user', text);
   qEl.value = '';
-  askBackend(text).then(out => {
+  /* Held from here until the answer is in, so the awake window cannot end
+     during the wait it is meant to be waiting through. */
+  Wake.asked();
+  askBackend(text, false, rid)
+    /* Released in a finally, not at the top of the then: this counter is the
+       only thing keeping the display awake, and a path that skipped it — a
+       refusal, a throw inside respond — would be a screen that never sleeps
+       again. Exactly once, whatever happened. */
+    .finally(()=> Wake.answered())
+    .then(out => {
     /* A refusal is silent, so there is nothing to say and nothing to
        remember. Putting an empty turn in the history would leave the next
        question preceded by an assistant that said nothing, which is a thing
        models try to make sense of. */
     if (out.refused) return;
     remember('assistant', out.reply);
-    respond(out.reply);
+    /* The server's answer about which endpoint replied wins where it gives
+       one — it is the only party that knows whether it fell through to
+       another — and the endpoint that was addressed is the fallback. */
+    respond(out.reply, out.route || rid);
     /* Nothing here ends the conversation. A house reports that it has finished
        acting, and for one day this slept on that — which made it the one
        endpoint you could not speak to twice, silently, with every following
@@ -4314,11 +4365,29 @@ const Wake = {
     if (!this.armed()){ this.awake = false; return; }
     if (!this.awake) return;
     if (Speech.active){ this.touch(); return; }   // don't age out mid-answer
+    /* NOR WHILE ONE IS BEING WORKED ON. Speaking held the window open and
+       thinking did not, so the entire round trip counted as the person having
+       gone quiet — and an endpoint slower than the window said goodbye BEFORE
+       it answered: "Sparky standing by", then the time, then nothing, because
+       it had already slept. The order was inside out, and the wait it was
+       measuring was its own.
+
+       A question outstanding is the opposite of silence. The window is held
+       until the answer arrives, and the countdown starts from the end of the
+       reply — which is where a person would start counting too. */
+    if (this.pending > 0){ this.touch(); return; }
     if (wallNow() > this.until){
       // same exit as the sleep word, so the user can choose to be told
       this.sleepNow(!!S.byeontimeout);
     }
-  }
+  },
+
+  /* How many questions are in flight. A count rather than a flag: a typed
+     question and a spoken one can overlap, and a flag cleared by the first to
+     come back would drop the window while the second was still out. */
+  pending: 0,
+  asked(){ this.pending++; },
+  answered(){ this.pending = Math.max(0, this.pending - 1); this.touch(); }
 };
 
 /* LEARN — capture what the transcriber actually returns when this person
