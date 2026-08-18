@@ -3205,6 +3205,23 @@ code for do not, and never will.
     <select id="sl_fac" class="ppick"></select>
     <button id="b_slsave" class="act-save">SAVE</button>
   </div>
+  <div class="setuprow">
+    <label class="vo"><input type="checkbox" id="hk_on"> Post alerts to a webhook</label>
+  </div>
+  <div class="setuprow" id="hk_where">
+    <label class="bklab" for="hk_url">Address</label>
+    <input id="hk_url" type="text" spellcheck="false" autocomplete="off"
+           placeholder="https://ntfy.example/resonance">
+  </div>
+  <div class="setuprow">
+    <label class="vo"><input type="checkbox" id="q_on"> Quiet hours</label>
+  </div>
+  <div class="setuprow" id="q_when">
+    <label class="bklab" for="q_from">From</label>
+    <input id="q_from" class="num" type="number" inputmode="numeric" min="0" max="23">
+    <label class="bklab" for="q_to">until</label>
+    <input id="q_to" class="num" type="number" inputmode="numeric" min="0" max="23">
+  </div>
   <div class="note" id="slnote"></div>
   <div class="note help">Cheapest reach after this list, by a distance: the
 standard library speaks it, every operator already has somewhere it goes, and
@@ -3217,7 +3234,22 @@ errors as <b>err</b>, warnings as <b>warning</b>, recoveries as <b>info</b>.
 
 <b>Fire and forget.</b> Nothing here retries or blocks, because a sink that did
 would turn reporting a fault into a second fault — and the alert it failed to
-send is still in the list above, which is why that one is not optional.</div>
+send is still in the list above, which is why that one is not optional.
+
+<b>A webhook</b> is one JSON POST and reaches ntfy, Slack, Discord, Gotify and
+whatever else you already run — the most reach per line of code available here,
+because they all take a body with a message in it.
+
+<b>Quiet hours run on this machine's clock</b>, the same one dark hours use,
+and they span midnight the way a night does: 22 until 7 is a night, not
+nineteen hours of daylight. Nothing is dropped — it is held, and the list still
+has it. Announcing a dead hallway screen through the house speakers at three in
+the morning is how alerting gets switched off in its first week.
+
+<b>Two exceptions, both deliberate.</b> Syslog ignores quiet hours, because a
+log with a hole in it every night is useless for the one fault that only
+happens at night. And a device asking to be let in comes through anyway —
+somebody is standing at a screen waiting, whatever time it is.</div>
 
   <div class="note help">An alert has four states, not two: open or resolved,
 acknowledged or not. The one that matters is <b>resolved but unread</b> — a
@@ -5931,6 +5963,13 @@ const SYSLOG_FACILITIES = ['user', 'local0', 'local1', 'local2', 'local3',
                            'local4', 'local5', 'local6', 'local7'];
 function paintSyslog(cfg){
   if (!cfg || !$('sl_on')) return;
+  $('hk_on').checked = !!cfg.hook_on;
+  $('hk_url').value = cfg.hook_url || '';
+  $('q_on').checked = !!cfg.quiet_on;
+  /* Written out rather than `|| 22`: midnight is 0 and falsy, which is
+     exactly the bug this pair had on the server. */
+  $('q_from').value = cfg.quiet_from == null ? 22 : cfg.quiet_from;
+  $('q_to').value = cfg.quiet_to == null ? 7 : cfg.quiet_to;
   $('sl_on').checked = !!cfg.syslog_on;
   $('sl_host').value = cfg.syslog_host || '';
   $('sl_port').value = cfg.syslog_port || 514;
@@ -5945,12 +5984,17 @@ function paintSyslog(cfg){
   syncSyslog();
 }
 function syncSyslog(){
-  const where = $('sl_where');
-  /* The address only means something once it is switched on. */
-  if (where) where.style.display = $('sl_on').checked ? '' : 'none';
+  /* Each address only means something once its own switch is on. */
+  const pairs = [['sl_where', 'sl_on'], ['hk_where', 'hk_on'], ['q_when', 'q_on']];
+  pairs.forEach(([box, sw])=>{
+    const el = $(box);
+    if (el) el.style.display = $(sw).checked ? '' : 'none';
+  });
 }
-const slon = $('sl_on');
-if (slon) slon.addEventListener('change', syncSyslog);
+['sl_on', 'hk_on', 'q_on'].forEach(id=>{
+  const el = $(id);
+  if (el) el.addEventListener('change', syncSyslog);
+});
 const bsl = $('b_slsave');
 if (bsl) bsl.addEventListener('click', async ()=>{
   const note = $('slnote');
@@ -5960,10 +6004,20 @@ if (bsl) bsl.addEventListener('click', async ()=>{
       syslog_host: ($('sl_host').value || '').trim(),
       syslog_port: parseInt($('sl_port').value, 10) || 514,
       syslog_facility: $('sl_fac').value,
+      hook_on: $('hk_on').checked ? 1 : 0,
+      hook_url: ($('hk_url').value || '').trim(),
+      quiet_on: $('q_on').checked ? 1 : 0,
+      quiet_from: parseInt($('q_from').value, 10),
+      quiet_to: parseInt($('q_to').value, 10),
     })});
     note.className = 'note';
-    note.textContent = $('sl_on').checked
-      ? 'saved — alerts also go to syslog' : 'saved — syslog is off';
+    const on = [];
+    if ($('sl_on').checked) on.push('syslog');
+    if ($('hk_on').checked) on.push('a webhook');
+    note.textContent = 'saved — ' + (on.length ? 'also going to ' + on.join(' and ')
+                                               : 'the list only')
+                     + ($('q_on').checked ? ', quiet ' + $('q_from').value
+                        + ':00–' + $('q_to').value + ':00' : '');
   }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
 });
 

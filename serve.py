@@ -1788,6 +1788,13 @@ DISPLAY_SETTINGS = {
     "syslog_host": "",                   # blank means the local daemon
     "syslog_port": 514,
     "syslog_facility": "user",
+    # A JSON POST, which is what ntfy, Slack, Discord and Gotify all take.
+    "hook_on": 0,
+    "hook_url": "",
+    # The house asleep, on the device clock — the same clock dark hours use.
+    "quiet_on": 0,
+    "quiet_from": 22,
+    "quiet_to": 7,
     # Kept so an existing document round-trips rather than losing a key on the
     # first save. `user` was the second DISPLAY kind and folded into `device`;
     # nothing reads this now, and nothing writes it either.
@@ -2138,6 +2145,26 @@ def validate_display_settings(obj, current):
         if f not in SYSLOG_FACILITIES:
             return None, "facility must be one of: " + ", ".join(SYSLOG_FACILITIES)
         cfg["syslog_facility"] = f
+    if "hook_on" in obj:
+        cfg["hook_on"] = 1 if obj["hook_on"] else 0
+    if "hook_url" in obj:
+        u = str(obj["hook_url"] or "").strip()[:400]
+        if u and not u.startswith(("http://", "https://")):
+            return None, "a webhook needs a full http:// or https:// address"
+        cfg["hook_url"] = u
+    if cfg.get("hook_on") and not cfg.get("hook_url"):
+        return None, "give the webhook an address before switching it on"
+    if "quiet_on" in obj:
+        cfg["quiet_on"] = 1 if obj["quiet_on"] else 0
+    for k in ("quiet_from", "quiet_to"):
+        if k in obj:
+            try:
+                h = int(obj[k])
+            except (TypeError, ValueError):
+                return None, "quiet hours are whole hours"
+            if not (0 <= h <= 23):
+                return None, "quiet hours run 0 to 23"
+            cfg[k] = h
     if "form" in obj:
         if not isinstance(obj["form"], (list, tuple)):
             return None, "the request form must be a list of fields"
@@ -3714,6 +3741,58 @@ def syslog_send(level, text):
         pass
 
 
+def in_quiet_hours(now_=None):
+    """Whether the house is asleep, on the DEVICE clock — the same clock dark
+    hours already run on, and for the same reason. Announcing a dead hallway
+    screen through the house speakers at three in the morning is how alerting
+    gets switched off in its first week.
+
+    Spans midnight, because that is the only shape anybody ever sets: 22 to 7
+    is a night, and read as a plain range it would be nineteen hours of
+    daylight and no quiet at all."""
+    cfg = display_settings()
+    if not cfg.get("quiet_on"):
+        return False
+    # `or` would be wrong here and was: midnight is 0, which is falsy, so a
+    # night set to start at 00 silently became 22 — the one hour a quiet
+    # period is most likely to involve, quietly replaced by a default.
+    def _hour(key, fallback):
+        try:
+            return int(cfg[key]) % 24
+        except (KeyError, TypeError, ValueError):
+            return fallback
+    start, end = _hour("quiet_from", 22), _hour("quiet_to", 7)
+    hour = time.localtime(now_ or time.time()).tm_hour
+    if start == end:
+        return False                       # a zero-length night is no night
+    # Inclusive of the start hour, exclusive of the end, both ways round.
+    # They disagreed once: the wrapping branch counted 22:30 as quiet for a
+    # night starting at 22 while the plain one did not count 09:30 as quiet for
+    # one starting at 09 — the same setting meaning two things.
+    return start <= hour < end if start < end else (hour >= start or hour < end)
+
+
+def post_webhook(text, level, row):
+    """One JSON POST. Reaches ntfy, Slack, Discord, Gotify and whatever else
+    somebody already runs — the most reach per line of code available here,
+    because they all accept a body with a message in it."""
+    cfg = display_settings()
+    url = str(cfg.get("hook_url") or "").strip()
+    if not cfg.get("hook_on") or not url:
+        return
+    try:
+        _post_json(url, {"text": text, "message": text, "content": text,
+                         "title": "Resonance",
+                         "level": level, "kind": row.get("kind"),
+                         "device": row.get("did") or "",
+                         "at": row.get("last") or int(time.time())},
+                   {}, 5)
+    except Exception as exc:                     # noqa: BLE001
+        # Said once, in the log, and never retried. A sink that retried would
+        # be a fault reporting a fault.
+        print("webhook failed: %s" % exc, flush=True)
+
+
 def deliver_alert(row, resolved=False):
     """Out to every sink that is switched on. The list is not one of them: it
     already has the row, which is how it can be the thing that is never
@@ -3722,10 +3801,22 @@ def deliver_alert(row, resolved=False):
     who = display_label(displays[row["did"]]) if row.get("did") in displays \
         else (row.get("did") or "this server")
     spec = ALERT_KINDS.get(row["kind"]) or {}
-    syslog_send("info" if resolved else row.get("level", "info"),
-                "%s %s%s%s" % (who, spec.get("words", row["kind"]),
-                               " — RESOLVED" if resolved else "",
-                               (": " + row["detail"]) if row.get("detail") else ""))
+    level = "info" if resolved else row.get("level", "info")
+    text = "%s %s%s%s" % (who, spec.get("words", row["kind"]),
+                          " — RESOLVED" if resolved else "",
+                          (": " + row["detail"]) if row.get("detail") else "")
+    # SYSLOG IGNORES QUIET HOURS. It is a file somebody reads later, not a
+    # thing that makes a noise in a house at three in the morning — and a log
+    # with a hole in it every night is worse than useless for the one fault
+    # that only ever happens at night.
+    syslog_send(level, text)
+    if in_quiet_hours() and not spec.get("now"):
+        # Held rather than dropped. Something is still true and somebody still
+        # has to hear it; the list has it, and the digest carries it at a
+        # civilised hour. The exception is the alert with a person standing at
+        # a screen — they are waiting now, whatever time it is.
+        return
+    post_webhook(text, level, row)
 
 
 #: How many missed polls before a screen is called gone. Three rather than one:
@@ -6564,7 +6655,9 @@ class Handler(SimpleHTTPRequestHandler):
                 # one that can disagree with it.
                 "settings": {k: display_settings().get(k)
                              for k in ("syslog_on", "syslog_host",
-                                       "syslog_port", "syslog_facility")},
+                                       "syslog_port", "syslog_facility",
+                                       "hook_on", "hook_url",
+                                       "quiet_on", "quiet_from", "quiet_to")},
                 "limits": {"event_days": EVENT_DAYS_LIMITS},
                 "kinds": list(EVENT_KINDS), "total": len(rows)})
         if path == "/identities":
