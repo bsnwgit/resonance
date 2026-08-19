@@ -3555,44 +3555,63 @@ route name, <b>ALERT</b>, <b>refused</b>.</div>
   <div class="setuprow">
     <label class="vo"><input type="checkbox" id="sl_on"> Also send alerts to syslog</label>
   </div>
+  <!-- .setpair on every label and its control. This row is a flex line that
+       wraps, and without the pairs it breaks on whatever boundary happens to
+       fall at the edge — which is how "Facility" ended a line with its picker
+       starting the next one. A loose note div in here was worse still: it
+       became a flex ITEM and pushed the controls after it up alongside its own
+       wrapped text. Explanation belongs behind the ?, with the rest of it. -->
   <div class="setuprow" id="sl_where">
-    <label class="bklab" for="sl_host">Host (blank for this machine's own daemon)</label>
-    <input id="sl_host" type="text" spellcheck="false" autocomplete="off"
-           placeholder="logs.example">
-    <label class="bklab" for="sl_port">Port</label>
-    <input id="sl_port" class="num" type="number" inputmode="numeric"
-           min="1" max="65535">
-    <label class="bklab" for="sl_name">Name in the source field</label>
-    <input id="sl_name" type="text" spellcheck="false" autocomplete="off"
-           placeholder="this machine's hostname">
-    <div class="note">What the collector files these lines under. Blank uses
-      this machine's own hostname. Sent to a remote collector only — the local
-      daemon writes its own header.</div>
-    <label class="bklab" for="sl_fac">Facility</label>
-    <select id="sl_fac" class="ppick"></select>
+    <span class="setpair">
+      <label class="bklab" for="sl_host">Host</label>
+      <input id="sl_host" type="text" spellcheck="false" autocomplete="off"
+             placeholder="blank for this machine's own daemon">
+    </span>
+    <span class="setpair">
+      <label class="bklab" for="sl_port">Port</label>
+      <input id="sl_port" class="num" type="number" inputmode="numeric"
+             min="1" max="65535">
+    </span>
+    <span class="setpair">
+      <label class="bklab" for="sl_name">Source name</label>
+      <input id="sl_name" type="text" spellcheck="false" autocomplete="off"
+             placeholder="this machine's hostname">
+    </span>
+    <span class="setpair">
+      <label class="bklab" for="sl_fac">Facility</label>
+      <select id="sl_fac" class="ppick"></select>
+    </span>
     <button id="b_slsave" class="act-save">SAVE</button>
   </div>
   <div class="setuprow">
     <label class="vo"><input type="checkbox" id="hk_on"> Post alerts to a webhook</label>
   </div>
   <div class="setuprow" id="hk_where">
-    <label class="bklab" for="hk_url">Address</label>
-    <input id="hk_url" type="text" spellcheck="false" autocomplete="off"
-           placeholder="https://ntfy.example/resonance">
+    <span class="setpair">
+      <label class="bklab" for="hk_url">Address</label>
+      <input id="hk_url" type="text" spellcheck="false" autocomplete="off"
+             placeholder="https://ntfy.example/resonance">
+    </span>
   </div>
   <div class="setuprow">
     <label class="vo"><input type="checkbox" id="ha_on"> Announce alerts through Home Assistant</label>
   </div>
   <div class="setuprow" id="ha_where">
-    <label class="bklab" for="ha_url">Address</label>
-    <input id="ha_url" type="text" spellcheck="false" autocomplete="off"
-           placeholder="http://homeassistant.local:8123">
-    <label class="bklab" for="ha_token">Long-lived access token</label>
-    <input id="ha_token" type="password" autocomplete="new-password"
-           placeholder="leave blank to keep the one stored">
-    <label class="bklab" for="ha_service">Service to call</label>
-    <input id="ha_service" type="text" spellcheck="false" autocomplete="off"
-           placeholder="persistent_notification.create">
+    <span class="setpair">
+      <label class="bklab" for="ha_url">Address</label>
+      <input id="ha_url" type="text" spellcheck="false" autocomplete="off"
+             placeholder="http://homeassistant.local:8123">
+    </span>
+    <span class="setpair">
+      <label class="bklab" for="ha_token">Long-lived access token</label>
+      <input id="ha_token" type="password" autocomplete="new-password"
+             placeholder="leave blank to keep the one stored">
+    </span>
+    <span class="setpair">
+      <label class="bklab" for="ha_service">Service to call</label>
+      <input id="ha_service" type="text" spellcheck="false" autocomplete="off"
+             placeholder="persistent_notification.create">
+    </span>
   </div>
   <!-- Only the alerting half. The SERVER, the credentials and the from-address
        moved to SETTINGS ▸ ADMIN ▸ Email, because they are not about alerting:
@@ -3603,11 +3622,10 @@ route name, <b>ALERT</b>, <b>refused</b>.</div>
     <label class="vo"><input type="checkbox" id="ml_on"> Send alerts by email</label>
   </div>
   <div class="setuprow" id="ml_where">
-    <label class="bklab" for="ml_to">To (comma separated)</label>
-    <input id="ml_to" type="text" spellcheck="false" autocomplete="off">
-    <div class="note">The mail server itself is under
-      <b>SETTINGS ▸ ADMIN ▸ Email</b>. Without one configured there, this
-      sends nothing.</div>
+    <span class="setpair">
+      <label class="bklab" for="ml_to">To (comma separated)</label>
+      <input id="ml_to" type="text" spellcheck="false" autocomplete="off">
+    </span>
   </div>
   <div class="setuprow">
     <label class="vo"><input type="checkbox" id="dg_on"> Gather alerts into a digest</label>
@@ -3638,6 +3656,26 @@ errors as <b>err</b>, warnings as <b>warning</b>, recoveries as <b>info</b>.
 <b>Fire and forget.</b> Nothing here retries or blocks, because a sink that did
 would turn reporting a fault into a second fault — and the alert it failed to
 send is still in the list above, which is why that one is not optional.
+
+<b>Where the mail server is set:</b> SETTINGS ▸ ADMIN ▸ Email. It is one
+connection, shared — the same one sends somebody their enrolment link — so it
+is not configured here. With no server set there, ticking this sends nothing.
+
+<b>Source name</b> is what the collector files these lines under. Blank uses
+this machine's own hostname, which is what a collector would infer from the
+packet anyway — the field is for when that is not the name you want to read: a
+host called <b>srv-04b</b> answering for the thing everybody calls the kitchen,
+or several installs arriving behind one address.
+
+It applies to a <b>remote</b> collector only. Sending to the local daemon
+leaves the header to the daemon, which is already writing one; a second would
+put the name inside the message text instead of in the column. Spaces become
+hyphens, because the format ends that field at the first space.
+
+The format carries <b>no time zone</b> — the timestamp is local time with
+nothing marking it as such, so a collector in another zone reads it as its
+own. That is RFC 3164 rather than a choice made here, and the alternative is a
+line some parsers reject outright.
 
 <b>A webhook</b> is one JSON POST and reaches ntfy, Slack, Discord, Gotify and
 whatever else you already run — the most reach per line of code available here,
