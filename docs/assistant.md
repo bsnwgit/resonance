@@ -89,6 +89,51 @@ People sign in at the display with the email address and password they set
 from their enrolment link. The admin panel is not affected and never was: it
 always asks, whatever is set here.
 
+#### What actually puts a sign-in box on a screen
+
+**Two different settings can produce it, and this is worth reading once.** The
+display does not show a sign-in box because *Sign in* is set to REQUIRED. It
+shows one because **this browser cannot use anything on this port** — and
+there is more than one way to be in that position.
+
+The server answers one question per endpoint, for the caller in front of it:
+*may this caller use it?* A NO is a NO, whichever setting produced it, and the
+page reacts the same way to all of them — by offering the ways past. So an
+endpoint you deliberately left open can still meet somebody with a sign-in
+box, if they are not on its allow-list.
+
+| *Sign in* | *Who may use it* | What somebody who is not signed in sees |
+|---|---|---|
+| NOT REQUIRED | ANY DISPLAY | **the assistant** — nothing is in the way |
+| NOT REQUIRED | ONLY THESE, and they are not on it | **a sign-in box** — not because signing in is required, but because this browser may not use it, and signing in as somebody who *is* listed is one of the ways past |
+| REQUIRED | ANY DISPLAY | **a sign-in box** — sign in as anybody and it works |
+| REQUIRED | ONLY THESE | **a sign-in box** — and signing in is not enough on its own; it has to be as somebody the list names |
+
+The one that surprises people is the second row: *Sign in* says NOT REQUIRED
+and a sign-in box appears anyway. Nothing is wrong. **ONLY THESE is itself a
+statement that some callers may not use this**, and a browser that is not one
+of them has to become one — which means signing in as a person the list
+allows. The setting above it only decides whether that is demanded of
+*everybody* or just of the ones the list does not already cover.
+
+Read the pair as one sentence and it stops being surprising:
+
+- *Sign in* — **must there be a person at all?**
+- *Who may use it* — **and given a caller, is it one of the ones allowed?**
+
+A sign-in box is what the display offers when the answer to either is no.
+
+#### And when there is no box at all
+
+Two states look like a fault and are not:
+
+- **"Nothing is set up on this port"** — no endpoint has been given this
+  network profile. There is nothing here to sign in to; giving an endpoint
+  this port under *Network* is the fix.
+- **A wall screen that stops answering** — an approved device on an endpoint
+  set to REQUIRED. It has no person on it and cannot acquire one, so it is
+  refused. That is the setting working, not failing.
+
 ### Who may use it
 
 Two reasons to restrict an endpoint.

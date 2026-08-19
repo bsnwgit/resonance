@@ -160,7 +160,15 @@ screen picks it up on its own within a few seconds — nobody needs to touch it.
 ## Signing in
 
 Opening the display page on a machine that is not already a screen on somebody's
-wall gives you a **sign-in box**: your email address and your password.
+wall may give you a **sign-in box**: your email address and your password.
+
+You will not always get one. It appears when this browser cannot use the
+assistant on that address — either because signing in is required there, or
+because it is limited to particular people and you are not yet one of them.
+Where neither applies you get the assistant straight away and never see a box
+at all. **So the same server can ask on one address and not on another**, and
+that is deliberate: whether an assistant needs a sign-in is set per assistant,
+not once for the machine.
 
 You get those from an administrator, in two halves. They create the account
 with your address and send you a **link**; opening it asks you to choose a
