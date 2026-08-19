@@ -78,10 +78,12 @@ that is still the product, and staying up unattended — a tablet on a wall is a
 browser tab running for a year, and it now checks in, says so when it cannot,
 reloads itself when it can again, and can be reached from the panel.
 
-**Next, in the order it matters:** identity and the PIN, which is phase 5 and
-the first thing after four — then memory, so a conversation can mean something
-an hour later; the embed is deliberately memoryless until that lands. Then
-packaging it as a library other projects can install.
+**Next, in the order it matters:** memory, so a conversation can mean
+something an hour later; the embed is deliberately memoryless until that
+lands. Then packaging it as a library other projects can install. Identity
+landed as accounts — an email address and a password each person sets from a
+one-shot enrolment link — and sign-in became a property of each assistant
+rather than of the deployment.
 
 The [Roadmap](#roadmap) carries the reasoning for each, including the
 decisions already taken about how identity and memory should work.
@@ -194,7 +196,7 @@ make, no browser warning, and no first-run password to fish out of a log:
 | listener | purpose |
 | --- | --- |
 | `http://localhost:9700` | the display in full — the mic works here |
-| `http://localhost:9702` | **administration**, no sign-in |
+| `http://localhost:9702` | **administration**, behind a sign-in |
 
 Browsers already treat `http://localhost` as a secure origin, so `getUserMedia`
 runs and nothing crosses a network for TLS to protect. Two settings decide
@@ -270,8 +272,9 @@ clear about how little it costs:
   which is the thing they were already allowed to do.
 
 **Two people sharing one approved device cannot be told apart.** Approval is
-per device. Distinguishing the people using it needs the PIN, and even then it
-governs what is *remembered* rather than what may be *read*.
+per device. Telling the people using it apart means each of them signing in
+with their own account, which is what an endpoint set to REQUIRED insists on —
+and a shared wall screen is exactly the case that cannot satisfy it.
 
 **A display learns the wake word of a route it may not use, and that is
 deliberate.** It has to: recognising the house's name is the only way it can
@@ -399,10 +402,10 @@ missing from the startup banner, run `make-cert.sh` and restart.
 The one exception is loopback, where the reason does not apply: nothing
 crosses a network at all, `http://localhost` is a secure origin in its own
 right, and the certificate ceremony is pure obstruction in front of the
-install that setting exists to make possible. With sign-in set to nothing
-there is no password either — everyone who can reach that listener is an
-admin, which is the whole of the setting and why it is only defensible when
-the network is already the boundary.
+install that setting exists to make possible. The panel still asks for a
+password there: it is the one interface that always does, whatever else is
+configured, because it holds the assistant's API key and the power to grant
+anybody access to anything.
 
 > This is local-account authentication, deliberately: no directory, no third
 > party, nothing leaves the machine to log in — the same principle as the
@@ -1031,7 +1034,7 @@ comma-terminated selector line may be followed by a comment or a blank line.
 **A script that does not parse is a page where nothing runs**, and it does not
 present as a syntax error. It presents as several unrelated pieces of the
 interface being absent at once — here the visualiser, the enrolment box, the
-request form and the PIN box, leaving the static markup alone on screen — which
+request form and the sign-in box, leaving the static markup alone on screen — which
 reads as four faults rather than one, and sends you looking at four features
 instead of at the parser. The cause was a statement added under a brace-less
 `if`, which pushed it out of the body and orphaned the `else` below it. With no
@@ -1098,7 +1101,7 @@ two people in one room with three listening microphones between them.
 | 2 | ~~**Displays, and binding a route to one**~~ **— done** | only the tablets you approved can actuate the house, whatever anyone's browser is set to | 1b | none |
 | 3 | ~~**What a wall display looks like**~~ **— done** | voice only and speak only, an appearance per place, and a screensaver that is still the product | 2 | none |
 | 4 | ~~**Staying up unattended**~~ **— done** | a tablet nobody touches for a year is still working | 3 | none · closed 2026-08-17 · alert and drop test in 8 |
-| 5 | **Identity and the PIN** | a person, as distinct from a place | 2 | none · designed 2026-08-17 · mixed sign-in deferred out of it |
+| 5 | ~~**Identity**~~ **— done** | a person, as distinct from a place | 2 | none · built 2026-08-18 as accounts; the PIN it was designed around was removed the same day |
 | 6 | ~~**Personal wake words**~~ **— done** | one person addressing a tablet stops triggering another person's device | 5 | none · built 2026-08-18 |
 | 7 | **Memory** | conversations that mean something across sessions | 5 | **1** · what the retained unit is — deliberately left to experience |
 | 8 | **Diagnostics and alerting** — *building* | a failing screen comes and finds you, rather than the other way round | 2 | none · window set to 7 days · still owes 4's network-drop test |
@@ -1140,10 +1143,9 @@ Assistant on its own connection, and email — with quiet hours and a digest.
 **What it still owes is the network-drop test**, which needs real hardware and
 a pulled cable, and it is the reason this phase is not closed.
 
-**Five is designed and its decision is closed** — 2026-08-17. A session is a
-user or a device and the URL decides which; guest, user without a PIN and user
-with one are three strengths of retention rather than three strengths of
-reach; identities and their URLs are created in the panel and nowhere else;
+**Five is built** — designed 2026-08-17, built 2026-08-18. A session is a
+user or a device and the URL decides which; guest and signed-in user are two
+strengths of retention rather than two strengths of reach; identities and their URLs are created in the panel and nowhere else;
 and Home Assistant keeps one service token whoever is speaking. What came out
 of designing it is a piece deliberately left for afterwards: signing a user
 into a device several people share but which is not a kiosk. That waits for
@@ -1482,14 +1484,14 @@ it. Each entry below carries its own panel scope.
   | | bound by | how many devices |
   | --- | --- | --- |
   | a **place** — the tablet in the kitchen | token + an admin approving it | exactly one |
-  | a **person** | their PIN | as many as they like |
+  | a **person** | their email address and password | as many as they like |
 
   A wall display is one physical object and two things claiming to be it is
   always wrong, so it is pinned to a single token that an admin blesses. A
   person is not a physical object — phone, tablet and laptop are all
-  legitimately them — so their credential is something they *carry* rather
-  than something a device *has*. They enter the PIN, that device earns its own
-  token, and they are not asked again.
+  legitimately them — so their credential is something they *know* rather
+  than something a device *has*. They sign in, that browser earns a session,
+  and they are not asked again until it expires.
 
   One mechanism, two ways of granting it: an admin bestows a place's, a person
   earns their own.
@@ -1837,15 +1839,17 @@ it. Each entry below carries its own panel scope.
   Maintenance section holds the four numbers, all of which are one server's
   business rather than one screen's.
 
-- **Identity, in three strengths.** How somebody arrives decides what may be
+- **Identity, in two strengths.** How somebody arrives decides what may be
   kept, because the strength of the claim and the durability of the memory
-  should move together. Settled in person terms 2026-08-17:
+  should move together. Settled in person terms 2026-08-17, and rebuilt
+  2026-08-18: there were three strengths while a PIN was optional, and a
+  password is not — the enrolment link exists to collect one, so a person is
+  signed in or they are not.
 
   | | how it arrives | retention |
   | --- | --- | --- |
   | **guest** | the bare address with no user in it — the default interface, usable, where security is not set to force the request form | none at all: no conversation, no data |
-  | **user, no PIN** | their own URL | limited, and short-lived |
-  | **user with PIN** | their own URL, PIN entered | longer, held server-side, and it follows the person |
+  | **user** | signed in with their email address and password | held server-side, and it follows the person to any machine they sign in on |
 
   **A session is a user or a device, never both, and the URL decides which.**
   A device added as a device operates as a device — a kiosk, a wall tablet —
@@ -1905,44 +1909,40 @@ it. Each entry below carries its own panel scope.
   wipe and a token does not. On its own it is a bearer identifier with no
   secret: names are guessable, so a name alone can never unlock memory.
 
-  A **PIN** raises what may be *remembered*: it is the difference between
-  retention that lives in one browser and retention held server-side that
-  follows the person between them. What may be *reached* does not come from
-  it — reach comes from the user, so a user without a PIN carries their grants
-  exactly the same, and the PIN buys durability rather than permission.
-  Hashed server-side with the same PBKDF2 as the admin passwords, never
-  compared in the browser. Rate limiting and lockout are what make a short PIN
-  viable, reusing the geometric back-off already built for admin sign-in, and
-  the obvious sequences are refused. An admin resets a forgotten PIN from the
-  identity list: with no email here that is the only recovery path, and it has
-  to exist in the first version.
+  A **password**, with an **email address** as the login. Set by the person
+  and never by an admin — the panel mints a one-shot enrolment link, they open
+  it, choose a password, and the link is spent. An admin who chose it would
+  know it, which is the whole reason the link exists rather than a password
+  field on the row. Hashed server-side with the same PBKDF2 as the admin
+  accounts and held to the same minimum length, never compared in the browser.
+  Guessing backs off geometrically per account, on its own ledger so somebody
+  fumbling a password cannot lock an admin out of the panel.
 
-  **An admin sets the required length**, so a sensitive area can demand more
-  digits than the default. Raising it is not advisory — every existing PIN
-  shorter than the new minimum is marked, and the next time that identity
-  unlocks it must set a conforming one before it can go any further. Warning
-  and letting them past would mean the setting only ever protected accounts
-  created after it changed, which is the failure that looks like success.
+  Recovery is one gesture: reissue the link. It mints a new one, clears the
+  old password, and signs out every browser that was open — a forgotten
+  password and a leaked link want the same answer, and neither of them is an
+  admin typing something they would then know.
 
-  The old PIN still authenticates that change: unlock with it, then set the
-  new one. Anything else means an admin resetting every identity by hand the
-  day the policy tightens. An identity that never comes back stays locked
-  until it does, which is the correct outcome, and the admin list shows who is
-  still outstanding so the rollout is visible rather than assumed. Lowering
-  the requirement invalidates nothing.
+  Signing in grants a session, measured in hours and **persistent on that
+  browser**. Being asked again every half hour would end with people avoiding
+  the assistants that ask.
 
-  Unlocking grants a session, measured in hours and **persistent on the user's
-  own device** — which is the case one for one covers: they opened their own
-  URL in their own browser. Being asked to key a PIN in again every half hour
-  would end with the PIN switched off entirely.
+  > **This replaced a PIN**, designed 2026-08-17 and removed 2026-08-18 along
+  > with the panel's own single-PIN sign-in rung. A PIN was six digits keyed
+  > into a screen: fine as a lock on a browser that had already proved who it
+  > was by holding a minted URL, and not what a credential typed on a login
+  > page can be. It also could not reach somebody on a machine that had never
+  > seen them, which is the thing an account is for. The paragraphs above are
+  > what was built in its place; the reasoning about tokens, declared names
+  > and guessability above them is unchanged and still holds.
 
-  **Session length belongs to the user**, now that a PIN is entered at their
-  own URL rather than at a screen standing in a room. The earlier design put
-  it on the display, and the reasoning was right for the case it was written
-  for: the place carries the risk, a workshop screen nobody but the workshop
-  can reach and a reception screen in front of the street want opposite
-  answers for the same person on the same PIN, and an admin securing a room
-  can reason about that room. **That case is the deferred one below** — a
+  **Session length belongs to the user**, now that a password is entered at a
+  login page rather than at a screen standing in a room. The earlier design
+  put it on the display, and the reasoning was right for the case it was
+  written for: the place carries the risk, a workshop screen nobody but the
+  workshop can reach and a reception screen in front of the street want
+  opposite answers for the same person, and an admin securing a room can
+  reason about that room. **That case is the deferred one below** — a
   person signing in at a device they do not own — so the per-display number
   waits there for it rather than being wrong here.
 
@@ -1958,28 +1958,25 @@ it. Each entry below carries its own panel scope.
   of and is measured in minutes, while somebody who has unlocked their own
   device is doing their work.
 
-  Recorded plainly: a PIN is not a password, and this is a lightweight account
-  system rather than a small feature. Six digits is a low bar that rate
-  limiting carries. It suits an internal tool and a number keyed into a
-  screen, and it should not be the only thing standing in front of anything
-  genuinely sensitive. It depends on HTTPS only — a PIN must never be
-  enterable on the plain listener.
+  Recorded plainly: this is a lightweight local account system rather than a
+  small feature, and there is no directory behind it. It depends on HTTPS
+  only — a password must never be enterable on the plain listener, and the
+  server refuses it there rather than degrading.
 
   Devices and identities are listed in the admin page with when they were last
   seen, and deletable there.
 
-  **This work now also owes the middle rung of the sign-in axis** — a single
-  PIN for the whole display, no accounts. Binding and authentication shipped
-  with their outer two rungs only, because that rung is this machinery pointed
-  at a display rather than at a named person, and building it twice would be
-  the waste. The setting is present and disabled until then, so the gap is
-  visible rather than silent, and the server names it specifically if
-  something asks for it over the API.
+  **The middle rung of the sign-in axis is gone rather than owed** — it was
+  a single PIN for the whole panel, no accounts, and it was removed 2026-08-18.
+  What it cost was the log: everything done behind one shared number was
+  recorded as "(single PIN)", because that is all it knew. A deployment with
+  one administrator is an account with one member, which is the same login
+  screen without the hole in the record.
 
   **The token row is pulled forward** into the displays entry above, where it
   is needed to make a route binding hold rather than to make memory durable.
-  What is left here is the PIN, and the thing the PIN unlocks: **per-identity
-  settings**, a storage tier that does not exist yet. There is shared
+  What is left here is the account, and the thing signing in unlocks:
+  **per-identity settings**, a storage tier that did not exist before. There is shared
   configuration, per-browser preference, and per-embed grant; a setting that
   belongs to a *person* has nowhere to live. Personal wake words are the first
   thing to need it and memory is the second.
@@ -2002,11 +1999,12 @@ it. Each entry below carries its own panel scope.
   kiosk. One for one is built first — a URL is a user or a device, and the
   session is whichever one opened it — and signing a user into a commonly used
   device comes after, once there is a working thing to look at rather than a
-  whiteboard. Two pieces are already waiting there for it: the per-display
-  session length, and the middle rung above.
+  whiteboard. One piece is already waiting there for it: the per-display
+  session length.
 
-  *Panel:* identities and their URLs, PIN policy and its minimum length,
-  per-user session length, and a PIN reset on the identity list.
+  *Panel:* identities, their email addresses and their one-shot enrolment
+  links, per-user session length, and reissuing a link as the single recovery
+  gesture on the identity list.
 
 - **Personal wake words.** Two people in a room, both with their own devices,
   and one of them says the name that reaches the model — both devices answer.
@@ -2224,7 +2222,7 @@ it. Each entry below carries its own panel scope.
   severities each carries; per alert, whether it is on, its threshold, its
   severity, and whether it arrives immediately or in a digest; quiet hours.
 - **The embed, once there is an identity to attach to it.** The memoryless
-  embed shipped first, deliberately: it is exactly the `named, no PIN → no
+  embed shipped first, deliberately: it is exactly the `named, not signed in → no
   memory` row above, so it needs no notion of a person at all. What remains
   arrives for free when identity lands — **an embed carries two identities at
   once** and they compose rather than compete: the application is
@@ -2285,6 +2283,70 @@ on a desk. A tablet bolted to a wall, answering a household, moves them:
 ## Progress log
 
 Newest first.
+
+### 2026-08-18 — accounts, and authentication moved onto the assistant
+
+Phase 5, built and then rebuilt in a day: the PIN it was designed around went,
+and where authentication is decided moved twice before it settled on the thing
+being reached.
+
+- **The PIN is gone, in both places it existed.** A person's PIN and the
+  panel's own single-PIN sign-in rung were removed together. A PIN was six
+  digits keyed into a screen — fine as a lock on a browser that had already
+  proved itself by holding a minted URL, and not what a credential typed on a
+  login page can be. It also could not reach somebody at a machine that had
+  never seen them, which is the thing an account is for. The panel's rung cost
+  the log: everything behind one shared number was recorded as "(single PIN)".
+- **A person is an email address and a password they set themselves.** The
+  panel mints a one-shot enrolment link; opening it forces a password and
+  spends the link. An admin never sets or sees one — reissuing the link is the
+  single recovery gesture, and it clears the password and signs out every open
+  browser. `identities.json` was not migrated: a row from the old model has a
+  PIN hash and no address, which is an account nobody can sign in to.
+- **The display gate is one question at a time.** It stacked three forms at
+  once and asked whoever was standing there to work out which was theirs. It
+  is now sign-in, with *Use Code Instead* and *Request Access* as links that
+  swap the box for the thing they name. Password-and-confirm appears in
+  exactly one place: the setup screen off an enrolment link.
+- **A request is for an ACCOUNT, not for a device.** Approving one creates the
+  person and mints the link rather than turning a browser into a screen on the
+  wall; the form asks for an email above whatever fields an admin defined, and
+  the requester's own page is sent to the password box the moment you approve.
+- **The panel always asks for a password.** The setting that could open it is
+  gone — a switch that opens an admin interface is a switch somebody leaves
+  on, and "the network is the boundary" holds until the machine joins another
+  network. `ensure_first_admin` runs unconditionally, so no install can reach
+  a state where the panel is locked and no key was ever cut.
+- **Sign-in became a property of the assistant.** There is no deployment-wide
+  switch in either direction. Each endpoint carries its own *Sign in* section,
+  because three assistants on one box can want three answers and one switch
+  covering all of them could only ever be set to the strictest. REQUIRED
+  refuses a device outright, approved or not: a wall screen has no person on
+  it, which is what makes this the control that limits what a model costs.
+- **A port carries one endpoint, and no port means no port.** Sharing went
+  with the sign-in requirement — a door with two assistants behind it can only
+  have one lock and would answer for the looser of them. The nominated default
+  that collected endpoints naming nothing went with it: two endpoints that had
+  simply never been given a port both landed there, chosen by nobody, which is
+  the collision the rule could not see.
+- **Two holes closed, one of them mine.** A network profile marked *the port
+  is the grant* short-circuited the permission test entirely, so an endpoint
+  requiring a sign-in quietly required nothing; the flag is gone rather than
+  patched. And `_identity` fell back to the setup cookie wherever sign-in was
+  off, which would have let an endpoint insisting on a person accept a cookie
+  nobody proved — identity now resolves only from a session.
+- **The posture warning stopped being shown on displays.** The reason it was
+  safe was written beside it: anyone reading it could open the admin port and
+  find out anyway. That expired the day the panel started always asking, and a
+  description of a server's exposure is not something to hand to every browser
+  that loads a screen. It is still said at startup and in the panel.
+- **A stray `@property` cost an hour.** Removing `pinned_open` left its
+  decorator on the method below, turning `_redirected` into a bool and killing
+  every request that called it — the panel sat on "saving…" forever.
+  `check.sh` and pyflakes both passed it: a stray decorator is valid Python
+  with valid names. Parse-clean is not the same as working.
+- **RIDGE**, a fourth visualiser form: the same signal folded into a landform
+  above its own reflection.
 
 ### 2026-08-18 — a page that did not parse
 

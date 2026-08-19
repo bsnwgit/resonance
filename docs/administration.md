@@ -66,7 +66,18 @@ list: one signs in with a password to configure the server, the other picks up
 a URL and talks to the display.
 
 - **ADMIN** — the accounts that can sign in to this panel.
-- **USER** — a person the display side knows about. Empty for now.
+- **USER** — the people the display side knows about: everybody who has used
+  their enrolment link and set a password. Somebody who has been given a link
+  and not used it yet is on ENROLLMENTS ▸ USER until they do.
+
+**ENROLLMENTS** — how something comes to be here: IDENTITY on its left is who
+is here already, SETTINGS on its right configures the server, and this is the
+one in the middle because it is the one somebody is waiting on.
+
+- **USER** — the people you have minted a URL for, the request form, and
+  everybody who has asked to be here and not yet been decided about.
+- **DEVICE** — where a screen is set up: named, given a code, and watched until
+  it takes it.
 
 **SETTINGS** — how the server itself is run.
 
@@ -87,14 +98,6 @@ a URL and talks to the display.
   configures is read on **STATUS**, which is a different page on purpose: one
   is set and the other is watched, and a page doing both is a page you cannot
   safely leave open.
-
-**ENROLLMENTS** — how something comes to be here, as opposed to everything left
-of it, which configures the server.
-
-- **USER** — the people you have minted a URL for, the request form, and
-  everybody who has asked to be here and not yet been decided about.
-- **DEVICE** — where a screen is set up: named, given a code, and watched until
-  it takes it.
 
 At the right of the same bar: **STATUS**, **HOME**, your own name, your role,
 **SIGN OUT**, and the **?**. One side of the bar is where you are going, the
@@ -139,9 +142,11 @@ you administer about it:
 
 - **AI** — the endpoints, each naming a speech profile, a model profile and a
   network profile.
-- **NODES** — everything currently connected, in two areas: the people you
-  approved, and the devices that took a code. What those devices are
-  *reporting* is not here — that is STATUS.
+- **NODES** — everything currently connected, in one register. Each row is
+  badged for the door it came through — **ASKED** for a device whose user
+  filled in the request form, **INVITED** for one you issued a code to — which
+  is a fact about the row and not two lists to have filed it under. What those
+  devices are *reporting* is not here — that is STATUS.
 - **EMBEDS** — keys that let another application frame this interface.
 
 **SEARCH** shares that bottom row, on the right third of it. Type to search
@@ -262,8 +267,8 @@ that both end up connected, so neither has to read the other's queue.
 
 | | |
 |---|---|
-| **People** | the people you have minted a URL for |
-| **The request form** | what a request asks for |
+| **People** | the ones you have minted a link for who have not used it yet |
+| **The request form** | what a request asks for, under a fixed email field |
 | **Waiting for approval** | everybody who has asked and not been decided about |
 
 ### A person, as against a device
@@ -272,23 +277,32 @@ A device is one screen standing in one room. A person moves between a phone, a
 laptop and a borrowed browser and is the same person in all three, so they are
 not the same kind of row and they are not created the same way.
 
-**You mint a person; they do not sign themselves up.** Name one under **People**
-and you are handed a URL to give them. There is no self-registration here — no
-email, no verification and nothing to vouch for a name — so anybody who could
-create their own identity could create somebody else's.
+**You mint a person; they do not sign themselves up.** Name one under
+**People**, give them an email address, and you are handed a link to send.
+There is no self-registration here and nothing that verifies an address, so
+anybody who could create their own account could create somebody else's.
 
-**The URL is the credential, and it is shown once.** It carries an unguessable
-component rather than being spelled out of their name: a name is guessable, and
-a guessable address that grants anything is a password written on a wall. What
-is stored is a hash of it, so the panel cannot show it to you a second time —
-hand it over before you leave the row. Opening it sets a cookie and drops the
-secret out of the address bar, so what stays in their browser history no longer
-carries anything.
+**The link buys one thing: the page that asks them to choose a password.** It
+is shown once — what is stored is a hash of it, so the panel cannot show it to
+you a second time — and it is spent the moment they use it. After that the
+account is reached by signing in with the address and the password, from any
+machine, including one that has never heard of them.
 
-**REISSUE** mints a new one and kills the old the moment you press it. It is
-for a URL that has got somewhere it should not have — pasted into a chat, left
-in a browser somebody else uses — where deleting the person would take
-everything they own with them.
+**You never see the password and cannot set one.** They choose it, and an
+admin who chose it would know it. That is the whole reason the link exists
+rather than a password field on the row.
+
+**A row moves when they use it.** Until then it sits here, badged
+*LINK NOT USED*. The moment they set a password it appears under
+**IDENTITY ▸ USER** — the same move a screen makes from ENROLLMENTS ▸ DEVICE
+to NODES when it takes its code, and for the same reason: what divides those
+two lists is whether the thing has finished arriving.
+
+**REISSUE THE LINK is the whole of account recovery**, and deliberately the
+same gesture as creating somebody. It mints a new link, clears the old
+password, and signs out every browser they had open. A forgotten password and
+a leaked link want the same answer, and neither of them is an admin typing a
+password they would then know.
 
 **A session is a person or a device, never both, and the URL decides which.** A
 device you approved operates as a device; opening a person's URL on one is
@@ -306,9 +320,10 @@ question this list is read to answer.
 | **Get a code** | name it, and the code appears with the clock already running |
 | **Waiting for their code** | rows minted and not yet used, with REISSUE for one that ran out |
 
-**CONNECTIONS** — everything that is working, in two areas, **People**
-and **Devices**. A row moves here on its own the moment it is connected, and
-leaves the tab it arrived through.
+**CONNECTIONS ▸ NODES** — everything that is working, in one register. A row
+moves here on its own the moment it is connected, and leaves the tab it arrived
+through; the door it came through stays with it as a badge, **ASKED** or
+**INVITED**, rather than deciding which list it lands in.
 
 Whether anybody is asked at all is on **SECURITY**, under **AI Requires
 Permission** — that is the door rather than the key, and it decides what a
@@ -920,8 +935,8 @@ two it did not ask for.
 **Two kinds, and they do not mix.**
 
 - **USERS** holds the people created under ENROLLMENTS ▸ USER. A person
-  reaches an endpoint from whatever machine they open their URL on, so a grant
-  made here follows the human rather than the hardware.
+  reaches an endpoint from whatever machine they sign in on, so a grant made
+  here follows the human rather than the hardware.
 - **DEVICES** holds displays — every screen and every laptop, however it got
   here.
 
@@ -973,9 +988,21 @@ been approved is still refused, and so is one whose access has run out. The
 group says *which* endpoints it may reach; approval says whether it may reach
 anything at all.
 
-**A person has no equivalent test.** An identity exists only because you made
+**A request is for an ACCOUNT, not for a device.** Somebody who fills the form
+in is a person asking to be let in, and approving them creates the account and
+mints the link rather than turning their browser into a screen on your wall.
+The form asks for an **email address** above whatever fields you defined — it
+is the login the request is for, so it cannot be renamed, reordered or
+switched off — and the endpoints you tick are granted to the person.
+
+They are standing at that screen waiting, so **their page takes them straight
+to the choose-a-password box** the moment you approve. The link also appears in
+the panel, once, for the case where they walked away.
+
+**A person has no equivalent test.** An account exists only because you made
 it, so creating one *is* the approval and there is no way to turn up asking to
-be one. Withdrawing it is deleting the person, or reissuing their URL.
+be one. Withdrawing it is deleting the person, or reissuing their link — which
+clears the password and signs out every browser they had open.
 
 **Deleting a group** removes it from every endpoint that named it. Nothing in
 it is deleted — a group is a way of referring to people and devices, not a

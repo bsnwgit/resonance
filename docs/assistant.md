@@ -66,6 +66,29 @@ allowed to use. That is what lets it stay quiet when somebody addresses
 another device: it has to recognise the house's name in order to ignore a
 command meant for the house rather than passing it into its own conversation.
 
+### Sign in
+
+Its own section on the endpoint, and the first one: whether somebody must be
+**signed in as a person** to use it at all. Nothing here is about *which*
+people — that is *Who may use it*, below — and the two are independent, so
+"open to everybody, but they must sign in" is a thing you can say.
+
+It is set per endpoint because that is where the answer differs. Three
+assistants on one server can want three: a house one anybody in the room may
+talk to, a hosted model worth money per question, one reading from a system
+that should know who asked. A single deployment-wide switch could only ever be
+set to the strictest of them, which is why there is no longer one.
+
+**REQUIRED refuses a device outright**, approved or not. A wall screen has no
+person on it and never will, so an endpoint set this way is one your kiosks
+stop answering on. That is what makes this the control that limits what a
+model costs, where an allow-list of screens only limits which rooms it is
+heard in.
+
+People sign in at the display with the email address and password they set
+from their enrolment link. The admin panel is not affected and never was: it
+always asks, whatever is set here.
+
 ### Who may use it
 
 Two reasons to restrict an endpoint.
@@ -243,22 +266,31 @@ want:
 |---|---|
 | Port | 1024–65535. Refused if it is the admin portal's, or one another profile already has. |
 | Plain HTTP, redirected here | Optional. A plain port that 307s to this one, which is what 9700 has always done for 9701. Leave it empty for none. |
-| More than one endpoint | Whether this port is shared. |
-| The port is the grant | **YES** turns the request form off on that port alone — a device that can reach it uses the endpoints straight away, approved or not. **NO** applies the ordinary rules. |
 
-**The default profile is always shared.** It carries every endpoint that names
-no profile, so one that could only take a single endpoint would strand the
-rest. The panel will not offer MAKE DEFAULT on an unshared profile, and the
-server refuses the save either way.
+A profile is a **port and an address, and nothing about permission**. It
+carried two permission switches once — *More than one endpoint*, and *The port
+is the grant* — and both are gone.
 
-A question arriving on a port for an endpoint that port does not carry is
-given the port's own default rather than refused — the same thing the shared
-port has always done with an endpoint switched off since the page loaded.
+**A port carries one endpoint.** Ports were shareable, several assistants told
+apart by wake word; that ended when signing in became a property of the
+endpoint, because a door with two assistants behind it can only have one lock
+and would have to answer for the looser of them. Choosing a port another
+endpoint already answers on is refused, and a taken port is not offered in the
+endpoint's picker.
 
-**The port is the grant** is a statement about your network rather than about
-this server. It is right when the port is on a VLAN only the intended devices
-are on, and wrong the moment it is not. It applies to that port only: the same
-device arriving on the shared display port is treated exactly as before.
+**No port selected means no port.** An endpoint that names no profile is
+attached to nothing and answers nowhere. It used to fall back to a nominated
+default, which is precisely what put two assistants on one port — two
+endpoints that had simply never been given one both landed there, chosen by
+nobody. The server names such endpoints at startup, and the endpoint's Network
+heading reads *no port — answers nowhere*.
+
+There is no MAKE DEFAULT on this page. One profile is still nominated
+internally as the owner of the built-in display port, because the display
+listener has to be some profile's port, but it collects nothing.
+
+**Whether a caller has to sign in is on the endpoint**, under CONNECTIONS ▸ AI
+▸ Sign in — not here. See *Who may use it*.
 
 TLS is the same certificate the display port uses — the microphone needs a
 secure context, and a second certificate for the same machine would be one

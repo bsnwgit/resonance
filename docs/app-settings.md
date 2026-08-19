@@ -26,12 +26,29 @@ does, rather than being committed by a button on a tab they are no longer on.
 
 They are still read as a pair:
 
-| Reachable at | Sign in | Fits |
-|---|---|---|
-| this machine only | nothing | your own machine; nothing else can reach it |
-| one address | nothing | your own home network, your call, stated plainly |
-| one address | a single PIN | a home network you would rather not leave open |
-| everything | accounts and roles | anywhere other people are |
+| Reachable at | Fits |
+|---|---|
+| this machine only | your own machine; nothing else can reach it |
+| one address | your own home network, your call, stated plainly |
+| everything | anywhere other people are |
+
+**There is no deployment-wide sign-in setting, in either direction.**
+
+The **admin panel** always asks for a password. It holds the assistant's API
+key, every credential the server stores, and the power to grant anybody access
+to anything — a switch that opened it would be a switch somebody leaves on.
+
+The **displays** ask per endpoint, under CONNECTIONS ▸ AI, on **MUST SIGN
+IN**. "Must there be a person" is a property of the thing being reached rather
+than of the server: three assistants on one box can want three different
+answers — a house one anybody in the room may talk to, a hosted model worth
+money per question, one reading from a system that should know who asked — and
+a single switch covering all three could only ever be set to the strictest.
+
+MUST SIGN IN refuses a **device** outright, approved or not. A wall screen has
+no person on it, so an endpoint set that way is one your kiosks stop answering
+on. That is what makes it the control that limits what a model costs, where an
+allow-list of screens only limits which rooms it is heard in.
 
 ### This machine only
 
@@ -57,40 +74,43 @@ If a stored address later disappears — a DHCP lease that moved, an interface
 that is down — it is still shown, flagged, rather than some other address
 being silently selected in its place.
 
-### Beyond loopback with no sign-in
+### Beyond loopback with no sign-in at the displays
 
 Allowed, and not dressed up as anything else. The structural argument for
 skipping accounts is gone and what is left is you accepting a risk on a
-network you control. It is not refused, because you may want exactly that —
-but it **warns at every startup and banners in the display itself**, because a
-laptop configured this way that later joins an office network will not have
-changed on the day that matters.
+network you control — anyone who can reach the machine can use whatever the
+assistants are open to, and whatever it costs to run them. The panel itself
+still asks. It is not refused, because you may want exactly that —
+but it **warns at every startup and in the admin panel**, because a laptop
+configured this way that later joins an office network will not have changed
+on the day that matters.
+
+It used to banner the display as well. That is gone: a description of this
+server's exposure is not something to hand to every browser that loads a
+screen. The reasoning that made it safe — anybody reading it could have opened
+the admin port and found out anyway — expired the day the panel started always
+asking for a password. Warnings live where they can be acted on: behind the
+sign-in, and in the log of whoever ran the command.
 
 A firewall rule, which is outside this application entirely, does more than
 anything inside it.
 
-### A single PIN
+### There used to be a panel PIN
 
-One number for the whole panel, no accounts and no account management. The
-middle rung, and the right answer for a deployment with one administrator:
-accounts exist to tell people apart, and telling one person apart from
-themselves is a login screen charging rent.
+One number for the whole panel — no accounts, no account management — for the
+deployment with a single administrator. It is gone, with every other PIN in
+this product.
 
-**Set the PIN before switching to it.** The switch is refused otherwise —
-saving it and restarting is how a panel ends up in a mode whose only key was
-never cut, and the way back from that is a text editor on the box. The field
-for it is directly under the choice.
+**What it cost was the log.** Everything an account does is recorded against a
+name. Everything done behind one shared number was recorded as
+**(single PIN)**, because that is all it knew about who was there. A
+deployment with one administrator is an account with one member, which is the
+same login screen without the hole in the record.
 
-It is held to the same rules as a person's PIN: digits only, at least as many
-as the PIN policy asks for, and runs, repeats and anything reading as a year
-refused where they are chosen. Guessing backs off geometrically, the same as a
-password does. Setting it does not sign anybody out; locking yourself out of
-the panel from inside the panel is not a security property.
-
-**What it costs is the log.** Everything an account does is recorded against a
-name. Everything done behind the PIN is recorded as **(single PIN)**, because
-that is all this rung knows about who is there. If it ever has to matter who
-did something, this is not the rung for it.
+An install saved on it comes up on **accounts** rather than refusing to start
+or falling back to nothing — a removed authentication mode must never fail
+open. The first-run password is minted the same way it is for any other
+install with no account yet, and printed at startup.
 
 ### Accounts and roles
 
@@ -99,15 +119,34 @@ reached. With sign-in set to nothing there are no accounts to manage: the
 sections under IDENTITY ▸ ADMIN are not offered, and the account routes refuse
 rather than quietly writing to a file nothing consults.
 
+**This setting governs the display side too.** On **accounts**, somebody who
+reaches a display that is not an approved device has to sign in with the email
+address and password they set from their enrolment link. On **nothing**, they
+do not — opening the link is the whole of it. One switch, because "is this
+server reachable by people I have not met" is one question.
+
 ## Ports
 
 **One port is configured here: the admin portal's**, 9702 by default — the page
 you are reading this in, which requires a sign-in.
 
 Everything the app answers on is a **network profile** instead, under
-PROFILES ▸ NETWORK. A deployment can want several, and which endpoints each
-one carries is a question about the app rather than about the portal. See
+PROFILES ▸ NETWORK. A deployment can want several, and which endpoint each one
+carries is a question about the app rather than about the portal. See
 *Assistants* → *Network profiles*.
+
+**A port carries one endpoint.** Ports were shareable once — several
+assistants on one, told apart by wake word — and that went when signing in
+became a property of the endpoint. A door with two assistants behind it can
+only have one lock, and would have to answer for the looser of them; one
+assistant per door is what makes the answer unambiguous. Choosing a port
+another endpoint already answers on is refused, and the same holds for the
+display port, which is simply the profile nominated DEFAULT.
+
+An install that already shares one keeps working — the rule is enforced where
+a save is made, not by rewriting a configuration on upgrade, since moving an
+assistant to another port changes the URL people use. It says so at every
+startup, naming the endpoints, until they are moved apart.
 
 The portal's port stays here deliberately: it is the way back in when what is
 over there is wrong. For the same reason the server refuses to put it on a
@@ -198,19 +237,14 @@ That check deliberately does **not** renew the session it is checking. A poll
 that refreshed what it was polling would mean an open tab never expired at
 all, because the check itself would be the activity keeping it alive.
 
-A viewer's session is a different question with a different answer, and it
-does not exist yet — see *Identity* in the README roadmap. When it does, a
-display unlocked with a PIN is measured in **hours** rather than minutes:
-somebody standing in front of a screen doing their job is not holding the keys
-to everyone else's configuration.
+A viewer's session is a different question with a different answer. Somebody
+signed in at a display is measured in **hours** rather than minutes: a person
+standing in front of a screen doing their job is not holding the keys to
+everyone else's configuration.
 
-That number will belong to **the display URL the PIN was entered at**, not to
-the person who entered it and not to one setting covering every display. The
-place is what carries the risk: a workshop screen only the workshop can reach
-and a reception screen facing the street are the same person on the same PIN
-and want opposite answers. An admin securing a room can reason about that
-room. Nobody can reason usefully about a number that follows a human between
-the two.
+That number belongs to **the person**, on their row under IDENTITY ▸ USER,
+rather than to one setting covering everybody. Blank takes the deployment's
+default.
 
 Changing a role or a password drops that account's existing sessions, so the
 new rights or the new password take effect at the next sign-in rather than
