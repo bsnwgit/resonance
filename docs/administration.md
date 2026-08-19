@@ -195,10 +195,14 @@ one of them adds a row you then have to name.
 There used to be a SAVE FOR EVERYONE at the foot of APPEARANCE, GEOMETRY and
 SPEECH, publishing that tab's settings to every display at once. There is not
 any more, and the reason is the profiles: those tabs are the **editor** for a
-profile now, and what every display gets is whichever profile is nominated
-DEFAULT, published when that profile is saved. A tab-wide commit sitting
-beside a list of profiles would have published whichever one happened to be
-open to every screen in the building.
+profile, and nothing else. A tab-wide commit sitting beside a list of profiles
+would have published whichever one happened to be open to every screen in the
+building.
+
+**Nothing on those tabs reaches a display by itself.** There is no shared
+appearance behind them and no nominated default in front of them: a display
+shows the profiles it NAMES, and the page's own settings for the ones it does
+not.
 
 The consequence worth knowing: **moving a control changes the preview and
 nothing else.** Nothing reaches a display until you press SAVE in the profile
@@ -211,7 +215,7 @@ Each of these writes a different document, so each has its own button:
 
 | Button | Writes | Applies |
 |---|---|---|
-| SAVE, inside a profile row | that profile alone; every display naming it, and every display at all if it is the default | immediately |
+| SAVE, inside a profile row | that profile alone, and every display naming it | immediately |
 | SAVE, inside an AI endpoint's box | that endpoint alone | immediately, next question |
 | SAVE, on SECURITY | who has to be approved, what a grant is worth, how long a code lasts | immediately |
 | SAVE, inside Sign in | how you get in | only after a restart |
@@ -348,11 +352,42 @@ hallway looks like once still reaches every kiosk using it. Day and night in
 one hallway share an appearance and differ only in the dim — that case is the
 reason the three lists stayed three.
 
-**One of them is the default**, and you choose which. A device that names no
-profile gets it, so a screen hung and never configured behaves like the rest of
-the building rather than like nothing. It is stored by name rather than being
-"the first in the list", so reordering the panel cannot quietly change what
-every unconfigured screen is doing.
+**None of them is the default, and there is no way to make one.** A device
+that names no profile shows what the page itself ships with — a working screen
+that nobody has dressed, rather than one wearing a profile built for somewhere
+else in the building. Every screen is something an admin picked or something
+plainly unpicked, and the register says which.
+
+That is the same rule the network profiles have always had, applied to the
+rest: a fallback nobody chose is how two things end up somewhere neither of
+them was put.
+
+### Setting a fleet in one place
+
+Eight screens on one assistant are eight rows to set by hand, and they are
+usually all the same kind of place. So an endpoint carries a **display profile
+for the screens named above** — CONNECTIONS ▸ AI, under *Who may use it* — and
+a screen that names no profile of its own takes that one.
+
+**A screen's own choice always wins.** Nothing an endpoint says moves a row
+somebody decided about. The inheritance is read only where the row's picker is
+left on INHERIT.
+
+**Only endpoints that NAME the screen**, directly or through a group of
+displays. An endpoint set to ANY DISPLAY is *reachable* by every screen in the
+building; it is not every screen's endpoint, and letting it dress the whole
+building is the accident this rule exists to prevent.
+
+**Two endpoints that disagree inherit nothing.** A screen can be granted
+several endpoints, so it can have several parents. Where two of them name
+different profiles the picker says so — *INHERIT — Sparky and Resonance
+disagree, pick one* — and you settle it on the row. It is deliberately not
+resolved: first in the list, last saved, alphabetical are all a screen's
+appearance decided by something nobody could see, and the failure would surface
+months later when somebody ticked a second endpoint for an unrelated reason.
+
+The picker names what it resolved to, so a row explains itself without opening
+another tab: *INHERIT — Hallway, from Sparky*.
 
 **One register became four lists, and every row is in exactly one.** Which one
 is two questions: is this thing working, and is it a person or a machine.
@@ -498,6 +533,27 @@ gesture, which is why it happens on a touch rather than on load.
 Only on a kiosk. A tab you opened is yours, and a page that went full screen the
 moment you clicked it would be a page you never opened twice.
 
+**A REFRESH ALWAYS DROPS IT, and no setting here can change that.** Leaving
+full screen on navigation is in the specification, and the request to re-enter
+needs a gesture — so a page cannot put itself back on load, however it is
+configured. After a reload the screen is a normal browser window until the next
+touch, which puts it back.
+
+That is a real problem on a wall, because a wall reloads on its own: a settings
+change published from the panel, a network blip, the browser restarting
+overnight. The page-level tick cannot solve it. **What solves it is starting the
+browser already full screen**, which is a window state rather than a page
+permission and therefore survives every reload:
+
+- **Kiosk mode** — `firefox --kiosk https://host:9701/` (Chromium:
+  `--kiosk --start-fullscreen`). The right answer for a screen that is only
+  ever this. Nothing to press, nothing to restore.
+- **F11**, once, by hand. Browser-chrome full screen is not the same mechanism
+  as the one this page asks for, and it is kept across reloads.
+
+With either of those the tick becomes redundant and harmless — leave it on, and
+it simply never finds anything to do.
+
 **It does not fight you.** Press Escape and it stays out for a minute, because
 somebody leaving full screen is nearly always the person installing the screen
 wanting the address bar back — and asking again on their next tap would make it
@@ -520,6 +576,12 @@ and costs the battery.
 Neither changes what this server will answer. This is entirely what the screen
 looks like.
 
+**Every row is a display**, and there is no longer a state where it is not
+one. There was, while a shared settings document dressed every screen whether
+or not it was in display mode; that document is gone, so a row in that state
+had nothing dressing it and came out looking broken rather than plain. The only
+question a row answers now is which profile — its own, or the one it inherits.
+
 **Voice only** is the geometry alone: no transcript and no composer. That is
 what a screen in a hallway wants. It is not a workstation, and a page of
 scrolling text on a kiosk is neither useful nor discreet.
@@ -537,6 +599,24 @@ an ordinary tab gets that person's own setting back.
 TALK, AUDIO and SPACE stay. A browser will not open a microphone without
 somebody asking it to, so a display with no TALK button is a display that could
 never hear its own wake word. Voice only means no text, not no controls.
+
+**Listen from the moment it loads** is the answer to the problem that creates
+on a wall. TALK is a button, and a wall screen has nobody standing at it — so
+every reload left the hallway deaf until somebody walked up and pressed it,
+which is exactly the walk the screen was meant to save. Tick this and the page
+opens the microphone itself as soon as it loads.
+
+**Off by default, and it has to be.** A page that opens a microphone unasked is
+a page nobody should trust, and on a laptop the button is right there.
+
+It is a **request, not a guarantee**: the browser decides whether a page may
+open a microphone without somebody touching it first, and the answer is no
+until the permission has been granted persistently for this address. So a
+screen hung for the first time still needs one visit — grant the microphone and
+tick *remember this decision*. After that it comes back listening on its own,
+through reboots and republished settings alike. When the browser does refuse,
+the status line says so and the **next touch of the screen starts it**, which is
+the same single touch that asks for full screen.
 
 **It says what to say to it.** A kiosk is walked past by people who
 have never used it, and nothing about a silent figure suggests that it listens.
@@ -576,9 +656,12 @@ preview, then capture it under a name.
 gesture as making one. There is no PREVIEW and no STOP: you are always looking
 at the profile you have open.
 
-**A device that names no profile gets whichever profile is nominated
-DEFAULT.** Deleting a profile puts every device that named it back to that,
-rather than to nothing — so the fall-back is always a working appearance.
+**A device that names no profile shows what the page ships with**, unless one
+of its endpoints hands it one — see *Setting a fleet in one place*. Nothing is
+nominated: no profile stands in for a choice nobody made. Deleting a profile
+puts every device that named it back to the page's own settings, which is still
+a working appearance and one no longer attributable to a profile that has
+gone.
 
 One limit worth knowing before a screen goes up: **type size tops out at
 LARGEST**, because that is the range the APPEARANCE tab offers. If that is not enough

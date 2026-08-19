@@ -231,8 +231,13 @@ names where the same question would have gone in use.
 ## Model profiles
 
 A profile is one connection under a name: **PROFILES ▸ MODELS**, one row each,
-the same caret and the same one-open-at-a-time as every other list. **ADD A PROFILE** makes one; SAVE commits the row; MAKE DEFAULT nominates the
-one an endpoint naming nothing gets.
+the same caret and the same one-open-at-a-time as every other list. **ADD A
+PROFILE** makes one and SAVE commits the row.
+
+There is no MAKE DEFAULT here, and nothing is nominated behind it — the same
+rule the network profiles have. An endpoint naming no model profile is not
+inheriting one; it is on `demo`, says so, and any profile can be removed
+because none of them is the one the deployment cannot lose.
 
 Editing a profile changes what every endpoint naming it reaches, in one place
 — which is the point. A key typed once serves all of them, and rotating it is

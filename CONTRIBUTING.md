@@ -152,10 +152,19 @@ regain a control that writes.
 **Settings are admin-only by design.** A viewer gets the microphone, mute, the
 push-to-talk/hands-free choice, and whether the transcript is shown. Nothing
 else, and adding a fifth is a decision rather than a convenience. Those four
-are remembered in that viewer's browser and outrank the shared settings;
-everything else belongs to the shared document, because the point of it is
-that one person decides what everyone sees. A visibility gate must be
-confirmed by the server — never inferred in the browser.
+are remembered in that viewer's browser and outrank whatever the screen was
+given; everything else is set in the panel, because the point of it is that one
+person decides what everyone sees. A visibility gate must be confirmed by the
+server — never inferred in the browser.
+
+**There is no shared appearance document.** APPEARANCE, GEOMETRY and SPEECH are
+a workbench: you tune them against the preview and capture the result as a
+profile, and a screen shows the profiles it NAMES and nothing else. The keys
+those tabs own are dropped out of a display's settings on the way to it — see
+`display_document` — so tuning a tab and walking away cannot repaint a
+building. Nothing in any list is nominated as a default, in either sense: no
+profile stands in for a choice nobody made, and none of them recreates itself
+when the one before it is deleted.
 
 **Record the non-obvious failures.** The *Engineering notes* section of the
 README exists so the same day isn't lost twice. If something cost you hours and

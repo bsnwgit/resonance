@@ -880,6 +880,14 @@ ROUTE_DEFAULTS.update({
     # only limits which rooms it is answered in.
     "needs_signin": False,
     "displays": [],
+    # The display profile this endpoint hands to the screens it NAMES. A
+    # convenience for a fleet: eight screens on one assistant are eight rows to
+    # set otherwise, and they are all the same kind of place.
+    #
+    # It is read ONLY where the screen's own row names none, and only when the
+    # answer is unambiguous — see inherited_kiosk, which is where the rule
+    # actually lives.
+    "kiosk_profile": "",
     # …and the groups it names. Kept beside the individual list rather than
     # folded into it: a grant made to "the physics department" should still
     # read that way next year, and flattening it at the point of saving would
@@ -1027,18 +1035,15 @@ def with_model(rec):
 
     Overlaid rather than replacing the record, so everything that is still the
     ROUTE's — its system prompt, its limits, where it falls through to — is
-    untouched. A route naming no profile gets the deployment's default; one
-    whose profile has been deleted falls back to it too, rather than quietly
-    talking to whatever base URL was last typed."""
+    untouched. A route naming no profile — or naming one that has been
+    deleted — resolves to nothing and stays on `demo`, rather than being
+    quietly connected to a model somebody picked for a different endpoint. It
+    used to fall back to a nominated default, which is how an endpoint could be
+    live against a credential nobody had pointed at it."""
     pool = _model_pool()
     if not pool:
         return rec
     prof = find_look(str(rec.get("model_profile") or ""), pool)
-    if prof is None:
-        try:
-            prof = find_look(display_settings()["model_default"], pool)
-        except Exception:
-            prof = None
     if not prof:
         return rec
     out = dict(rec)
@@ -1053,13 +1058,6 @@ def _speech_pool():
         return display_settings()["speeches"]
     except Exception:
         return []
-
-
-def _speech_default():
-    try:
-        return display_settings()["speech_default"]
-    except Exception:
-        return ""
 
 
 def public_routes(doc, disp=None, ident=None):
@@ -1087,11 +1085,12 @@ def public_routes(doc, disp=None, ident=None):
             continue
         row = {k: rec[k] for k in ROUTE_PRESENTATION}
         # Resolved here, so a browser is handed a voice rather than the name of a
-        # profile it has no business knowing the rest of. A route naming none
-        # falls back to the deployment's default speech profile, and one whose
-        # profile has been deleted falls back with it rather than going silent.
-        prof = find_look(str(rec.get("speech") or ""), _speech_pool()) \
-               or find_look(_speech_default(), _speech_pool()) or {}
+        # profile it has no business knowing the rest of. A route naming none —
+        # or naming one that has been deleted — gets NOTHING here and speaks in
+        # the page's own voice. It used to fall back to a nominated default,
+        # which meant an endpoint could be speaking in a voice nobody had
+        # chosen for it and the panel showed an empty box either way.
+        prof = find_look(str(rec.get("speech") or ""), _speech_pool()) or {}
         for k in ROUTE_SPEECH_KEYS:
             if k in prof:
                 row[k] = prof[k]
@@ -1226,6 +1225,13 @@ def validate_route(obj, current, doc, rid=None):
     for k in ("name", "greeting", "voice"):
         if k in obj:
             rec[k] = str(obj[k] or "").strip()[:200]
+    if "kiosk_profile" in obj:
+        pid = str(obj["kiosk_profile"] or "")[:16]
+        if pid and not any(k["id"] == pid
+                           for k in display_settings()["kiosks"]):
+            return None, ("that display profile no longer exists — reload the "
+                          "panel to see the current list")
+        rec["kiosk_profile"] = pid
     if "speech" in obj:
         pid = str(obj["speech"] or "")[:16]
         if pid and not any(p["id"] == pid
@@ -1713,11 +1719,20 @@ SAVER_OFF = {"delay": 0, "scale": 70, "dim": 45,
 #: Validated against the values the panel offers rather than stored as typed. A
 #: palette name that is not a palette is not a screen that looks wrong, it is
 #: `PALETTES[S.palette].ink` throwing once per frame forever.
+#: A figure that used to exist, and what a stored one becomes. STACK went when
+#: RIDGE stopped being a fold of it and became its own thing — but settings
+#: files and appearance profiles in the field still name it, and a mode the
+#: display page has no builder for is a screen quietly drawing the wrong
+#: figure. Rewritten on the way out rather than on disk, the same way the old
+#: assistant name is: nothing is lost if this turns out to be wrong, and it
+#: persists by itself the next time an admin saves the tab it lives on.
+RETIRED_MODES = {"stack": "ridge"}
+
 LOOK_VALUES = {
     "fs":      ("1", "1.12", "1.25"),
     "palette": ("blue", "milk", "ice", "amber", "rust"),
     "layout":  ("hero", "bleed"),
-    "mode":    ("stack", "ridge", "disc", "orb", "knot"),
+    "mode":    ("ridge", "disc", "orb", "knot", "dna"),
 }
 #: How many appearance profiles may exist — the same reasoning and the same
 #: number as the screensavers. A place, not a screen.
@@ -1782,9 +1797,6 @@ DISPLAY_SETTINGS = {
     # would mean a profile per combination.
     "motions": [],
     "speeches": [],
-    # Which profile in each list an ordinary display gets. One per list, always
-    # set, and the profile it names cannot be removed — a list whose default
-    # points at nothing would leave every screen with no appearance at all.
     # The connection half of an endpoint, under a name: which provider, which
     # base URL, which model, and the key for it. An endpoint names one instead
     # of carrying its own copy — two endpoints on the same model used to be the
@@ -1797,21 +1809,27 @@ DISPLAY_SETTINGS = {
     # port, which is where every endpoint was before this existed. A default
     # would silently move one onto a port of its own.
     "networks": [],
-    # …and, unlike MODELS, one of them is nominated. It has to be: the display
-    # ports live here now rather than in app.json, so an endpoint naming no
-    # profile still has to answer somewhere, and that somewhere is this one.
-    # A default network profile is always SHARED, or endpoints naming nothing
-    # would be pointed at a port that refuses to carry more than one.
-    "model_default": "",
-    "look_default": "",
-    "motion_default": "",
-    "speech_default": "",
     "kiosks": [],
-    # Which of them a device gets when it names none. An id rather than "the
-    # first in the list", so reordering the panel cannot silently change what
-    # every unconfigured screen in the building is doing — the same reason a
-    # route's default is stored by id.
-    "kiosk_default": "",
+    # NO NOMINATED DEFAULT, in any of these lists, and that is the rule rather
+    # than an omission. A row naming nothing is not quietly handed a profile
+    # somebody else picked: an endpoint naming no model profile is on `demo`,
+    # a route naming no speech profile speaks in the page's own voice, and a
+    # display naming no appearance profile shows what the page ships with.
+    # Each of those reads as an empty NONE in the panel, which is true, rather
+    # than as another admin's profile wearing the word "default".
+    #
+    # The mechanism this replaces did not merely offer a default — it RECREATED
+    # one, silently re-pointing at the first profile in the list whenever the
+    # nominated one went away. Clearing it was not something the panel could
+    # express.
+    #
+    # Which settings key belongs to which of the three profile tabs, published
+    # by the panel because only the panel knows: the mapping is built from the
+    # sections themselves, so a control moved between tabs corrects itself here
+    # rather than leaving a stale copy on the server. It is what lets a
+    # display's document drop the keys a profile is responsible for — see
+    # display_document.
+    "profile_keys": {},
     # How long an enrolment code is worth anything for, in minutes. ZERO IS
     # NEVER, which is a real answer: a deployment that mints a code on Friday
     # and hangs the screen on Monday is not less secure for it, because a code
@@ -2025,6 +2043,9 @@ def clean_profiles(raw, prefix, limit=None):
         for k, v in list(vals.items())[:MAX_PROFILE_KEYS]:
             if isinstance(k, str) and isinstance(v, (str, int, float, bool)):
                 clean[k[:40]] = v
+        # A profile naming a figure that no longer exists — see RETIRED_MODES.
+        if clean.get("mode") in RETIRED_MODES:
+            clean["mode"] = RETIRED_MODES[clean["mode"]]
         out.append({"id": pid, "name": name, "values": clean})
     return out
 
@@ -2089,6 +2110,18 @@ KIOSK_OFF = {"voice_only": True, "look": "", "motion": "", "speech": "",
              # system is already set never to sleep, where holding the lock
              # gains nothing and costs the battery.
              "keep_awake": True,
+             # Open the microphone as soon as the page loads, rather than
+             # waiting for somebody to press TALK. OFF by default and it has
+             # to be: a page that opens a microphone unasked is a page nobody
+             # should trust, and on a laptop the button is right there. It is
+             # a real answer on a wall — a screen nobody is standing at cannot
+             # press its own button, and a reload (a settings change, a
+             # network blip, the browser restarting overnight) otherwise
+             # leaves the hallway deaf until somebody walks up and touches it.
+             #
+             # A REQUEST, not a guarantee: the browser decides. See the
+             # display's Kiosk.startListening for what happens when it says no.
+             "listen": False,
              # The line low in the frame that tells a passer-by this listens.
              "prompt": True,
              # …and what it says. EMPTY MEANS the automatic one, built from the
@@ -2129,27 +2162,24 @@ def clean_kiosks(raw):
                     "saver": str(k.get("saver") or "")[:16],
                     "fullscreen": bool(k.get("fullscreen", KIOSK_OFF["fullscreen"])),
                     "keep_awake": bool(k.get("keep_awake", KIOSK_OFF["keep_awake"])),
+                    "listen": bool(k.get("listen", KIOSK_OFF["listen"])),
                     "prompt": bool(k.get("prompt", KIOSK_OFF["prompt"])),
                     "prompt_text": str(k.get("prompt_text") or "")
                                    .strip()[:MAX_PROMPT_TEXT]})
     return out
 
 
-def find_kiosk(kid, kiosks=None, default_id=None):
-    """The profile a row names, or the deployment's default where it names
-    none — which is what "the admin picks which kiosk is the default" means at
-    the point it is read.
+def find_kiosk(kid, kiosks=None):
+    """The profile a row NAMES, and nothing else.
 
-    A row naming a profile that has since been deleted falls back to the
-    default rather than to nothing, for the same reason a missing screensaver
-    falls back to off: a screen must keep working, and the panel is where the
-    mistake is visible."""
+    There is no deployment default to fall back to any more. A row naming none
+    is not a row missing a setting — it is a screen nobody has made a kiosk,
+    and it shows the page's own defaults. A row naming one that has since been
+    deleted lands in the same place, which is the panel's problem to see rather
+    than a reason to substitute a profile the admin did not choose."""
     pool = display_settings()["kiosks"] if kiosks is None else kiosks
-    if default_id is None:
-        default_id = display_settings()["kiosk_default"]
-    for want in (str(kid or ""), str(default_id or "")):
-        if not want:
-            continue
+    want = str(kid or "")
+    if want:
         for k in pool:
             if k["id"] == want:
                 return k
@@ -2582,42 +2612,22 @@ def validate_display_settings(obj, current):
                                   "exists — reload the panel to see the "
                                   "current list" % what)
         cfg["kiosks"] = clean_kiosks(obj["kiosks"])
-    # Which profile each list hands to a display that names none. Corrected
-    # rather than refused when it points at nothing — the deletion was the
-    # deliberate act, and a list whose default named a profile that is gone
-    # would leave every ordinary screen with no appearance at all.
-    #
     # WHICH KEY BELONGS TO WHICH TAB is not known here, and deliberately: that
     # mapping is built in the panel from the sections themselves, so a control
     # moved between tabs cannot leave a stale copy of the answer on the server.
-    # Seeding the first profile is the panel's job for the same reason.
-    for dkey, lkey in (("look_default", "looks"), ("motion_default", "motions"),
-                       ("speech_default", "speeches"), ("model_default", "models")):
-        if dkey in obj:
-            want = str(obj[dkey] or "")
-            if want and not any(p["id"] == want for p in cfg[lkey]):
-                return None, "that default is not one of the %s profiles" % lkey[:-1]
-            if want:
-                cfg[dkey] = want
-        if cfg[lkey] and not any(p["id"] == cfg.get(dkey) for p in cfg[lkey]):
-            cfg[dkey] = cfg[lkey][0]["id"]
-    if "kiosk_default" in obj:
-        want = str(obj["kiosk_default"] or "")
-        # Empty is "choose for me", not a mistake — it is what a deployment
-        # saving its very first profile has to send, since there was nothing to
-        # nominate before this request. Only a NAMED default that matches
-        # nothing is somebody's stale panel, and that is worth saying.
-        if want and not any(k["id"] == want for k in cfg["kiosks"]):
-            return None, "the default has to be one of the kiosk profiles"
-        if want:
-            cfg["kiosk_default"] = want
-    # A default that named a profile somebody just deleted is corrected here
-    # rather than refused: the deletion was the deliberate act, and leaving the
-    # deployment pointing at nothing would take every unconfigured screen with
-    # it.
-    if cfg["kiosks"] and not any(k["id"] == cfg.get("kiosk_default")
-                                 for k in cfg["kiosks"]):
-        cfg["kiosk_default"] = cfg["kiosks"][0]["id"]
+    # It is stored rather than computed because display_document needs it on
+    # every request, including ones no panel is open for.
+    if "profile_keys" in obj:
+        got = obj["profile_keys"]
+        if not isinstance(got, dict):
+            return None, "profile_keys has to be a map of tab to key names"
+        keymap = {}
+        for tab in ("look", "motion", "speech"):
+            keys = got.get(tab) or []
+            if not isinstance(keys, (list, tuple)):
+                return None, "profile_keys has to be a map of tab to key names"
+            keymap[tab] = sorted({str(k)[:40] for k in keys if str(k).strip()})
+        cfg["profile_keys"] = keymap
     if "guest_requests" in obj:
         cfg["guest_requests"] = bool(obj["guest_requests"])
     return cfg, None
@@ -2694,11 +2704,6 @@ def migrate_models():
     if not order:
         return
     cfg["models"] = order
-    if cfg.get("model_default") not in [p["id"] for p in order]:
-        # The default endpoint's connection is the one an endpoint naming
-        # nothing should get.
-        dflt = routes.get(doc.get("default")) or {}
-        cfg["model_default"] = dflt.get("model_profile") or order[0]["id"]
     ddoc["settings"] = cfg
     _write_displays_doc(ddoc)
     doc["routes"] = routes
@@ -2745,30 +2750,13 @@ def migrate_networks():
           "port only", flush=True)
 
 
-def ensure_default_kiosk():
-    """There is always at least one kiosk profile, and always one nominated as
-    the default.
-
-    A tickbox whose only companion is an empty list is a control that appears
-    broken to the person meeting it first. Seeding one means ticking KIOSK on a
-    screen does something immediately, and the admin renames or re-points it
-    rather than being made to build one before anything works."""
-    doc = read_displays_doc()
-    cfg = doc.get("settings")
-    cfg = dict(cfg) if isinstance(cfg, dict) else {}
-    kiosks = clean_kiosks(cfg.get("kiosks"))
-    changed = False
-    if not kiosks:
-        kiosks = [dict(KIOSK_OFF, id="k" + secrets.token_hex(4), name="Default")]
-        changed = True
-    if cfg.get("kiosk_default") not in [k["id"] for k in kiosks]:
-        cfg["kiosk_default"] = kiosks[0]["id"]
-        changed = True
-    if not changed:
-        return
-    cfg["kiosks"] = kiosks
-    doc["settings"] = cfg
-    _write_displays_doc(doc)
+# NO ensure_default_kiosk. It used to invent a kiosk profile called "Default"
+# at startup whenever the list was empty, so that ticking KIOSK on a screen did
+# something immediately. That is the same act as nominating one — a profile
+# nobody asked for, standing in for a choice — and it had the property that
+# made the nominations worth removing: deleting every profile and restarting
+# brought one back. An empty list is a real answer now, and a display in that
+# state shows what the page ships with.
 
 
 def migrate_kiosks():
@@ -2817,8 +2805,6 @@ def migrate_kiosks():
         for dead in ("wall", "voice_only", "saver", "look"):
             rec.pop(dead, None)
     cfg["kiosks"] = kiosks
-    if cfg.get("kiosk_default") not in [k["id"] for k in kiosks] and kiosks:
-        cfg["kiosk_default"] = kiosks[0]["id"]
     doc["settings"] = cfg
     doc["displays"] = rows
     _write_displays_doc(doc)
@@ -2849,7 +2835,7 @@ def display_label(rec):
 KIOSK_FIELDS = ("kiosk", "kiosk_profile")
 
 
-def kiosk_of(rec, savers=None, looks=None, kiosks=None, default_id=None,
+def kiosk_of(rec, savers=None, looks=None, kiosks=None,
              motions=None, speeches=None):
     """What this display is, resolved and clamped: whether it is a kiosk at
     all, whether the transcript is there, and the numbers of the screensaver
@@ -2861,16 +2847,26 @@ def kiosk_of(rec, savers=None, looks=None, kiosks=None, default_id=None,
     the names of places it is not in. The same applies to the kiosk profiles
     themselves: a screen is told what it is, never what the others are.
 
-    Everything is off where the row is not a kiosk. The profile stays stored,
-    so unticking is not the same as forgetting: a device taken down and put
-    back up comes back as what it was."""
-    if not rec.get("kiosk"):
-        return {"kiosk": False, "voice_only": False, "look": None,
-                "saver": dict(SAVER_OFF)}
+    EVERY ROW IS A DISPLAY. There is no longer a state where it is not one —
+    see the note below and the picker on the register."""
+    # NO "NOT A KIOSK" BRANCH ANY MORE, and the field it read is on its way
+    # out with it. It made sense while a shared settings document dressed every
+    # screen whether or not it was in display mode; that document is gone, so a
+    # row in that state had nothing dressing it and came out looking broken
+    # rather than plain. Every display row is a display. Rows stored `False`
+    # before this are read as True rather than migrated on disk — the same
+    # fail-forward as every other rewrite here, and nothing is lost if it turns
+    # out to be wrong.
     # `kiosk` is published in its own right and not merely implied by the
     # settings under it, because being a kiosk means things none of them
     # covers — a rig instrument in the corner of a hallway screen is the first.
-    prof = find_kiosk(rec.get("kiosk_profile"), kiosks, default_id) or {}
+    # The row's own choice first, and only then what its endpoints say. A
+    # screen that names a profile is a screen somebody decided about, and
+    # nothing an endpoint says may move it.
+    want = str(rec.get("kiosk_profile") or "")
+    if not want:
+        want, _ = inherited_kiosk(rec.get("id"), kiosks=kiosks)
+    prof = find_kiosk(want, kiosks) or {}
     # The three snapshots are merged into ONE map of settings before it leaves
     # here. The display already knows how to take a map of settings and apply
     # it; handing it three would make it learn an order of precedence that only
@@ -2894,6 +2890,7 @@ def kiosk_of(rec, savers=None, looks=None, kiosks=None, default_id=None,
             "saver": find_saver(str(prof.get("saver") or ""), savers),
             "fullscreen": bool(prof.get("fullscreen", KIOSK_OFF["fullscreen"])),
             "keep_awake": bool(prof.get("keep_awake", KIOSK_OFF["keep_awake"])),
+            "listen": bool(prof.get("listen", KIOSK_OFF["listen"])),
             "prompt": bool(prof.get("prompt", KIOSK_OFF["prompt"])),
             # The admin's words where there are any, and the empty string where
             # there are not — the display builds the automatic line itself,
@@ -3470,6 +3467,50 @@ def subject_may(route, disp=None, ident=None):
                                        kinds=DISPLAY_GROUP_KINDS)
 
 
+def inherited_kiosk(did, doc=None, kiosks=None):
+    """What display profile a screen takes from its endpoints, and from where.
+
+    Returns (profile id, [endpoint names]). An empty id means it inherits
+    nothing, and the names say why — either none of its endpoints sets one, or
+    more than one does and they disagree.
+
+    ONLY ENDPOINTS THAT NAME IT. An endpoint open to everybody is REACHABLE by
+    every screen in the building; it is not every screen's endpoint, and
+    letting an unrestricted route dress a whole building is the accident this
+    rule exists to prevent. Named directly, or by a group of displays — the
+    same two ways a grant is made.
+
+    EXACTLY ONE ANSWER, OR NONE AT ALL. A screen can be granted several
+    endpoints, so it can have several parents, and two of them can name
+    different profiles. There is no correct answer to that, so this returns
+    nothing rather than picking: the panel names the two that disagree and an
+    admin settles it on the row. Every tie-break available here — first in the
+    list, last saved, alphabetical — would be a screen's appearance decided by
+    something nobody could see, and the failure would surface months later when
+    somebody ticked a second endpoint for an unrelated reason.
+
+    A profile that has since been deleted inherits nothing, for the same reason
+    a row naming a deleted one gets nothing: a screen must not wear settings
+    that cannot be found in the panel to change."""
+    doc = doc or read_routes()
+    found, names = set(), []
+    for rid in route_order(doc):
+        rec = doc["routes"][rid]
+        if not rec.get("kiosk_profile"):
+            continue
+        if did not in (rec.get("displays") or []) \
+           and did not in group_members(rec.get("groups"),
+                                        kinds=DISPLAY_GROUP_KINDS):
+            continue
+        names.append(rec.get("name") or rid)
+        found.add(rec["kiosk_profile"])
+    if len(found) != 1:
+        return "", names
+    pid = found.pop()
+    pool = kiosks if kiosks is not None else display_settings()["kiosks"]
+    return (pid if any(k["id"] == pid for k in pool) else ""), names
+
+
 def admin_displays():
     """The list, less the credential. What a token IS never leaves this server
     — the panel shows the id, which says which device a row is about without
@@ -3484,9 +3525,11 @@ def admin_displays():
     # it. The grant was made, stored and invisible: ticks that could only ever
     # be empty on the one page that shows a device's settings.
     granted = {}
-    for rid, rrec in read_routes()["routes"].items():
+    rdoc = read_routes()
+    for rid, rrec in rdoc["routes"].items():
         for member in (rrec.get("displays") or []):
             granted.setdefault(member, []).append(rid)
+    kpool = display_settings()["kiosks"]
     for did, rec in sorted(displays.items(), key=lambda kv: kv[1]["created"]):
         row = {k: rec.get(k) for k in
                ("name", "asked", "approved", "hint", "created", "last_seen",
@@ -3497,6 +3540,16 @@ def admin_displays():
         # editing what this device names, and the numbers behind that name are
         # on the profile where they can be changed once for every screen.
         row.update({k: rec.get(k, DISPLAY_DEFAULTS[k]) for k in KIOSK_FIELDS})
+        # WHAT A BLANK PICKER IS CURRENTLY GETTING, resolved here rather than
+        # in the panel. The rule is one rule and belongs in one place: a panel
+        # deriving it a second time is a second rule to keep in step, and the
+        # two would disagree the first time either changed.
+        inh_id, inh_from = inherited_kiosk(did, rdoc, kpool)
+        row["inherit"] = {
+            "profile": inh_id,
+            "name": next((k["name"] for k in kpool if k["id"] == inh_id), ""),
+            "from": inh_from,
+        }
         ref = _display_refusals.get(did)
         # A code with no deadline is live; one whose deadline has passed is
         # not. Both have to be tellable apart from "there is no code", which
@@ -4634,8 +4687,7 @@ def wake_words_in_use(skip_pid=""):
     doc = read_routes()
     for rid in route_order(doc):
         rec = doc["routes"][rid]
-        prof = find_look(str(rec.get("speech") or ""), _speech_pool()) \
-               or find_look(_speech_default(), _speech_pool()) or {}
+        prof = find_look(str(rec.get("speech") or ""), _speech_pool()) or {}
         for w in [prof.get("wakeword") or rec.get("wakeword") or ""] \
                  + list(prof.get("aliases") or rec.get("aliases") or []):
             if w:
@@ -6098,6 +6150,37 @@ def drop_embed_sessions(embed_id):
 OLD_AINAME = "resonance"
 
 
+def display_document(full=False):
+    """What a browser is handed as `settings`.
+
+    THERE IS NO SHARED APPEARANCE. APPEARANCE, GEOMETRY and SPEECH are tuned on
+    the panel and captured as profiles, and a display gets whichever profiles
+    its kiosk profile NAMES — nothing else. So the keys those three tabs own
+    are dropped on the way out here: a screen naming no appearance profile
+    shows what the page itself ships with, rather than inheriting a document
+    somebody tuned while looking at a different screen.
+
+    That document still exists, and is still the file the tabs edit — it is the
+    panel's working surface and the thing a profile is a snapshot OF. What
+    changed is that no display reads those parts of it any more, so tuning a
+    tab and walking away cannot silently repaint a building.
+
+    `full` is the panel's own preview. It frames the real display page and is
+    the editor for all three tabs, so it is the one caller that has to see the
+    document whole."""
+    doc = read_settings()
+    if full:
+        return doc
+    owned = set()
+    try:
+        groups = display_settings().get("profile_keys") or {}
+    except Exception:
+        groups = {}
+    for keys in groups.values():
+        owned.update(str(k) for k in (keys or []))
+    return {k: v for k, v in doc.items() if k not in owned}
+
+
 def read_settings():
     try:
         with open(SETTINGS_PATH) as fh:
@@ -6111,6 +6194,8 @@ def read_settings():
     # saves the tab it lives on.
     if stored.get("ainame") == OLD_AINAME:
         stored["ainame"] = "{assistant}"
+    if stored.get("mode") in RETIRED_MODES:
+        stored["mode"] = RETIRED_MODES[stored["mode"]]
     return stored
 
 
@@ -6967,7 +7052,12 @@ class Handler(SimpleHTTPRequestHandler):
             #
             # It is still said where it can be acted on: in the panel, behind
             # the sign-in, and in the startup log to whoever ran the command.
-            return self._json(200, {"settings": read_settings()})
+            # Whole for the panel's preview, which is the editor for the
+            # three profile tabs; without those keys for every real display,
+            # which reads its appearance from the profiles it names and from
+            # nowhere else. See display_document.
+            return self._json(200,
+                              {"settings": display_document(bool(self.admin_port))})
         if path == "/auth/me":
             s = self._session()
             if not s:
@@ -9298,7 +9388,6 @@ def main():
     # DISPLAY_DEFAULTS, so the first write after an upgrade would drop the old
     # wall settings silently — see migrate_kiosks.
     migrate_kiosks()
-    ensure_default_kiosk()
     migrate_models()
     migrate_networks()
     # The two groups that always exist. Made at startup rather than on first
