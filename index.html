@@ -3111,6 +3111,7 @@ FullScreen.init();
    three want it. */
 ['pointerdown', 'touchstart', 'keydown', 'wheel'].forEach(ev=>
   window.addEventListener(ev, ()=>{
+    lastTouch = wallNow();
     Saver.poke(); FullScreen.ask();
     if (typeof Kiosk !== 'undefined') Kiosk.touched();
   }, {passive: true}));
@@ -3436,9 +3437,39 @@ const Events = {
   },
 };
 
+/* When anybody last touched this screen. A message that follows a touch is one
+   somebody asked for, whatever the wake gate happens to be doing — CALIBRATE,
+   MIC ONLY, a code typed into the box. Set by the same listener that ends the
+   screensaver, because there is only ever one first touch. */
+let lastTouch = -1e9;
+const TOUCH_GRACE = 8;          // seconds a touch keeps the screen talkative
+
+/* SHOULD THE WALL STAY QUIET.
+
+   A display asleep still does plenty — it transcribes every utterance in the
+   room, because that is the only way the wake word is ever caught — and it was
+   narrating all of it. On a wall that is worse than noise: `#status:empty`
+   collapses the bar, so each note made it appear, push the figure down and
+   vanish again. A screen that twitches at conversations nobody addressed to it
+   reads as broken, and the twitching is the part people notice.
+
+   Three things unhush it: the gate not being armed at all (a desk, where the
+   messages are for the person sitting there), being awake, and a recent touch.
+   Errors are never hushed — a fault is worth a jump — and neither is CLEARING
+   a note, or one left on screen would outlive whatever put it there. */
+function hush(){
+  if (typeof Wake === 'undefined') return false;
+  if (!Wake.armed() || Wake.engaged()) return false;
+  return (wallNow() - lastTouch) > TOUCH_GRACE;
+}
+
+/* THE PANEL STILL SEES EVERYTHING. Only the painting is suppressed; `relay`
+   sends the real text regardless, so an admin watching the rig loses no
+   diagnostics because a screen decided to be quiet. */
 function micNote(m, bad){
   const el = $('micnote');
-  if (el){ el.textContent = m; el.classList.toggle('bad', !!bad); }
+  const show = (bad || !m || !hush()) ? m : '';
+  if (el){ el.textContent = show; el.classList.toggle('bad', !!bad); }
   relay('micnote', m);
 }
 
@@ -3510,7 +3541,7 @@ const Listen = {
        The same predicate as the mic's visual gate, so what a display shows and
        what it says about itself agree. Errors below are deliberately NOT
        gated: those are faults, and rare enough not to be a flicker. */
-    if (typeof Wake === 'undefined' || Wake.engaged()) micNote('transcribing…');
+    micNote('transcribing…');                  // hushed by micNote when asleep
     syncTalk();
     try{
       /* No hint. Biasing the decoder toward the wake word — by either
@@ -3980,7 +4011,8 @@ function unlockTTS(){ ttsUnlocked = true; }
 
 function note(msg, bad){
   const el = $('ttsnote');
-  if (el){ el.textContent = msg; el.classList.toggle('bad', !!bad); }
+  const show = (bad || !msg || !hush()) ? msg : '';      // see hush()
+  if (el){ el.textContent = show; el.classList.toggle('bad', !!bad); }
   relay('ttsnote', msg);
 }
 
