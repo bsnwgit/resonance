@@ -310,6 +310,27 @@ not the same kind of row and they are not created the same way.
 There is no self-registration here and nothing that verifies an address, so
 anybody who could create their own account could create somebody else's.
 
+**Pick their assistant while you are there, and the link comes out pointing at
+it.** The **AI** picker on that box does two things in one press: it grants
+them the endpoint — the same grant its own *Who may use it* list makes — and it
+decides the address in the link you are handed, because an endpoint answers on
+a network profile and a network profile is an address and a port. Left on NONE
+the link points at whichever port is bound, which is what every link did before
+the picker existed. An endpoint open to everyone is reachable already, so the
+grant half adds nothing there; the address half applies either way.
+
+**A picker, where a screen gets ticks.** A screen may hold several assistants
+and usually does; a person is enrolled on one, because a link has to be opened
+somewhere and one link is one address. They can be given others afterwards on
+CONNECTIONS ▸ AI, and their link keeps pointing at the one they were enrolled
+on. It is spendable at any bound address anyway — the setup route is served by
+every listener, because spending a link is not an endpoint's business — so a
+changed grant costs somebody a second address to try and never their account.
+
+The row says where it points, under **Enrolled on**, which is the one fact
+about a person that cannot be read off anything else: the link itself is shown
+once and never again.
+
 **The link buys one thing: the page that asks them to choose a password.** It
 is shown once — what is stored is a hash of it, so the panel cannot show it to
 you a second time — and it is spent the moment they use it. After that the
@@ -331,6 +352,11 @@ same gesture as creating somebody. It mints a new link, clears the old
 password, and signs out every browser they had open. A forgotten password and
 a leaked link want the same answer, and neither of them is an admin typing a
 password they would then know.
+
+It comes out at the same address the first one did, because it is read off the
+same endpoint. A recovery link arriving from a different host than the one
+somebody was originally sent is how a legitimate link gets treated as a
+phishing attempt.
 
 **A session is a person or a device, never both, and the URL decides which.** A
 device you approved operates as a device; opening a person's URL on one is

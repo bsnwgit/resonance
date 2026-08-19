@@ -3117,22 +3117,63 @@ def display_network_clash(rids, doc=None):
     return "Unable to use AI Assistants that run on different network ports"
 
 
+def identity_network(rec, doc=None):
+    """WHICH PORT A PERSON'S LINK IS OPENED AT — the profile the endpoint they
+    were enrolled on answers on, or "".
+
+    The twin of display_network, and deliberately not the same derivation. A
+    screen is one address, so its profile is read back off every endpoint it
+    was granted and two of them is a contradiction. A person is not one
+    address: they sign in from a phone, a laptop and a borrowed browser, and
+    being granted two assistants on two ports is an ordinary thing to be. So
+    the link names the endpoint they were ENROLLED on — one, chosen while they
+    were created — and later grants change what they may use without moving
+    where their link points.
+
+    ENABLED, because only an enabled endpoint gets its profile bound: see the
+    listener loop. An address nothing is listening on is worse than the
+    fallback, which at least answers."""
+    rid = str((rec or {}).get("endpoint") or "")
+    if not rid:
+        return ""
+    doc = doc or read_routes()
+    route = doc["routes"].get(rid)
+    # Deleted since, or switched off. Either way this is not an address to
+    # hand anybody, and the caller falls back to one that is bound.
+    if not route or not route.get("enabled", True):
+        return ""
+    return str(route.get("network") or "")
+
+
+def net_base_for(nid, prefix, host):
+    """Where a link on network profile `nid` is opened — scheme, address, port
+    and the prefix — or "" if that profile names no port.
+
+    The address the PROFILE gives, falling back to the host header where it
+    says ANY: a profile bound to everything has no one address to name, and
+    the one somebody is already reading the panel at is the best guess left.
+
+    Shared by both populations because both questions are the same question. A
+    screen is handed /e/ and a person is handed /p/; what goes in front of it
+    is a port with something listening on it either way."""
+    vals = (net_profile(nid) or {}).get("values") or {}
+    try:
+        port = int(vals.get("port"))
+    except (TypeError, ValueError):
+        port = 0
+    if not port:
+        return ""
+    return "https://%s:%d%s" % (str(vals.get("address") or "").strip() or host,
+                                port, prefix)
+
+
 def enrol_base_for(rec, host, secure, nid=""):
     """Where the code for this row is typed — an address and a port, because a
     code without them is six characters and no idea where to put them. The
     profile comes from display_network: what this screen was granted decides
     where it is loaded from."""
-    if nid:
-        prof = net_profile(nid)
-        vals = (prof or {}).get("values") or {}
-        try:
-            port = int(vals.get("port"))
-        except (TypeError, ValueError):
-            port = 0
-        if port:
-            addr = str(vals.get("address") or "").strip() or host
-            return "https://%s:%d/e/" % (addr, port)
-    return "%s://%s:%d/e/" % ("https" if secure else "http", host,
+    return (net_base_for(nid, "/e/", host) if nid else "") \
+        or "%s://%s:%d/e/" % ("https" if secure else "http", host,
                               secure or RUNNING.get("http_port") or 0)
 
 
@@ -4455,6 +4496,23 @@ IDENTITY_DEFAULTS = {
     # at a screen standing in a room, so there is no place carrying the risk to
     # set it from. Zero takes the deployment default.
     "session_hours": 0,
+    # THE ENDPOINT THEY WERE ENROLLED ON, and the whole of what it decides is
+    # WHERE THEIR LINK IS OPENED — an address and a port, taken from the
+    # network profile that endpoint answers on. Without it the link was built
+    # from the host header the panel happened to be read on and whichever port
+    # was bound first, which is this server's opinion of where it lives rather
+    # than the address somebody is standing at.
+    #
+    # It is not the grant. The grant is on the ENDPOINT, in its own allow-list,
+    # exactly as it is for a screen, and a person can be given more of them
+    # afterwards without touching this. This is the one that was chosen while
+    # they were being created, kept because a link has to name one address and
+    # a set of grants has no order anybody would recognise.
+    #
+    # The ENDPOINT is stored, never its address. A port moved on the profile
+    # moves the link with it — the same rule display_network follows since the
+    # stored `network` field came off display rows.
+    "endpoint": "",
 }
 
 #: What a person is allowed to keep. An ALLOW-list, not a filter: this store is
@@ -4766,7 +4824,7 @@ def identity_label(rec):
     return rec.get("name") or "unnamed person"
 
 
-def new_identity(name, email, by):
+def new_identity(name, email, by, endpoint=""):
     """Mint one, and hand back (setup token, record) — or (None, error).
 
     The token is shown once, in the URL an admin hands over. What is stored is
@@ -4794,6 +4852,10 @@ def new_identity(name, email, by):
     salt, dk = hash_key(secret)
     rows[pid] = dict(IDENTITY_DEFAULTS, name=name, email=email,
                      salt=salt, hash=dk,
+                     # Not validated here. An id naming nothing is read back as
+                     # no endpoint at all — see identity_network — so a stale
+                     # one costs the fallback base and never a broken link.
+                     endpoint=str(endpoint or "")[:32],
                      created=int(time.time()), created_by=str(by or "")[:60])
     write_identities(rows)
     # Filed with their own population the moment they exist, and the group is
@@ -4871,7 +4933,7 @@ def admin_identities():
     # register, and it is the one thing an admin cannot do for them.
     return [dict({k: rec.get(k) for k in
                   ("name", "email", "created", "last_seen", "created_by",
-                   "pw_set_at")},
+                   "pw_set_at", "endpoint")},
                  id=pid, label=identity_label(rec),
                  wakeword=rec.get("wakeword") or "",
                  ready=identity_ready(rec))
@@ -6653,8 +6715,17 @@ class Handler(SimpleHTTPRequestHandler):
             return None, ident
         return disp, None
 
-    def _person_base(self):
+    def _person_base(self, rec=None):
         """Where a minted link lives, whole: scheme, host, port and the prefix.
+
+        THE PERSON'S OWN ENDPOINT FIRST, where they were enrolled on one. Its
+        network profile names an address and a port, and those are the two
+        halves an admin is about to read aloud or a mail is about to carry —
+        so they come from the thing that was chosen for them rather than from
+        wherever this panel happens to be being read.
+
+        Everything below that line is the answer for somebody enrolled on no
+        endpoint, and it is the answer this had for everybody:
 
         The HOST HEADER, not a stored hostname — an admin is about to hand this
         address to somebody, or this server is about to mail it, so it has to
@@ -6664,8 +6735,14 @@ class Handler(SimpleHTTPRequestHandler):
         The port is a listener's, and with no built-in display listener left
         there may be several. It takes whichever one is bound: any of them
         serves this route, because spending a link is not an endpoint's
-        business."""
+        business — which is also why the endpoint above is a preference and
+        never a restriction. A link handed out for one port is still spendable
+        at any of them, so naming the wrong one costs somebody a second
+        address to try and never their account."""
         host = re.sub(r":\d+$", "", self.headers.get("Host") or "") or LOOPBACK
+        mine = net_base_for(identity_network(rec), PERSON_PREFIX, host)
+        if mine:
+            return mine
         secure = RUNNING.get("https_port")
         if not secure:
             # A PROFILE THAT IS ACTUALLY BOUND. Taking the first one with a
@@ -7290,10 +7367,19 @@ class Handler(SimpleHTTPRequestHandler):
             # somebody, so it has to be whole rather than a path they finish by
             # guessing. A stored hostname would be this server's opinion of
             # where it lives; the Host header is where somebody actually is.
+            # ONE BASE PER ROW, for the same reason the enrolment codes have
+            # one: a person enrolled on an endpoint is sent to that endpoint's
+            # address and port, so a single base for the whole list stopped
+            # being the truth the moment one could differ. `base` stays as the
+            # answer for a row enrolled on nothing, and as what the box at the
+            # top shows before it has made anybody.
+            _rows = read_identities()
             return self._json(200, {"identities": admin_identities(),
                                     "max": MAX_IDENTITIES,
                                     "pw_min": MIN_PASSWORD,
                                     "mail": mail_ready(),
+                                    "bases": {pid: self._person_base(r)
+                                              for pid, r in _rows.items()},
                                     "base": self._person_base()})
         if path == "/app":
             if not self._require("admin"):
@@ -8187,13 +8273,37 @@ class Handler(SimpleHTTPRequestHandler):
             obj = self._json_body()
             if obj is None:
                 return
+            # WHICH ASSISTANT THEY ARE BEING GIVEN, chosen while they are
+            # created rather than found afterwards on a row among fifty — the
+            # same move the device box makes with its ticks, and the reason
+            # this one is a single picker is that the link it decides has to
+            # name one address.
+            #
+            # Refused rather than stored, where it names nothing. A live
+            # deployment cannot produce this — the picker is filled from the
+            # endpoint list — so an id that does not resolve is a stale panel
+            # or a hand-made request, and silently keeping it would leave a row
+            # claiming an endpoint nobody could see.
+            rid = str(obj.get("endpoint") or "")[:32]
+            if rid and rid not in read_routes()["routes"]:
+                return self._json(404, {"error": "no such endpoint"})
             token, rec = new_identity(obj.get("name"), obj.get("email"),
-                                      s["user"])
+                                      s["user"], endpoint=rid)
             if not token:                        # `rec` is the reason
                 return self._json(409, {"error": rec})
-            print("identity %s (%s) created by %s"
-                  % (rec["id"], identity_label(rec), s["user"]), flush=True)
-            sent = mail_setup_link(rec, self._person_base(), token)
+            # THE GRANT ITSELF, which the row does not hold: enrolling somebody
+            # on an assistant and letting them use it are one gesture, and the
+            # allow-list is where the second half lives. Written after the row
+            # exists because it is keyed on the id that creating it minted.
+            if rid:
+                set_identity_endpoints(rec["id"], [rid])
+            # Built from the row, so it is the address of the endpoint they
+            # were just put on rather than the port this panel is read at.
+            base = self._person_base(rec)
+            print("identity %s (%s) created by %s%s"
+                  % (rec["id"], identity_label(rec), s["user"],
+                     (" on endpoint %s" % rid) if rid else ""), flush=True)
+            sent = mail_setup_link(rec, base, token)
             if sent:
                 print("identity %s: setup link mailed to %s"
                       % (rec["id"], rec.get("email")), flush=True)
@@ -8208,6 +8318,12 @@ class Handler(SimpleHTTPRequestHandler):
             # link because it believed it had sent one would be a server you
             # cannot enrol anybody from the day the SMTP host changes.
             return self._json(200, {"ok": True, "token": token, "mailed": sent,
+                                    # The base this token belongs in front of.
+                                    # The list's own map is a refresh behind at
+                                    # this moment — the row did not exist when
+                                    # it was built — and the URL is shown once,
+                                    # so it cannot be the one that is late.
+                                    "base": base,
                                     "identities": admin_identities()})
 
         if parsed.path == "/user/login":
@@ -8438,14 +8554,20 @@ class Handler(SimpleHTTPRequestHandler):
             if not token:
                 return self._json(404, {"error": "no such identity"})
             print("identity %s reissued by %s" % (_pid, s["user"]), flush=True)
-            sent = mail_setup_link(read_identities().get(_pid),
-                                   self._person_base(), token, again=True)
+            # The SAME address the first link had, because it is read off the
+            # same endpoint. A recovery link arriving at a different host from
+            # the one somebody was originally sent is the sort of difference
+            # that gets a legitimate link treated as a phishing attempt.
+            _rec = read_identities().get(_pid)
+            base = self._person_base(_rec)
+            sent = mail_setup_link(_rec, base, token, again=True)
             if sent:
                 print("identity %s: new link mailed" % _pid, flush=True)
             # The old URL stopped working the moment that returned. Anything
             # holding a cookie from it keeps that cookie and it no longer
             # resolves, which is the same revocation an embed key gets.
             return self._json(200, {"ok": True, "token": token, "mailed": sent,
+                                    "base": base,
                                     "identities": admin_identities()})
 
         if parsed.path == "/identities/rename":
@@ -8689,7 +8811,14 @@ class Handler(SimpleHTTPRequestHandler):
                       or next((a["value"] for a in (rec.get("answers") or [])
                                if (a.get("value") or "").strip()), "") \
                       or display_label(rec)
-                token, made = new_identity(who, rec["req_email"], s["user"])
+                # THE FIRST OF THE TICKS, as the one their link names. The
+                # ticks here are a list because approving is granting and a
+                # person may be given several; the enrolment endpoint is one
+                # because an address is one. Order is the panel's, which is
+                # the endpoint order an admin was looking at when they ticked.
+                _ends = [str(r)[:32] for r in (obj.get("endpoints") or [])]
+                token, made = new_identity(who, rec["req_email"], s["user"],
+                                           endpoint=_ends[0] if _ends else "")
                 if not token:                    # `made` is the reason
                     return self._json(409, {"error": made})
                 rec["setup"] = token
@@ -8722,8 +8851,8 @@ class Handler(SimpleHTTPRequestHandler):
                 # Their screen is also being sent to the link — they are
                 # standing at it — so this is the copy for somebody who filled
                 # the form in and walked away.
-                sent = mail_setup_link(read_identities().get(made["id"]),
-                                       self._person_base(), token)
+                _made = read_identities().get(made["id"])
+                sent = mail_setup_link(_made, self._person_base(_made), token)
                 if sent:
                     print("identity %s: setup link mailed to %s"
                           % (made["id"], rec["req_email"]), flush=True)

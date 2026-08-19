@@ -1918,10 +1918,28 @@ it. Each entry below carries its own panel scope.
   Guessing backs off geometrically per account, on its own ledger so somebody
   fumbling a password cannot lock an admin out of the panel.
 
+  **The link's address comes from the endpoint they were enrolled on**, which
+  is chosen in the same box that names them. An endpoint answers on a network
+  profile, and a profile is an address and a port — so the link is built from
+  the thing that was picked for them rather than from the host header the panel
+  happened to be read on and whichever port bound first. The endpoint id is
+  what is stored, never the address: moving that endpoint to another port moves
+  the link with it, the same rule a screen's enrolment code has followed since
+  the stored `network` field came off display rows.
+
+  One endpoint, where a screen gets several. A screen is one address and holds
+  as many assistants as it was granted; a person is not one address — they sign
+  in from a phone, a laptop and a borrowed browser — so the grants stay a set
+  and the *enrolment* is the single one their link names. Later grants change
+  what they may use and not where the link points, which is safe because the
+  setup route is served by every listener: naming the wrong one costs a second
+  address to try, never an account.
+
   Recovery is one gesture: reissue the link. It mints a new one, clears the
   old password, and signs out every browser that was open — a forgotten
   password and a leaked link want the same answer, and neither of them is an
-  admin typing something they would then know.
+  admin typing something they would then know. It comes out at the same address
+  as the first, because it is read off the same endpoint.
 
   Signing in grants a session, measured in hours and **persistent on that
   browser**. Being asked again every half hour would end with people avoiding

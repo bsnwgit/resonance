@@ -3255,6 +3255,25 @@ behaves like the rest of the building rather than like nothing.</div>
              autocapitalize="none" placeholder="sarah@example.com">
       <button id="b_idnew" class="act-add">CREATE A PERSON</button>
     </div>
+    <!-- WHICH ASSISTANT THEY ARE GIVEN, and therefore WHERE THEIR LINK IS
+         OPENED: the address and the port come from the network profile that
+         endpoint answers on, which is the difference between handing somebody
+         an address they can reach and one that is this server's opinion of
+         where it lives.
+
+         A PICKER, where the screen box above has ticks. A screen may hold
+         several assistants; a link can only name one address, so a person is
+         enrolled on one. More can be granted afterwards on CONNECTIONS ▸ AI,
+         and those change what they may use without moving where their link
+         points.
+
+         AI, the same word the ticks above use and the tab they come from. -->
+    <div class="setuprow">
+      <span class="setpair">
+        <label class="bklab" for="id_endpoint">AI</label>
+        <select id="id_endpoint" class="ppick"></select>
+      </span>
+    </div>
   </div>
   <!-- Where the URL appears, once. Same place the enrolment code appears, and
        for the same reason: what you have just made is what you came here to
@@ -3271,9 +3290,23 @@ behaves like the rest of the building rather than like nothing.</div>
 standing in one room; a person moves between a phone, a laptop and a borrowed
 browser and is the same person in all three.
 
-<b>Name them, give them an address, hand over the link.</b> The address is
-what they will sign in with; the link is what lets them choose a password, and
-it buys exactly that one thing. It is shown <b>once</b>, here, at the moment
+<b>Name them, give them an address, pick their assistant, hand over the
+link.</b> The address is what they will sign in with; the link is what lets
+them choose a password, and it buys exactly that one thing.
+
+<b>The assistant decides two things, and the second is the one you can see.</b>
+It grants them that endpoint — the same grant its own <i>Who may use it</i>
+list makes — and it decides the address in the link you are about to hand over,
+because a link has to be opened somewhere and an endpoint answers on a network
+profile with an address and a port. Leave it on NONE and the link points at
+whichever port is bound, which is what every link did before this picker
+existed. An endpoint that is open to everyone is reachable already, so the
+grant half adds nothing there; the address half applies either way.
+
+<b>One here, more later.</b> A person can be given other endpoints afterwards,
+on CONNECTIONS ▸ AI. Their link keeps pointing at the one they were enrolled
+on — it is spendable at any bound address anyway, so the worst a changed grant
+costs is a second address to try. It is shown <b>once</b>, here, at the moment
 you create it — what is stored is a hash, so this page cannot show it to you a
 second time. Hand it over before you leave the row.
 
@@ -6369,12 +6402,18 @@ async function loadDisplays(){
    nowhere else: there is no email and nothing to vouch for a name, so anybody
    who could mint their own could mint somebody else's. */
 let IDENTITIES = [], IDBASE = '', OPENPID = '', IDPWMIN = 10;
+/* ONE BASE PER ROW. A person enrolled on an endpoint is sent to that
+   endpoint's address and port, so a single base for the whole list stopped
+   being the truth the moment one could differ — the same move the enrolment
+   codes made. IDBASE stays as the answer for a row enrolled on nothing. */
+let IDBASES = {};
 
 async function loadIdentities(){
   try{
     const j = await api('/identities');
     IDENTITIES = j.identities || [];
     IDBASE = j.base || '';
+    IDBASES = j.bases || {};
     IDPWMIN = j.pw_min || 10;
   }catch(e){ IDENTITIES = []; }
   return IDENTITIES;
@@ -6400,18 +6439,25 @@ function idNote(m, bad){
 /* The URL, in the one moment it exists in the clear. Shown whole, the way an
    enrolment code is: nobody is retyping half an address, and this page cannot
    show it a second time. */
-function showPersonUrl(name, token, mailed){
+function showPersonUrl(name, token, mailed, base){
   /* On the tab it was asked for. Shown ONCE — so a new link painted onto the
      other tab is somebody locked out, which is the one failure this function
      exists to prevent. */
   const out = $(CURRENT_TAB === 'users' ? 'idhereurl' : 'idurl');
   if (!out) return;
   const line = document.createElement('div');
-  /* No base means the server has no bound display port to put in front of the
+  /* THE BASE THE SERVER JUST USED, and not the list's. It built this one for
+     this person — off the endpoint they were enrolled on — and the list's map
+     is a refresh behind at this exact moment, because the row it belongs to
+     did not exist when the map was made. IDBASE is the fallback for a row
+     enrolled on nothing, which is what it always was.
+
+     No base at all means the server has no bound port to put in front of the
      token — see _person_base. Showing the bare secret would look like a link
      somebody could fix by adding a host, and it would be a live credential on
      screen with nowhere to use it. */
-  line.textContent = IDBASE ? IDBASE + token
+  const at = base || IDBASE;
+  line.textContent = at ? at + token
     : 'no display port is bound — give an endpoint a network profile under '
       + 'PROFILES ▸ NETWORK, then reissue this link';
   const sub = document.createElement('span');
@@ -6622,7 +6668,7 @@ async function refreshIdentities(){
       if (!j || !j.token) return;
       /* On screen before anything repaints: the old one is already dead, so a
          new one nobody caught is somebody locked out. */
-      showPersonUrl(p.label || p.id, j.token, j.mailed);
+      showPersonUrl(p.label || p.id, j.token, j.mailed, j.base);
       idNote('the previous link stopped working just now');
       refreshIdentities();
     };
@@ -6631,7 +6677,20 @@ async function refreshIdentities(){
 
     const meta = document.createElement('div');
     meta.className = 'meta';
-    [['Created', dispWhen(p.created)
+    /* WHERE THEIR LINK POINTS, on the row, because it is the one fact about
+       a person that cannot be read off anything else here — the URL itself is
+       shown once and never again, so without this a row minted last week is a
+       row nobody can say the address of. The endpoint by name where this tab
+       has the list, by id where it has not: IDENTITY ▸ USER does not fetch the
+       display document, and an id is still enough to tell two rows apart. */
+    [['Enrolled on', (()=>{
+        if (!p.endpoint) return 'no assistant — the link uses whichever port '
+                              + 'is bound';
+        const e = (DPEND || []).find(x=> x.id === p.endpoint);
+        const at = (IDBASES[p.id] || '').replace(/\/p\/$/, '');
+        return (e ? e.name : p.endpoint) + (at ? ' · ' + at : '');
+      })()],
+     ['Created', dispWhen(p.created)
                  + (p.created_by ? ' by ' + p.created_by : '')],
      ['Password set', p.pw_set_at ? dispWhen(p.pw_set_at)
                                   : 'not yet — the link is still outstanding'],
@@ -6686,14 +6745,21 @@ $('b_idnew').addEventListener('click', async ()=>{
     mail.focus();
     return;
   }
-  const j = await idAction('/identities/new', {name, email});
+  /* The picker's value straight off the control. NONE is the empty string and
+     a legitimate answer — the server reads it as enrolled on nothing. */
+  const j = await idAction('/identities/new',
+                           {name, email, endpoint: $('id_endpoint').value});
   if (!j || !j.token) return;           // idAction has said why
   /* Cleared only on success. A refused address left in the box is one that can
      be corrected; clearing it first would make somebody retype the whole
-     thing to fix a typo. */
+     thing to fix a typo.
+
+     THE PICKER IS NOT CLEARED. Enrolling a department onto one assistant is
+     the ordinary case, and resetting it to NONE would make that a choice per
+     person — the same reasoning that keeps the screen box's ticks. */
   el.value = '';
   mail.value = '';
-  showPersonUrl(name, j.token, j.mailed);
+  showPersonUrl(name, j.token, j.mailed, j.base);
   refreshIdentities();
 });
 $('id_email').addEventListener('keydown', e=>{
@@ -9684,7 +9750,36 @@ $('b_bulkapply').addEventListener('click', async ()=>{
 /* The two pickers on GET A CODE, filled from the same document the profile
    lists are drawn from. Repainted with it, so a profile added on another tab
    is offered here without a reload. */
+/* THE ONE PICKER ON CREATE A PERSON, filled from the same endpoint list the
+   screen box's ticks are drawn from — so an endpoint added on another tab is
+   offered here without a reload, and neither box can be offering a set the
+   other is not. */
+function paintPersonEndpoint(){
+  const sel = $('id_endpoint');
+  if (!sel) return;
+  /* Kept across the repaint. This runs whenever the display document is
+     refetched, which is on a timer and after every action, and a choice
+     somebody made and has not pressed CREATE A PERSON on yet must not be
+     dropped underneath them. */
+  const had = sel.value;
+  sel.innerHTML = '';
+  const none = document.createElement('option');
+  /* NONE, first and the default, and a real answer rather than an empty one:
+     the link then points at whichever port is bound. A deployment that has
+     not configured an endpoint yet still has to be able to enrol somebody. */
+  none.value = '';
+  none.textContent = (DPEND || []).length ? 'NONE' : 'NONE — no endpoints yet';
+  sel.appendChild(none);
+  (DPEND || []).forEach(e=>{
+    const o = document.createElement('option');
+    o.value = e.id; o.textContent = e.name;
+    sel.appendChild(o);
+  });
+  sel.value = had;
+}
+
 function paintNewSetup(){
+  paintPersonEndpoint();
   const prof = $('dp_newprofile'), ends = $('dp_newends');
   if (!prof || !ends) return;
   const fill = (sel, rows, blank)=>{
