@@ -3111,6 +3111,7 @@ FullScreen.init();
    three want it. */
 ['pointerdown', 'touchstart', 'keydown', 'wheel'].forEach(ev=>
   window.addEventListener(ev, ()=>{
+    lastTouch = wallNow();
     Saver.poke(); FullScreen.ask();
     if (typeof Kiosk !== 'undefined') Kiosk.touched();
   }, {passive: true}));
@@ -3436,9 +3437,67 @@ const Events = {
   },
 };
 
+/* When anybody last touched this screen. A message that follows a touch is one
+   somebody asked for, whatever the wake gate happens to be doing — CALIBRATE,
+   MIC ONLY, a code typed into the box. Set by the same listener that ends the
+   screensaver, because there is only ever one first touch. */
+/* SEEDED AT LOAD, not at zero. The first seconds of a page are when the
+   things worth reading happen — no microphone, an insecure origin, no
+   recorder — and none of them follows a touch. Starting the clock here gives
+   them their moment and then lets the screen go quiet. */
+let lastTouch = performance.now()/1000;
+const TOUCH_GRACE = 8;          // seconds a touch keeps the screen talkative
+
+/* SHOULD THE WALL STAY QUIET.
+
+   A display asleep still does plenty — it transcribes every utterance in the
+   room, because that is the only way the wake word is ever caught — and it was
+   narrating all of it. On a wall that is worse than noise: `#status:empty`
+   collapses the bar, so each note made it appear, push the figure down and
+   vanish again. A screen that twitches at conversations nobody addressed to it
+   reads as broken, and the twitching is the part people notice.
+
+   THE QUESTION IS WHETHER THIS SCREEN IS IN A CONVERSATION, and nothing else.
+   An earlier version asked the WAKE GATE instead, and it was silently useless:
+   `Wake.armed()` is false in auto + push-to-talk, so on a display set that way
+   this returned false on the first line and nothing was ever hushed. The gate
+   mode is not the question — a push-to-talk screen sitting idle twitches at
+   the room exactly as a hands-free one does.
+
+   So: thinking or speaking is a conversation, being awake is a conversation,
+   and a touch in the last few seconds means somebody is standing there and the
+   messages are for them — which covers CALIBRATE and MIC ONLY on a screen that
+   is otherwise asleep, and covers holding SPACE, which is a keydown like any
+   other.
+
+   ERRORS ARE HUSHED TOO, and getting that wrong is what made two attempts at
+   this fail. `bad` looked like the right exemption — a fault is worth a jump —
+   but the most frequent message on an idle screen is flagged with it:
+   "nothing recognised" fires on every scrap of room noise that transcribes to
+   nothing, which while asleep is nearly all of it. Exempting `bad` exempted
+   precisely the thing being complained about.
+
+   A wall loses nothing by it. `relay` still sends every message to the panel,
+   `Events.add` still records the real faults, and the ones that matter most —
+   no microphone, an insecure origin — happen in the first seconds, which the
+   seeded clock above keeps visible. What is left is a screen that says nothing
+   about work nobody asked it to do.
+
+   CLEARING is never hushed, or a note left on screen would outlive whatever
+   put it there. */
+function hush(){
+  if (typeof Drive !== 'undefined' && Drive.phase !== 'idle') return false;
+  if (typeof Wake !== 'undefined' && Wake.awake) return false;
+  return (wallNow() - lastTouch) > TOUCH_GRACE;
+}
+
+/* THE PANEL STILL SEES EVERYTHING. Only the painting is suppressed; `relay`
+   sends the real text regardless, so an admin watching the rig loses no
+   diagnostics because a screen decided to be quiet. */
 function micNote(m, bad){
   const el = $('micnote');
-  if (el){ el.textContent = m; el.classList.toggle('bad', !!bad); }
+  const show = (!m || !hush()) ? m : '';
+  if (el){ el.textContent = show; el.classList.toggle('bad', !!bad); }
   relay('micnote', m);
 }
 
@@ -3498,7 +3557,20 @@ const Listen = {
   },
 
   async _send(blob){
-    this.busy = true; micNote('transcribing…'); syncTalk();
+    this.busy = true;
+    /* SAID ONLY WHERE SOMEBODY IS TALKING TO THIS SCREEN. A display asleep
+       still transcribes everything it hears — it has to, or the wake word is
+       never caught — but announcing each attempt is telling a room about work
+       it did not ask for, and it MOVES THE PAGE: `#status:empty` collapses the
+       bar, so every passing conversation made it appear, push the figure down
+       and vanish again. A screen that twitches at speech nobody addressed to
+       it reads as broken.
+
+       The same predicate as the mic's visual gate, so what a display shows and
+       what it says about itself agree. Errors below are deliberately NOT
+       gated: those are faults, and rare enough not to be a flicker. */
+    micNote('transcribing…');                  // hushed by micNote when asleep
+    syncTalk();
     try{
       /* No hint. Biasing the decoder toward the wake word — by either
          initial_prompt or hotwords — makes it treat the word as context
@@ -3967,7 +4039,8 @@ function unlockTTS(){ ttsUnlocked = true; }
 
 function note(msg, bad){
   const el = $('ttsnote');
-  if (el){ el.textContent = msg; el.classList.toggle('bad', !!bad); }
+  const show = (!msg || !hush()) ? msg : '';             // see hush()
+  if (el){ el.textContent = show; el.classList.toggle('bad', !!bad); }
   relay('ttsnote', msg);
 }
 
