@@ -3594,7 +3594,12 @@ route name, <b>ALERT</b>, <b>refused</b>.</div>
   <label class="bklab" for="loginbad">When a sign-in is refused</label>
   <input id="loginbad" type="text" spellcheck="false" maxlength="200"
          placeholder="empty — say nothing">
-  <div class="setuprow" style="margin-top:8px">
+  <!-- `seg actrow`, which is the idiom for a section's own commit: .seg is
+       what gives a button its type size, and .actrow pushes it to the bottom
+       right of the box. A bare .setuprow, which this was, left it hard left
+       at the browser's default font — the one button on the tab that did not
+       look like a button here. -->
+  <div class="seg actrow">
     <button id="b_loginalert" class="act-save">SAVE</button>
   </div>
   <div class="note" id="loginalertnote"></div>
