@@ -4928,6 +4928,12 @@ def admin_identities():
     password leaves this server — the first after the one moment it was
     minted, the second ever."""
     rows = read_identities()
+    # THE ENDPOINT'S NAME, resolved here rather than in the panel. IDENTITY ▸
+    # USER never fetches the display document, so a page that looked the name
+    # up itself would print an id on that tab and a name on the other one for
+    # the same row. Read once for the whole list.
+    named = {rid: (rec.get("name") or rid)
+             for rid, rec in read_routes()["routes"].items()}
     # WHETHER, never what. That they have set a password is the fact the panel
     # is built on: it is what moves a row from the enrolment queue to the
     # register, and it is the one thing an admin cannot do for them.
@@ -4935,6 +4941,9 @@ def admin_identities():
                   ("name", "email", "created", "last_seen", "created_by",
                    "pw_set_at", "endpoint")},
                  id=pid, label=identity_label(rec),
+                 # "" where it names one that has since been deleted, which
+                 # reads as no assistant — which is what it now is.
+                 endpoint_name=named.get(rec.get("endpoint") or "", ""),
                  wakeword=rec.get("wakeword") or "",
                  ready=identity_ready(rec))
             for pid, rec in sorted(rows.items(), key=lambda kv: kv[1]["created"])]

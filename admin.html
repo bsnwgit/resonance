@@ -6680,15 +6680,17 @@ async function refreshIdentities(){
     /* WHERE THEIR LINK POINTS, on the row, because it is the one fact about
        a person that cannot be read off anything else here — the URL itself is
        shown once and never again, so without this a row minted last week is a
-       row nobody can say the address of. The endpoint by name where this tab
-       has the list, by id where it has not: IDENTITY ▸ USER does not fetch the
-       display document, and an id is still enough to tell two rows apart. */
+       row nobody can say the address of.
+
+       The NAME comes with the row rather than being looked up in DPEND: this
+       list is drawn on two tabs and only one of them has ever fetched the
+       endpoints, so looking it up here would print a name on ENROLLMENTS and
+       an id on IDENTITY for the same person. */
     [['Enrolled on', (()=>{
-        if (!p.endpoint) return 'no assistant — the link uses whichever port '
-                              + 'is bound';
-        const e = (DPEND || []).find(x=> x.id === p.endpoint);
+        if (!p.endpoint_name) return 'no assistant — the link uses whichever '
+                                   + 'port is bound';
         const at = (IDBASES[p.id] || '').replace(/\/p\/$/, '');
-        return (e ? e.name : p.endpoint) + (at ? ' · ' + at : '');
+        return p.endpoint_name + (at ? ' · ' + at : '');
       })()],
      ['Created', dispWhen(p.created)
                  + (p.created_by ? ' by ' + p.created_by : '')],
