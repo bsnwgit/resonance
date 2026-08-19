@@ -1094,7 +1094,7 @@ if (PERSON_ARRIVED === 'setup') GATE = 'setup';
    it, see it appear in the admin list, approve it, and it starts working —
    which is a better first five minutes than a screen that looks broken. */
 const Display = {
-  id: '', name: DISPLAY_NAME, approved: false, known: false,
+  id: '', name: DISPLAY_NAME, named: DISPLAY_NAME, approved: false, known: false,
   /* What the server last said about this device. `state` is one of none,
      requested, approved, expired, denied — and the page is built from it
      rather than from three booleans that can disagree with each other. */
@@ -1148,6 +1148,10 @@ const Display = {
   take(d){
     this.id = d.id || '';
     this.name = d.name || DISPLAY_NAME;
+    /* A NAME OR NOTHING — see display_named. `name` above carries the list's
+       placeholder for a row nobody has named, which is right in a note about
+       this screen and wrong as the speaker of a line of transcript. */
+    this.named = d.named || DISPLAY_NAME;
     this.approved = !!d.approved;
     this.state = d.state || 'none';
     /* Where this browser goes to choose a password, on a request that was
@@ -1840,7 +1844,7 @@ const VARS = {
      one and the declared name until then. The same place either way, so a
      {display} written into a greeting before approval keeps meaning what it
      meant after it. */
-  display: ()=> Display.name || DISPLAY_NAME,
+  display: ()=> Display.named || DISPLAY_NAME,
   /* WHO IS SIGNED IN, which nothing here could say before. Every name this
      table held was a machine's or an assistant's, because the transcript
      label predates accounts entirely: the only way to attribute a line was
@@ -1851,7 +1855,7 @@ const VARS = {
      screen can be. A personal browser has somebody signed in and says their
      name; a wall screen has nobody and says the room's. Without the fallback
      an admin would have to choose which of the two to get wrong. */
-  user: ()=> Person.name || Display.name || DISPLAY_NAME,
+  user: ()=> Person.name || Display.named || DISPLAY_NAME,
 };
 function expand(s, rid){
   return String(s == null ? '' : s).replace(/\{(\w+)\}/g, (m, k)=>{

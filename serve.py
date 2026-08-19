@@ -2809,15 +2809,18 @@ def migrate_kiosks():
              ", ".join(p["name"] for p in made.values()) or "none"), flush=True)
 
 
-def display_label(rec):
-    """What to call it. The admin's name where there is one, then the name it
-    announced itself with, then the first thing the person typed on the request
-    form — which on a form that asks for a name is their name, and on one that
-    does not is at least something that tells two rows apart.
+def display_named(rec):
+    """The name somebody actually GAVE it, or "". The admin's where there is
+    one, then the name it announced itself with, then the first thing typed on
+    its request form — which on a form that asks for a name is their name, and
+    on one that does not is at least something that tells two rows apart.
 
-    Without that last fall-back, everybody who asked for access appears as
-    "unnamed display", which makes the list unreadable and the group picker
-    unusable — a set of identical entries nobody can choose between."""
+    Split from display_label because the two answers are read by two different
+    readers and only one of them can take a placeholder. A LIST needs every row
+    to say something, so display_label ends in one. A SPEAKER LABEL needs a
+    name or nothing: "unnamed display" is prose about an admin's list, and it
+    was appearing down the side of the transcript as the name of the person who
+    had just spoken."""
     if rec.get("name"):
         return rec["name"]
     if rec.get("asked"):
@@ -2825,7 +2828,16 @@ def display_label(rec):
     for a in (rec.get("answers") or []):
         if a.get("value"):
             return str(a["value"])[:40]
-    return "unnamed display"
+    return ""
+
+
+def display_label(rec):
+    """What to call it in a list, which is never nothing.
+
+    Without the fall-back, everybody who asked for access appears as "unnamed
+    display", which makes the list unreadable and the group picker unusable — a
+    set of identical entries nobody can choose between."""
+    return display_named(rec) or "unnamed display"
 
 
 KIOSK_FIELDS = ("kiosk", "kiosk_profile")
@@ -6847,6 +6859,13 @@ class Handler(SimpleHTTPRequestHandler):
         may_ask = (cfg["guest_requests"] and not working
                    and not (rec.get("denied") and not rec.get("deny_repeat", True)))
         out = {"id": rec.get("id", ""), "name": display_label(rec),
+               # THE NAME, as against the label. The page prints `name` in the
+               # notes a screen shows about itself, where a placeholder is the
+               # right answer — "waiting to be approved — unnamed display" is
+               # true and useful. It must not be what the transcript calls
+               # whoever is speaking, and there is no way to tell the two apart
+               # from one string, so both go.
+               "named": display_named(rec),
                "approved": working, "state": state,
                "can_request": bool(may_ask),
                # Where to go and choose a password. The path only, built the
