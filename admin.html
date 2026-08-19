@@ -1579,7 +1579,15 @@
     margin-top:12px;padding-top:10px;
     border-top:1px solid rgba(var(--glass),.22);
   }
-  .rtacts button{border-width:2px;border-style:solid;padding:6px 10px}
+  /* The toolbar's own buttons, matched to the commit shape rather than given a
+     heavier one. It used to be 2px on 6/10, which was fine while it was the
+     whole toolbar — but a toolbar holds act-* buttons too, and once those
+     carry the profile row's metrics wherever they stand, the ones beside them
+     were the only buttons in the panel still a different size. ENABLE and
+     SAVE sitting side by side must not be two shapes. */
+  .rtacts button{font:inherit;font-size:calc(8.5px * var(--fs));
+                 letter-spacing:.1em;padding:3px 6px;cursor:pointer;
+                 border-width:1px;border-style:solid}
   .rtacts .spacer,
   .erow .acts .spacer{flex:1;min-width:8px}
   /* The first control in a box should not sit tight under its heading. */
@@ -1893,7 +1901,7 @@
   button.act-save, button.act-undo, button.act-danger,
   button.act-add, button.act-warn{
     font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.1em;
-    padding:3px 6px;cursor:pointer;
+    padding:3px 6px;cursor:pointer;border-width:1px;border-style:solid;
   }
   button.act-save{
     border-color:rgba(122,201,160,.75);color:#a8e3c4;
@@ -7469,6 +7477,9 @@ function paintDpForm(fields){
     });
     const del = document.createElement('button');
     del.textContent = 'REMOVE';
+    /* act-danger like every other REMOVE. It had no class at all, so it was
+       the browser's own button sitting in a row of styled ones. */
+    del.className = 'act-danger';
     del.onclick = ()=>{ DPFORM.splice(i, 1); paintDpForm(DPFORM); };
     row.appendChild(del);
     box.appendChild(row);
