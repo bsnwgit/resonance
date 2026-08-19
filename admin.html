@@ -441,8 +441,12 @@
   #approw.on,.uirow.on{display:block}
 
   #approw .seg,.uirow .seg{justify-content:flex-end;margin-top:8px}
-  #approw .seg button,
-  .uirow .seg button{border-width:2px;border-style:solid;padding:6px 10px}
+  /* ADMIN's SAVE and REVERT used to be given a heavier shape here, and that
+     is the last place a container decided what a commit looked like: an id in
+     the selector beats `button.act-*` outright, so those two stayed 2px on
+     6/10 while every other commit in the panel moved to the profile row's
+     8.5px on 3/6. `.uirow` went with it — the rows it styled have not been
+     built since APPEARANCE and GEOMETRY stopped being settings tabs. */
   /* What this row's scope actually is. Worth a line, because "shared" is the
      property that separates these from the three controls a viewer keeps. */
   .uirow .scope{
@@ -3615,12 +3619,20 @@ route name, <b>ALERT</b>, <b>refused</b>.</div>
   <section class="grp wide" data-tab="alerts">
     <h4>Login alert</h4>
     <div class="grpbody">
-  <label class="bklab" for="loginok">When somebody signs in</label>
-  <input id="loginok" type="text" spellcheck="false" maxlength="200"
-         placeholder="empty — say nothing">
-  <label class="bklab" for="loginbad">When a sign-in is refused</label>
-  <input id="loginbad" type="text" spellcheck="false" maxlength="200"
-         placeholder="empty — say nothing">
+  <!-- TEXTAREAS, for two reasons that happen to agree. They are a POOL like
+       the greeting phrases — one per line, picked at random — so a screen
+       somebody signs into all day does not repeat itself. And a password
+       manager will not offer to fill a textarea: these two sit next to the
+       words "sign in", which is enough for LastPass to put its icon in a
+       single-line box and offer a password, whatever the opt-out attributes
+       say. The panel already hides that icon; not being a text input means it
+       never appears. -->
+  <label class="bklab" for="loginok">Say this on successful login</label>
+  <textarea id="loginok" rows="2" spellcheck="false"
+            placeholder="one per line — empty says nothing"></textarea>
+  <label class="bklab" for="loginbad">Say this on failed login</label>
+  <textarea id="loginbad" rows="2" spellcheck="false"
+            placeholder="one per line — empty says nothing"></textarea>
   <!-- `seg actrow`, which is the idiom for a section's own commit: .seg is
        what gives a button its type size, and .actrow pushes it to the bottom
        right of the box. A bare .setuprow, which this was, left it hard left
@@ -3639,7 +3651,9 @@ wall in a shared space announcing <i>that did not work</i> tells everybody in
 earshot that somebody just got a password wrong; announcing the success tells
 them who is now signed in. Neither is a thing to switch on for somebody.
 
-<b>{name}</b> and the other variables work here, the same as in the greeting.
+<b>One per line.</b> Several lines and it picks one, the same as the greeting
+phrases — a screen somebody signs into all day should not say the same words
+every time. <b>{name}</b> and the other variables work here too.
 
 <b>It needs the local voice to be reliable.</b> A browser will only start
 speech synthesis inside the gesture that asked for it, and whether a sign-in

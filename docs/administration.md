@@ -222,7 +222,9 @@ wall in a shared space announcing *that did not work* tells everybody in
 earshot that somebody just got a password wrong; announcing the success tells
 them who is now signed in. Neither is a thing to switch on for somebody.
 
-`{name}` and the other variables work here, the same as in the greeting.
+**One per line**, and it picks one — the same as the greeting phrases, so a
+screen somebody signs into all day does not repeat itself. `{name}` and the
+other variables work here too.
 
 **It needs the local voice to be reliable.** A browser only starts speech
 synthesis inside the gesture that asked for it, and whether a sign-in worked is

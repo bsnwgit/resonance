@@ -4041,8 +4041,12 @@ let muted = false;
    engine it goes through `Play`, which is ordinary audio playback and not
    subject to that gate. So it is reliable on local TTS and best-effort
    otherwise, which is stated in the panel rather than left to be discovered. */
-function announce(text){
-  text = expand(String(text || '')).trim();
+function announce(pool){
+  /* A POOL, one per line, the same shape as the greetings — a screen somebody
+     signs into all day should not say the same words every time. */
+  const lines = String(pool || '').split('\n').map(x=> x.trim()).filter(Boolean);
+  if (!lines.length) return;
+  const text = expand(lines[(Math.random()*lines.length)|0]).trim();
   if (!text || muted || S.src !== 'tts' || !Speech.supported) return;
   Speech.speak(text, {body: document.createElement('div'),
                       caret: document.createElement('span')});
