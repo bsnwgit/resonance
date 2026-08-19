@@ -2300,9 +2300,18 @@ label that can be right: a fixed word attributes every answer to the same
 name. Each line keeps the name of whoever gave it, so switching endpoints
 mid-conversation does not rewrite what is already on screen.
 
-<b>{display}</b> — the name of the device this is being viewed at. Put it in
-<i>the person</i> and every device attributes the transcript to itself, with no
-setting per device.
+<b>{user}</b> — whoever is signed in here, and the device where nobody is.
+<b>Put this in <i>the person</i>.</b> It is the only one that can name a person:
+every other variable here predates accounts, when the nearest thing to a
+speaker was the machine they typed at. A laptop somebody signs in on labels
+their words with their name; a wall screen nobody signs in to falls through to
+the name below, so one setting is right in both places rather than an admin
+having to choose which to get wrong.
+
+<b>{display}</b> — the name of the device this is being viewed at, and only
+ever that. Put it in <i>the person</i> and every device attributes the
+transcript to itself, with no setting per device — including the lines typed by
+somebody signed in, which is what {user} is for.
 
 It resolves to the first of these that exists: the name you gave that row under
 ACCESS, then <b>?display=</b> from its URL, then the first thing typed on its
@@ -6412,6 +6421,10 @@ async function loadIdentities(){
   try{
     const j = await api('/identities');
     IDENTITIES = j.identities || [];
+    /* The same array the display document fills, from whichever of the two
+       was fetched last. It is one list — which endpoints exist — and the tab
+       that asked should not change the answer. */
+    if (j.endpoints) DPEND = j.endpoints;
     IDBASE = j.base || '';
     IDBASES = j.bases || {};
     IDPWMIN = j.pw_min || 10;
@@ -6447,12 +6460,47 @@ let SHOWNPID = '';
    would sit unnoticed until somebody scrolled past it. */
 function clearPersonUrl(){
   SHOWNPID = '';
+  watchPersonUrl();                     // …which stops it, there being nothing
   ['idurl', 'idhereurl'].forEach(id=>{
     const el = $(id);
     if (!el) return;
     el.classList.remove('on');
     el.innerHTML = '';
   });
+}
+
+/* WATCHING FOR A LINK THAT HAS BEEN SPENT. Somebody opening theirs is the one
+   thing that happens to this row from somewhere else, and there is no way to
+   find out but to ask — so a link on screen after it has been used sits there
+   looking live, and the next person to read it off the screen is handed a URL
+   that opens a login form for an account they cannot get into.
+
+   The shape and the reasoning are watchEnrolments' exactly: it runs ONLY while
+   there is something to watch — a minted link on screen, on a tab that shows
+   it — and stops the moment there is not. A panel that refetches for ever
+   because somebody left it open is a cost with no reader. */
+let personWatch = 0;
+const PERSON_WATCH_MS = 5000;
+function watchPersonUrl(){
+  clearInterval(personWatch);
+  personWatch = 0;
+  if (!SHOWNPID) return;
+  /* The two tabs the box lives on. Off them the URL is not on screen to be
+     read, and refreshIdentities runs on the way back anyway — which re-arms
+     this or clears the link outright. */
+  if (CURRENT_TAB !== 'users' && CURRENT_TAB !== 'displays') return;
+  personWatch = setInterval(()=>{
+    if (!SHOWNPID || signedOut || !ME){
+      clearInterval(personWatch); personWatch = 0; return;
+    }
+    /* NOT UNDER SOMEBODY'S CURSOR, the same rule the enrolment watcher and
+       the request form follow: this rebuilds every row, and a refresh landing
+       mid-keystroke takes the control away from whoever is typing in it. */
+    const a = document.activeElement;
+    if (a && a.closest && a.closest('#panel')
+        && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) return;
+    refreshIdentities();               // …which clears it, or re-arms this
+  }, PERSON_WATCH_MS);
 }
 
 /* The URL, in the one moment it exists in the clear. Shown whole, the way an
@@ -6469,6 +6517,7 @@ function showPersonUrl(name, token, mailed, base, pid){
      was revoked the moment this one was minted. */
   clearPersonUrl();
   SHOWNPID = pid || '';
+  watchPersonUrl();
   const line = document.createElement('div');
   /* THE BASE THE SERVER JUST USED, and not the list's. It built this one for
      this person — off the endpoint they were enrolled on — and the list's map
@@ -6524,6 +6573,19 @@ async function refreshIdentities(){
     return;
   }
   await loadIdentities();
+  /* THE LINK ON SCREEN, AGAINST THE LIST IT CAME FROM. `ready` is true the
+     moment somebody sets a password, which is the moment their link is spent
+     — and a row that is gone entirely was deleted, here or in another admin's
+     browser. Either way what is on screen opens nothing, and a dead secret
+     that still looks live is one that gets handed over.
+
+     Here rather than in the delete handler alone: that one only knows about
+     the presses made in this browser, and being used is not one of them. */
+  if (SHOWNPID){
+    const row = IDENTITIES.find(p=> p.id === SHOWNPID);
+    if (!row || row.ready) clearPersonUrl();
+  }
+  watchPersonUrl();                     // re-arm, or stop, on what is left
   live.forEach(k=>{ boxes[k].innerHTML = ''; boxes[k].className = ''; });
   const filled = {};
   IDENTITIES.forEach(p=>{
@@ -6681,8 +6743,64 @@ async function refreshIdentities(){
     erow.appendChild(em);
     row.appendChild(erow);
 
+    /* WHICH ASSISTANTS THEY MAY USE — the display row's control, one
+       population over, writing the same allow-lists through the identity half
+       of the same function. The ticks existed in two places already, beside
+       APPROVE and on the box that mints somebody, and in neither of them
+       could a grant be CHANGED afterwards: what was decided at enrolment was
+       readable on the row and editable nowhere. */
+    const ends = document.createElement('div');
+    ends.className = 'newends';
+    const alab = document.createElement('label');
+    alab.className = 'bklab';
+    alab.textContent = 'AI';
+    ends.appendChild(alab);
+    const gl = grantList(p, false);
+    ends.appendChild(gl.el);
+    row.appendChild(ends);
+    /* Its own line under the ticks, the way the wake word's is. The list's
+       note is on the list, and a row's answer belongs on the row. */
+    const gnote = document.createElement('div');
+    gnote.className = 'note';
+    row.appendChild(gnote);
+
     const acts = document.createElement('div');
     acts.className = 'seg actrow';
+    /* SAVE and REVERT in the row's own bottom bar with everything else,
+       because a row with two action rows reads as two things to press rather
+       than one place to look — the same reason the display row's live there
+       and not under the ticks. */
+    const gsave = document.createElement('button');
+    gsave.className = 'act-save';
+    gsave.textContent = 'SAVE';
+    gsave.onclick = async ()=>{
+      const want = gl.ticks.filter(c=> c.checked).map(c=> c.dataset.r);
+      gnote.className = 'note';
+      gnote.textContent = 'saving…';
+      const j = await idAction('/identities/endpoints',
+                               {id: p.id, endpoints: want});
+      if (!j){ gnote.className = 'note bad'; gnote.textContent = ''; return; }
+      /* The record this row was drawn from, brought up to date — so REVERT
+         goes back to what was just saved rather than to what the page was
+         opened with. The list is NOT rebuilt: that would throw away the row
+         somebody has open and this message with it. */
+      p.granted = want;
+      gnote.textContent = want.length
+        ? 'saved — ' + want.length + (want.length === 1 ? ' endpoint' : ' endpoints')
+        : 'saved — nothing granted, so only what is open to everyone';
+    };
+    acts.appendChild(gsave);
+    const gundo = document.createElement('button');
+    gundo.className = 'act-undo';
+    gundo.textContent = 'REVERT';
+    gundo.onclick = ()=>{
+      gl.ticks.forEach(c=>{
+        c.checked = (p.granted || []).indexOf(c.dataset.r) >= 0;
+      });
+      gnote.className = 'note';
+      gnote.textContent = 'back to what is saved';
+    };
+    acts.appendChild(gundo);
     /* THE WHOLE OF ACCOUNT RECOVERY, and deliberately one button. A forgotten
        password and a leaked link want the same answer — a new link, and a
        password only its holder ever chooses. There is no CLEAR THE PASSWORD

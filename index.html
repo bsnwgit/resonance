@@ -868,6 +868,13 @@ const Person = {
        is the thing that follows them. */
     if (p.settings) Prefs.adopt(p.settings);
     paintGate();
+    /* THE TRANSCRIPT, RELABELLED. Signing in is the one moment the answer to
+       "who is speaking" changes without a setting being touched, and the
+       lines already on screen were attributed to whatever this browser was
+       before — on a page that does not reload, that label would sit there
+       for the rest of the session. Guarded because this object is taken at
+       load, before the transcript exists. */
+    if (typeof repaintNames === 'function') repaintNames();
   },
 };
 
@@ -1834,6 +1841,17 @@ const VARS = {
      {display} written into a greeting before approval keeps meaning what it
      meant after it. */
   display: ()=> Display.name || DISPLAY_NAME,
+  /* WHO IS SIGNED IN, which nothing here could say before. Every name this
+     table held was a machine's or an assistant's, because the transcript
+     label predates accounts entirely: the only way to attribute a line was
+     the device it was typed at, and {display} in `the person` is a laptop
+     labelling its owner's words with the laptop's name.
+
+     It falls through to the device, so ONE setting is right in both places a
+     screen can be. A personal browser has somebody signed in and says their
+     name; a wall screen has nobody and says the room's. Without the fallback
+     an admin would have to choose which of the two to get wrong. */
+  user: ()=> Person.name || Display.name || DISPLAY_NAME,
 };
 function expand(s, rid){
   return String(s == null ? '' : s).replace(/\{(\w+)\}/g, (m, k)=>{

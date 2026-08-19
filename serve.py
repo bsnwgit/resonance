@@ -4932,8 +4932,18 @@ def admin_identities():
     # USER never fetches the display document, so a page that looked the name
     # up itself would print an id on that tab and a name on the other one for
     # the same row. Read once for the whole list.
+    doc = read_routes()
     named = {rid: (rec.get("name") or rid)
-             for rid, rec in read_routes()["routes"].items()}
+             for rid, rec in doc["routes"].items()}
+    # WHAT EACH OF THEM IS ACTUALLY GRANTED, read off the allow-lists rather
+    # than stored on the row — the endpoint owns the grant and this is the
+    # same set its own `Who may use it` list shows. `granted` and not
+    # `endpoints`, because that is the key grantList reads for a display and
+    # the ticks on a person are meant to be the same control.
+    held = {}
+    for rid in route_order(doc):
+        for p in (doc["routes"][rid].get("identities") or []):
+            held.setdefault(p, []).append(rid)
     # WHETHER, never what. That they have set a password is the fact the panel
     # is built on: it is what moves a row from the enrolment queue to the
     # register, and it is the one thing an admin cannot do for them.
@@ -4944,6 +4954,7 @@ def admin_identities():
                  # "" where it names one that has since been deleted, which
                  # reads as no assistant — which is what it now is.
                  endpoint_name=named.get(rec.get("endpoint") or "", ""),
+                 granted=held.get(pid, []),
                  wakeword=rec.get("wakeword") or "",
                  ready=identity_ready(rec))
             for pid, rec in sorted(rows.items(), key=lambda kv: kv[1]["created"])]
@@ -6461,7 +6472,8 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/events", "/events/clear",
                      "/identities/wake", "/identities/wake/check",
                      "/identities", "/identities/new", "/identities/rename",
-                     "/identities/delete", "/identities/reissue")
+                     "/identities/delete", "/identities/reissue",
+                     "/identities/endpoints")
 #: where an enrolment code is typed. On the display listeners only — it hands
 #: out a display's token, and the admin listener is not a display.
 ENROL_PREFIX = "/e/"
@@ -7383,7 +7395,21 @@ class Handler(SimpleHTTPRequestHandler):
             # answer for a row enrolled on nothing, and as what the box at the
             # top shows before it has made anybody.
             _rows = read_identities()
+            _doc = read_routes()
             return self._json(200, {"identities": admin_identities(),
+                                    # THE ENDPOINTS, WITH THE PEOPLE. The ticks
+                                    # on a person's row are drawn from the same
+                                    # list a display's are, and IDENTITY ▸ USER
+                                    # never fetches the display document — so
+                                    # without this every box on that tab was
+                                    # drawn from an empty array, which is the
+                                    # exact failure the grant list's own
+                                    # comment describes one population over.
+                                    "endpoints": [
+                                        {"id": r, "name": _doc["routes"][r]["name"],
+                                         "restricted": _doc["routes"][r].get("restricted"),
+                                         "is_default": r == _doc["default"]}
+                                        for r in route_order(_doc)],
                                     "max": MAX_IDENTITIES,
                                     "pw_min": MIN_PASSWORD,
                                     "mail": mail_ready(),
@@ -8556,6 +8582,34 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(409, {"error": bad})
             print("identity %s wake word set to %r by %s"
                   % (pid, str(obj.get("word") or "").strip(), s["user"]), flush=True)
+            return self._json(200, {"ok": True, "identities": admin_identities()})
+
+        if parsed.path == "/identities/endpoints":
+            # WHICH ASSISTANTS A PERSON MAY USE, from their own row. The ticks
+            # existed in two places already — beside APPROVE, and on the box
+            # that mints somebody — and nowhere that could change them
+            # afterwards, so a grant made at enrolment could be read on the
+            # row and never edited there. This is the display row's control,
+            # one population over, and it writes the same allow-lists.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            pid = str(obj.get("id") or "")
+            if pid not in read_identities():
+                return self._json(404, {"error": "no such identity"})
+            rids = [str(r)[:32] for r in (obj.get("endpoints") or [])][:MAX_ALLOW]
+            # Refused rather than dropped. A tick for an endpoint that is not
+            # there is a stale panel, and quietly saving the rest would report
+            # success for a grant that was never made.
+            known = read_routes()["routes"]
+            if [r for r in rids if r not in known]:
+                return self._json(404, {"error": "no such endpoint"})
+            set_identity_endpoints(pid, rids)
+            print("identity %s endpoints set by %s — %d granted"
+                  % (pid, s["user"], len(rids)), flush=True)
             return self._json(200, {"ok": True, "identities": admin_identities()})
 
         if parsed.path == "/identities/reissue":
