@@ -1058,6 +1058,12 @@ async function gateArrived(j){
   if (j && j.settings) Prefs.adopt(j.settings);
   if (note){ note.className = ''; note.textContent = ''; }
   await Display.hello();
+  /* AND THE ROUTES AGAIN. `allowed` is this caller's answer, computed when the
+     list was fetched — and the caller has just changed from nobody to a
+     signed-in person. Without this the page would re-paint against the
+     anonymous answer and keep showing the gate it just let somebody through. */
+  await Routes.load();
+  syncWake();
   paintRequest();
   applyPrefs();
 }
@@ -1356,7 +1362,46 @@ function paintRequest(){
      all: no form, because none was allowed, and no way to use a code, because
      there had never been one. A device an admin had just made a code for had
      nowhere to type it and no sign that a code was a thing. */
-  const canEnrol = D.known && D.state !== 'approved';
+  /* CAN THIS BROWSER ACTUALLY USE WHAT IS ON THIS PORT? The server already
+     answered that per endpoint, in `allowed`, and its answer accounts for the
+     endpoint's own sign-in requirement and its allow-list. If something here
+     is usable, this browser is not somebody who has to get past a gate — it
+     is somebody who can talk to the assistant, and putting a sign-in box in
+     front of them would be the deployment-wide approval setting overruling
+     the per-endpoint one that replaced it.
+
+     That collision is exactly what this fixes: "General users require
+     approval" forced the request form onto EVERY unapproved browser, so an
+     endpoint deliberately set to need no sign-in still met one.
+ 
+     A screen being commissioned reaches the code box the other way, by typing
+     <server>/e/CODE, which is the path the documentation already gives for a
+     television with a remote. */
+  const usableHere = (Routes.list || []).some(r=> Routes.usable(r));
+  /* A PORT WITH NOTHING ON IT. Not a gate: there is no assistant here to sign
+     in to, so a sign-in box would be asking somebody to authenticate to an
+     empty room. Says what is true and what fixes it. */
+  const emptyPort = D.known && !(Routes.list || []).length;
+  const canEnrol = D.known && D.state !== 'approved' && !usableHere && !emptyPort;
+  if (emptyPort){
+    document.body.toggleAttribute('data-request', true);
+    document.body.toggleAttribute('data-gate', true);
+    const head = $('gatehead'), note = $('gatenote'), fields = $('gatefields'),
+          links = $('gatelinks');
+    if (fields) fields.style.display = 'none';
+    if (links) links.style.display = 'none';
+    if (head) head.textContent = 'Nothing is set up on this port';
+    if (note){
+      note.className = '';
+      note.textContent = 'No assistant answers here yet. An administrator '
+                       + 'gives one this port under CONNECTIONS ▸ AI.';
+    }
+    ['reqhead', 'reqform', 'reqsend', 'reqnote', 'enrol'].forEach(id=>{
+      const el = $(id);
+      if (el) el.style.display = 'none';
+    });
+    return;
+  }
   const canAsk = canEnrol && D.canRequest;
   document.body.toggleAttribute('data-enrol', canEnrol);
   document.body.toggleAttribute('data-request', canEnrol);

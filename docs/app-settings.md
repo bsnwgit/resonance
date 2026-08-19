@@ -140,8 +140,9 @@ assistants on one, told apart by wake word — and that went when signing in
 became a property of the endpoint. A door with two assistants behind it can
 only have one lock, and would have to answer for the looser of them; one
 assistant per door is what makes the answer unambiguous. Choosing a port
-another endpoint already answers on is refused, and the same holds for the
-display port, which is simply the profile nominated DEFAULT.
+another endpoint already answers on is refused, and the built-in display
+ports are simply a profile like any other — there is no nominated default and
+no listener that is special.
 
 An install that already shares one keeps working — the rule is enforced where
 a save is made, not by rewriting a configuration on upgrade, since moving an

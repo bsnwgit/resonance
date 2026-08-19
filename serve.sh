@@ -8,13 +8,20 @@ PIDFILE="$DIR/server.pid"
 
 # The display port is configurable from the admin page, so read it from the
 # same place the server does. Environment still wins, for a one-off run.
+#
+# THE ADMIN PORT, not the display's. This anchored on http_port, which was the
+# built-in display listener — and that listener is gone: every network profile
+# is its own listener now and none of them is special, so a deployment can
+# legitimately have nothing on the old display port at all. When that happened
+# this script reported "down" for a server that was running, and its stop did
+# nothing. The admin port is the one this server always binds.
 cfg_port() {
   "$(command -v python3)" - "$DIR/app.json" <<'PY' 2>/dev/null || echo 9700
 import json, sys
 try:
-    print(int(json.load(open(sys.argv[1]))["http_port"]))
+    print(int(json.load(open(sys.argv[1]))["admin_port"]))
 except Exception:
-    print(9700)
+    print(9702)
 PY
 }
 # Remember whether the caller asked for a specific port. If they did it is
