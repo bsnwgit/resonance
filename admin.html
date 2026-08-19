@@ -1876,6 +1876,25 @@
      source order. The earlier version of these rules was written as bare ids
      and lost outright to `#saverow button`, which is an id plus an element —
      hence the shape here, and hence the rule above giving up its colour. */
+  /* ONE SHAPE FOR EVERY COMMIT, wherever it is standing.
+
+     The treatment on a profile row was the only one that had been thought
+     about, and everything else took whatever its container happened to give
+     it: a commit inside `.seg` came out at 9.5px on 5/8 padding, and one in a
+     plain `.setuprow` had no rule at all and fell back to the browser's own
+     font — visibly a different control doing the same job. The five action
+     classes now carry the profile row's metrics themselves, so where a button
+     sits stops deciding what it looks like.
+
+     `button.act-*` ties with `.erow button` and `.seg button` on specificity
+     and sits after both, so the tie goes this way on source order — the same
+     reasoning as the colours below, and the reason these are written with the
+     element name rather than as bare classes. */
+  button.act-save, button.act-undo, button.act-danger,
+  button.act-add, button.act-warn{
+    font:inherit;font-size:calc(8.5px * var(--fs));letter-spacing:.1em;
+    padding:3px 6px;cursor:pointer;
+  }
   button.act-save{
     border-color:rgba(122,201,160,.75);color:#a8e3c4;
     background:rgba(122,201,160,.10);
