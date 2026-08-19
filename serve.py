@@ -2,11 +2,14 @@
 """Static server + local speech-to-text for Resonance.
 
 Listeners:
-  One per NETWORK PROFILE, each carrying the endpoints that name it — one
-  assistant on a port of its own, or several told apart by wake word. The
-  profile nominated DEFAULT is where an endpoint naming none of them answers,
-  and an upgrade turns the ports an install already had into one called
-  "Display" (9701, with 9700 redirecting to it).
+  One per NETWORK PROFILE, and each carries exactly ONE endpoint: one
+  assistant, one port. Ports were shareable once — several endpoints on one,
+  told apart by wake word — and that went when authentication became a
+  property of the port, because a door with two assistants behind it can only
+  have one lock and would have to answer for the looser of them. The profile
+  nominated DEFAULT is where an endpoint naming none of them answers, and an
+  upgrade turns the ports an install already had into one called "Display"
+  (9701, with 9700 redirecting to it).
 
   HTTPS wherever a certificate exists, because getUserMedia is refused on an
   insecure origin — except on loopback, which the browser already treats as
@@ -62,11 +65,6 @@ import manual                            # the manual, and its PDF writer
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SETTINGS_PATH = os.path.join(ROOT, "settings.json")
 USERS_PATH = os.path.join(ROOT, "users.json")
-#: The panel's own PIN, for the middle rung. Its own file rather than a key in
-#: app.json, because that document is handed to the panel whole on /app and a
-#: credential — even a hashed one — has no business riding along with the
-#: ports and the bind address.
-PANEL_PIN_PATH = os.path.join(ROOT, "panel_pin.json")
 APP_PATH = os.path.join(ROOT, "app.json")
 BACKEND_PATH = os.path.join(ROOT, "backend.json")
 _settings_lock = threading.Lock()
@@ -144,7 +142,6 @@ APP_DEFAULTS = {
     # install comes back up unchanged after an upgrade.
     "bind": "everything",            # loopback | address | everything
     "bind_address": "",              # the one address, when bind == "address"
-    "auth": "accounts",              # none | accounts
     # ---- staying up unattended ----
     # A display at rest issues no requests at all, so without a poll an outage
     # would end and the screen would stay broken until somebody walked up and
@@ -201,17 +198,28 @@ UNATTENDED_LIMITS = {"poll_seconds": (2, 300), "retry_attempts": (1, 10),
 PORT_MIN, PORT_MAX = 1024, 65535     # below 1024 needs root; this runs as you
 SESSION_MIN, SESSION_MAX = 5, 480    # minutes: below 5 is unusable, above 8h absurd
 BIND_MODES = ("loopback", "address", "everything")
-#: THREE RUNGS. Nothing at the door, one number for the whole panel, or
-#: accounts with roles. The middle one is the identity work's PIN machinery
-#: pointed at the panel rather than at a named person — which is why it waited
-#: for that rather than being built twice.
+#: TWO RUNGS. Nothing at the door, or accounts with roles.
 #:
-#: What it is FOR is the deployment with one administrator: accounts exist to
-#: tell people apart, and telling one person apart from themselves is a login
-#: screen charging rent. What it is NOT for is a deployment where the log has
-#: to say who did a thing. A single PIN cannot, and the log says "(single PIN)"
-#: rather than implying somebody.
-AUTH_MODES = ("none", "pin", "accounts")
+#: There were three. The middle one was a single PIN for the whole panel, and
+#: it went with every other PIN in this product: it could not say WHO did a
+#: thing — the log wrote "(single PIN)" rather than naming anybody — and the
+#: deployment it existed for, the one with a single administrator, is an
+#: account with one member. That is a login screen either way, and one of the
+#: two ways left a hole in the log.
+#:
+#: An install saved on the old middle rung comes up on `accounts`; see
+#: read_app. The first-run password is minted the same way it is for any other
+#: install that has no account yet.
+#: There is no deployment-wide sign-in setting any more, in either
+#: direction. The PANEL always asks — it holds the API key and every
+#: credential, and a switch that opens it is a switch somebody leaves on. The
+#: DISPLAYS ask per endpoint, on `needs_signin`, because "must there be a
+#: person" is a property of the thing being reached rather than of the server:
+#: three assistants on one box can legitimately want three different answers,
+#: and one switch covering all of them could only ever be set to the strictest.
+#:
+#: `auth` is dropped from app.json on read. A stored value is ignored rather
+#: than migrated: there is nothing left for it to mean.
 LOOPBACK = "127.0.0.1"
 
 
@@ -234,15 +242,22 @@ def exposed(cfg):
 
 def posture_warning(cfg):
     """The one arrangement that is allowed but should never be quiet: reachable
-    from the network, and nothing at the door. Not refused — somebody may want
-    exactly this on a network they control — but a laptop configured this way
-    that later joins an office network must say so."""
-    if cfg.get("auth") == "none" and exposed(cfg):
+    from the network, and no sign-in in front of the DISPLAYS. Not refused —
+    somebody may want exactly this on a network they control — but a laptop
+    configured this way that later joins an office network must say so.
+
+    It no longer says anything about the configuration page. That is always
+    signed into, whatever this setting is, so the old wording — "anyone who can
+    reach this machine can change its configuration" — stopped being true."""
+    if exposed(cfg) and any(not r.get("needs_signin")
+                            for r in read_routes()["routes"].values()
+                            if r.get("enabled", True)):
         where = ("every interface on this machine" if bind_host(cfg) == "0.0.0.0"
                  else bind_host(cfg))
-        return ("Reachable at %s with no sign-in — anyone who can reach this "
-                "machine can change its configuration, including the "
-                "assistant's API key." % where)
+        return ("Reachable at %s, and at least one assistant can be used "
+                "without signing in — anyone who can reach this machine can "
+                "use it, and whatever it costs to run. The admin panel is not "
+                "affected: that always asks." % where)
     return ""
 
 
@@ -267,6 +282,11 @@ def read_app():
             cfg.update({k: v for k, v in stored.items() if k in APP_DEFAULTS})
     except (OSError, ValueError):
         pass
+    # THE MIDDLE RUNG IS GONE. An install saved on the single panel PIN comes
+    # up on accounts rather than refusing to start or, worse, falling through
+    # to no sign-in at all — a removed authentication mode must never fail
+    # OPEN. Read-time only and the file is not rewritten: the panel shows
+    # `accounts` and the admin's next save is what makes it permanent.
     return cfg
 
 
@@ -848,6 +868,17 @@ ROUTE_DEFAULTS.update({
     # been hung is a legitimate order to do things in, and the panel says so
     # out loud instead.
     "restricted": False,
+    # MUST THERE BE A PERSON. Separate from `restricted`, and deliberately:
+    # that one asks WHICH callers, this one asks whether a caller has proved
+    # who they are at all. An endpoint can be open to everybody and still
+    # insist they sign in — a hosted model worth giving to anyone in the
+    # building and to nobody walking past it.
+    #
+    # It refuses a DEVICE outright, approved or not. A wall screen has no
+    # person on it and never will; that is what makes this the control that
+    # limits what an expensive model costs, where an allow-list of screens
+    # only limits which rooms it is answered in.
+    "needs_signin": False,
     "displays": [],
     # …and the groups it names. Kept beside the individual list rather than
     # folded into it: a grant made to "the physics department" should still
@@ -1142,15 +1173,20 @@ def net_members(doc, nid):
     moving an endpoint between ports takes effect on the next question — the
     SOCKET needs a restart, the membership does not.
 
-    The default profile also carries every endpoint that names no profile at
-    all: that is what makes it the default, and it is why the default has to
-    be shared."""
+    NAMING NO PROFILE MEANS NO PORT. It used to mean "the default one", and
+    that fallback was the thing quietly putting two assistants on one port:
+    two endpoints that had simply never been given a port both landed on it,
+    without anybody choosing that. An endpoint with no profile is now attached
+    to nothing and answers nowhere — visibly, and said at startup — which is a
+    state somebody fixes rather than one that hides.
+
+    The profile that owns the built-in display port is still nominated, but
+    that is about which LISTENER is the display's; it no longer collects
+    endpoints that named nothing."""
     if not nid:
         return list(route_order(doc))
-    dflt = nid == display_settings()["network_default"]
     return [r for r in route_order(doc)
-            if doc["routes"][r].get("network") == nid
-            or (dflt and not doc["routes"][r].get("network"))]
+            if doc["routes"][r].get("network") == nid]
 
 
 def route_dest(cfg):
@@ -1219,22 +1255,39 @@ def validate_route(obj, current, doc, rid=None):
         if nid and not any(p["id"] == nid for p in pool):
             return None, ("that network profile no longer exists — reload the "
                           "panel to see the current list")
-        # A SHARED port carries as many endpoints as you like and tells them
-        # apart by wake word, which is how the display port has always worked.
-        # An exclusive one is the other thing you might want — a port that IS
-        # one assistant — and a second endpoint claiming it would simply never
-        # be reached, so it is refused rather than silently ignored.
-        if nid:
-            prof = next((p for p in pool if p["id"] == nid), {})
-            if not (prof.get("values") or {}).get("shared"):
-                other = [k for k, r in doc["routes"].items()
-                         if k != rid and r.get("network") == nid]
-                if other:
-                    who = doc["routes"][other[0]].get("name") or "another endpoint"
-                    return None, ("%s already answers on that port, and it is "
-                                  "not marked shared — mark it shared, or give "
-                                  "this one a port of its own" % who)
         rec["network"] = nid
+
+    # ONE PORT, ONE ENDPOINT. No exceptions, including the built-in display
+    # ports.
+    #
+    # Ports used to be shareable: several endpoints on one, told apart by wake
+    # word. It is gone because a port is the level authentication is decided
+    # at, and a door with two assistants behind it can only have one lock —
+    # the moment they disagreed about needing a sign-in, the port had to
+    # answer for both and answered for the looser of them. One assistant per
+    # door is what makes the answer unambiguous.
+    #
+    # OUTSIDE the `if "network" in obj` above, and that is the whole point.
+    # Inside it, the rule only ran when a save happened to carry the network
+    # field — so an install whose endpoints all sat on the display port sailed
+    # through every save, because none of them was CHANGING port. The rule is
+    # about the state being saved, not about which fields the panel sent.
+    #
+    # BLANK IS NOT A PORT. It used to resolve to the default profile, and two
+    # endpoints that had simply never been given one both landed there — the
+    # collision this rule exists to prevent, arriving through the one door the
+    # rule could not see. Naming no profile now attaches an endpoint to
+    # nothing, so blanks cannot collide with each other and there is nothing
+    # here to compare them against.
+    target = str(rec.get("network") or "")
+    if target:
+        other = [k for k, r in doc["routes"].items()
+                 if k != rid and str(r.get("network") or "") == target]
+        if other:
+            who = doc["routes"][other[0]].get("name") or "another endpoint"
+            return None, ("%s already answers on that port, and a port carries "
+                          "one endpoint — give this one a port of its own "
+                          "under PROFILES \u25b8 NETWORK" % who)
     if "model_profile" in obj:
         mid = str(obj["model_profile"] or "")[:16]
         if mid and not any(p["id"] == mid
@@ -1267,6 +1320,8 @@ def validate_route(obj, current, doc, rid=None):
             return None, "the route to fall through to no longer exists"
     if "restricted" in obj:
         rec["restricted"] = bool(obj["restricted"])
+    if "needs_signin" in obj:
+        rec["needs_signin"] = bool(obj["needs_signin"])
     if "displays" in obj:
         # Checked against the displays that exist, so a stale id cannot sit in
         # an allow-list looking like a device somebody approved. Unknown ones
@@ -1415,18 +1470,6 @@ def validate_app(obj, current):
                           "machine — the server would fail to start on it"
                           % cfg[k])
 
-    if "auth" in obj:
-        v = str(obj["auth"] or "").strip()
-        if v not in AUTH_MODES:
-            return None, "sign-in must be one of: " + ", ".join(AUTH_MODES)
-        if v == "pin" and not has_panel_pin():
-            # Refused HERE rather than at the restart that would apply it.
-            # Saving this and restarting is how a panel ends up in a mode whose
-            # only key was never cut, and the way back is a text editor on the
-            # box.
-            return None, ("set the panel PIN first — switching to it with none "
-                          "set would leave no way in")
-        cfg["auth"] = v
     if "session_idle_minutes" in obj:
         try:
             m = int(obj["session_idle_minutes"])
@@ -1461,8 +1504,8 @@ def validate_app(obj, current):
 # Places and people bind differently, and the difference is cardinality: a wall
 # display is one physical object, so it is pinned to a single token an admin
 # blesses. A person is not — phone, tablet and laptop are all legitimately them
-# — so their credential is something they CARRY, which is the PIN, and it is
-# the identity phase's to build. One mechanism, two ways of granting it.
+# — so their credential is something they KNOW, which is an email address and
+# a password. One mechanism, two ways of granting it.
 DISPLAYS_PATH = os.path.join(ROOT, "displays.json")
 _displays_lock = threading.Lock()
 DISPLAY_COOKIE = "rsn_did"
@@ -1665,7 +1708,7 @@ LOOK_VALUES = {
     "fs":      ("1", "1.12", "1.25"),
     "palette": ("blue", "milk", "ice", "amber", "rust"),
     "layout":  ("hero", "bleed"),
-    "mode":    ("stack", "disc", "orb", "knot"),
+    "mode":    ("stack", "ridge", "disc", "orb", "knot"),
 }
 #: How many appearance profiles may exist — the same reasoning and the same
 #: number as the screensavers. A place, not a screen.
@@ -1673,17 +1716,10 @@ MAX_LOOKS = 8
 
 #: The displays document's own settings, as opposed to the rows in it. Set in
 #: the panel, and none of them needs a restart.
-#: Six digits is a low bar that rate limiting carries, and it is the number a
-#: person keys into a screen. An admin can raise it where the room deserves
-#: more; below four is not a secret, above twelve is a password with the wrong
-#: keyboard.
-PIN_MIN_DEFAULT = 6
 #: Days. Long enough to still be there on Monday for a fault somebody noticed
 #: on Saturday, short enough that it is not a record of a household.
 EVENT_DAYS_DEFAULT = 7
 EVENT_DAYS_LIMITS = (1, 90)
-PIN_LIMITS = (4, 12)
-PIN_MAX = 32
 
 DISPLAY_SETTINGS = {
     # May a device nobody invited ask for access at all?
@@ -1757,6 +1793,10 @@ DISPLAY_SETTINGS = {
     # profile still has to answer somewhere, and that somewhere is this one.
     # A default network profile is always SHARED, or endpoints naming nothing
     # would be pointed at a port that refuses to carry more than one.
+    # WHICH PROFILE OWNS THE BUILT-IN DISPLAY PORT, and nothing else. It was
+    # also where an endpoint naming no profile landed, and that second job is
+    # gone: it put two assistants on one port whenever two of them had simply
+    # never been given one. Naming no profile now means no port at all.
     "network_default": "",
     "model_default": "",
     "look_default": "",
@@ -1784,10 +1824,6 @@ DISPLAY_SETTINGS = {
     # had shipped and since changed. After that a default group's name is the
     # admin's, including if they choose the old one back.
     "group_names_done": 0,
-    # The fewest digits a PIN may have. Raising it does not revoke anything —
-    # it marks every PIN below it, and those are made to conform at the next
-    # unlock. See identity_pin_state.
-    "pin_min": PIN_MIN_DEFAULT,
     # How long a technical event and its conversation record are kept. SHORT
     # on purpose: retention is the only control there is over a store that
     # holds what was said to a display, and a generous default is a decision
@@ -1839,7 +1875,7 @@ DISPLAY_SETTINGS = {
 }
 MAX_FORM_FIELDS = 5
 #: (low, high) for each number the panel can set
-DISPLAY_LIMITS = {"pin_min": PIN_LIMITS, "event_days": EVENT_DAYS_LIMITS,
+DISPLAY_LIMITS = {"event_days": EVENT_DAYS_LIMITS,
                   "max_displays": (2, 5000), "max_pending": (1, 1000),
                   "guest_days": (1, 3650),
                   # 0 is off — see code_minutes. A week is the top because a
@@ -2469,23 +2505,15 @@ def validate_display_settings(obj, current):
             r["values"]["address"] = addr
             r["values"]["port"] = pv
             r["values"]["redirect"] = rv
-            r["values"]["shared"] = bool(r["values"].get("shared"))
-            r["values"]["open"] = bool(r["values"].get("open"))
         cfg["networks"] = rows
-        # There is always a default, and it is always shared. An endpoint
-        # naming no profile lands on it, and a default that refused to carry
-        # more than one endpoint would strand every one of them.
+        # There is always a default: it is where an endpoint naming no profile
+        # answers, which is the display port. It no longer has to be "shared",
+        # because nothing is — it carries ONE endpoint like every other port,
+        # and a second endpoint naming no profile is refused at the endpoint.
         want = str(obj.get("network_default") or cfg.get("network_default") or "")
         by_id = {r["id"]: r for r in rows}
         if want not in by_id:
-            want = next((r["id"] for r in rows if r["values"].get("shared")), "")
-        if rows and not want:
-            return None, ("one network profile has to be shared — it is where "
-                          "an endpoint that names none of them answers")
-        if want and not by_id[want]["values"].get("shared"):
-            return None, ("%s is the default, so it has to be shared — it is "
-                          "where an endpoint that names no profile answers"
-                          % by_id[want]["name"])
+            want = rows[0]["id"] if rows else ""
         cfg["network_default"] = want
     for key, prefix in (("motions", "m"), ("speeches", "p")):
         if key not in obj:
@@ -2681,21 +2709,20 @@ def migrate_networks():
     have = str(cfg.get("network_default") or "")
     if have and any(r["id"] == have for r in rows):
         return                                          # already nominated
-    # A profile list built before there was a default — an exclusive port made
-    # for one endpoint, say — is not a reason to invent a second display port.
-    # Nominate a shared one if there is one; otherwise the app's own ports
-    # become the profile they always were in everything but name.
-    pick = next((r["id"] for r in rows if (r["values"] or {}).get("shared")), "")
+    # A profile list built before there was a default is not a reason to
+    # invent a second display port. Take the first one there is; otherwise the
+    # app's own ports become the profile they always were in everything but
+    # name.
+    pick = rows[0]["id"] if rows else ""
     if not pick:
         app = read_app()
         prof = {"id": "w" + secrets.token_hex(4), "name": "Display",
                 "values": {"port": app["https_port"],
-                           "redirect": app["http_port"],
-                           "shared": True, "open": False}}
+                           "redirect": app["http_port"]}}
         rows = [prof] + rows
         pick = prof["id"]
         print("network migration: display ports %d/%d -> profile "
-              "\u201cDisplay\u201d (shared)"
+              "\u201cDisplay\u201d"
               % (app["https_port"], app["http_port"]), flush=True)
     cfg["networks"] = rows
     cfg["network_default"] = pick
@@ -3291,6 +3318,30 @@ def request_access(did, answers):
     return dict(rec, id=did), None
 
 
+def set_identity_endpoints(pid, rids):
+    """Which endpoints this PERSON may use. The identity half of
+    set_display_endpoints, and deliberately its twin: added where it is named,
+    removed everywhere else, allow-lists only.
+
+    It exists because approving a request now creates a person rather than a
+    device, and the ticks beside APPROVE have to land somewhere. Sending them
+    to the display half would have written the browser's id into a list that
+    is read for people — a grant that looks made and reaches nobody."""
+    doc = read_routes()
+    want = set(rids or [])
+    changed = False
+    for rid, rec in doc["routes"].items():
+        has = pid in (rec.get("identities") or [])
+        if rid in want and not has:
+            rec["identities"] = list(rec.get("identities") or []) + [pid]
+            changed = True
+        elif rid not in want and has:
+            rec["identities"] = [p for p in rec["identities"] if p != pid]
+            changed = True
+    if changed:
+        write_routes(doc)
+
+
 def set_display_endpoints(did, rids):
     """Which endpoints this display may use, as one gesture: added where it is
     named, removed everywhere else. The ticks are the whole truth rather than
@@ -3365,6 +3416,21 @@ def subject_may(route, disp=None, ident=None):
     into. A person has no equivalent test, because an identity only exists at
     all if an admin made it — creation IS the approval, and there is no way to
     turn up asking to be one."""
+    # THE PANEL'S PREVIEW, first of all. It is an admin looking at a display,
+    # already signed in, and one that refused to demonstrate half the endpoints
+    # would be lying in the other direction. Hoisted above the sign-in test for
+    # that reason — it has no person on it either.
+    if disp and disp.get("preview"):
+        return True
+    # MUST THERE BE A PERSON. Above the allow-list test, because it applies to
+    # an endpoint that has no allow-list at all: "open to anyone who signs in"
+    # is a real and useful thing to say, and checking this after the
+    # unrestricted early-return would have made it unsayable.
+    #
+    # `ident` is only ever set for a browser holding a PROVED session — see
+    # _identity — so a device is refused here whatever it was approved for.
+    if route.get("needs_signin") and not ident:
+        return False
     if not route.get("restricted"):
         return True
     if ident:
@@ -3378,11 +3444,6 @@ def subject_may(route, disp=None, ident=None):
                                             kinds=IDENTITY_GROUP_KINDS)
     if not disp:
         return False
-    # The preview is the panel. It is already signed in as an admin, who can
-    # reach any endpoint from the panel anyway, and a preview that refused to
-    # demonstrate half the endpoints would be lying in the other direction.
-    if disp.get("preview"):
-        return True
     # Expiry is checked here rather than at the door, which is what makes a
     # grant run out cleanly mid-conversation: the turn already in flight was
     # allowed when it started and finishes, and the next one is refused.
@@ -3432,6 +3493,11 @@ def admin_displays():
         live = bool(rec.get("code")) and (not deadline or deadline > now_)
         row.update(id=did, label=display_label(rec),
                    network=str(rec.get("network") or ""),
+                   # Approved into an ACCOUNT rather than into a device. The
+                   # live row for this person is on the identity list; this
+                   # one is the browser they asked from and has nothing left
+                   # to decide, so the panel drops it out of every queue.
+                   converted=bool(rec.get("setup")),
                    guest=is_guest(rec), expired=display_expired(rec),
                    # What it was SET to, and what it resolves to. The panel
                    # needs both: one is the control's value, the other is the
@@ -4236,18 +4302,19 @@ IDENTITY_DEFAULTS = {
     "salt": "", "hash": "",
     "created": 0, "last_seen": 0,
     "created_by": "",
-    # THE PIN. PBKDF2 like an admin password and not the SHA-256 the URL gets:
-    # a URL secret is 32 bytes from the system generator with no dictionary to
-    # run, where a PIN is six digits a human chose. Stretching is the only
-    # thing standing between that and a list of a million guesses.
-    #
-    # `pin_len` is kept because the policy is a MINIMUM that can be raised
-    # later, and a hash cannot be asked how long the thing behind it was. It
-    # is the length and nothing else — it narrows the search space by a factor
-    # nobody can use without the hash, and without it raising the minimum
-    # would either do nothing to existing PINs or force everybody to reset.
-    "pin_salt": "", "pin_hash": "", "pin_len": 0, "pin_set_at": 0,
-    # PER-IDENTITY SETTINGS: the storage tier a PIN unlocks, and the one this
+    # THE LOGIN. An email address, because it is the one handle a person
+    # already has that is unique without anybody administering a namespace,
+    # and because it is somewhere to send a fresh setup link the day they
+    # forget the password. It is what they type to sign in; `name` stays what
+    # the panel calls their row.
+    "email": "",
+    # THE PASSWORD. PBKDF2, and chosen by THEM: the setup link is spent
+    # forcing one, and an admin never sets or sees it. This replaced a PIN,
+    # which was six digits keyed into a screen — fine for a lock on a browser
+    # that had already proved who it was, and not what a credential typed on a
+    # login page can be.
+    "pw_salt": "", "pw_hash": "", "pw_set_at": 0,
+    # PER-IDENTITY SETTINGS: the tier signing in unlocks, and the one this
     # server did not have. There was shared configuration, a per-browser
     # preference and a per-embed grant; a setting belonging to a PERSON had
     # nowhere to live, so it lived in whichever browser they happened to be
@@ -4260,8 +4327,8 @@ IDENTITY_DEFAULTS = {
     # reconciling it afterwards, and it is what people expect anyway: an
     # assistant answers to a name you chose.
     "wakeword": "",
-    # How long an unlock lasts on this person's own device, in hours. Theirs
-    # rather than the deployment's: a PIN is now entered at their own URL, not
+    # How long a sign-in lasts on this person's own device, in hours. Theirs
+    # rather than the deployment's: a password is entered at a login page, not
     # at a screen standing in a room, so there is no place carrying the risk to
     # set it from. Zero takes the deployment default.
     "session_hours": 0,
@@ -4277,14 +4344,15 @@ IDENTITY_PREF_KEYS = ("ptt", "muted", "text")
 #: again in a working day, short enough to matter on a machine they borrowed.
 SESSION_HOURS_DEFAULT = 12
 SESSION_HOURS_LIMITS = (1, 720)
-#: A browser that has unlocked. Its own cookie, because the identity cookie is
-#: the URL secret and every device that person owns holds the same one —
-#: unlocking on the laptop would unlock the phone, which is not what entering a
-#: PIN on one machine means. In memory, like the admin sessions: a restart asks
-#: again, and that is the same bargain the rest of this server makes.
-_pin_sessions = {}               # token -> {"pid": str, "expires": float}
-_pin_lock = threading.Lock()
-PIN_COOKIE = "rsn_pinq"
+#: A browser that has SIGNED IN. Its own cookie, separate from the identity
+#: cookie: that one says which person this browser claims to be and is set by
+#: the setup link, this one says the claim has been proved with a password.
+#: Signing in on the laptop must not sign in the phone. In memory, like the
+#: admin sessions: a restart asks again, and that is the same bargain the rest
+#: of this server makes.
+_user_sessions = {}              # token -> {"pid": str, "expires": float}
+_user_lock = threading.Lock()
+USER_COOKIE = "rsn_user"
 
 
 def clean_identity_settings(obj):
@@ -4318,135 +4386,152 @@ def identity_hours(rec):
     return h if h > 0 else SESSION_HOURS_DEFAULT
 
 
-def open_pin_session(pid, hours):
+def open_user_session(pid, hours):
     token = secrets.token_urlsafe(32)
-    with _pin_lock:
-        # Swept here rather than on a timer: this runs when somebody unlocks,
+    with _user_lock:
+        # Swept here rather than on a timer: this runs when somebody signs in,
         # which is the only moment the map grows.
         now_ = time.time()
-        for t in [t for t, v in _pin_sessions.items() if v["expires"] <= now_]:
-            _pin_sessions.pop(t, None)
-        _pin_sessions[token] = {"pid": pid, "expires": now_ + hours * 3600}
+        for t in [t for t, v in _user_sessions.items() if v["expires"] <= now_]:
+            _user_sessions.pop(t, None)
+        _user_sessions[token] = {"pid": pid, "expires": now_ + hours * 3600}
     return token
 
 
-def pin_session_pid(token):
-    """Which person this browser has unlocked, or "". Expiry is read HERE
+def user_session_pid(token):
+    """Which person this browser has signed in as, or "". Expiry is read HERE
     rather than swept on a clock, so a session that has run out is over the
     moment it is asked about rather than whenever a timer next fired."""
-    rec = _pin_sessions.get(str(token or ""))
+    rec = _user_sessions.get(str(token or ""))
     if not rec:
         return ""
     if rec["expires"] <= time.time():
-        _pin_sessions.pop(str(token), None)
+        _user_sessions.pop(str(token), None)
         return ""
     return rec["pid"]
 
 
-def close_pin_sessions(pid):
-    """Every unlocked browser for one person, ended. Called where their PIN
-    changes hands — an admin clearing it, or the person setting a new one —
-    because a session opened by a secret that no longer exists is a door left
-    open behind a lock somebody just changed."""
-    with _pin_lock:
-        for t in [t for t, v in _pin_sessions.items() if v["pid"] == pid]:
-            _pin_sessions.pop(t, None)
+def close_user_sessions(pid):
+    """Every signed-in browser for one person, ended. Called where their
+    password changes hands — them setting a new one, or an admin reissuing the
+    setup link — because a session opened by a credential that no longer
+    exists is a door left open behind a lock somebody just changed."""
+    with _user_lock:
+        for t in [t for t, v in _user_sessions.items() if v["pid"] == pid]:
+            _user_sessions.pop(t, None)
 
-#: Guessing is per IDENTITY rather than per address. A six-digit PIN is small
-#: enough that the thing to slow down is attempts against one person, and an
-#: attacker who changes address between guesses must not get a fresh budget.
-#: Its own ledger, so somebody fumbling their PIN cannot lock an admin out of
-#: the panel — the same reason the embed keys keep theirs.
-_pin_fails = {}                  # identity id -> [count, blocked_until]
+#: Guessing is per ACCOUNT rather than per address: an attacker who changes
+#: address between guesses must not get a fresh budget. Its own ledger, and its
+#: own NAMES — the panel keeps one of exactly this shape further down the file,
+#: keyed by client address. Sharing a name would mean whichever was defined
+#: second silently answered for both, and somebody fumbling their password
+#: would be charged against the ledger that locks admins out of the panel.
+_user_fails = {}                 # identity id -> [count, blocked_until]
 
 
-def pin_blocked(pid):
-    rec = _pin_fails.get(pid)
+def user_login_blocked(pid):
+    rec = _user_fails.get(pid)
     return bool(rec and rec[1] > time.time())
 
 
-def note_pin_failure(pid):
-    rec = _pin_fails.setdefault(pid, [0, 0])
+def note_user_login_failure(pid):
+    rec = _user_fails.setdefault(pid, [0, 0])
     rec[0] += 1
     if rec[0] >= 5:
         rec[1] = time.time() + min(300, 15 * (2 ** (rec[0] - 5)))
 
 
-def weak_pin(pin):
-    """The guesses anybody would try first, refused where they are chosen
-    rather than left for the back-off to absorb. A run, a repeat, or the year
-    somebody was born is most of what a keypad ever sees, and rate limiting is
-    what makes six digits survivable — it should not be spending its budget on
-    111111."""
-    if len(set(pin)) == 1:
-        return "that is one digit repeated"
-    runs = "0123456789" * 2
-    if pin in runs or pin in runs[::-1]:
-        return "that is a run of digits"
-    if len(pin) == 4 and pin.startswith(("19", "20")):
-        return "that reads as a year"
+def clean_email(v):
+    """The address as it will be stored, or "". Lowercased, because somebody
+    typing their own address at a login box does not remember which case they
+    used the day they were enrolled.
+
+    Deliberately NOT a grammar. Every regex anybody writes for this refuses
+    somebody's real address, and there is nothing here that sends mail, so
+    there is nothing to bounce: it is a handle that must be unique, must be
+    typeable, and must look enough like an address that a person recognises
+    it as the thing to type."""
+    v = str(v or "").strip().lower()
+    if len(v) > 160 or " " in v:
+        return ""
+    name, at, host = v.partition("@")
+    if not at or not name or "." not in host or host.startswith("."):
+        return ""
+    return v
+
+
+def identity_by_email(email):
+    """The person who logs in with this address, or None. The comparison is on
+    the stored value, which is already lowercased, so two rows cannot differ by
+    case alone — see check_email."""
+    want = clean_email(email)
+    if not want:
+        return None
+    for pid, rec in read_identities().items():
+        if (rec.get("email") or "") == want:
+            return dict(rec, id=pid)
+    return None
+
+
+def check_email(email, skip_pid=""):
+    """The address, or ("", reason). Unique across identities: it is what
+    somebody types to sign in, so two rows holding one address is a login with
+    no answer rather than a duplicate somebody can tidy up later."""
+    v = clean_email(email)
+    if not v:
+        return "", "that does not look like an email address"
+    other = identity_by_email(v)
+    if other and other["id"] != skip_pid:
+        return "", "somebody here already uses that address"
+    return v, ""
+
+
+def check_user_password(pw):
+    """What is wrong with this password, or "" if nothing is. The same floor an
+    admin account gets: there is one rule in this product for how long a
+    password has to be, and a second number for a second population would be
+    two answers to one question."""
+    pw = str(pw or "")
+    if len(pw) < MIN_PASSWORD:
+        return "password must be at least %d characters" % MIN_PASSWORD
+    if len(pw) > 512:
+        return "that is longer than a password needs to be"
     return ""
 
 
-def check_pin(pin, minimum=None):
-    """What is wrong with this PIN, or "" if nothing is. Digits only: it is
-    keyed into a screen, often with a remote, and a PIN that needed letters
-    would be a password with the wrong name."""
-    pin = str(pin or "")
-    low = PIN_MIN_DEFAULT if minimum is None else minimum
-    if not pin.isdigit():
-        return "a PIN is digits only"
-    if len(pin) > PIN_MAX:
-        return "that is longer than a PIN needs to be"
-    if len(pin) < low:
-        return "a PIN needs at least %d digits here" % low
-    return weak_pin(pin)
+def set_identity_password(pid, pw):
+    """The person choosing their OWN. Returns "" or the reason it was refused.
 
-
-def set_identity_pin(pid, pin, minimum=None):
-    """Set or replace somebody's PIN. Returns "" or the reason it was refused."""
+    An admin never passes through here. They mint a setup link and the person
+    at the other end of it sets the password — an admin who chose it would
+    know it, and the whole point of the link is that nobody but its holder
+    ever does."""
     rows = read_identities()
     if pid not in rows:
         return "no such identity"
-    bad = check_pin(pin, minimum)
+    bad = check_user_password(pw)
     if bad:
         return bad
-    salt, dk = hash_password(str(pin))
-    rows[pid].update(pin_salt=salt, pin_hash=dk, pin_len=len(str(pin)),
-                     pin_set_at=int(time.time()))
+    salt, dk = hash_password(str(pw))
+    rows[pid].update(pw_salt=salt, pw_hash=dk, pw_set_at=int(time.time()))
     write_identities(rows)
-    _pin_fails.pop(pid, None)
-    close_pin_sessions(pid)
+    _user_fails.pop(pid, None)
+    close_user_sessions(pid)
     return ""
 
 
-def clear_identity_pin(pid):
-    """An admin resetting a forgotten one. With no email here this is the only
-    recovery path, which is why it exists in the first version — and it does
-    not set a new PIN, it removes the old one: an admin who chose somebody's
-    PIN would know it."""
-    rows = read_identities()
-    if pid not in rows:
-        return False
-    rows[pid].update(pin_salt="", pin_hash="", pin_len=0, pin_set_at=0)
-    write_identities(rows)
-    _pin_fails.pop(pid, None)
-    close_pin_sessions(pid)
-    return True
-
-
-def verify_identity_pin(pid, pin):
+def verify_identity_password(pid, pw):
     """True where it matches. Compared HERE and never in the browser, and the
-    back-off is charged on the way out rather than the way in, so a correct PIN
-    entered after four wrong ones still works."""
+    back-off is charged on the way out rather than the way in, so a correct
+    password entered after four wrong ones still works."""
     rec = read_identities().get(pid)
-    if not rec or not rec.get("pin_hash"):
+    if not rec or not rec.get("pw_hash"):
         return False
-    ok = verify_password(str(pin or ""), rec["pin_salt"], rec["pin_hash"])
+    ok = verify_password(str(pw or ""), rec["pw_salt"], rec["pw_hash"])
     if ok:
-        _pin_fails.pop(pid, None)
+        _user_fails.pop(pid, None)
     else:
-        note_pin_failure(pid)
+        note_login_failure(pid)
     return bool(ok)
 
 
@@ -4513,14 +4598,15 @@ def set_identity_wake(pid, word):
     return ""
 
 
-def identity_pin_state(rec, minimum=None):
-    """none, ok, or short. SHORT is a PIN that was legal when it was set and is
-    below a minimum raised since — marked rather than revoked, because the
-    person still has to be able to unlock in order to change it."""
-    low = PIN_MIN_DEFAULT if minimum is None else minimum
-    if not rec.get("pin_hash"):
-        return "none"
-    return "ok" if (rec.get("pin_len") or 0) >= low else "short"
+def identity_ready(rec):
+    """Has this person finished arriving? True once they have set a password.
+
+    It is the whole of what divides the two lists in the panel: a row without
+    one is a setup link outstanding and sits on ENROLLMENTS, a row with one is
+    somebody who is here and sits under IDENTITY. Nothing else decides it and
+    no admin can set it by hand — only the person at the far end of the link,
+    by using it."""
+    return bool(rec.get("pw_hash"))
 
 
 def read_identities():
@@ -4554,28 +4640,34 @@ def identity_label(rec):
     return rec.get("name") or "unnamed person"
 
 
-def new_identity(name, by):
-    """Mint one, and hand back (url token, record) — or (None, error).
+def new_identity(name, email, by):
+    """Mint one, and hand back (setup token, record) — or (None, error).
 
     The token is shown once, in the URL an admin hands over. What is stored is
     its hash, so a panel that has been closed cannot show it again and a copy
-    of this file cannot be read back into a working URL."""
+    of this file cannot be read back into a working URL. It buys ONE thing:
+    the page that asks them to choose a password. After that the account is
+    reached by signing in, and the link is spent."""
     name = str(name or "").strip()[:60]
     if not name:
         return None, "a name is required"
+    email, bad = check_email(email)
+    if bad:
+        return None, bad
     rows = read_identities()
     if len(rows) >= MAX_IDENTITIES:
         return None, ("that is %d identities already — remove one first"
                       % MAX_IDENTITIES)
     if any(r["name"].lower() == name.lower() for r in rows.values()):
-        # Not a security property: the URL is the credential, and two people
-        # called Sam would still be told apart by it. It is that a list with
-        # two identical rows is one an admin cannot act on.
+        # Not a security property — the email is the handle and two people
+        # called Sam are still told apart by it. It is that a list with two
+        # identical rows is one an admin cannot act on.
         return None, "there is already an identity with that name"
     pid = "p" + secrets.token_hex(6)
     secret = secrets.token_urlsafe(32)
     salt, dk = hash_key(secret)
-    rows[pid] = dict(IDENTITY_DEFAULTS, name=name, salt=salt, hash=dk,
+    rows[pid] = dict(IDENTITY_DEFAULTS, name=name, email=email,
+                     salt=salt, hash=dk,
                      created=int(time.time()), created_by=str(by or "")[:60])
     write_identities(rows)
     # Filed with their own population the moment they exist, and the group is
@@ -4588,17 +4680,28 @@ def new_identity(name, by):
 
 
 def reissue_identity(pid):
-    """A new secret, and the old URL stops working the moment this returns.
-    What it is for is a URL that got somewhere it should not have — pasted
-    into a chat, left in a browser somebody else uses — where deleting the
-    person would take everything they own with it."""
+    """A fresh setup link, and everything the old credentials opened is shut.
+
+    This is the ONLY recovery path, and it is deliberately the same gesture as
+    creating somebody: a forgotten password and a leaked URL want the same
+    answer, which is a new link and a password only its holder ever chooses.
+    An admin who could set one would know it.
+
+    So it clears the password as well as minting a new secret. Leaving it in
+    place would hand out a link that the setup page then refuses — the account
+    already has a password — which is a dead end wearing the shape of a fix.
+    Every signed-in browser is dropped with it: an account being recovered is
+    one whose open doors are the problem."""
     rows = read_identities()
     rec = rows.get(pid)
     if not rec:
         return None
     secret = secrets.token_urlsafe(32)
     rec["salt"], rec["hash"] = hash_key(secret)
+    rec.update(pw_salt="", pw_hash="", pw_set_at=0)
     write_identities(rows)
+    _user_fails.pop(pid, None)
+    close_user_sessions(pid)
     return pid + "." + secret
 
 
@@ -4633,19 +4736,19 @@ def note_identity_seen(pid):
 
 
 def admin_identities():
-    """The list, less the credential. What a URL secret IS never leaves this
-    server after the one moment it was minted."""
+    """The list, less the credentials. Neither the setup secret nor the
+    password leaves this server — the first after the one moment it was
+    minted, the second ever."""
     rows = read_identities()
-    low = display_settings()["pin_min"]
-    # The STATE of a PIN, never the PIN. Whether somebody has one, and whether
-    # theirs is below a minimum raised since they set it, is what an admin has
-    # to be able to see — the rollout of a tightened policy is otherwise a
-    # thing you assume rather than watch.
+    # WHETHER, never what. That they have set a password is the fact the panel
+    # is built on: it is what moves a row from the enrolment queue to the
+    # register, and it is the one thing an admin cannot do for them.
     return [dict({k: rec.get(k) for k in
-                  ("name", "created", "last_seen", "created_by", "pin_set_at")},
+                  ("name", "email", "created", "last_seen", "created_by",
+                   "pw_set_at")},
                  id=pid, label=identity_label(rec),
                  wakeword=rec.get("wakeword") or "",
-                 pin=identity_pin_state(rec, low))
+                 ready=identity_ready(rec))
             for pid, rec in sorted(rows.items(), key=lambda kv: kv[1]["created"])]
 
 
@@ -4806,6 +4909,37 @@ def ensure_default_membership():
     if added:
         write_groups(groups)
         print("put %d row(s) back in their default group" % added, flush=True)
+
+
+def migrate_pin_identities():
+    """THE PIN MODEL DOES NOT CARRY FORWARD. A row from before this change has
+    a PIN hash and no email, which is an account nobody can sign in to: the
+    login page asks for an address the record does not have, and there is no
+    admin gesture that invents one.
+
+    Wiped rather than half-migrated. The alternative was to keep the names and
+    the wake words and leave every row needing an address typed in and a link
+    reissued before it worked — which is the same work as creating them again,
+    with a list of broken rows sitting in the panel until somebody does it.
+    Announced loudly on the way out, because it is somebody's data and a
+    server that removes data silently is one you cannot trust with the rest.
+
+    Runs once and only where the old shape is actually present: a fresh
+    install has no file, and an install already on the new model has no row
+    carrying a `pin_hash`."""
+    rows = read_identities()
+    old = [pid for pid, rec in rows.items()
+           if rec.get("pin_hash") or not rec.get("email")]
+    if not rows or not old:
+        return
+    for pid in old:
+        print("identity %s (%s) removed: the PIN model it was created under "
+              "is gone, and it has no email address to sign in with — create "
+              "them again under ENROLLMENTS \u25b8 USER"
+              % (pid, identity_label(rows[pid])), flush=True)
+        rows.pop(pid, None)
+    write_identities(rows)
+    print("removed %d identity row(s) from the PIN model" % len(old), flush=True)
 
 
 def migrate_unenrolled_invites():
@@ -5200,7 +5334,6 @@ _BOUND = set()
 # Read once at startup rather than per request, for the same reason the ports
 # are: this decides what a listener IS, and a listener cannot be re-founded
 # under the requests already in flight on it.
-AUTH_MODE = "accounts"
 
 
 def app_pending(cfg):
@@ -5209,7 +5342,7 @@ def app_pending(cfg):
     on load and again on save, and two copies would drift into disagreeing
     about whether a restart is owed."""
     keys = ("http_port", "https_port", "admin_port", "session_idle_minutes",
-            "bind", "bind_address", "auth")
+            "bind", "bind_address")
     return sorted(k for k in keys
                   if RUNNING.get(k) is not None and RUNNING[k] != cfg[k])
 
@@ -5475,51 +5608,6 @@ def wake_conformance():
     return [(sp, w, st, want, serve_got)
             for sp, w, st, want in WAKE_CORPUS
             for serve_got in (wake_hit(sp, w, st),) if serve_got != want]
-
-
-def read_panel_pin():
-    try:
-        with open(PANEL_PIN_PATH) as fh:
-            doc = json.load(fh)
-    except (OSError, ValueError):
-        return {}
-    return doc if isinstance(doc, dict) else {}
-
-
-def has_panel_pin():
-    d = read_panel_pin()
-    return bool(d.get("hash") and d.get("salt"))
-
-
-def set_panel_pin(pin, minimum=None):
-    """The panel's PIN. Returns "" or the reason it was refused.
-
-    Stretched with the same PBKDF2 as an account password and held to the same
-    rules as a person's PIN — a run or a repeat is refused where it is chosen,
-    because rate limiting is what makes a short secret survivable and it should
-    not spend its budget on 111111.
-
-    Setting it does NOT end the sessions it protects, unlike a person's. Those
-    are one human's own browsers, and locking yourself out of the panel from
-    the panel is not a security property."""
-    bad = check_pin(pin, minimum)
-    if bad:
-        return bad
-    salt, dk = hash_password(str(pin))
-    tmp = PANEL_PIN_PATH + ".tmp"
-    with open(tmp, "w") as fh:
-        json.dump({"version": 1, "salt": salt, "hash": dk,
-                   "set": int(time.time())}, fh)
-    os.chmod(tmp, 0o600)
-    os.replace(tmp, PANEL_PIN_PATH)
-    return ""
-
-
-def verify_panel_pin(pin):
-    d = read_panel_pin()
-    if not (d.get("salt") and d.get("hash")):
-        return False
-    return verify_password(str(pin or ""), d["salt"], d["hash"])
 
 
 def verify_password(password, salt_hex, hash_hex):
@@ -6139,13 +6227,11 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/displays/delete", "/displays/new", "/displays/reissue",
                      "/displays/decide", "/displays/settings", "/displays/kiosk",
                      "/groups", "/groups/save", "/groups/delete", "/groups/sets",
-                     "/app/pin",
                      "/log", "/alerts", "/alerts/ack",
                      "/events", "/events/clear",
                      "/identities/wake", "/identities/wake/check",
                      "/identities", "/identities/new", "/identities/rename",
-                     "/identities/delete", "/identities/reissue",
-                     "/identities/pin")
+                     "/identities/delete", "/identities/reissue")
 #: where an enrolment code is typed. On the display listeners only — it hands
 #: out a display's token, and the admin listener is not a display.
 ENROL_PREFIX = "/e/"
@@ -6205,15 +6291,6 @@ class Handler(SimpleHTTPRequestHandler):
         self.redirect_to = redirect_to
         self.pinned_net = pinned_net
         super().__init__(*args, **kw)
-
-    @property
-    def pinned_open(self):
-        """Whether reaching this port is itself the grant. Read live off the
-        profile rather than captured at bind time, so turning it off takes
-        effect on the next request instead of at the next restart — the socket
-        is the part that cannot move without one."""
-        n = net_profile(self.pinned_net)
-        return bool((n.get("values") or {}).get("open")) if n else False
 
     def _redirected(self):
         """The plain listener, once HTTPS is the only real way in. Kept as a
@@ -6286,13 +6363,17 @@ class Handler(SimpleHTTPRequestHandler):
         listeners have no privileged route to reach."""
         if not self.admin_port:
             return None
-        if AUTH_MODE == "none":
-            # Nothing at the door, by configuration. Everyone who reaches this
-            # listener is an admin — which is the whole of the setting, and why
-            # it is only defensible when the network is the boundary. The name
-            # is not a username: it is what the panel and the log should say
-            # instead of implying somebody signed in as somebody.
-            return {"user": "(no sign-in)", "role": "admin"}
+        # NO BYPASS. There used to be one: with sign-in set to nothing this
+        # returned a synthetic admin and everyone who could reach the listener
+        # was one. The setting still exists and still means something — it
+        # governs whether a PERSON has to sign in at a display — but it no
+        # longer reaches this door.
+        #
+        # This interface holds the assistant's API key, every credential the
+        # server stores, and the power to grant anybody access to anything. A
+        # configuration switch that opens it is a switch that gets left on: it
+        # was defensible only while "the network is the boundary" stayed true,
+        # and it stays true right up until the laptop joins another network.
         raw = self.headers.get("Cookie")
         if not raw:
             return None
@@ -6370,15 +6451,27 @@ class Handler(SimpleHTTPRequestHandler):
             # The panel's live preview is an admin looking at a display. It is
             # not somebody's personal session and must never borrow one.
             return None
-        raw = self.headers.get("Cookie")
-        if not raw:
-            return None
-        try:
-            jar = http.cookies.SimpleCookie(raw)
-        except http.cookies.CookieError:
-            return None
-        morsel = jar.get(IDENTITY_COOKIE)
-        return find_identity(morsel.value) if morsel else None
+        # SIGNED IN BEATS EVERYTHING. A session was proved with a password, on
+        # this browser, and it is the only thing here that reaches a person who
+        # never opened a setup link on this machine — which is the whole point
+        # of there being a login at all.
+        pid = self._user_pid()
+        if pid:
+            rec = read_identities().get(pid)
+            if rec:
+                return dict(rec, id=pid)
+        # AND NOTHING ELSE. There was a fallback to the setup cookie — who
+        # this browser CLAIMS to be, from having spent a minted link here once
+        # — used wherever sign-in was switched off deployment-wide. That switch
+        # is gone, and with per-endpoint requirements the fallback was worse
+        # than redundant: an endpoint that insists on a person would have
+        # accepted a cookie nobody proved, and inherited that person's grants
+        # without a password.
+        #
+        # The setup cookie still exists and still means something. It is read
+        # in exactly one place — /user/setup — where it is the claim being
+        # spent, and it buys the password box and nothing else.
+        return None
 
     def _subject(self):
         """Which caller this request IS: `(display, identity)`, never both.
@@ -6401,10 +6494,10 @@ class Handler(SimpleHTTPRequestHandler):
             return None, ident
         return disp, None
 
-    def _pin_pid(self):
-        """Which person this browser has UNLOCKED, or "". Distinct from
-        `_identity`, which says who it claims to be: the cookie is the claim,
-        this is the claim having been proved."""
+    def _user_pid(self):
+        """Which person this browser has SIGNED IN as, or "". Read straight
+        from the jar and never through `_identity`, which calls this — the two
+        would otherwise recurse."""
         raw = self.headers.get("Cookie")
         if not raw or self.admin_port:
             return ""
@@ -6412,11 +6505,11 @@ class Handler(SimpleHTTPRequestHandler):
             jar = http.cookies.SimpleCookie(raw)
         except http.cookies.CookieError:
             return ""
-        m = jar.get(PIN_COOKIE)
-        return pin_session_pid(m.value) if m else ""
+        m = jar.get(USER_COOKIE)
+        return user_session_pid(m.value) if m else ""
 
-    def _set_pin_cookie(self, token, hours):
-        bits = ["%s=%s" % (PIN_COOKIE, token), "Path=/", "HttpOnly",
+    def _set_user_cookie(self, token, hours):
+        bits = ["%s=%s" % (USER_COOKIE, token), "Path=/", "HttpOnly",
                 "SameSite=Strict", "Max-Age=%d" % int(hours * 3600)]
         if isinstance(self.connection, ssl.SSLSocket):
             bits.insert(3, "Secure")
@@ -6445,22 +6538,27 @@ class Handler(SimpleHTTPRequestHandler):
         working = bool(rec.get("approved")) and not expired
         # Refused, and told so; waiting on a decision; running on a grant that
         # has run out; or simply here, with whatever is open to everyone.
-        state = ("denied" if rec.get("denied")
+        # SETUP OUTRANKS EVERYTHING. A row carrying one has been approved
+        # into an account, and the only thing left for this browser to do is
+        # go and choose a password. It is not `approved` — nothing was granted
+        # to the device — so without its own state it would read as still
+        # waiting, on a screen whose answer has already arrived.
+        state = ("setup" if rec.get("setup")
+                 else "denied" if rec.get("denied")
                  else "expired" if expired
                  else "approved" if working
                  else "requested" if rec.get("requested_at")
                  else "none")
         may_ask = (cfg["guest_requests"] and not working
                    and not (rec.get("denied") and not rec.get("deny_repeat", True)))
-        if self.pinned_open:
-            # Reaching this port is the grant. There is nothing to ask for and
-            # nothing to wait on, so the page gets its composer rather than a
-            # form — the row still exists and still says what this device is,
-            # and it is this PORT that has stopped gating on it.
-            working, state, may_ask = True, "approved", False
         out = {"id": rec.get("id", ""), "name": display_label(rec),
                "approved": working, "state": state,
                "can_request": bool(may_ask),
+               # Where to go and choose a password. The path only, built the
+               # same way the panel builds it — the secret is in it, and it
+               # goes out over the token that asked and to nobody else.
+               "setup_url": (PERSON_PREFIX + rec["setup"]) if rec.get("setup")
+                            else "",
                # A renewal does not ask the form again — what they told you is
                # already on the row, and making somebody retype it every month
                # is how a form stops being answered honestly.
@@ -6689,14 +6787,27 @@ class Handler(SimpleHTTPRequestHandler):
                 self.end_headers()
                 return
             rec = find_identity(token)
+            # THREE ANSWERS, because the link means two different things now.
+            # An account with no password is somebody arriving for the first
+            # time and the page owes them the box that chooses one; an account
+            # that already has one is a link that has done its job, and the way
+            # in is the login form. Saying which here keeps the display page
+            # from having to ask a second question to find out what just
+            # happened.
+            where = "bad"
+            if rec:
+                where = "ready" if identity_ready(rec) else "setup"
             self.send_response(303)
-            self.send_header("Location", "/?person=" + ("ok" if rec else "bad"))
+            self.send_header("Location", "/?person=" + where)
             self.send_header("Content-Length", "0")
             if rec:
                 note_identity_seen(rec["id"])
-                print("identity %s (%s) spent its URL from %s"
-                      % (rec["id"], identity_label(rec), self.address_string()),
-                      flush=True)
+                print("identity %s (%s) opened its link from %s (%s)"
+                      % (rec["id"], identity_label(rec),
+                         self.address_string(), where), flush=True)
+                # Set either way. On the setup path it is the claim /user/setup
+                # reads; on the other it costs nothing, because a claim without
+                # a sign-in reaches nothing wherever sign-in is required.
                 self._set_identity_cookie(token)
             self.end_headers()
             return
@@ -6718,27 +6829,32 @@ class Handler(SimpleHTTPRequestHandler):
 
         if path == "/settings":
             # public: this is what every viewer's interface is built from.
-            # The warning rides along because the display has to be able to
-            # say it too — a startup banner is seen by whoever ran the
-            # command, and the person who needs to know a screen is wide open
-            # is usually the person standing in front of it. It discloses
-            # nothing: anyone who can read this can already open the admin
-            # port and find out the same thing by getting in.
-            return self._json(200, {"settings": read_settings(),
-                                    "warning": posture_warning(RUNNING)})
+            # THE POSTURE WARNING DOES NOT RIDE ALONG. It used to, and the
+            # reason it was safe was written here: "anyone who can read this
+            # can already open the admin port and find out the same thing by
+            # getting in." That stopped being true the day the panel started
+            # always asking for a password. What was a warning shared with
+            # somebody who could have looked anyway is now a description of
+            # this server's exposure handed to every browser that loads a
+            # display — including the ones the warning is about.
+            #
+            # It is still said where it can be acted on: in the panel, behind
+            # the sign-in, and in the startup log to whoever ran the command.
+            return self._json(200, {"settings": read_settings()})
         if path == "/auth/me":
             s = self._session()
             if not s:
                 # WHICH DOOR. The gate cannot know whether to ask for a
                 # username and a password or for one number, and guessing wrong
                 # is a form somebody fills in twice.
-                return self._json(401, {"error": "not signed in",
-                                        "mode": AUTH_MODE})
+                return self._json(401, {"error": "not signed in"})
             # The panel needs to tell "signed in as an admin" from "there is no
             # sign-in here" — they grant the same access and want different
             # words, and one of them has no account to offer or to sign out of.
-            return self._json(200, {"user": s["user"], "role": s["role"],
-                                    "no_auth": AUTH_MODE == "none"})
+            # `no_auth` is gone with the bypass: reaching here at all now
+            # means somebody signed in, so there is always an account to name
+            # and always something to sign out of.
+            return self._json(200, {"user": s["user"], "role": s["role"]})
         if path == "/auth/check":
             # The panel's heartbeat. Deliberately does NOT slide the session:
             # a poll that renewed what it was checking would mean an open tab
@@ -6764,13 +6880,11 @@ class Handler(SimpleHTTPRequestHandler):
                 # not filtered out of a list the browser then ignores — they
                 # never leave here, which is the rule the connection half
                 # already follows. One endpoint on an exclusive port, several
-                # told apart by wake word on a shared one: the same page
-                # either way, built from what it was told.
+                # One endpoint per port now, so this is a list of one — kept
+                # as a list because the membership is read at request time and
+                # the rule is enforced at the other end, on save.
                 mine = net_members(doc, self.pinned_net)
                 rows = [r for r in rows if r["id"] in mine]
-                if self.pinned_open:
-                    for r in rows:
-                        r["allowed"] = True
                 # The document's own default where this port carries it, and
                 # otherwise the first thing here — a port whose endpoints do
                 # not include the default still has to send a typed question
@@ -6973,7 +7087,7 @@ class Handler(SimpleHTTPRequestHandler):
             secure = RUNNING.get("https_port")
             return self._json(200, {"identities": admin_identities(),
                                     "max": MAX_IDENTITIES,
-                                    "pin_min": display_settings()["pin_min"],
+                                    "pw_min": MIN_PASSWORD,
                                     "base": "%s://%s:%d%s"
                                             % ("https" if secure else "http", host,
                                                secure or RUNNING.get("http_port") or 0,
@@ -6996,20 +7110,10 @@ class Handler(SimpleHTTPRequestHandler):
                                                "session_min": SESSION_MIN,
                                                "session_max": SESSION_MAX,
                                                "bind_modes": list(BIND_MODES),
-                                               "auth_modes": list(AUTH_MODES),
-                                               # Whether the middle rung can be
-                                               # switched to at all. The panel
-                                               # says so rather than letting a
-                                               # save come back refused.
-                                               "has_panel_pin": has_panel_pin()}})
+                                               }})
         if path == "/users":
             if not self._require("admin"):
                 return
-            if AUTH_MODE == "none":
-                # Listing the accounts stored from a previous configuration
-                # would show a set of people who cannot sign in and are not
-                # keeping anybody out. An empty list plus the reason is truer.
-                return self._json(200, {"users": [], "disabled": True})
             return self._json(200, {"users": [
                 {"username": n, "role": u.get("role", "viewer"),
                  "created": u.get("created")}
@@ -7102,13 +7206,6 @@ class Handler(SimpleHTTPRequestHandler):
         # to users.json would leave an admin believing they had created an
         # account that nothing consults. Refuse where the mistake is made, and
         # say which setting is responsible.
-        if AUTH_MODE == "none" and (parsed.path.startswith("/auth/")
-                                    or parsed.path.startswith("/users")):
-            return self._json(409, {"error": "this server is set to no sign-in — "
-                                             "there are no accounts to manage. "
-                                             "Switch sign-in to accounts in APP "
-                                             "SETTINGS and restart."})
-
         if parsed.path == "/auth/login":
             ip = self.address_string()
             if login_blocked(ip):
@@ -7116,26 +7213,6 @@ class Handler(SimpleHTTPRequestHandler):
             obj = self._json_body()
             if obj is None:
                 return
-            if AUTH_MODE == "pin":
-                # One number, no account to name. The session is an admin
-                # because there is nobody else it could be: this rung exists
-                # for the deployment with one administrator, and a role system
-                # with one member is a role system pretending.
-                if not verify_panel_pin(obj.get("pin")):
-                    note_login_failure(ip)
-                    print("failed PIN sign-in from %s" % ip, flush=True)
-                    return self._json(401, {"error": "that is not the PIN"})
-                clear_login_failures(ip)
-                name, role = "(single PIN)", "admin"
-                token = new_session(name, role)
-                body = json.dumps({"ok": True, "user": name, "role": role}).encode()
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(body)))
-                self._set_cookie(token)
-                self.end_headers()
-                print("signed in with the panel PIN", flush=True)
-                return self.wfile.write(body)
             name = str(obj.get("username") or "").strip()
             users = read_users()
             u = users.get(name)
@@ -7633,30 +7710,19 @@ class Handler(SimpleHTTPRequestHandler):
                 who = self._identity()
                 if who:
                     note_identity_seen(who["id"])
-                    open_for = self._pin_pid()
-                    # THREE STATES, and the page needs all three. `none` is
-                    # somebody with no PIN, who keeps their preferences in this
-                    # browser exactly as the display always has. `locked` is a
-                    # PIN set and this browser not having entered it. `open` is
-                    # the durable tier, and the only one whose settings come
-                    # from the server rather than from localStorage.
-                    pin = ("open" if open_for == who["id"]
-                           else "locked" if who.get("pin_hash") else "none")
-                    low = display_settings()["pin_min"]
-                    out = {"id": who["id"], "name": who["name"], "pin": pin,
-                           "pin_min": low}
-                    if pin == "open":
-                        out["settings"] = identity_settings(who["id"])
-                        # A PIN that was legal when it was set and is below a
-                        # minimum raised since. Marked rather than revoked:
-                        # they still have to be able to unlock in order to
-                        # change it, and this is what says the change is owed.
-                        out["conform"] = identity_pin_state(who, low) == "short"
-                    elif pin == "locked":
-                        # Said plainly rather than left for a failed unlock to
-                        # reveal: somebody who is locked out should stop, not
-                        # keep typing into a box that looks like it is working.
-                        out["blocked"] = pin_blocked(who["id"])
+                    # SIGNED IN, and the page only ever sees this state now.
+                    # `_identity` already refused a browser that merely holds
+                    # the setup cookie wherever sign-in is required, so a
+                    # person reaching here has proved who they are and their
+                    # settings come from the server rather than localStorage.
+                    #
+                    # There were three states, because a PIN was optional and a
+                    # person could be here without one. A password is not
+                    # optional — it is what the setup link exists to collect —
+                    # so "signed in" and "not" is the whole of it.
+                    out = {"id": who["id"], "name": who["name"] or "",
+                           "email": who.get("email") or "",
+                           "settings": identity_settings(who["id"])}
                     return self._json(200, {"person": out})
             if disp:
                 note_display_seen(disp["id"], asked=asked or None,
@@ -7827,6 +7893,20 @@ class Handler(SimpleHTTPRequestHandler):
             # A renewal sends nothing: the answers are already on the row, and
             # asking somebody to retype them every month is how a form stops
             # being answered honestly.
+            # THE ADDRESS, ahead of the admin's own fields and not one of
+            # them. It is not something a deployment chose to ask: it is the
+            # login this request is FOR, so it cannot be renamed, reordered or
+            # switched off, and a form with it missing is a request that could
+            # only ever be approved into an account nobody can reach.
+            #
+            # Checked here as well as at approval. The person is standing at
+            # the screen now and can fix a typo; the admin looking at the row
+            # tomorrow cannot.
+            email = ""
+            if not obj.get("renew"):
+                email, bad = check_email(obj.get("email"))
+                if bad:
+                    return self._json(400, {"error": bad})
             answers = None
             if not obj.get("renew"):
                 answers, err = [], None
@@ -7848,6 +7928,12 @@ class Handler(SimpleHTTPRequestHandler):
             rec, err = request_access(disp["id"], answers)
             if err:
                 return self._json(409, {"error": err})
+            if email:
+                rows = read_displays()
+                if disp["id"] in rows:
+                    rows[disp["id"]]["req_email"] = email
+                    write_displays(rows)
+                    rec = dict(rows[disp["id"]], id=disp["id"])
             print("display %s (%s) asked for access%s"
                   % (rec["id"], display_label(rec),
                      " again" if obj.get("renew") else ""), flush=True)
@@ -7898,7 +7984,8 @@ class Handler(SimpleHTTPRequestHandler):
             obj = self._json_body()
             if obj is None:
                 return
-            token, rec = new_identity(obj.get("name"), s["user"])
+            token, rec = new_identity(obj.get("name"), obj.get("email"),
+                                      s["user"])
             if not token:                        # `rec` is the reason
                 return self._json(409, {"error": rec})
             print("identity %s (%s) created by %s"
@@ -7911,118 +7998,159 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"ok": True, "token": token,
                                     "identities": admin_identities()})
 
-        if parsed.path == "/person/unlock":
-            # A PIN, entered by the person it belongs to, at their own URL.
+        if parsed.path == "/user/login":
+            # AN EMAIL AND A PASSWORD, from anywhere. Nothing is required in
+            # the cookie jar first: that is the difference between this and
+            # every credential this server had before it — a person can sit
+            # down at a machine that has never heard of them and be themselves
+            # on it, which is what an account is for and what a minted URL in a
+            # cookie could never do.
             #
-            # HTTPS ONLY, and refused rather than degraded: a PIN typed over
-            # plain HTTP is a PIN somebody else has. The loopback case is the
-            # exception the whole server already makes — bound there it is the
-            # only listener and there is nothing between the two ends.
+            # HTTPS ONLY, and refused rather than degraded: a password typed
+            # over plain HTTP is a password somebody else has. The loopback
+            # case is the exception the whole server already makes — bound
+            # there it is the only listener and nothing is between the ends.
             if self.admin_port:
                 return self._json(404, {"error": "not found"})
             if not self._same_origin():
                 return self._json(403, {"error": "cross-origin request refused"})
             if not isinstance(self.connection, ssl.SSLSocket) \
                and exposed(read_app()):
-                return self._json(400, {"error": "a PIN needs a secure "
+                return self._json(400, {"error": "signing in needs a secure "
                                                  "connection"})
-            who = self._identity()
-            if not who:
-                return self._json(401, {"error": "open your own URL first"})
             obj = self._json_body()
             if obj is None:
                 return
+            who = identity_by_email(obj.get("email"))
+            # ONE ANSWER FOR BOTH HALVES. "no such account" tells somebody
+            # standing at a public screen which addresses are real here, which
+            # is a list worth having before you start guessing passwords.
+            wrong = {"error": "that is not an email and password we know"}
+            if not who:
+                return self._json(401, wrong)
             pid = who["id"]
-            if pin_blocked(pid):
+            if user_login_blocked(pid):
                 # The number is not given: "wait 47 seconds" is a clock an
                 # attacker can read, and the person who typed it wrong twice
                 # needs to know to stop rather than to know when.
                 return self._json(429, {"error": "too many attempts — wait a "
                                                  "little and try again"})
-            rec = read_identities()[pid]
-            if not rec.get("pin_hash"):
-                return self._json(400, {"error": "there is no PIN on this "
-                                                 "identity"})
-            if not verify_identity_pin(pid, obj.get("pin")):
-                print("PIN refused for %s from %s" % (pid, self.address_string()),
-                      flush=True)
-                return self._json(401, {"error": "that is not the PIN"})
-            hours = identity_hours(rec)
-            token = open_pin_session(pid, hours)
-            print("identity %s unlocked for %dh" % (pid, hours), flush=True)
+            if not verify_identity_password(pid, obj.get("password")):
+                print("sign-in refused for %s from %s"
+                      % (pid, self.address_string()), flush=True)
+                return self._json(401, wrong)
+            hours = identity_hours(who)
+            token = open_user_session(pid, hours)
+            note_identity_seen(pid)
+            print("identity %s signed in for %dh" % (pid, hours), flush=True)
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self._set_pin_cookie(token, hours)
+            self._set_user_cookie(token, hours)
             body = json.dumps({"ok": True, "hours": hours,
+                               "name": who.get("name") or "",
                                "settings": identity_settings(pid)}).encode()
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
             return
 
-        if parsed.path == "/person/pin":
-            # A person choosing their OWN PIN. An admin never sets one — they
-            # clear it, and this is the other half of that: the only way a PIN
-            # comes to exist.
+        if parsed.path == "/user/logout":
+            # Ending it HERE as well as dropping the cookie: a session the
+            # server still honours is a session, whatever the browser was
+            # persuaded to forget.
+            if self.admin_port:
+                return self._json(404, {"error": "not found"})
+            if not self._same_origin():
+                return self._json(403, {"error": "cross-origin request refused"})
+            pid = self._user_pid()
+            if pid:
+                close_user_sessions(pid)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self._set_user_cookie("", 0)
+            body = json.dumps({"ok": True}).encode()
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if parsed.path == "/user/setup":
+            # THE SETUP LINK BEING SPENT. A person chooses their own password
+            # here and nowhere else: an admin who set it would know it, and
+            # then the account would be theirs rather than the person's.
             #
-            # Two doors, and which one applies is whether there is a PIN
-            # already. With none, the URL is the credential and holding it is
-            # the whole claim. With one, the OLD PIN authenticates the change —
-            # which means an unlocked session, because that is what having
-            # entered it looks like a moment later. Anything else would let
-            # somebody who found an open browser change the lock on it.
+            # The claim is the setup cookie, which the minted URL left in this
+            # browser a moment ago. It is enough exactly ONCE — the moment a
+            # password exists, this route refuses, and the way back in is the
+            # login page. Otherwise anybody who found that browser open could
+            # take the account by setting a new password on it.
             if self.admin_port:
                 return self._json(404, {"error": "not found"})
             if not self._same_origin():
                 return self._json(403, {"error": "cross-origin request refused"})
             if not isinstance(self.connection, ssl.SSLSocket) \
                and exposed(read_app()):
-                return self._json(400, {"error": "a PIN needs a secure "
-                                                 "connection"})
-            who = self._identity()
-            if not who:
-                return self._json(401, {"error": "open your own URL first"})
+                return self._json(400, {"error": "choosing a password needs a "
+                                                 "secure connection"})
+            # Read from the jar rather than through `_identity`, which answers
+            # None wherever sign-in is required — and this is the one moment
+            # somebody legitimately has no way to sign in yet.
+            claim = ""
+            raw = self.headers.get("Cookie")
+            if raw:
+                try:
+                    jar = http.cookies.SimpleCookie(raw)
+                except http.cookies.CookieError:
+                    jar = {}
+                m = jar.get(IDENTITY_COOKIE) if jar else None
+                found = find_identity(m.value) if m else None
+                claim = found["id"] if found else ""
+            if not claim:
+                return self._json(401, {"error": "open the link you were sent "
+                                                 "first"})
             obj = self._json_body()
             if obj is None:
                 return
-            pid = who["id"]
-            has = bool(read_identities()[pid].get("pin_hash"))
-            if has and self._pin_pid() != pid:
-                return self._json(401, {"error": "enter your current PIN first"})
-            low = display_settings()["pin_min"]
-            bad = set_identity_pin(pid, obj.get("pin"), low)
+            rec = read_identities().get(claim)
+            if not rec:
+                return self._json(404, {"error": "no such account"})
+            if identity_ready(rec):
+                return self._json(409, {"error": "this account already has a "
+                                                 "password — sign in with it"})
+            bad = set_identity_password(claim, obj.get("password"))
             if bad:
                 return self._json(400, {"error": bad})
-            # set_identity_pin ended every session this person had, including
-            # this browser's — a PIN changing hands closes the doors the old
-            # one opened. So a fresh one is issued here, or somebody would set
-            # a PIN and be asked for it in the same breath.
-            hours = identity_hours(read_identities()[pid])
-            token = open_pin_session(pid, hours)
-            print("identity %s %s its PIN" % (pid, "changed" if has else "set"),
+            # Signed in on the way out. set_identity_password closes every
+            # session the account had, so without this somebody would choose a
+            # password and be asked for it in the same breath.
+            hours = identity_hours(read_identities()[claim])
+            token = open_user_session(claim, hours)
+            note_identity_seen(claim)
+            print("identity %s set its password and signed in" % claim,
                   flush=True)
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self._set_pin_cookie(token, hours)
+            self._set_user_cookie(token, hours)
             body = json.dumps({"ok": True, "hours": hours,
-                               "settings": identity_settings(pid)}).encode()
+                               "name": rec.get("name") or "",
+                               "settings": identity_settings(claim)}).encode()
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
             return
 
         if parsed.path == "/person/settings":
-            # What a person keeps. Only for a browser that has UNLOCKED: the
-            # identity cookie says who this claims to be, and a claim is not
-            # what durable storage hangs off. Without a PIN the display keeps
-            # its own preferences in the browser, exactly as it always has.
+            # What a person keeps. Only for a browser that has SIGNED IN: the
+            # setup cookie says who this claims to be, and a claim is not what
+            # durable storage hangs off. Signed out, the display keeps its own
+            # preferences in the browser, exactly as it always has.
             if self.admin_port:
                 return self._json(404, {"error": "not found"})
             if not self._same_origin():
                 return self._json(403, {"error": "cross-origin request refused"})
-            pid = self._pin_pid()
+            pid = self._user_pid()
             if not pid:
-                return self._json(401, {"error": "not unlocked"})
+                return self._json(401, {"error": "not signed in"})
             obj = self._json_body()
             if obj is None:
                 return
@@ -8030,24 +8158,6 @@ class Handler(SimpleHTTPRequestHandler):
             if saved is None:
                 return self._json(404, {"error": "no such identity"})
             return self._json(200, {"ok": True, "settings": saved})
-
-        if parsed.path == "/app/pin":
-            # The panel's own PIN, set from the panel. Admin only, and there is
-            # no "old PIN" gate on it: reaching this route already required a
-            # session, which in PIN mode means having just entered the current
-            # one. Asking for it again would be asking somebody to prove twice
-            # what one door already proved.
-            s = self._require("admin")
-            if not s:
-                return
-            obj = self._json_body()
-            if obj is None:
-                return
-            bad = set_panel_pin(obj.get("pin"), display_settings()["pin_min"])
-            if bad:
-                return self._json(400, {"error": bad})
-            print("the panel PIN was set by %s" % s["user"], flush=True)
-            return self._json(200, {"ok": True, "has_pin": True})
 
         if parsed.path == "/alerts/ack":
             s = self._require("admin")
@@ -8104,24 +8214,6 @@ class Handler(SimpleHTTPRequestHandler):
                   % (pid, str(obj.get("word") or "").strip(), s["user"]), flush=True)
             return self._json(200, {"ok": True, "identities": admin_identities()})
 
-        if parsed.path == "/identities/pin":
-            # An admin CLEARS a PIN; they never choose one. With no email here
-            # this is the only recovery path, which is why it is in the first
-            # version — and clearing rather than setting is the difference
-            # between giving somebody their account back and knowing their PIN.
-            s = self._require("admin")
-            if not s:
-                return
-            obj = self._json_body()
-            if obj is None:
-                return
-            pid = str(obj.get("id") or "")
-            if not clear_identity_pin(pid):
-                return self._json(404, {"error": "no such identity"})
-            print("identity %s had its PIN cleared by %s" % (pid, s["user"]),
-                  flush=True)
-            return self._json(200, {"ok": True, "identities": admin_identities()})
-
         if parsed.path == "/identities/reissue":
             s = self._require("admin")
             if not s:
@@ -8159,6 +8251,20 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(409, {"error": "there is already an identity "
                                                  "with that name"})
             rows[pid]["name"] = name
+            # THE ADDRESS IS EDITABLE, because it is what they sign in with and
+            # people change employer, surname and provider. Only when one is
+            # sent: the panel edits the two fields separately and a rename that
+            # arrived without an address must not blank the login.
+            #
+            # It does NOT touch the password. Changing where somebody signs in
+            # from is not a reason to take away what they signed in with, and
+            # an admin who could reset a password by editing an address would
+            # be able to take the account.
+            if obj.get("email") is not None:
+                email, bad = check_email(obj.get("email"), skip_pid=pid)
+                if bad:
+                    return self._json(409, {"error": bad})
+                rows[pid]["email"] = email
             write_identities(rows)
             return self._json(200, {"ok": True, "identities": admin_identities()})
 
@@ -8351,6 +8457,51 @@ class Handler(SimpleHTTPRequestHandler):
             name = str(obj.get("name") or "").strip()[:40]
             if name:
                 rec["name"] = name
+            # A REQUEST IS FOR AN ACCOUNT, NOT FOR A DEVICE. Somebody who
+            # filled in the form is a person asking to be let in, and a person
+            # is an account now — so approving them creates one and mints the
+            # link that lets them choose a password. The row they asked from is
+            # a browser on a machine; it does not become a screen on anybody's
+            # wall because they typed their name into a form.
+            #
+            # The link goes back down the channel the verdict already uses:
+            # they are standing at that screen waiting for an answer, and the
+            # answer is "here is where you choose your password". The panel
+            # keeps a copy on the row for the case where they walked away.
+            if approve and rec.get("req_email") and not rec.get("approved_at"):
+                who = str(rec.get("name") or "").strip() \
+                      or next((a["value"] for a in (rec.get("answers") or [])
+                               if (a.get("value") or "").strip()), "") \
+                      or display_label(rec)
+                token, made = new_identity(who, rec["req_email"], s["user"])
+                if not token:                    # `made` is the reason
+                    return self._json(409, {"error": made})
+                rec["setup"] = token
+                # Not a device, and not left in the queue either: the person
+                # row is the live thing now and this one is only the browser
+                # they asked from.
+                rec.update(approved=False, denied=False, deny_reason="",
+                           approved_by=s["user"], approved_at=now_, expires=0)
+                write_displays(displays)
+                # THE TICKS, ON THE PERSON. Approving and granting are one
+                # gesture — that is the whole reason the endpoints are on this
+                # row — and they have to follow the account, not the browser
+                # the form was filled in on. That browser is about to stop
+                # being anything at all.
+                set_identity_endpoints(made["id"], obj.get("endpoints"))
+                # The display half, cleared: this row was never granted
+                # anything as a device and must not keep a grant from an
+                # earlier ask.
+                set_display_endpoints(did, [])
+                # Decided, so it is no longer asking.
+                clear_alert("asked_in", did)
+                print("request from display %s approved into identity %s (%s) "
+                      "by %s" % (did, made["id"], rec["req_email"], s["user"]),
+                      flush=True)
+                return self._json(200, {"ok": True,
+                                        "token": token,
+                                        "identities": admin_identities(),
+                                        "displays": admin_displays()})
             if approve:
                 # Ever granted before, which is what makes this one a renewal.
                 # Not `approved`: asking again clears that, so by the time a
@@ -8716,7 +8867,13 @@ class Handler(SimpleHTTPRequestHandler):
             # one: its rights come from its key, so it reaches the endpoints
             # anything can reach and no others.
             disp, ident = (None, None) if emb else self._subject()
-            if not (self.pinned_open or subject_may(cfg, disp, ident)):
+            # ONE GATE. There was a second — a network profile could be marked
+            # "the port is the grant", and reaching such a port bypassed this
+            # test entirely. It is gone, and with it the hole where an endpoint
+            # requiring a sign-in sat on such a port and quietly required
+            # nothing. What a port is FOR is now said on the endpoint that owns
+            # it, where it can be read.
+            if not subject_may(cfg, disp, ident):
                 note_display_refused(disp, cfg["name"])
                 print("refused: %s may not use %s (%s)"
                       % (disp["id"] if disp else
@@ -8862,11 +9019,11 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(400, {"error": err})
             write_app(cfg)
             print("app settings saved by %s: http=%d https=%d admin=%d "
-                  "session=%dm bind=%s%s auth=%s"
+                  "session=%dm bind=%s%s"
                   % (s["user"], cfg["http_port"], cfg["https_port"],
                      cfg["admin_port"], cfg["session_idle_minutes"], cfg["bind"],
-                     (" " + cfg["bind_address"]) if cfg["bind"] == "address" else "",
-                     cfg["auth"]), flush=True)
+                     (" " + cfg["bind_address"]) if cfg["bind"] == "address" else ""),
+                  flush=True)
             warn = posture_warning(cfg)
             if warn:
                 print("  WARNING: " + warn, flush=True)
@@ -8986,7 +9143,7 @@ def start_tls(port, cert, key, admin_port=False, host="0.0.0.0", pinned_net=""):
 
 
 def main():
-    global SESSION_IDLE, AUTH_MODE
+    global SESSION_IDLE
     # Before anything can read a display. read_displays keeps only the keys in
     # DISPLAY_DEFAULTS, so the first write after an upgrade would drop the old
     # wall settings silently — see migrate_kiosks.
@@ -8998,6 +9155,7 @@ def main():
     # need, so they are there before anything can enrol into them and there is
     # no moment where a population has nowhere to land.
     ensure_system_groups()
+    migrate_pin_identities()
     migrate_unenrolled_invites()
     prune_group_members()
     ensure_default_membership()
@@ -9031,12 +9189,11 @@ def main():
     adm_port = _env("ADMIN_PORT") or (_env("PORT") + 2 if shifted
                                       else app["admin_port"])
     SESSION_IDLE = app["session_idle_minutes"] * 60
-    AUTH_MODE = app["auth"]
     host = bind_host(app)
     RUNNING.update({"http_port": port, "https_port": None, "admin_port": None,
                     "session_idle_minutes": app["session_idle_minutes"],
                     "bind": app["bind"], "bind_address": app["bind_address"],
-                    "auth": app["auth"], "bind_host": host,
+                    "bind_host": host,
                     "exposed": exposed(app)})
 
     cert, key = os.path.join(ROOT, "cert.pem"), os.path.join(ROOT, "key.pem")
@@ -9070,12 +9227,46 @@ def main():
     # The pair, reported as a pair. Not a name for the combination — a name
     # goes stale the moment one half of it changes.
     _dflt = display_settings()["network_default"]
-    print("reachable at %s · %s" % (
+    # EXISTING SHARERS, named out loud. The one-endpoint-per-port rule is
+    # enforced where a save is made, not by rewriting somebody's configuration
+    # on an upgrade — moving an assistant to a different port is a decision
+    # with a URL on the other end of it. So an install that already shares one
+    # keeps working and says so every time it starts, rather than staying
+    # quiet until the next save is refused for a reason that looks new.
+    _doc = read_routes()
+    _byport, _adrift = {}, []
+    for _rid, _r in _doc["routes"].items():
+        if not _r.get("enabled", True):
+            continue
+        _on = str(_r.get("network") or "")
+        if not _on:
+            # NO PORT, SO NOWHERE. Named rather than counted: an assistant
+            # nobody can reach is a fault, and the only thing worse than the
+            # fault is it being invisible.
+            _adrift.append(_r.get("name") or _rid)
+            continue
+        _byport.setdefault(_on, []).append(_r.get("name") or _rid)
+    if _adrift:
+        print("WARNING: %d endpoint(s) answer nowhere — no port is selected "
+              "for %s. Give each one a network profile under PROFILES \u25b8 "
+              "NETWORK, or it cannot be reached."
+              % (len(_adrift), ", ".join(sorted(_adrift))), flush=True)
+    for _nid, _names in sorted(_byport.items()):
+        if len(_names) > 1:
+            _prof = net_profile(_nid) or {}
+            print("WARNING: %d endpoints share one port (%s): %s — a port "
+                  "carries one endpoint now, and saving any of them is "
+                  "refused until they are moved apart"
+                  % (len(_names), _prof.get("name") or "the display port",
+                     ", ".join(sorted(_names))), flush=True)
+    _shut = sum(1 for r in read_routes()["routes"].values()
+                if r.get("enabled", True) and r.get("needs_signin"))
+    _all = sum(1 for r in read_routes()["routes"].values()
+               if r.get("enabled", True))
+    print("reachable at %s · %d of %d assistant(s) need a sign-in" % (
         "this machine only (loopback)" if personal else
         "every interface on this machine" if host == "0.0.0.0" else host,
-        "no sign-in" if AUTH_MODE == "none"
-        else "one PIN, no accounts" if AUTH_MODE == "pin"
-        else "accounts and roles"), flush=True)
+        _shut, _all), flush=True)
 
     if have_tls:
         # Pinned to the default profile, so an endpoint moved onto a port of
@@ -9114,7 +9305,7 @@ def main():
     # not something to open and close under an admin's mouse, which is the
     # same reason the admin portal's port has always taken a restart.
     #
-    # The DEFAULT profile is skipped — it is the display listener started
+    # The NOMINATED profile is skipped — it is the display listener started
     # above, and binding it twice would be the server colliding with itself.
     _dflt_id = display_settings()["network_default"]
     for _n in display_settings()["networks"]:
@@ -9161,11 +9352,10 @@ def main():
                 print("HTTP  on %s:%d  → redirects to %d" % (_host, _bind, _p),
                       flush=True)
             else:
-                print("%-5s on %s:%d  → %s%s"
+                print("%-5s on %s:%d  → %s"
                       % ("HTTPS" if have_tls else "HTTP", _host, _bind,
-                         ", ".join(_doc["routes"][r]["name"] for r in _mine),
-                         "  (no approval — the port is the grant)"
-                         if _vals.get("open") else ""), flush=True)
+                         ", ".join(_doc["routes"][r]["name"] for r in _mine)),
+                      flush=True)
 
     if not port:
         pass                     # the default profile names no plain port
@@ -9185,18 +9375,21 @@ def main():
     # ceremony it forces is pure obstruction — which is exactly the install
     # this setting exists to make possible.
     if have_tls or personal:
-        # Only the accounts rung mints one. In PIN mode the key was cut before
-        # the mode could be saved, and with nothing at the door there is no key.
-        first_pw = ensure_first_admin() if AUTH_MODE == "accounts" else None
+        # ALWAYS. The panel is always signed into now, so an install that
+        # reaches this line with no account is an admin interface nobody can
+        # open — and the only way back would be editing JSON on the box. It
+        # was conditional while a mode existed that needed no key at all.
+        first_pw = ensure_first_admin()
         if have_tls:
             start_tls(adm_port, cert, key, admin_port=True, host=host)
         else:
             srv = make_server(adm_port, admin_port=True, host=host)
             threading.Thread(target=srv.serve_forever, daemon=True).start()
         RUNNING["admin_port"] = adm_port
-        print("ADMIN on %s:%d  (%s, %s)"
-              % (host, adm_port, "HTTPS" if have_tls else "HTTP on loopback",
-                 "no sign-in" if AUTH_MODE == "none" else "sign-in required"),
+        # No second half about sign-in: there is only one answer now, and a
+        # banner that reports a constant is a banner people stop reading.
+        print("ADMIN on %s:%d  (%s, sign-in required)"
+              % (host, adm_port, "HTTPS" if have_tls else "HTTP on loopback"),
               flush=True)
         if first_pw:
             print("", flush=True)
@@ -9205,7 +9398,7 @@ def main():
             print("      password: %s" % first_pw, flush=True)
             print("  change it after signing in.", flush=True)
             print("", flush=True)
-        elif AUTH_MODE == "accounts":
+        else:
             print("       %d account(s) configured" % len(read_users()), flush=True)
     else:
         print("ADMIN disabled — it takes a password and refuses to serve one "

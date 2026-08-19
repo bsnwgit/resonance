@@ -329,22 +329,51 @@
   #enrol{display:none;flex-direction:column;gap:8px;
          padding-bottom:14px;border-bottom:1px solid rgba(var(--glass),.18)}
   body[data-enrol] #enrol{display:flex}
-  #pinbox{display:none;flex-direction:column;gap:8px;
-          padding-bottom:14px;border-bottom:1px solid rgba(var(--glass),.18)}
-  body[data-pin] #pinbox{display:flex}
-  #pinhead{font-size:calc(12px * var(--fs));line-height:1.6;
-           color:rgba(var(--paper),.88)}
-  #pinrow{display:flex;gap:8px;flex-wrap:wrap}
-  #pincode{
-    flex:1 1 180px;min-width:0;font:inherit;
-    font-size:calc(17px * var(--fs));letter-spacing:.34em;
-    padding:8px 10px;background:rgba(0,0,0,.45);color:var(--text);
-    border:1px solid rgba(var(--glass),.3);outline:0;border-radius:0;
+  /* ---- the gate ----
+     The first thing anybody who is not already a screen on this wall sees.
+     Signing in is the default because it is what most people arriving here
+     are doing; the other two ways past — a code, or asking — are a line of
+     links under it rather than two more boxes stacked on the same page. Three
+     forms at once was the old shape, and it asked somebody to work out which
+     of them was theirs before they could do anything. */
+  #gate{display:none;flex-direction:column;gap:10px;
+        padding-bottom:14px;border-bottom:1px solid rgba(var(--glass),.18)}
+  body[data-gate] #gate{display:flex}
+  /* The mark, and the only place on this page it appears at rest. A login box
+     with nothing above it could belong to anything.
+
+     LARGE, and centred over the fields. It was small and hard left, which read
+     as a watermark on a form; at this size it is the thing you see first and
+     the form is what sits under it — which is the right order for a page whose
+     whole job, before anybody types anything, is to say what this is. */
+  #gatemark{width:320px;max-width:82%;height:auto;opacity:.95;
+            align-self:center;margin:4px auto 18px}
+  #gatehead{font-size:calc(12px * var(--fs));line-height:1.6;
+            color:rgba(var(--paper),.88)}
+  #gatefields{display:flex;flex-direction:column;gap:8px}
+  #gatefields input{
+    font:inherit;font-size:calc(13px * var(--fs));
+    padding:9px 11px;color:rgba(var(--paper),.95);
+    background:rgba(var(--glass),.07);
+    border:1px solid rgba(var(--glass),.28);border-radius:0;
   }
-  #pincode:focus{border-color:rgba(var(--glass),.62)}
-  #pinnote{font-size:calc(10px * var(--fs));line-height:1.6;
-           color:rgba(var(--paper),.62)}
-  #pinnote.bad{color:#ff8a8a}
+  #gatefields input:focus{border-color:rgba(var(--glass),.62);outline:none}
+  #gatefields input::placeholder{color:rgba(var(--paper),.3)}
+  /* The links, in one row, in the order somebody needs them: the way most
+     people get past this, then the two exceptions. */
+  #gatelinks{display:flex;gap:16px;flex-wrap:wrap;margin-top:2px}
+  .gatelink{
+    font:inherit;font-size:calc(10px * var(--fs));letter-spacing:.08em;
+    background:none;border:0;padding:0;cursor:pointer;
+    color:rgba(var(--paper),.62);
+    border-bottom:1px solid rgba(var(--glass),.28);
+  }
+  .gatelink:hover{color:rgba(var(--paper),.9);
+                  border-bottom-color:rgba(var(--glass),.6)}
+  #gatenote{font-size:calc(10px * var(--fs));line-height:1.6;
+            color:rgba(var(--paper),.62)}
+  #gatenote.bad{color:#ff8a8a}
+  #gatego_row{display:flex;gap:8px;flex-wrap:wrap}
   #enrolhead{
     font-size:calc(12px * var(--fs));line-height:1.6;color:rgba(var(--paper),.88);
   }
@@ -357,24 +386,23 @@
   }
   #enrolcode:focus{border-color:rgba(var(--glass),.62)}
   #enrolcode::placeholder{color:rgba(var(--paper),.28);letter-spacing:.28em}
-  #pincode::placeholder{color:rgba(var(--paper),.28);letter-spacing:.34em}
-  #pingo,
+  #gatego,
   #enrolgo{
     font:inherit;font-size:calc(10px * var(--fs));letter-spacing:.18em;
     padding:8px 14px;cursor:pointer;
     background:none;color:rgba(var(--paper),.9);
     border:1px solid rgba(var(--glass),.4);
   }
-  #pingo:hover,
+  #gatego:hover,
   #enrolgo:hover{border-color:rgba(var(--glass),.75)}
   /* Quieter than the thing it sits beside: leaving is the lesser of the two
      answers, not the one being recommended. */
-  #pinskip{
+  #gateskip{
     font:inherit;font-size:calc(10px * var(--fs));letter-spacing:.18em;
     padding:8px 12px;cursor:pointer;background:none;
     color:rgba(var(--paper),.55);border:1px solid transparent;
   }
-  #pinskip:hover{color:rgba(var(--paper),.85)}
+  #gateskip:hover{color:rgba(var(--paper),.85)}
   #enrolgo[disabled]{opacity:.5;cursor:default}
   #enrolnote{
     font-size:calc(9.5px * var(--fs));line-height:1.6;
@@ -518,27 +546,7 @@
 
   #fps{position:fixed;left:12px;top:10px;z-index:20;font-size:calc(9px * var(--fs));letter-spacing:.14em;
        color:rgba(var(--paper),.76)}
-  /* Across the top, above everything including the reading room, because a
-     screen that is wide open should not be something you have to close a
-     panel to find out about. It takes the width rather than floating in a
-     corner: this is not a status readout, it is a thing to go and fix. */
-  #posturebanner{
-    position:fixed;left:0;right:0;top:0;z-index:80;
-    display:flex;align-items:center;gap:12px;
-    padding:8px 14px;
-    background:rgba(40,26,4,.94);border-bottom:1px solid var(--warn);
-    color:var(--warn);
-    font-size:calc(9.5px * var(--fs));letter-spacing:.08em;line-height:1.5;
-  }
-  #posturebanner button{
-    margin-left:auto;flex:0 0 auto;
-    background:none;border:0;padding:0 4px;cursor:pointer;
-    color:var(--warn);font:inherit;font-size:calc(14px * var(--fs));line-height:1;
-    opacity:.72;
-  }
-  #posturebanner button:hover{opacity:1}
-
-  /* ---------- the screensaver, last on purpose ----------
+    /* ---------- the screensaver, last on purpose ----------
      While it drifts there is nothing on the screen but the figure. The
      transcript and the composer go because text sliding around a panel is
      worse than either state on its own; the status line, an unanswered
@@ -630,25 +638,49 @@
          Its own path to the end: the URL form, /e/CODE, is a fine thing to
          type into a television with a remote and a poor thing to ask for from
          somebody already looking at this screen. -->
-    <!-- A PERSON, at their own URL, with a PIN on their identity. Built like
-         the code box beside it because it is the same moment — something is
-         being typed to finish arriving — and unlike it in one way: this is a
-         secret, so it is a password field and the server refuses it outright
-         over a plain connection. -->
-    <div id="pinbox">
-      <div id="pinhead">Welcome back<span id="pinwho"></span></div>
-      <div id="pinrow">
-        <input id="pincode" type="password" inputmode="numeric"
-               autocomplete="one-time-code" maxlength="32"
-               placeholder="······" aria-label="your PIN">
-        <button id="pingo" type="button">UNLOCK</button>
-        <!-- Only where a PIN is being OFFERED, never where one is owed. -->
-        <button id="pinskip" type="button">NOT NOW</button>
+    <!-- A PERSON, signing in. An email address and a password, which is the
+         one credential here that reaches somebody on a machine that has never
+         heard of them — a minted URL in a cookie could only ever be the
+         browser it was opened in. The server refuses it outright over a plain
+         connection.
+
+         FIRST, and the default state of this page, with the other two ways
+         past it as links underneath. All three used to be stacked and visible
+         at once, which asked whoever was standing here to work out which of
+         three forms was theirs before they could do anything. -->
+    <div id="gate">
+      <img id="gatemark" src="lockup.svg" alt="Resonance">
+      <div id="gatehead"></div>
+      <div id="gatefields">
+        <input id="gateuser" type="email" autocomplete="username"
+               spellcheck="false" autocapitalize="none" maxlength="160"
+               placeholder="you@example.com" aria-label="your email address">
+        <input id="gatepass" type="password" autocomplete="current-password"
+               maxlength="512" placeholder="password" aria-label="your password">
+        <!-- Setup only. Choosing a password you cannot reproduce, on the one
+             page that will not let you back in to try again, is the failure
+             this second field exists to catch. -->
+        <input id="gatepass2" type="password" autocomplete="new-password"
+               maxlength="512" placeholder="password again"
+               aria-label="the same password again" style="display:none">
+        <div id="gatego_row">
+          <button id="gatego" type="button">SIGN IN</button>
+        </div>
       </div>
-      <div id="pinnote">Your PIN keeps what this screen remembers about you, so
-it follows you to any machine you open your URL on.</div>
+      <div id="gatenote"></div>
+      <!-- The two exceptions, as links. Each one swaps the box above for the
+           thing it names and offers the way back; a person only ever sees the
+           routes they are NOT currently on. -->
+      <div id="gatelinks">
+        <button id="gatecode" class="gatelink" type="button">Use Code Instead</button>
+        <button id="gatereq" class="gatelink" type="button">Request Access</button>
+      </div>
     </div>
-    <div id="enrol">
+    <!-- Hidden until USE CODE INSTEAD asks for it. Inline rather than left to
+         `body[data-enrol] #enrol{display:flex}`, which turns on for any screen
+         that is not approved — that rule predates the gate, when the code box
+         was one of three things stacked on this page at once. -->
+    <div id="enrol" style="display:none">
       <div id="enrolhead">Setting this screen up?</div>
       <div id="enrolrow">
         <input id="enrolcode" type="text" spellcheck="false" autocomplete="off"
@@ -813,173 +845,231 @@ if (ENROL && window.history && history.replaceState)
 
 /* ================================================================== PERSON
    Who is at this browser, as against WHERE it is. A display is one machine in
-   one room; a person opens their own URL on whatever they are sitting at.
+   one room; a person signs in on whatever they are sitting at.
 
-   Three states, and the middle one is the only one with a control:
-     none    somebody with no PIN. Their preferences stay in this browser,
-             exactly as the display has always kept them.
-     locked  a PIN is set and this browser has not entered it.
-     open    it has. Preferences now come from the server and go back to it,
-             so they follow the person to the next machine.
+   TWO STATES, where there were three. There used to be `none`, `locked` and
+   `open`, because a PIN was optional — somebody could be here without one and
+   keep their preferences in this browser. A password is not optional: the
+   setup link exists to collect one, and nothing reaches an account without it.
+   So a person is signed in or they are not, and signed in is the only state
+   whose settings come from the server rather than from localStorage.
 
-   `?person=` is the one word the server sends back after spending a minted
-   URL, read once and taken straight out of the address bar — the outcome of a
-   thing that happened once has no business surviving a reload. */
-/* Waved away for this page only. Not stored: somebody who says NOT NOW on a
-   borrowed machine has not decided anything about the next one, and a server
-   that remembered it would be keeping a preference for a person who declined
-   to have preferences kept. */
-let PIN_DISMISSED = false;
+   `?person=` is the one word the server sends back after somebody opens a
+   minted link, read once and taken straight out of the address bar — the
+   outcome of a thing that happened once has no business surviving a reload.
+   Three answers now: `setup` for an account with no password yet, `ready` for
+   a link that has already been spent, `bad` for one that means nothing. */
 const PERSON_ARRIVED = (new URLSearchParams(location.search).get('person') || '')
   .replace(/[^a-z]/g, '').slice(0, 12);
 if (PERSON_ARRIVED && window.history && history.replaceState)
   history.replaceState(null, '', location.pathname);
 
 const Person = {
-  id: '', name: '', pin: '', blocked: false, conform: false, min: 6,
+  id: '', name: '', email: '',
   is(){ return !!this.id; },
-  open(){ return this.pin === 'open'; },
-  /* Setting one is offered where there is none, and REQUIRED where the one
-     they have is below a minimum raised since they chose it. */
-  setting(){ return this.is() && (this.pin === 'none' || this.conform); },
   take(p){
     this.id = p.id || '';
     this.name = p.name || '';
-    this.pin = p.pin || 'none';
-    this.blocked = !!p.blocked;
-    this.conform = !!p.conform;
-    this.min = p.pin_min || 6;
+    this.email = p.email || '';
     /* Their own settings win over whatever this browser had. That is the
-       whole point of the tier: the machine's copy is a local habit, theirs is
-       the thing that follows them. */
-    if (this.pin === 'open' && p.settings) Prefs.adopt(p.settings);
-    paintPin();
+       whole point of an account: the machine's copy is a local habit, theirs
+       is the thing that follows them. */
+    if (p.settings) Prefs.adopt(p.settings);
+    paintGate();
   },
 };
 
-async function setPin(){
-  const el = $('pincode'), note = $('pinnote');
-  const pin = (el.value || '').trim();
-  if (!pin) return;
-  note.className = '';
-  note.textContent = 'saving…';
-  try{
-    const r = await fetch('person/pin', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({pin}),
-    });
-    const j = await r.json().catch(()=>({}));
-    if (!r.ok){
-      el.value = '';
-      note.className = 'bad';
-      note.textContent = j.error || 'that did not work';
-      return;
-    }
-    el.value = '';
-    Person.pin = 'open';
-    Person.conform = false;
-    if (j.settings) Prefs.adopt(j.settings);
-    paintPin();
-    applyPrefs();
-  }catch(e){
-    note.className = 'bad';
-    note.textContent = 'could not reach the server';
+/* WHICH OF THE FOUR THINGS THIS PAGE IS ASKING FOR. One at a time, because
+   they are four different conversations and only one of them is ever yours:
+
+     login    an email and a password. The default, and where most people are.
+     setup    the link has been opened and there is no password yet. Forced —
+              there is no link out of this state, because an account without a
+              password is one nobody can ever sign in to.
+     code     six characters an admin read out, for a screen being hung.
+     request  the form, for somebody asking to be let in.
+
+   A link swaps between them; nothing here reloads. */
+let GATE = 'login';
+
+function paintGate(){
+  const box = $('gate');
+  if (!box) return;
+  const setup = GATE === 'setup';
+  const signing = GATE === 'login' || setup;
+  /* The two failures a link can have. Said here rather than nowhere: the
+     server answers a redirect with one word, and somebody who followed a link
+     that did not work should be told, not left looking at a page behaving as
+     though they never clicked it. */
+  const failed = PERSON_ARRIVED === 'bad' || PERSON_ARRIVED === 'isdevice';
+  const head = $('gatehead'), note = $('gatenote');
+  const fields = $('gatefields'), links = $('gatelinks');
+  const user = $('gateuser'), pass = $('gatepass'), pass2 = $('gatepass2');
+  const go = $('gatego');
+
+  if (fields) fields.style.display = signing ? '' : 'none';
+  /* The email is not asked for at setup: the link already said who this is,
+     and a box somebody could type a different address into would look like a
+     choice that is not being offered. */
+  if (user) user.style.display = setup ? 'none' : '';
+  if (pass2) pass2.style.display = setup ? '' : 'none';
+  if (go) go.textContent = setup ? 'SET PASSWORD' : 'SIGN IN';
+  if (pass) pass.setAttribute('autocomplete',
+                              setup ? 'new-password' : 'current-password');
+  if (pass) pass.placeholder = setup ? 'choose a password' : 'password';
+
+  if (head){
+    head.textContent =
+        setup   ? 'Choose a password'
+      : GATE === 'code'    ? 'Setting this screen up?'
+      : GATE === 'request' ? 'Ask to be let in'
+      : failed && PERSON_ARRIVED === 'isdevice'
+                           ? 'This screen belongs to the building'
+      : failed             ? 'That link did not work'
+      : 'Sign in';
   }
+  /* Only where nothing else has written a reason into it. A failed sign-in
+     leaves its own message here and repainting the mode must not wipe it. */
+  if (note && !note.classList.contains('bad')){
+    note.textContent =
+        setup   ? 'It is how you sign in from now on, and this link only '
+                  + 'works once. Choose something long.'
+      : GATE === 'code'    ? ''
+      : GATE === 'request' ? ''
+      : failed && PERSON_ARRIVED === 'isdevice'
+                           ? 'It is set up as a display, so a personal link '
+                             + 'cannot be opened on it. Use your own device, '
+                             + 'or ask an administrator.'
+      : failed             ? 'It may have been replaced since it was sent to '
+                             + 'you. Ask an administrator for a new one.'
+      : '';
+  }
+
+  /* The links name where you are NOT. Nothing to press that lands you where
+     you already are, and no way out of setup at all. */
+  if (links){
+    links.style.display = setup ? 'none' : '';
+    const code = $('gatecode'), req = $('gatereq');
+    if (code) code.textContent = GATE === 'code' ? 'Sign In Instead'
+                                                 : 'Use Code Instead';
+    if (req) req.textContent = GATE === 'request' ? 'Sign In Instead'
+                                                  : 'Request Access';
+  }
+  paintGateAreas();
 }
 
-function paintPin(){
-  const locked = Person.is() && Person.pin === 'locked';
-  /* The two ways spending a URL fails. Shown here rather than nowhere: the
-     server answers a redirect with one word, and a person who followed a link
-     that did not work should be told, not left looking at a page that behaves
-     as though they had never clicked it. */
-  const failed = !Person.is()
-                 && (PERSON_ARRIVED === 'bad' || PERSON_ARRIVED === 'isdevice');
-  const setting = Person.setting() && !PIN_DISMISSED;
-  document.body.toggleAttribute('data-pin', locked || failed || setting);
-  const head = $('pinhead'), row = $('pinrow'), note = $('pinnote');
-  const go = $('pingo'), skip = $('pinskip');
-  if (row) row.style.display = (locked || setting) ? '' : 'none';
-  if (go) go.textContent = setting ? 'SET IT' : 'UNLOCK';
-  /* Offered where there is no PIN, and not where one is owed: a minimum that
-     can be waved away is a minimum that only ever applied to people who set a
-     PIN after it changed. */
-  if (skip) skip.style.display = (setting && !Person.conform) ? '' : 'none';
-  if (setting){
-    if (head) head.textContent = Person.conform
-      ? 'Your PIN is shorter than this server now asks for'
-      : 'Keep your settings across machines?';
-    if (note){
-      note.className = '';
-      note.textContent = Person.conform
-        ? 'Choose a new one of at least ' + Person.min + ' digits to carry on.'
-        : 'Choose a PIN of at least ' + Person.min + ' digits and what this '
-          + 'screen remembers about you follows you to any machine you open '
-          + 'your URL on. You can leave it — without one, your settings stay '
-          + 'in this browser.';
-    }
-    return;
-  }
-  if (!(locked || failed)) return;
-  if (failed){
-    if (head) head.textContent = PERSON_ARRIVED === 'isdevice'
-      ? 'This screen belongs to the building'
-      : 'That link did not work';
-    if (note){
-      note.className = '';
-      note.textContent = PERSON_ARRIVED === 'isdevice'
-        ? 'It is set up as a display, so a personal URL cannot be opened on it. '
-          + 'Use your own device, or ask an administrator.'
-        : 'It may have been replaced since it was sent to you. Ask an '
-          + 'administrator for a new one.';
-    }
-    return;
-  }
-  const who = $('pinwho');
-  if (who) who.textContent = Person.name ? ', ' + Person.name : '';
-  if (note && Person.blocked){
-    note.className = 'bad';
-    /* No countdown. How long is a clock somebody guessing can read, and the
-       person who mistyped it needs to know to stop rather than to know when. */
-    note.textContent = 'Too many attempts. Wait a little and try again.';
-  }
-}
-/* Said even where hello never reports a person, which is both failure cases:
-   a spent or reissued URL leaves no cookie, and a display's browser is a
-   display. */
-if (PERSON_ARRIVED === 'bad' || PERSON_ARRIVED === 'isdevice')
-  window.addEventListener('DOMContentLoaded', paintPin);
+/* The code box and the request form. They live outside #gate because they
+   were here first and the server fills the second one — the mode decides
+   which, if either, is on screen.
 
-async function unlockPin(){
-  const el = $('pincode'), note = $('pinnote');
-  const pin = (el.value || '').trim();
-  if (!pin) return;
+   The request half is handed to paintRequest, which is the one that knows
+   whether this deployment takes requests at all. Two functions writing the
+   same display property would be a race decided by call order. */
+/* THE CODE BOX, AND ONLY THAT. The request half belongs to paintRequest,
+   which is the one that knows whether this deployment takes requests at all —
+   and which now calls paintGate. If this called it back the two would loop. */
+function paintGateAreas(){
+  const enrol = $('enrol');
+  if (enrol) enrol.style.display = GATE === 'code' ? 'flex' : 'none';
+}
+
+function gateMode(m){
+  GATE = m;
+  const note = $('gatenote');
+  if (note){ note.className = ''; note.textContent = ''; }
+  paintGate();
+  /* The request half, which paintGate no longer reaches. Called after it so
+     the form is drawn against the mode that was just set. */
+  paintRequest();
+  const first = $(m === 'code' ? 'enrolcode'
+                 : m === 'setup' ? 'gatepass' : 'gateuser');
+  if (first && first.offsetParent !== null) first.focus();
+}
+
+/* SIGNING IN. The one credential that does not need this browser to have been
+   anywhere before. */
+async function doLogin(){
+  const note = $('gatenote');
+  const email = ($('gateuser').value || '').trim();
+  const password = $('gatepass').value || '';
+  if (!email || !password) return;
   note.className = '';
   note.textContent = 'checking…';
   try{
-    const r = await fetch('person/unlock', {
+    const r = await fetch('user/login', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({pin}),
+      body: JSON.stringify({email, password}),
     });
     const j = await r.json().catch(()=>({}));
     if (!r.ok){
-      el.value = '';
+      $('gatepass').value = '';
       note.className = 'bad';
       note.textContent = j.error || 'that did not work';
       return;
     }
-    el.value = '';
-    Person.pin = 'open';
-    if (j.settings) Prefs.adopt(j.settings);
-    note.className = '';
-    note.textContent = '';
-    paintPin();
-    applyPrefs();
+    await gateArrived(j);
   }catch(e){
     note.className = 'bad';
     note.textContent = 'could not reach the server';
   }
 }
+
+/* SPENDING THE LINK. The password is chosen here and nowhere else — an admin
+   who set it would know it. */
+async function doSetup(){
+  const note = $('gatenote');
+  const password = $('gatepass').value || '';
+  const again = $('gatepass2').value || '';
+  if (!password) return;
+  if (password !== again){
+    note.className = 'bad';
+    note.textContent = 'those two do not match';
+    return;
+  }
+  note.className = '';
+  note.textContent = 'saving…';
+  try{
+    const r = await fetch('user/setup', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({password}),
+    });
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok){
+      note.className = 'bad';
+      note.textContent = j.error || 'that did not work';
+      return;
+    }
+    await gateArrived(j);
+  }catch(e){
+    note.className = 'bad';
+    note.textContent = 'could not reach the server';
+  }
+}
+
+/* WHAT BOTH DOORS OPEN ONTO. The session exists now, so the server answers
+   `hello` with a person where a moment ago it answered with an unapproved
+   display — which is what takes this page off the gate and onto the product.
+   Asking it again rather than assuming: the answer decides what this browser
+   IS, and guessing it here would be a second opinion about that. */
+async function gateArrived(j){
+  const note = $('gatenote');
+  $('gatepass').value = '';
+  if ($('gatepass2')) $('gatepass2').value = '';
+  if (j && j.settings) Prefs.adopt(j.settings);
+  if (note){ note.className = ''; note.textContent = ''; }
+  await Display.hello();
+  paintRequest();
+  applyPrefs();
+}
+
+/* Said even where hello never reports a person, which is both failure cases:
+   a link that means nothing leaves no cookie, and a display's browser is a
+   display. */
+if (PERSON_ARRIVED === 'bad' || PERSON_ARRIVED === 'isdevice')
+  window.addEventListener('DOMContentLoaded', paintGate);
+/* The forced state. Nothing else can be done on this page until there is a
+   password, so it is set before anything paints rather than switched to. */
+if (PERSON_ARRIVED === 'setup') GATE = 'setup';
 
 /* ================================================================= DISPLAY
    Which physical thing this page is running on, as far as the server is
@@ -1053,6 +1143,9 @@ const Display = {
     this.name = d.name || DISPLAY_NAME;
     this.approved = !!d.approved;
     this.state = d.state || 'none';
+    /* Where this browser goes to choose a password, on a request that was
+       approved into an account. Empty on every other row. */
+    this.setupUrl = d.setup_url || '';
     this.canRequest = !!d.can_request;
     this.form = d.form || [];
     this.answered = !!d.answered;
@@ -1095,6 +1188,16 @@ const Display = {
       await Routes.load();
       syncWake();
       paintRequest();
+      /* APPROVED INTO AN ACCOUNT. They are standing here waiting on a
+         decision and the decision was yes, so this takes them to the box that
+         chooses their password rather than telling them to go and find a link
+         somebody has to send. Spending the link sets the cookie and comes back
+         with ?person=setup, which is the forced state on the gate. */
+      if (this.state === 'setup' && this.setupUrl){
+        clearInterval(this._t);
+        location.href = this.setupUrl;
+        return;
+      }
       if (this.state === 'approved'){
         clearInterval(this._t);
         verdict('Approved', 'This device may now use '
@@ -1257,7 +1360,31 @@ function paintRequest(){
   const canAsk = canEnrol && D.canRequest;
   document.body.toggleAttribute('data-enrol', canEnrol);
   document.body.toggleAttribute('data-request', canEnrol);
+  /* The gate and the page it sits on appear together: anything that is not an
+     approved screen is somebody who has to get past this, whichever of the
+     four ways is theirs. */
+  document.body.toggleAttribute('data-gate', canEnrol);
+  /* AND THE GATE IS PAINTED HERE. It was painted only when a person arrived or
+     when a link was pressed, so a first load with neither showed the markup's
+     own defaults: the sign-in box with the confirm-password field still in it
+     and the code box open underneath. Everything corrected itself the moment
+     anything was clicked, which is the signature of a state that is drawn on
+     change and never on arrival. */
+  paintGate();
   if (!canEnrol) return;
+  /* REQUEST ACCESS is not offered where nobody may ask. The link would open a
+     form this deployment refuses to take, which is worse than not offering
+     it: somebody fills the thing in before finding out. */
+  const reqlink = $('gatereq');
+  if (reqlink) reqlink.style.display = canAsk ? '' : 'none';
+  if (GATE === 'request' && !canAsk) GATE = 'login';
+  if (GATE !== 'request'){
+    ['reqhead', 'reqform', 'reqsend', 'reqnote'].forEach(id=>{
+      const el = $(id);
+      if (el) el.style.display = 'none';
+    });
+    return;
+  }
   /* The three request elements go away when nobody may ask, leaving the code
      box as the whole of the page — which is what it is for a screen being
      commissioned in a deployment that takes no requests. */
@@ -1297,10 +1424,32 @@ function paintRequest(){
      somebody's cursor would take the field they were typing in away from
      them, and a form somebody is filling in is exactly the wrong thing to
      replace on a twenty-second timer. */
-  const wantForm = !asking && !again && D.mayAskAgain && D.form.length;
+  /* The form is wanted even where an admin defined no fields: the address is
+     always asked for, so there is always something to fill in. It used to
+     stand or fall on D.form.length, which would now hide the one field that
+     is not optional. */
+  const wantForm = !asking && !again && D.mayAskAgain;
   if (wantForm && !form.contains(document.activeElement)
       && form.dataset.built !== String(D.form.length)){
     form.innerHTML = '';
+    /* FIXED, AND FIRST. This is not something a deployment chose to ask —
+       it is the login the request is FOR, so it cannot be renamed, reordered
+       or switched off. Everything under it is the admin's own. */
+    const mlab = document.createElement('label');
+    const mcap = document.createElement('span');
+    mcap.textContent = 'Email address';
+    mlab.appendChild(mcap);
+    const mel = document.createElement('input');
+    mel.type = 'email'; mel.id = 'reqemail';
+    mel.autocapitalize = 'none'; mel.spellcheck = false;
+    mel.placeholder = 'you@example.com';
+    mlab.appendChild(mel);
+    form.appendChild(mlab);
+    const mnote = document.createElement('div');
+    mnote.className = 'req';
+    mnote.style.marginTop = '-4px';
+    mnote.textContent = 'this is what you will sign in with';
+    form.appendChild(mnote);
     D.form.forEach((f, i)=>{
       const lab = document.createElement('label');
       const cap = document.createElement('span');
@@ -1340,16 +1489,29 @@ async function sendRequest(){
   const btn = $('reqsend');
   const renew = btn.dataset.renew === '1';
   const answers = {};
-  if (!renew)
+  let email = '';
+  if (!renew){
     $('reqform').querySelectorAll('[data-i]').forEach(el=>{
       answers[el.dataset.i] = el.value;
     });
+    email = (($('reqemail') || {}).value || '').trim();
+    /* Caught here as well as at the server. The person is standing in front of
+       this screen and can fix it now; the admin reading the row tomorrow
+       cannot, and an approved request with no address is an account nobody
+       can ever sign in to. */
+    if (!email){
+      reqNote('an email address is needed — it is what you will sign in with',
+              true);
+      if ($('reqemail')) $('reqemail').focus();
+      return;
+    }
+  }
   btn.disabled = true;
   reqNote('sending…');
   try{
     const r = await fetch('display/request', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(renew ? {renew:true} : {answers})
+      body: JSON.stringify(renew ? {renew:true} : {answers, email})
     });
     const j = await r.json().catch(()=>({}));
     if (!r.ok || !j.display) throw new Error(j.error || ('HTTP ' + r.status));
@@ -1637,7 +1799,10 @@ const Prefs = {
     try{ localStorage.setItem(PREFS_KEY, JSON.stringify(this.data)); }catch(e){}
   },
   push(){
-    if (typeof Person === 'undefined' || !Person.open()) return;
+    /* Signed in, which is the only state there is now — `open` was the
+       third of three when a PIN was optional. A browser with no session
+       keeps its preferences locally, exactly as this page always has. */
+    if (typeof Person === 'undefined' || !Person.is()) return;
     clearTimeout(this._t);
     /* Debounced. Three switches can move in a second while somebody settles
        in, and each one is a write of a document nobody is reading yet. */
@@ -2057,6 +2222,72 @@ function buildStack(){
   return out;
 }
 
+/* RIDGE — a range of hills seen end-on, mirrored in still water.
+
+   The same signal STACK draws, folded twice. Where STACK gives every layer
+   the same span and lets the waveform swing either side of a centre line,
+   this takes the ABSOLUTE displacement and pushes it up from a spine, then
+   repeats it downward at a fraction of the height — so the figure reads as a
+   landform above its own reflection rather than as a wave.
+
+   Two things make it a range rather than a fin. Each layer is drawn from its
+   own moment (the layer phase STACK already has), so peaks do not line up
+   front to back and the eye reads depth from the disagreement. And the whole
+   span is multiplied by a SPINDLE envelope, fat in the middle and pinched to
+   nothing at both ends, which is what turns a rectangle of lines into a
+   single object with a silhouette.
+
+   The reflection is deliberately not a mirror. It is shorter, and it is
+   smoothed by dropping the noise term — water does not reproduce a skyline,
+   it suggests one, and an exact copy reads as a graph with two halves rather
+   than as one thing sitting on a surface. */
+function buildRidge(){
+  const N = 220, lines = Math.max(4, S.lines);
+  const tab = basisOpen(N);
+  const out = [];
+  for (let k=0;k<lines;k++){
+    const kt   = lines>1 ? k/(lines-1) : .5;
+    const z    = (kt-0.5) * S.depth;
+    /* Front layers loudest. STACK fades from its middle because its middle is
+       the one nearest the viewer; here the range recedes, so the falloff runs
+       front to back and the far ridges sit down into the haze. */
+    const fade = 1 - kt*0.45;
+    lineCoef(phaseOf(k));
+    const gain = layerGain(k);
+    const up = new Float32Array(N*3),   ua = new Float32Array(N);
+    const dn = new Float32Array(N*3),   da = new Float32Array(N);
+    for (let i=0;i<N;i++){
+      const it = i/(N-1);
+      /* The silhouette. sin gives the pinch at both ends; the power sharpens
+         it so the taper happens near the tips rather than eating the middle,
+         and the second term keeps a thin spine running the whole width so the
+         ends come to a line instead of stopping in mid-air. */
+      const env = Math.pow(Math.sin(Math.PI*it), 0.85);
+      const spindle = env*0.94 + 0.06;
+      const body  = modeSum(tab,i)*S.body*fade;
+      const live  = fieldAtU(it)*gain;
+      const grain = lineNoise(k,i);
+      /* ABSOLUTE, which is the whole difference. A signed value would swing
+         through the spine and the two halves would cross each other. */
+      const h = Math.abs(body + live) * spindle + Math.abs(grain)*env*0.7;
+      const x = (it-0.5) * S.spread;
+      up[i*3  ] = x;
+      up[i*3+1] = -h * 150 * S.amp;
+      up[i*3+2] = z;
+      ua[i] = h;
+      /* The reflection: shorter, and without the grain. */
+      const hr = (Math.abs(body + live) * spindle) * 0.46;
+      dn[i*3  ] = x;
+      dn[i*3+1] = hr * 150 * S.amp;
+      dn[i*3+2] = z;
+      da[i] = hr;
+    }
+    out.push({p:up, a:ua});
+    out.push({p:dn, a:da});
+  }
+  return out;
+}
+
 function buildOrb(){
   const rings = Math.max(3, S.lines), N = 96, R = S.spread*0.30;
   const tab = basisRing(N);
@@ -2163,6 +2394,7 @@ function render(){
   setAngles();
   buildField();
   const build = S.mode==='stack' ? buildStack
+              : S.mode==='ridge' ? buildRidge
               : S.mode==='disc'  ? buildDisc
               : S.mode==='orb'   ? buildOrb : buildKnot;
   const polys = build();
@@ -2628,7 +2860,7 @@ resize(); requestAnimationFrame(frame);
    makes the motion read as speech. */
 const REPLIES = [
   "Interface check. I am rendering from a simulated token stream — no telemetry is attached to this surface. Every impulse you see in the geometry is one token arriving, nothing more.",
-  "Three forms are loaded. STACK is a scrolling waveform given depth: each line reads the same signal a few frames further back, so rotation turns the delay into a twist. ORB is a sphere of latitude rings displaced radially. KNOT is a parametric torus knot that breathes.",
+  "Four forms are loaded. STACK is a scrolling waveform given depth: each line reads the same signal a few frames further back, so rotation turns the delay into a twist. RIDGE folds that same signal into a landform above its own reflection. ORB is a sphere of latitude rings displaced radially. KNOT is a parametric torus knot that breathes.",
   "The tumble is continuous angular velocity on all three axes, re-aimed on an interval. It drifts most of the time, then visibly reorients — which is the behaviour you described, rather than a fixed spin.",
   "Depth cueing is painter's-algorithm only. Chunks are sorted back to front and stroked with alpha and weight falling off with distance, so crossings occlude correctly without any real z-buffer.",
   "Speech synthesis is live. The browser engine will not route through an audio analyser, so there is no real envelope to read — what it gives is one boundary event per word. Each word is split into its estimated syllables and pulsed at speech rate, which is what you are watching now.",
@@ -4710,46 +4942,10 @@ const Settings = {
       let n = 0;
       Object.keys(got).forEach(k=>{ if (k in S){ S[k] = got[k]; n++; } });
       if (n) repaintAll();
-      showPostureWarning(j && j.warning);
       return n;
     }catch(e){ return -1; }
   }
 };
-
-/* The one arrangement that is allowed but must never be quiet: reachable from
-   the network with nothing at the door. The startup banner is seen by whoever
-   ran the command, which is not usually the person standing in front of the
-   screen — and on a display left running for weeks, nobody has seen it for
-   weeks. So it is said here too.
-
-   Not shown in an embed. There the host application's own admin authenticated
-   with a key, the person looking at it did not configure this server and
-   cannot act on it, and a warning about somebody else's binding rendered
-   inside somebody else's product is noise they have no move against. */
-let postureEl = null;
-function showPostureWarning(text){
-  if (EMBED) return;
-  if (!text){
-    if (postureEl){ postureEl.remove(); postureEl = null; }
-    return;
-  }
-  if (!postureEl){
-    postureEl = document.createElement('div');
-    postureEl.id = 'posturebanner';
-    /* Dismissible, and deliberately only for this page view — it does not
-       remember. A warning you can permanently silence from the screen it is
-       warning about is a warning that will be silenced on day one and absent
-       on the day the machine changes networks. */
-    const x = document.createElement('button');
-    x.type = 'button';
-    x.textContent = '×';
-    x.title = 'hide until this page is reloaded';
-    x.addEventListener('click', ()=>{ postureEl.remove(); postureEl = null; });
-    postureEl.appendChild(document.createTextNode(text));
-    postureEl.appendChild(x);
-    document.body.appendChild(postureEl);
-  }
-}
 
 /* Relabel what is already on screen. The admin is tuning this against a live
    transcript, and a name that only applied to the next line would look like
@@ -5277,12 +5473,17 @@ function announcePreview(){
 }
 
 on('reqsend', 'click', sendRequest);
-/* One control, two jobs, and the state decides which — the box is the same
-   box and the difference is whether there is a PIN behind it yet. */
-const pinGo = ()=> (Person.setting() ? setPin() : unlockPin());
-on('pingo', 'click', pinGo);
-on('pincode', 'keydown', e=>{ if (e.key === 'Enter') pinGo(); });
-on('pinskip', 'click', ()=>{ PIN_DISMISSED = true; paintPin(); });
+/* One control, two jobs, and the mode decides which — the box is the same box
+   and the difference is whether there is a password behind it yet. */
+const gateGo = ()=> (GATE === 'setup' ? doSetup() : doLogin());
+on('gatego', 'click', gateGo);
+/* ENTER, from any of the three fields. Somebody typing a password does not
+   reach for the mouse, and a form that only submits from its last field is one
+   that ignores half the people using it. */
+['gateuser', 'gatepass', 'gatepass2'].forEach(id=>
+  on(id, 'keydown', e=>{ if (e.key === 'Enter') gateGo(); }));
+on('gatecode', 'click', ()=> gateMode(GATE === 'code' ? 'login' : 'code'));
+on('gatereq', 'click', ()=> gateMode(GATE === 'request' ? 'login' : 'request'));
 on('enrolgo', 'click', useCode);
 on('enrolcode', 'keydown', e=>{ if (e.key === 'Enter') useCode(); });
 /* Typed off another screen, so it arrives with whatever spacing and case the

@@ -119,6 +119,7 @@ shape, so try each rather than assuming.
 | Mode | Reads as |
 |---|---|
 | STACK | layered horizontal waves — the most legible for speech |
+| RIDGE | the same waves folded into a landform above its own reflection |
 | DISC | a rotating ring |
 | ORB | a sphere of lines |
 | KNOT | a closed looping curve |

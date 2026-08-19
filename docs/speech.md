@@ -260,7 +260,7 @@ one device has ever heard of.
 
 Set it on the person under **ENROLLMENTS ▸ USER**, in *Wakes to*. From then on
 their word reaches the endpoint a question goes to when nothing named one, on
-whatever machine they open their URL on — and nowhere else. That is the whole
+whatever machine they sign in on — and nowhere else. That is the whole
 mechanism: the collision stops because no other browser was ever told the word
 exists.
 
