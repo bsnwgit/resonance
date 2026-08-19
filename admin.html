@@ -8281,7 +8281,7 @@ function paintSavers(list){
       if (SVSHOWN === i) cmd('kiosk', {saver: saverOf(s)});
     };
     cell('Dark by %').appendChild(nd);
-    [['night_to', 'Dark until'], ['night_from', 'Dark from']].forEach(([k, label])=>{
+    [['night_from', 'Dark from'], ['night_to', 'Dark until']].forEach(([k, label])=>{
       const sel = document.createElement('select');
       for (let h = 0; h < 24; h++){
         const o = document.createElement('option');
