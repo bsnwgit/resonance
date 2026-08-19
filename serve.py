@@ -880,13 +880,9 @@ ROUTE_DEFAULTS.update({
     # only limits which rooms it is answered in.
     "needs_signin": False,
     "displays": [],
-    # The display profile this endpoint hands to the screens it NAMES. A
-    # convenience for a fleet: eight screens on one assistant are eight rows to
-    # set otherwise, and they are all the same kind of place.
-    #
-    # It is read ONLY where the screen's own row names none, and only when the
-    # answer is unambiguous — see inherited_kiosk, which is where the rule
-    # actually lives.
+    # The display profile every screen opened on THIS ENDPOINT'S PORT gets.
+    # Read only where the screen's own row names none — see kiosk_from_port,
+    # which is where the rule actually lives.
     "kiosk_profile": "",
     # …and the groups it names. Kept beside the individual list rather than
     # folded into it: a grant made to "the physics department" should still
@@ -2836,7 +2832,7 @@ KIOSK_FIELDS = ("kiosk", "kiosk_profile")
 
 
 def kiosk_of(rec, savers=None, looks=None, kiosks=None,
-             motions=None, speeches=None):
+             motions=None, speeches=None, nid=""):
     """What this display is, resolved and clamped: whether it is a kiosk at
     all, whether the transcript is there, and the numbers of the screensaver
     the profile names.
@@ -2860,12 +2856,12 @@ def kiosk_of(rec, savers=None, looks=None, kiosks=None,
     # `kiosk` is published in its own right and not merely implied by the
     # settings under it, because being a kiosk means things none of them
     # covers — a rig instrument in the corner of a hallway screen is the first.
-    # The row's own choice first, and only then what its endpoints say. A
+    # The row's own choice first, and only then the port it came in on. A
     # screen that names a profile is a screen somebody decided about, and
-    # nothing an endpoint says may move it.
+    # nothing the endpoint says may move it.
     want = str(rec.get("kiosk_profile") or "")
     if not want:
-        want, _ = inherited_kiosk(rec.get("id"), kiosks=kiosks)
+        want, _ = kiosk_from_port(nid, kiosks=kiosks)
     prof = find_kiosk(want, kiosks) or {}
     # The three snapshots are merged into ONE map of settings before it leaves
     # here. The display already knows how to take a map of settings and apply
@@ -3467,48 +3463,43 @@ def subject_may(route, disp=None, ident=None):
                                        kinds=DISPLAY_GROUP_KINDS)
 
 
-def inherited_kiosk(did, doc=None, kiosks=None):
-    """What display profile a screen takes from its endpoints, and from where.
+def kiosk_from_port(nid, doc=None, kiosks=None):
+    """The display profile a screen gets from THE PORT IT WAS OPENED ON.
 
-    Returns (profile id, [endpoint names]). An empty id means it inherits
-    nothing, and the names say why — either none of its endpoints sets one, or
-    more than one does and they disagree.
+    Returns (profile id, endpoint name). Empty id means the port carries no
+    endpoint, or the one it carries names no profile.
 
-    ONLY ENDPOINTS THAT NAME IT. An endpoint open to everybody is REACHABLE by
-    every screen in the building; it is not every screen's endpoint, and
-    letting an unrestricted route dress a whole building is the accident this
-    rule exists to prevent. Named directly, or by a group of displays — the
-    same two ways a grant is made.
+    THE PORT IS THE ASSOCIATION, and this is the second time that has turned
+    out to be the rule here. An earlier version keyed this off the GRANT — the
+    screens an endpoint names — which meant a profile set on an endpoint
+    applied to nothing until somebody also ticked every screen, and it dragged
+    in a problem it then had to refuse: a screen can be granted several
+    endpoints, so it could have several parents naming different profiles.
 
-    EXACTLY ONE ANSWER, OR NONE AT ALL. A screen can be granted several
-    endpoints, so it can have several parents, and two of them can name
-    different profiles. There is no correct answer to that, so this returns
-    nothing rather than picking: the panel names the two that disagree and an
-    admin settles it on the row. Every tie-break available here — first in the
-    list, last saved, alphabetical — would be a screen's appearance decided by
-    something nobody could see, and the failure would surface months later when
-    somebody ticked a second endpoint for an unrelated reason.
+    A page is loaded from exactly one port, and a port carries one endpoint.
+    So there is nothing to disambiguate, nothing to tick, and no way for the
+    answer to change because somebody adjusted a permission somewhere else. A
+    browser on the Demo port is a Demo screen because that is the address it
+    was opened at.
 
-    A profile that has since been deleted inherits nothing, for the same reason
-    a row naming a deleted one gets nothing: a screen must not wear settings
-    that cannot be found in the panel to change."""
+    A profile that has since been deleted resolves to nothing, for the same
+    reason a row naming a deleted one gets nothing: a screen must not wear
+    settings that cannot be found in the panel to change."""
+    if not nid:
+        return "", ""
     doc = doc or read_routes()
-    found, names = set(), []
     for rid in route_order(doc):
         rec = doc["routes"][rid]
-        if not rec.get("kiosk_profile"):
+        if str(rec.get("network") or "") != str(nid):
             continue
-        if did not in (rec.get("displays") or []) \
-           and did not in group_members(rec.get("groups"),
-                                        kinds=DISPLAY_GROUP_KINDS):
-            continue
-        names.append(rec.get("name") or rid)
-        found.add(rec["kiosk_profile"])
-    if len(found) != 1:
-        return "", names
-    pid = found.pop()
-    pool = kiosks if kiosks is not None else display_settings()["kiosks"]
-    return (pid if any(k["id"] == pid for k in pool) else ""), names
+        pid = str(rec.get("kiosk_profile") or "")
+        if not pid:
+            return "", (rec.get("name") or rid)
+        pool = kiosks if kiosks is not None else display_settings()["kiosks"]
+        if not any(k["id"] == pid for k in pool):
+            return "", (rec.get("name") or rid)
+        return pid, (rec.get("name") or rid)
+    return "", ""
 
 
 def admin_displays():
@@ -3525,11 +3516,9 @@ def admin_displays():
     # it. The grant was made, stored and invisible: ticks that could only ever
     # be empty on the one page that shows a device's settings.
     granted = {}
-    rdoc = read_routes()
-    for rid, rrec in rdoc["routes"].items():
+    for rid, rrec in read_routes()["routes"].items():
         for member in (rrec.get("displays") or []):
             granted.setdefault(member, []).append(rid)
-    kpool = display_settings()["kiosks"]
     for did, rec in sorted(displays.items(), key=lambda kv: kv[1]["created"]):
         row = {k: rec.get(k) for k in
                ("name", "asked", "approved", "hint", "created", "last_seen",
@@ -3540,16 +3529,12 @@ def admin_displays():
         # editing what this device names, and the numbers behind that name are
         # on the profile where they can be changed once for every screen.
         row.update({k: rec.get(k, DISPLAY_DEFAULTS[k]) for k in KIOSK_FIELDS})
-        # WHAT A BLANK PICKER IS CURRENTLY GETTING, resolved here rather than
-        # in the panel. The rule is one rule and belongs in one place: a panel
-        # deriving it a second time is a second rule to keep in step, and the
-        # two would disagree the first time either changed.
-        inh_id, inh_from = inherited_kiosk(did, rdoc, kpool)
-        row["inherit"] = {
-            "profile": inh_id,
-            "name": next((k["name"] for k in kpool if k["id"] == inh_id), ""),
-            "from": inh_from,
-        }
+        # NOTHING ABOUT INHERITANCE HERE ANY MORE. What a blank picker gets
+        # depends on the PORT the screen is opened at, and a row in a register
+        # has not been opened at one — the same device can be loaded from two
+        # addresses and would inherit differently at each. The panel says what
+        # the rule IS rather than pretending to a per-row answer it cannot
+        # have.
         ref = _display_refusals.get(did)
         # A code with no deadline is live; one whose deadline has passed is
         # not. Both have to be tellable apart from "there is no code", which
@@ -6782,7 +6767,11 @@ class Handler(SimpleHTTPRequestHandler):
                # where a screen sits burning an image into itself. It is also
                # this display's own row and nobody else's, so there is nothing
                # here to leak — it went out through the token that asked.
-               "kiosk": kiosk_of(rec)}
+               # WHICH PORT THIS REQUEST CAME IN ON. Set per listener when
+               # the socket was bound, so a screen is answered about the
+               # address it is actually being viewed at rather than about the
+               # one its row was created under.
+               "kiosk": kiosk_of(rec, nid=self.pinned_net)}
         if may_ask:
             out["form"] = cfg["form"]
         if rec.get("denied"):

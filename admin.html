@@ -5237,30 +5237,26 @@ Devices enrol themselves and are approved under ACCESS.</div>
     <h5>Display<span class="subsum"></span></h5>
     <div class="subbody">
   <select data-f="kiosk_profile" class="ppick"></select>
-  <div class="note help">The <b>display profile</b> the screens this endpoint
-NAMES take, where their own row does not name one. Eight screens on one
-assistant are eight rows to set otherwise, and they are usually all the same
-kind of place.
+  <div class="note help">The <b>display profile</b> every screen opened on this
+endpoint's <b>port</b> gets. A browser on the Demo port is a Demo screen
+because that is the address it was opened at — nothing to tick, and no list to
+keep in step.
 
 <b>A screen's own choice always wins.</b> A row that names a profile is a
 screen somebody decided about, and nothing set here moves it — this is read
 only where that row's picker is left on INHERIT.
 
-<b>Every option here is a real profile.</b> There is no "none": a screen that
-inherits nothing already has an answer of its own, so offering the absence as a
-choice made it look like a decision. An endpoint that has never been given one
-reads <i>choose a display profile</i> until it is.
+<b>The port, not the grant.</b> Which screens an endpoint <i>permits</i> is a
+separate question, on the section above. A page is loaded from exactly one
+address and a port carries one endpoint, so there is never more than one answer
+here and never anything to disambiguate.
 
-<b>Only screens this endpoint names</b>, directly or through a group of
-displays. An endpoint set to ANY DISPLAY is reachable by every screen in the
-building; it is not every screen's endpoint, and dressing the whole building
-from here is the accident that rule exists to prevent — so this does nothing
-while it is set to ANY DISPLAY.
+<b>Every option here is a real profile.</b> There is no "none": an endpoint
+that has never been given one reads <i>choose a display profile</i> until it
+is.
 
-<b>Two endpoints that disagree inherit nothing.</b> A screen can be granted
-several, so it can have several parents. Where two of them name different
-profiles the screen's own row says so and you settle it there, rather than one
-of them being picked by something nobody can see.</div>
+<b>An endpoint with no port reaches nothing</b>, this included — it is attached
+to nothing and answers nowhere, which the Network section says.</div>
     </div>
   </div>
 
@@ -8769,27 +8765,14 @@ function kioskBlock(d){
      broken rather than plain. A state whose only outcome is a page that looks
      wrong is not a choice worth offering. Every row is a display now, and the
      only question left is which profile. */
-  /* INHERIT, and it says WHAT FROM. The server resolves this — one rule, in
-     one place — and hands back the profile it landed on and the endpoints
-     that had an opinion. All four outcomes are worth different words, because
-     "inherit" alone is the state somebody would have to open another tab to
-     understand:
-       nothing named it        — nothing to inherit, so the page's own settings
-       one named it            — say which, so the row explains itself
-       several, all agreeing   — same, and no reason to complain
-       several, disagreeing    — REFUSED rather than resolved, and it names the
-                                 endpoints so the fix is obvious. Picking one
-                                 here would be this screen's appearance decided
-                                 by something nobody can see. */
-  const inh = d.inherit || {};
-  const from = inh.from || [];
+  /* INHERIT, and the row deliberately does not claim to know WHAT FROM. What
+     a blank picker gets depends on the PORT the screen is opened at, and a row
+     in a register has not been opened at one — the same device loaded from two
+     addresses inherits differently at each. So this states the rule rather
+     than a per-row answer it cannot have. */
   const dflt = document.createElement('option');
   dflt.value = '';
-  dflt.textContent =
-      inh.profile ? 'INHERIT — ' + inh.name + ', from ' + from.join(' and ')
-    : from.length > 1 ? 'INHERIT — ' + from.join(' and ') + ' disagree, pick one'
-    : from.length === 1 ? 'INHERIT — ' + from[0] + ' names a profile that has gone'
-    : "INHERIT — nothing to inherit, so the page's own settings";
+  dflt.textContent = 'INHERIT — whatever the endpoint on its port says';
   sel.appendChild(dflt);
   kiosks.forEach(k=>{
     const o = document.createElement('option');
@@ -8898,16 +8881,12 @@ function kioskBlock(d){
      list already is, and the row should not have to work out a second time
      what it is showing.
 
-     The row's own profile, then what it inherits — and it SAYS which, because
-     "Hallway" and "Hallway, because Sparky says so" are different facts about
-     a screen and only one of them survives you unticking an endpoint. */
+     Its own profile where it names one. Where it does not, the row cannot say
+     which — that is decided by the port it is opened at, not by anything
+     stored here. */
   const ownProf = kiosks.filter(k=> k.id === (d.kiosk_profile || ''))[0] || null;
-  const inhProf = ownProf ? null
-                : (kiosks.filter(k=> k.id === (inh.profile || ''))[0] || null);
-  const named = ownProf || inhProf;
-  const label = 'DISPLAY MODE'
-              + (named ? ' · ' + named.name + (inhProf ? ' · inherited' : '')
-                       : ' · no profile');
+  const label = 'DISPLAY MODE · '
+              + (ownProf ? ownProf.name : 'inherits from its port');
   return {box: box, save: save, undo: undo, said: said, label: label};
 }
 
