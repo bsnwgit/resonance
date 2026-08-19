@@ -8244,9 +8244,12 @@ function paintSavers(list){
     namerow.appendChild(nm);
     row.appendChild(namerow);
 
-    /* Six controls, two to a line. The first three are what it does when
-       nobody has been there; the last three are what it does at night
-       whether anybody has or not. */
+    /* Six controls, two to a line, and the ORDER is the pairing. The first
+       three are what it does when nobody has been there; the last three are
+       what it does at night whether anybody has or not. Putting the night dim
+       ahead of the two hours lands the two percentages beside each other on
+       one line and the two clock times on the next, instead of the night group
+       being split across three rows with a percentage stranded at the end. */
     const nums = document.createElement('div');
     nums.className = 'cols2';
     const cell = (label)=>{
@@ -8270,7 +8273,15 @@ function paintSavers(list){
       };
       cell(label).appendChild(inp);
     });
-    [['night_from', 'Dark from'], ['night_to', 'Dark until']].forEach(([k, label])=>{
+    const nd = document.createElement('input');
+    nd.type = 'number'; nd.min = 0; nd.max = 85; nd.value = s.night_dim;
+    nd.oninput = ()=>{
+      DPSAVERS[i].night_dim = s.night_dim = parseInt(nd.value, 10) || 0;
+      retitle();
+      if (SVSHOWN === i) cmd('kiosk', {saver: saverOf(s)});
+    };
+    cell('Dark by %').appendChild(nd);
+    [['night_to', 'Dark until'], ['night_from', 'Dark from']].forEach(([k, label])=>{
       const sel = document.createElement('select');
       for (let h = 0; h < 24; h++){
         const o = document.createElement('option');
@@ -8286,14 +8297,6 @@ function paintSavers(list){
       };
       cell(label).appendChild(sel);
     });
-    const nd = document.createElement('input');
-    nd.type = 'number'; nd.min = 0; nd.max = 85; nd.value = s.night_dim;
-    nd.oninput = ()=>{
-      DPSAVERS[i].night_dim = s.night_dim = parseInt(nd.value, 10) || 0;
-      retitle();
-      if (SVSHOWN === i) cmd('kiosk', {saver: saverOf(s)});
-    };
-    cell('Dark by %').appendChild(nd);
     row.appendChild(nums);
 
     const acts = document.createElement('div');
