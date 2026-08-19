@@ -3441,7 +3441,11 @@ const Events = {
    somebody asked for, whatever the wake gate happens to be doing — CALIBRATE,
    MIC ONLY, a code typed into the box. Set by the same listener that ends the
    screensaver, because there is only ever one first touch. */
-let lastTouch = -1e9;
+/* SEEDED AT LOAD, not at zero. The first seconds of a page are when the
+   things worth reading happen — no microphone, an insecure origin, no
+   recorder — and none of them follows a touch. Starting the clock here gives
+   them their moment and then lets the screen go quiet. */
+let lastTouch = performance.now()/1000;
 const TOUCH_GRACE = 8;          // seconds a touch keeps the screen talkative
 
 /* SHOULD THE WALL STAY QUIET.
@@ -3466,8 +3470,21 @@ const TOUCH_GRACE = 8;          // seconds a touch keeps the screen talkative
    is otherwise asleep, and covers holding SPACE, which is a keydown like any
    other.
 
-   Errors are never hushed — a fault is worth a jump — and neither is CLEARING
-   a note, or one left on screen would outlive whatever put it there. */
+   ERRORS ARE HUSHED TOO, and getting that wrong is what made two attempts at
+   this fail. `bad` looked like the right exemption — a fault is worth a jump —
+   but the most frequent message on an idle screen is flagged with it:
+   "nothing recognised" fires on every scrap of room noise that transcribes to
+   nothing, which while asleep is nearly all of it. Exempting `bad` exempted
+   precisely the thing being complained about.
+
+   A wall loses nothing by it. `relay` still sends every message to the panel,
+   `Events.add` still records the real faults, and the ones that matter most —
+   no microphone, an insecure origin — happen in the first seconds, which the
+   seeded clock above keeps visible. What is left is a screen that says nothing
+   about work nobody asked it to do.
+
+   CLEARING is never hushed, or a note left on screen would outlive whatever
+   put it there. */
 function hush(){
   if (typeof Drive !== 'undefined' && Drive.phase !== 'idle') return false;
   if (typeof Wake !== 'undefined' && Wake.awake) return false;
@@ -3479,7 +3496,7 @@ function hush(){
    diagnostics because a screen decided to be quiet. */
 function micNote(m, bad){
   const el = $('micnote');
-  const show = (bad || !m || !hush()) ? m : '';
+  const show = (!m || !hush()) ? m : '';
   if (el){ el.textContent = show; el.classList.toggle('bad', !!bad); }
   relay('micnote', m);
 }
@@ -4022,7 +4039,7 @@ function unlockTTS(){ ttsUnlocked = true; }
 
 function note(msg, bad){
   const el = $('ttsnote');
-  const show = (bad || !msg || !hush()) ? msg : '';      // see hush()
+  const show = (!msg || !hush()) ? msg : '';             // see hush()
   if (el){ el.textContent = show; el.classList.toggle('bad', !!bad); }
   relay('ttsnote', msg);
 }
