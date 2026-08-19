@@ -395,14 +395,6 @@
   }
   #gatego:hover,
   #enrolgo:hover{border-color:rgba(var(--glass),.75)}
-  /* Quieter than the thing it sits beside: leaving is the lesser of the two
-     answers, not the one being recommended. */
-  #gateskip{
-    font:inherit;font-size:calc(10px * var(--fs));letter-spacing:.18em;
-    padding:8px 12px;cursor:pointer;background:none;
-    color:rgba(var(--paper),.55);border:1px solid transparent;
-  }
-  #gateskip:hover{color:rgba(var(--paper),.85)}
   #enrolgo[disabled]{opacity:.5;cursor:default}
   #enrolnote{
     font-size:calc(9.5px * var(--fs));line-height:1.6;
@@ -1381,7 +1373,11 @@ function paintRequest(){
   /* A PORT WITH NOTHING ON IT. Not a gate: there is no assistant here to sign
      in to, so a sign-in box would be asking somebody to authenticate to an
      empty room. Says what is true and what fixes it. */
-  const emptyPort = D.known && !(Routes.list || []).length;
+  /* `Routes.loaded`, not just an empty list. Before the first successful
+     read the list is empty because nothing has arrived yet, and saying "no
+     assistant answers here" then would be this page reporting its own
+     unfinished boot — or a dropped request — as a configuration fault. */
+  const emptyPort = D.known && Routes.loaded && !(Routes.list || []).length;
   const canEnrol = D.known && D.state !== 'approved' && !usableHere && !emptyPort;
   if (emptyPort){
     document.body.toggleAttribute('data-request', true);
@@ -1645,6 +1641,13 @@ function verdict(title, body){
    shared settings. */
 const Routes = {
   list: [], defaultId: '',
+  /* Whether the list has ever ARRIVED, as against being empty. The two are
+     not the same and one caller has to tell them apart: a port with no
+     endpoint on it says so and hides the interface, and doing that because a
+     fetch failed would take a working screen off the air over one bad
+     response. Set only on a successful read, and never cleared — a later
+     failure leaves the last good list rather than pretending there is none. */
+  loaded: false,
 
   async load(){
     try{
@@ -1658,6 +1661,7 @@ const Routes = {
          correctly. It simply answers to nothing. */
       this.list = (j && j.routes || []).filter(x=> x && x.id);
       this.defaultId = (j && j.default) || (this.list[0] || {}).id || '';
+      this.loaded = true;
       return this.list.length;
     }catch(e){ return -1; }
   },

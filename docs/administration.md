@@ -999,6 +999,14 @@ They are standing at that screen waiting, so **their page takes them straight
 to the choose-a-password box** the moment you approve. The link also appears in
 the panel, once, for the case where they walked away.
 
+**Either setting on an endpoint can put a sign-in box in front of somebody.**
+*Sign in* asks whether there must be a person at all; *Who may use it* asks
+whether this particular caller is allowed. A NO from either one leaves the
+browser unable to use the endpoint, and a sign-in box is what the display
+offers when that happens — so an endpoint left at NOT REQUIRED still shows one
+to a browser its allow-list does not cover. See *Assistants* → *Sign in* for
+the full table.
+
 **A person has no equivalent test.** An account exists only because you made
 it, so creating one *is* the approval and there is no way to turn up asking to
 be one. Withdrawing it is deleting the person, or reissuing their link — which
@@ -1220,6 +1228,26 @@ Two exceptions, both deliberate: **syslog ignores quiet hours**, because a log
 with a hole in it every night is useless for the fault that only happens at
 night; and **a device asking to be let in comes through regardless** of quiet
 hours and digest mode both, because somebody is standing at a screen waiting.
+
+**Name in the source field** decides what a collector files these lines under.
+Blank uses this machine's own hostname, which is what a collector would infer
+from the packet anyway — the field is for when that is not the name you want
+to read: a host called `srv-04b` answering for the thing everybody calls the
+kitchen, or several installs arriving behind one address.
+
+It applies to a **remote** collector only. Sending to the local daemon leaves
+the header to the daemon, which is already doing it; a second one would put
+the name inside the message text instead of in the column.
+
+Spaces in the name are turned into hyphens. The format ends that field at the
+first space, so a name with one in it would push the rest of the line into the
+message and leave half a word in the source column.
+
+One thing worth knowing about the format rather than about this server:
+**RFC 3164 carries no time zone**. The timestamp is local time with nothing
+marking it as such, so a collector in another zone reads it as its own. That
+is the format, not a choice made here, and the alternative is a line some
+parsers reject outright.
 
 ### The server log
 

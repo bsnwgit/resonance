@@ -2284,6 +2284,50 @@ on a desk. A tablet bolted to a wall, answering a household, moves them:
 
 Newest first.
 
+### 2026-08-19 — a review that found what testing had not
+
+A read of everything the day before had changed, looking for dead code and
+faults rather than waiting for them to surface. It found five, three of which
+would have been reported eventually as "it does not work" with no clue why.
+
+- **User passwords were not rate limited at all.** `verify_identity_password`
+  called `note_login_failure` — the PANEL's ledger, keyed by client address —
+  instead of `note_user_login_failure`. Failures went into a map nothing reads
+  for people, so `user_login_blocked` never became true and the back-off that
+  makes a password survivable was never charged. A rename with one caller left
+  behind, and the two names being one word apart is exactly why they now are
+  not.
+- **The whole request-to-account path was dead.** `req_email` and `setup` were
+  written onto a display record but were not in `DISPLAY_DEFAULTS`, and
+  `read_displays` rebuilds every record from those keys and drops the rest. So
+  both evaporated on the next read: approving a request found no address and
+  quietly approved a DEVICE, and the requester's screen never learned there was
+  a password to set. Nothing errored.
+- **An enrolment link could name a port nothing listens on.** With no
+  nominated profile, the link's base took the first profile with a port — and
+  a profile no endpoint has been given is never bound. The link is built from a
+  profile that is actually carrying something now, and returns empty rather
+  than a URL with port 0 in it when there is nothing bound at all.
+- **A dropped `/routes` fetch told a working screen it was unconfigured.** The
+  new "nothing is set up on this port" state tested an empty list, and an empty
+  list is also what a failed load leaves behind. It tests whether the list has
+  ever arrived.
+- **Approving a request minted a link and never mailed it**, unlike creating
+  or reissuing one — and the `mailed` flag the server returned was read by
+  nothing, so the panel could not say either way.
+
+Dead code out with it: an uncalled `_blank_routes`, an unused `base64` import,
+four CSS rules for elements and classes that no longer exist, and a comment
+claiming two settings keys were consulted by a function that had stopped
+consulting them.
+
+Also: **the sign-in box is documented properly**, because two different
+settings produce it and only one of them is called *Sign in* — an endpoint left
+at NOT REQUIRED still shows one to a browser its allow-list does not cover.
+There is a table. And **syslog lines carry a name you choose**, in a real RFC
+3164 header, so a collector's source column reads as something recognisable
+rather than as an address.
+
 ### 2026-08-18 — accounts, and authentication moved onto the assistant
 
 Phase 5, built and then rebuilt in a day: the PIN it was designed around went,

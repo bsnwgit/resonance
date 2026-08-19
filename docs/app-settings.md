@@ -45,6 +45,11 @@ answers — a house one anybody in the room may talk to, a hosted model worth
 money per question, one reading from a system that should know who asked — and
 a single switch covering all three could only ever be set to the strictest.
 
+**Two settings on an endpoint can each produce a sign-in box** — MUST SIGN IN,
+and an allow-list that does not cover this caller. The display shows one
+whenever it cannot use what is on the port, and does not distinguish the
+reason. *Assistants* → *Sign in* has the table.
+
 MUST SIGN IN refuses a **device** outright, approved or not. A wall screen has
 no person on it, so an endpoint set that way is one your kiosks stop answering
 on. That is what makes it the control that limits what a model costs, where an

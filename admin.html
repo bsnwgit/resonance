@@ -678,7 +678,6 @@
      the .act-save / .act-undo classes below, so this rule must not name one
      or it would override them from a more specific selector. */
 
-  #saverule{margin:10px 0 2px}
   /* Grow from their own label rather than from a zero basis, so a panel too
      narrow to hold them wraps to a second line instead of squeezing a label
      out through its own border. */
@@ -999,8 +998,6 @@
   }
   .ro #panel .grp[data-tab="accounts"] .seg button,
   .ro #panel .grp[data-tab="accounts"] input{pointer-events:auto;opacity:1}
-  #rolebadge{font-size:calc(8.5px * var(--fs));letter-spacing:.14em;padding:2px 6px;
-             border:1px solid rgba(var(--glass),.25);color:rgba(var(--paper),.87)}
   .note{font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);
         margin-top:8px;line-height:1.6;white-space:pre-line}
   .note.bad{color:#ff8a8a}
@@ -1190,12 +1187,6 @@
   select.ppick{
     width:auto;flex:0 1 auto;min-width:0;max-width:100%;box-sizing:border-box;
     padding:3px 6px;font:inherit;
-    font-size:calc(9px * var(--fs));letter-spacing:.06em;
-    background:rgba(0,0,0,.55);color:rgba(var(--paper),.96);
-    border:1px solid rgba(var(--glass),.16);outline:0;
-  }
-  .kiosk select.kpick{
-    width:auto;max-width:100%;padding:3px 6px;font:inherit;
     font-size:calc(9px * var(--fs));letter-spacing:.06em;
     background:rgba(0,0,0,.55);color:rgba(var(--paper),.96);
     border:1px solid rgba(var(--glass),.16);outline:0;
@@ -1573,14 +1564,6 @@
   .subgrp > .subbody > .bklab:first-child{margin-top:2px}
   .grp.isdefault > h4{border-left:2px solid rgba(122,201,160,.9);padding-left:7px}
   .grp.isoff > h4{opacity:.55}
-  /* A divider inside a block: the wake word half above, the connection half
-     below. Not two sections — one endpoint is one thing to save. */
-  .rtsplit{
-    margin:16px 0 2px;padding-top:9px;
-    border-top:1px solid rgba(var(--glass),.16);
-    font-size:calc(8px * var(--fs));letter-spacing:.22em;text-transform:uppercase;
-    color:rgba(var(--paper),.55);
-  }
   /* Which assistant the topic below belongs to. With one topic open at a
      time you cannot see the list while you edit, so each of the three that
      describe one assistant has to say whose settings these are — otherwise
@@ -2521,6 +2504,56 @@ using. Below 1024 needs root, and the server runs as an ordinary user.</div>
     </div>
   </section>
 
+
+  <!-- ONE CONNECTION, TWO USERS. It lived inside the alerting block and only
+       appeared once you ticked "send alerts by email", which is why somebody
+       looking for SMTP configuration could not find it. It is server wiring —
+       a host, a port, credentials and a from-address — and it belongs beside
+       the ports and the bind address rather than inside the first feature
+       that happened to need it. -->
+  <section class="grp wide" data-tab="app">
+    <h4>Email</h4>
+    <div class="grpbody">
+  <div class="note help">The mail server this one sends through. Nothing here
+turns anything on: it is the connection, and two things use it.
+
+<b>A person's enrolment link.</b> Creating somebody under ENROLLMENTS ▸ USER,
+or reissuing their link, mails it to the address on their row — so you are not
+copying a one-time link out of the panel and into a chat window. The link is
+still shown here once whatever happens, because mail is the convenience and
+the visible link is the guarantee: a server that hid it because it believed it
+had sent one would be a server you cannot enrol anybody from the day the SMTP
+host changes.
+
+<b>Alerts</b>, if you switch them on under SETTINGS ▸ ALERT. That is a
+separate decision — wanting the link mailed and wanting to be paged about a
+screen going quiet are not the same thing.
+
+Leave the server blank and nothing is mailed, anywhere. Everything still
+works; you hand the link over yourself.</div>
+  <div class="setuprow">
+    <label class="bklab" for="ml_host">Server</label>
+    <input id="ml_host" type="text" spellcheck="false" autocomplete="off"
+           placeholder="smtp.example">
+    <label class="bklab" for="ml_port">Port</label>
+    <input id="ml_port" class="num" type="number" inputmode="numeric" min="1" max="65535">
+    <label class="vo"><input type="checkbox" id="ml_tls"> Use STARTTLS</label>
+    <label class="bklab" for="ml_user">Username (blank for none)</label>
+    <input id="ml_user" type="text" spellcheck="false" autocomplete="off">
+    <label class="bklab" for="ml_pass">Password</label>
+    <!-- The placeholder is set on paint from `mail_has_pass`, so it says
+         whether one is actually stored rather than asserting it. -->
+    <input id="ml_pass" type="password" autocomplete="new-password">
+    <label class="bklab" for="ml_from">From</label>
+    <input id="ml_from" type="text" spellcheck="false" autocomplete="off"
+           placeholder="resonance@example">
+  </div>
+  <div class="note" id="mailnote"></div>
+  <div class="seg actrow">
+    <button id="b_mailsave" class="act-save">SAVE</button>
+  </div>
+    </div>
+  </section>
 
   <section class="grp wide" data-tab="app">
     <h4>Maintenance</h4>
@@ -3529,6 +3562,12 @@ route name, <b>ALERT</b>, <b>refused</b>.</div>
     <label class="bklab" for="sl_port">Port</label>
     <input id="sl_port" class="num" type="number" inputmode="numeric"
            min="1" max="65535">
+    <label class="bklab" for="sl_name">Name in the source field</label>
+    <input id="sl_name" type="text" spellcheck="false" autocomplete="off"
+           placeholder="this machine's hostname">
+    <div class="note">What the collector files these lines under. Blank uses
+      this machine's own hostname. Sent to a remote collector only — the local
+      daemon writes its own header.</div>
     <label class="bklab" for="sl_fac">Facility</label>
     <select id="sl_fac" class="ppick"></select>
     <button id="b_slsave" class="act-save">SAVE</button>
@@ -3555,25 +3594,20 @@ route name, <b>ALERT</b>, <b>refused</b>.</div>
     <input id="ha_service" type="text" spellcheck="false" autocomplete="off"
            placeholder="persistent_notification.create">
   </div>
+  <!-- Only the alerting half. The SERVER, the credentials and the from-address
+       moved to SETTINGS ▸ ADMIN ▸ Email, because they are not about alerting:
+       the same connection sends somebody their enrolment link, and a
+       deployment can want that and not want to be paged about a screen going
+       quiet. What is left here is whether ALERTS use it, and who they go to. -->
   <div class="setuprow">
     <label class="vo"><input type="checkbox" id="ml_on"> Send alerts by email</label>
   </div>
   <div class="setuprow" id="ml_where">
-    <label class="bklab" for="ml_host">Server</label>
-    <input id="ml_host" type="text" spellcheck="false" autocomplete="off"
-           placeholder="smtp.example">
-    <label class="bklab" for="ml_port">Port</label>
-    <input id="ml_port" class="num" type="number" inputmode="numeric" min="1" max="65535">
-    <label class="vo"><input type="checkbox" id="ml_tls"> Use STARTTLS</label>
-    <label class="bklab" for="ml_user">Username (blank for none)</label>
-    <input id="ml_user" type="text" spellcheck="false" autocomplete="off">
-    <label class="bklab" for="ml_pass">Password</label>
-    <input id="ml_pass" type="password" autocomplete="new-password">
-    <label class="bklab" for="ml_from">From</label>
-    <input id="ml_from" type="text" spellcheck="false" autocomplete="off"
-           placeholder="resonance@example">
     <label class="bklab" for="ml_to">To (comma separated)</label>
     <input id="ml_to" type="text" spellcheck="false" autocomplete="off">
+    <div class="note">The mail server itself is under
+      <b>SETTINGS ▸ ADMIN ▸ Email</b>. Without one configured there, this
+      sends nothing.</div>
   </div>
   <div class="setuprow">
     <label class="vo"><input type="checkbox" id="dg_on"> Gather alerts into a digest</label>
@@ -6124,17 +6158,31 @@ function idNote(m, bad){
 /* The URL, in the one moment it exists in the clear. Shown whole, the way an
    enrolment code is: nobody is retyping half an address, and this page cannot
    show it a second time. */
-function showPersonUrl(name, token){
+function showPersonUrl(name, token, mailed){
   /* On the tab it was asked for. Shown ONCE — so a new link painted onto the
      other tab is somebody locked out, which is the one failure this function
      exists to prevent. */
   const out = $(CURRENT_TAB === 'users' ? 'idhereurl' : 'idurl');
   if (!out) return;
   const line = document.createElement('div');
-  line.textContent = IDBASE + token;
+  /* No base means the server has no bound display port to put in front of the
+     token — see _person_base. Showing the bare secret would look like a link
+     somebody could fix by adding a host, and it would be a live credential on
+     screen with nowhere to use it. */
+  line.textContent = IDBASE ? IDBASE + token
+    : 'no display port is bound — give an endpoint a network profile under '
+      + 'PROFILES ▸ NETWORK, then reissue this link';
   const sub = document.createElement('span');
-  sub.textContent = '“' + name + '” · hand this over now — it is not shown '
-                  + 'again · opening it drops the secret out of their address bar';
+  /* WHETHER IT WAS ALSO EMAILED. The server says so and this ignored it,
+     which left an admin copying a link by hand with no way to know one had
+     already gone — or, worse, assuming one had when no mail server is
+     configured. */
+  sub.textContent = '“' + name + '” · '
+                  + (mailed ? 'emailed to them as well — '
+                            : 'not emailed (no mail server configured under '
+                              + 'SETTINGS ▸ ADMIN ▸ Email) — ')
+                  + 'hand this over now, it is not shown again · opening it '
+                  + 'drops the secret out of their address bar';
   out.innerHTML = '';
   out.appendChild(line);
   out.appendChild(sub);
@@ -6332,7 +6380,7 @@ async function refreshIdentities(){
       if (!j || !j.token) return;
       /* On screen before anything repaints: the old one is already dead, so a
          new one nobody caught is somebody locked out. */
-      showPersonUrl(p.label || p.id, j.token);
+      showPersonUrl(p.label || p.id, j.token, j.mailed);
       idNote('the previous link stopped working just now');
       refreshIdentities();
     };
@@ -6403,7 +6451,7 @@ $('b_idnew').addEventListener('click', async ()=>{
      thing to fix a typo. */
   el.value = '';
   mail.value = '';
-  showPersonUrl(name, j.token);
+  showPersonUrl(name, j.token, j.mailed);
   refreshIdentities();
 });
 $('id_email').addEventListener('keydown', e=>{
@@ -6542,6 +6590,7 @@ function paintSyslog(cfg){
   $('q_to').value = cfg.quiet_to == null ? 7 : cfg.quiet_to;
   $('sl_on').checked = !!cfg.syslog_on;
   $('sl_host').value = cfg.syslog_host || '';
+  $('sl_name').value = cfg.syslog_name || '';
   $('sl_port').value = cfg.syslog_port || 514;
   const sel = $('sl_fac');
   if (sel && !sel.options.length)
@@ -6575,6 +6624,7 @@ if (bsl) bsl.addEventListener('click', async ()=>{
       syslog_on: $('sl_on').checked ? 1 : 0,
       syslog_host: ($('sl_host').value || '').trim(),
       syslog_port: parseInt($('sl_port').value, 10) || 514,
+      syslog_name: ($('sl_name').value || '').trim(),
       syslog_facility: $('sl_fac').value,
       hook_on: $('hk_on').checked ? 1 : 0,
       hook_url: ($('hk_url').value || '').trim(),
@@ -6582,13 +6632,11 @@ if (bsl) bsl.addEventListener('click', async ()=>{
       ha_url: ($('ha_url').value || '').trim(),
       ha_token: $('ha_token').value,
       ha_service: ($('ha_service').value || '').trim(),
+      /* The connection is SETTINGS ▸ ADMIN ▸ Email and is saved there.
+         Sending it from here too would mean whichever tab was saved last won,
+         and a password field this tab no longer draws would post an empty
+         string over a stored credential. */
       mail_on: $('ml_on').checked ? 1 : 0,
-      mail_host: ($('ml_host').value || '').trim(),
-      mail_port: parseInt($('ml_port').value, 10) || 587,
-      mail_tls: $('ml_tls').checked ? 1 : 0,
-      mail_user: ($('ml_user').value || '').trim(),
-      mail_pass: $('ml_pass').value,
-      mail_from: ($('ml_from').value || '').trim(),
       mail_to: ($('ml_to').value || '').trim(),
       digest_on: $('dg_on').checked ? 1 : 0,
       digest_minutes: parseInt($('dg_mins').value, 10) || 60,
@@ -7176,6 +7224,27 @@ function dpNote(m, bad, which){
   el.className = 'note' + (bad ? ' bad' : '');
   el.textContent = m || '';
 }
+
+/* SETTINGS ▸ ADMIN ▸ Email. Its own commit, because it writes the shared
+   settings document rather than app.json — the tab's own SAVE publishes
+   app.json, and one button writing two documents is a button whose failure
+   mode nobody can describe. */
+$('b_mailsave').addEventListener('click', ()=>{
+  const body = {
+    mail_host: ($('ml_host').value || '').trim(),
+    mail_port: parseInt($('ml_port').value, 10) || 587,
+    mail_tls: $('ml_tls').checked ? 1 : 0,
+    mail_user: ($('ml_user').value || '').trim(),
+    mail_from: ($('ml_from').value || '').trim(),
+  };
+  /* Only when something was typed. An empty password field means "keep the
+     one stored", the same contract every other credential on this panel has —
+     posting the empty string would clear it every time somebody saved the
+     port. */
+  const pw = $('ml_pass').value;
+  if (pw) body.mail_pass = pw;
+  saveDp(body, 'mailnote').then(()=>{ $('ml_pass').value = ''; });
+});
 
 async function saveDp(body, slot){
   dpNote('saving…', false, slot);
@@ -9581,7 +9650,7 @@ async function displayAction(path, body, said){
        link appears. Shown before the repaint: what was just made is what you
        came here to collect. */
     if (j && j.token) showPersonUrl(body && body.name ? body.name : 'the request',
-                                    j.token);
+                                    j.token, j.mailed);
     await refreshDisplays();
     if (j && j.identities) refreshIdentities();
     /* An allow-list that still offers a display somebody just deleted is a

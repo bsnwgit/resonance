@@ -195,6 +195,9 @@ PY
 for page in index.html admin.html; do
   check_page "$page" || fail=1
 done
+# …and that nothing called at LOAD is missing. Parsing proves the script is
+# well formed; this proves it gets past its first line. See check_calls.py.
+python3 "$DIR/check_calls.py" "$DIR/index.html" "$DIR/admin.html" || fail=1
 for mod in serve.py manual.py; do
   check_py "$mod" || fail=1
 done

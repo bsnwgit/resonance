@@ -55,7 +55,7 @@ Plain `python3 -m http.server` also honours conditional GETs, so a browser can
 sit on a cached copy of index.html and you end up debugging code that is no
 longer running. This sends no-store on everything instead.
 """
-import base64, contextlib, functools, hashlib, hmac, http.cookies, inspect, \
+import contextlib, functools, hashlib, hmac, http.cookies, inspect, \
        json, os, re, \
        secrets, socket, ssl, subprocess, sys, tempfile, threading, time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -913,10 +913,6 @@ def _keep_word(s):
 
 
 
-def _blank_routes():
-    return {"default": "", "routes": {}}
-
-
 def _migrate_routes():
     """The single assistant this server had until now becomes route one.
 
@@ -1592,6 +1588,19 @@ DISPLAY_DEFAULTS = {
     # at. That guessing is the whole point: approving what you cannot identify
     # is not a decision, it is a coin toss.
     "answers": [], "requested_at": 0,
+    # THE ADDRESS THEY ASKED WITH, and the link approving them minted. Both
+    # belong here rather than being set on the row and left to survive on
+    # their own: `read_displays` rebuilds every record from DISPLAY_DEFAULTS
+    # and keeps only the keys it names, so a field written anywhere else is
+    # gone by the next read.
+    #
+    # That is not hypothetical. Both of these were written straight onto the
+    # row and dropped on the next read, which took the whole request-to-
+    # account path with them: approving a request found no `req_email` and
+    # quietly approved a DEVICE instead, and the requester's screen never
+    # learned there was a password to set because `setup` had evaporated.
+    "req_email": "",
+    "setup": "",
     # Guest access is a LIFECYCLE, not a session. It runs out, and the person
     # asks again — against this same row, so what they told you the first time
     # is still here and they do not fill the form in twice. Zero means never,
@@ -1810,9 +1819,16 @@ DISPLAY_SETTINGS = {
     # Ten minutes is the default because the usual case is somebody walking
     # across a building with six characters in their head.
     "code_minutes": 10,
-    # Which group each population lands in when it starts working. Minted on
-    # first need rather than shipped, so an install that never uses groups
-    # never grows two it did not ask for — see default_group.
+    # Where each population landed when it started working, back when the
+    # answer was stored here. It is not any more: `default_group` asks
+    # `system_group`, which finds the permanent group of that kind in the
+    # groups document — so nothing reads or writes these two, and the comment
+    # that sent a reader to `default_group` for them was pointing at code that
+    # had stopped consulting them.
+    #
+    # Kept anyway, for the same reason `user_group` below is: dropping a key
+    # rewrites every existing settings document on its next save, and losing
+    # somebody's data to tidy a default is the wrong trade.
     "device_group": "",
     "identity_group": "",
     # Set once ensure_system_groups has had its one chance to correct a name it
@@ -1831,6 +1847,16 @@ DISPLAY_SETTINGS = {
     "syslog_host": "",                   # blank means the local daemon
     "syslog_port": 514,
     "syslog_facility": "user",
+    # WHAT THIS BOX IS CALLED IN THE COLLECTOR'S SOURCE COLUMN. Blank takes the
+    # machine's own hostname, which is what a collector would infer from the
+    # packet anyway — the field exists for when that is not the name you want
+    # to read: a host called `srv-04b` answering for the thing everybody calls
+    # the kitchen, or several installs behind one address.
+    #
+    # Sent only to a REMOTE collector. The local daemon writes its own header
+    # and prepending a second one there would put the name in the message
+    # text, which is the opposite of tidy.
+    "syslog_name": "",
     # A JSON POST, which is what ntfy, Slack, Discord and Gotify all take.
     "hook_on": 0,
     "hook_url": "",
@@ -2213,6 +2239,12 @@ def validate_display_settings(obj, current):
         if not (1 <= port <= 65535):
             return None, "the syslog port must be between 1 and 65535"
         cfg["syslog_port"] = port
+    if "syslog_name" in obj:
+        # No spaces: RFC 3164 ends the HOSTNAME field at the first one, so a
+        # name with a space in it would push the rest into the message and the
+        # source column would show half a word.
+        cfg["syslog_name"] = re.sub(r"\s+", "-",
+                                    str(obj["syslog_name"] or "").strip())[:64]
     if "syslog_facility" in obj:
         f = str(obj["syslog_facility"] or "").strip()
         if f not in SYSLOG_FACILITIES:
@@ -3945,6 +3977,24 @@ def syslog_send(level, text):
         pri = fac * 8 + SYSLOG_SEVERITY.get(level, 6)
         line = "<%d>resonance: %s" % (pri, str(text)[:900])
         if host:
+            # A REAL RFC 3164 HEADER, for a remote collector only. Without one
+            # the collector files the line under whatever it can infer from
+            # the packet — usually the sending IP — and the source column is
+            # then an address rather than a name anybody recognises.
+            #
+            # The day is space-padded, not zero-padded: "Aug  1", two spaces.
+            # That is what the format says and what strict parsers expect, and
+            # Python's %d gives "01".
+            #
+            # LOCAL TIME, with no zone marker, because RFC 3164 has no field
+            # for one. A collector in another zone reads this as its own local
+            # time — that is the format's problem rather than a choice being
+            # made here, and the alternative is a line some parsers reject.
+            stamp = time.strftime("%b %e %H:%M:%S")
+            who = (str(cfg.get("syslog_name") or "").strip()
+                   or socket.gethostname().split(".")[0] or "resonance")
+            line = "<%d>%s %s resonance: %s" % (pri, stamp, who,
+                                                str(text)[:900])
             port = int(cfg.get("syslog_port") or 514)
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             try:
@@ -4024,15 +4074,68 @@ def post_home_assistant(text, level, row):
         print("home assistant alert failed: %s" % exc, flush=True)
 
 
-def send_mail(subject, body):
+def mail_setup_link(rec, base, token, again=False):
+    """Send somebody the link that lets them choose a password. Returns True if
+    it went, False if there is no mail server or it failed.
+
+    The panel still shows the link once whatever happens here. Mail is the
+    convenience; the visible link is the guarantee, and a deployment with no
+    SMTP server is not a deployment that cannot enrol anybody."""
+    addr = str((rec or {}).get("email") or "").strip()
+    if not addr or not base or not mail_ready():
+        # No base means no display port is bound, and a link with no host in
+        # front of it is worse than no mail at all.
+        return False
+    who = (rec.get("name") or "").strip()
+    url = base + token
+    body = ("%s\n\n"
+            "%s"
+            "Open this link to choose your password:\n\n"
+            "    %s\n\n"
+            "It works once. After that you sign in with this address and the "
+            "password you chose.\n\n"
+            "If you were not expecting this, ignore it — the link reaches "
+            "nothing until somebody uses it.\n"
+            % (("Hello %s," % who) if who else "Hello,",
+               ("Your access was reset, so the link you had no longer works.\n\n"
+                if again else ""),
+               url))
+    return send_mail("Resonance: %s" % ("your new sign-in link" if again
+                                        else "set your password"),
+                     body, to=addr)
+
+
+def mail_ready():
+    """Is there a server to send through? Separate from `mail_on`, which is
+    about ALERTS: a deployment can legitimately want the enrolment link mailed
+    and not want to be paged about a screen going quiet."""
+    cfg = display_settings()
+    return bool(str(cfg.get("mail_host") or "").strip())
+
+
+def send_mail(subject, body, to=None):
     """One message, or nothing. Costs no dependency and is still last on the
     list: it wants a server and credentials, and when it fails it usually
-    fails somewhere this process cannot see."""
+    fails somewhere this process cannot see.
+
+    `to` names the recipient. Without it the message goes to the alert
+    addresses, which is what every caller wanted while the only thing this
+    sent was an alert — and with it, to the person the message is about. That
+    is the whole of what made this unusable for a user's own mail: the
+    recipient was a deployment setting."""
     cfg = display_settings()
     host = str(cfg.get("mail_host") or "").strip()
-    to = [a.strip() for a in str(cfg.get("mail_to") or "").split(",") if a.strip()]
-    if not (cfg.get("mail_on") and host and to):
-        return
+    if to:
+        # A person's own address. `mail_on` is not consulted: that switch says
+        # whether ALERTS are mailed, and somebody's enrolment link is not one.
+        to = [to] if isinstance(to, str) else list(to)
+        to = [str(a).strip() for a in to if str(a).strip()]
+        if not (host and to):
+            return False
+    else:
+        to = [a.strip() for a in str(cfg.get("mail_to") or "").split(",") if a.strip()]
+        if not (cfg.get("mail_on") and host and to):
+            return False
     frm = str(cfg.get("mail_from") or "").strip() or "resonance@localhost"
     try:
         import smtplib
@@ -4050,8 +4153,10 @@ def send_mail(subject, body):
             if user:
                 sm.login(user, str(cfg.get("mail_pass") or ""))
             sm.send_message(msg)
+        return True
     except Exception as exc:                     # noqa: BLE001
         print("mail failed: %s" % exc, flush=True)
+        return False
 
 
 def post_webhook(text, level, row):
@@ -4511,7 +4616,11 @@ def verify_identity_password(pid, pw):
     if ok:
         _user_fails.pop(pid, None)
     else:
-        note_login_failure(pid)
+        # note_USER_login_failure. The other one is the panel's, keyed by
+        # client address — calling it here charged a person's wrong password
+        # against a ledger nothing reads for people, so `user_login_blocked`
+        # never became true and password guessing was not rate limited at all.
+        note_user_login_failure(pid)
     return bool(ok)
 
 
@@ -6474,6 +6583,44 @@ class Handler(SimpleHTTPRequestHandler):
             return None, ident
         return disp, None
 
+    def _person_base(self):
+        """Where a minted link lives, whole: scheme, host, port and the prefix.
+
+        The HOST HEADER, not a stored hostname — an admin is about to hand this
+        address to somebody, or this server is about to mail it, so it has to
+        be the address somebody is actually at rather than this server's
+        opinion of where it lives.
+
+        The port is a listener's, and with no built-in display listener left
+        there may be several. It takes whichever one is bound: any of them
+        serves this route, because spending a link is not an endpoint's
+        business."""
+        host = re.sub(r":\d+$", "", self.headers.get("Host") or "") or LOOPBACK
+        secure = RUNNING.get("https_port")
+        if not secure:
+            # A PROFILE THAT IS ACTUALLY BOUND. Taking the first one with a
+            # port would happily name a profile no endpoint has been given —
+            # and those are not bound at all, so the link would point at a
+            # port nothing is listening on. A person cannot be told that; they
+            # just get nothing.
+            doc = read_routes()
+            live = {str(r.get("network") or "") for r in doc["routes"].values()
+                    if r.get("enabled", True)}
+            for _n in display_settings()["networks"]:
+                _p = (_n.get("values") or {}).get("port")
+                if _p and _n["id"] in live:
+                    secure = int(_p)
+                    break
+        port = secure or RUNNING.get("http_port") or 0
+        if not port:
+            # NOTHING IS BOUND. Empty rather than a URL naming port 0: the
+            # callers concatenate a token onto this, so anything returned here
+            # that is not a real base becomes a broken link with a live secret
+            # inside it. Both callers check.
+            return ""
+        return "%s://%s:%d%s" % ("https" if secure else "http", host, port,
+                                 PERSON_PREFIX)
+
     def _user_pid(self):
         """Which person this browser has SIGNED IN as, or "". Read straight
         from the jar and never through `_identity`, which calls this — the two
@@ -7044,7 +7191,8 @@ class Handler(SimpleHTTPRequestHandler):
                 # one that can disagree with it.
                 "settings": {k: panel_settings().get(k)
                              for k in ("syslog_on", "syslog_host",
-                                       "syslog_port", "syslog_facility",
+                                       "syslog_port", "syslog_name",
+                                       "syslog_facility",
                                        "hook_on", "hook_url",
                                        "ha_on", "ha_url", "ha_service",
                                        "ha_has_token",
@@ -7063,15 +7211,11 @@ class Handler(SimpleHTTPRequestHandler):
             # somebody, so it has to be whole rather than a path they finish by
             # guessing. A stored hostname would be this server's opinion of
             # where it lives; the Host header is where somebody actually is.
-            host = re.sub(r":\d+$", "", self.headers.get("Host") or "") or LOOPBACK
-            secure = RUNNING.get("https_port")
             return self._json(200, {"identities": admin_identities(),
                                     "max": MAX_IDENTITIES,
                                     "pw_min": MIN_PASSWORD,
-                                    "base": "%s://%s:%d%s"
-                                            % ("https" if secure else "http", host,
-                                               secure or RUNNING.get("http_port") or 0,
-                                               PERSON_PREFIX)})
+                                    "mail": mail_ready(),
+                                    "base": self._person_base()})
         if path == "/app":
             if not self._require("admin"):
                 return
@@ -7970,12 +8114,21 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(409, {"error": rec})
             print("identity %s (%s) created by %s"
                   % (rec["id"], identity_label(rec), s["user"]), flush=True)
+            sent = mail_setup_link(rec, self._person_base(), token)
+            if sent:
+                print("identity %s: setup link mailed to %s"
+                      % (rec["id"], rec.get("email")), flush=True)
             # The URL is handed back ONCE and never again: what is stored is
             # its hash, so a panel that has been closed cannot show it a second
             # time. Same contract an embed key already has, and for the same
             # reason — a secret a panel can re-display is a secret sitting in
             # every browser that ever had that page open.
-            return self._json(200, {"ok": True, "token": token,
+            #
+            # Handed back even when it was mailed. Mail is the convenience and
+            # the visible link is the guarantee: a server that quietly hid the
+            # link because it believed it had sent one would be a server you
+            # cannot enrol anybody from the day the SMTP host changes.
+            return self._json(200, {"ok": True, "token": token, "mailed": sent,
                                     "identities": admin_identities()})
 
         if parsed.path == "/user/login":
@@ -8201,15 +8354,19 @@ class Handler(SimpleHTTPRequestHandler):
             obj = self._json_body()
             if obj is None:
                 return
-            token = reissue_identity(str(obj.get("id") or ""))
+            _pid = str(obj.get("id") or "")
+            token = reissue_identity(_pid)
             if not token:
                 return self._json(404, {"error": "no such identity"})
-            print("identity %s reissued by %s" % (obj.get("id"), s["user"]),
-                  flush=True)
+            print("identity %s reissued by %s" % (_pid, s["user"]), flush=True)
+            sent = mail_setup_link(read_identities().get(_pid),
+                                   self._person_base(), token, again=True)
+            if sent:
+                print("identity %s: new link mailed" % _pid, flush=True)
             # The old URL stopped working the moment that returned. Anything
             # holding a cookie from it keeps that cookie and it no longer
             # resolves, which is the same revocation an embed key gets.
-            return self._json(200, {"ok": True, "token": token,
+            return self._json(200, {"ok": True, "token": token, "mailed": sent,
                                     "identities": admin_identities()})
 
         if parsed.path == "/identities/rename":
@@ -8478,8 +8635,21 @@ class Handler(SimpleHTTPRequestHandler):
                 print("request from display %s approved into identity %s (%s) "
                       "by %s" % (did, made["id"], rec["req_email"], s["user"]),
                       flush=True)
+                # MAILED HERE TOO. Creating somebody and reissuing their link
+                # both send one; approving a request mints exactly the same
+                # link and was the one path that did not, which is the sort of
+                # gap that reads as mail being unreliable rather than absent.
+                #
+                # Their screen is also being sent to the link — they are
+                # standing at it — so this is the copy for somebody who filled
+                # the form in and walked away.
+                sent = mail_setup_link(read_identities().get(made["id"]),
+                                       self._person_base(), token)
+                if sent:
+                    print("identity %s: setup link mailed to %s"
+                          % (made["id"], rec["req_email"]), flush=True)
                 return self._json(200, {"ok": True,
-                                        "token": token,
+                                        "token": token, "mailed": sent,
                                         "identities": admin_identities(),
                                         "displays": admin_displays()})
             if approve:
