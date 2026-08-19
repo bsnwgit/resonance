@@ -3453,13 +3453,24 @@ const TOUCH_GRACE = 8;          // seconds a touch keeps the screen talkative
    vanish again. A screen that twitches at conversations nobody addressed to it
    reads as broken, and the twitching is the part people notice.
 
-   Three things unhush it: the gate not being armed at all (a desk, where the
-   messages are for the person sitting there), being awake, and a recent touch.
+   THE QUESTION IS WHETHER THIS SCREEN IS IN A CONVERSATION, and nothing else.
+   An earlier version asked the WAKE GATE instead, and it was silently useless:
+   `Wake.armed()` is false in auto + push-to-talk, so on a display set that way
+   this returned false on the first line and nothing was ever hushed. The gate
+   mode is not the question — a push-to-talk screen sitting idle twitches at
+   the room exactly as a hands-free one does.
+
+   So: thinking or speaking is a conversation, being awake is a conversation,
+   and a touch in the last few seconds means somebody is standing there and the
+   messages are for them — which covers CALIBRATE and MIC ONLY on a screen that
+   is otherwise asleep, and covers holding SPACE, which is a keydown like any
+   other.
+
    Errors are never hushed — a fault is worth a jump — and neither is CLEARING
    a note, or one left on screen would outlive whatever put it there. */
 function hush(){
-  if (typeof Wake === 'undefined') return false;
-  if (!Wake.armed() || Wake.engaged()) return false;
+  if (typeof Drive !== 'undefined' && Drive.phase !== 'idle') return false;
+  if (typeof Wake !== 'undefined' && Wake.awake) return false;
   return (wallNow() - lastTouch) > TOUCH_GRACE;
 }
 
