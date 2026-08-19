@@ -6436,15 +6436,39 @@ function idNote(m, bad){
   el.textContent = m || '';
 }
 
+/* WHOSE URL IS ON SCREEN, or ''. The box holds the last link minted, whoever
+   it was for, and a link is only live for as long as the row behind it — so
+   deleting that row has to take the URL with it, and deleting anybody else's
+   must leave it exactly where it is. */
+let SHOWNPID = '';
+
+/* Off the screen, both boxes. It is painted onto whichever tab it was asked
+   for, and the one you are NOT standing on is precisely where a dead secret
+   would sit unnoticed until somebody scrolled past it. */
+function clearPersonUrl(){
+  SHOWNPID = '';
+  ['idurl', 'idhereurl'].forEach(id=>{
+    const el = $(id);
+    if (!el) return;
+    el.classList.remove('on');
+    el.innerHTML = '';
+  });
+}
+
 /* The URL, in the one moment it exists in the clear. Shown whole, the way an
    enrolment code is: nobody is retyping half an address, and this page cannot
    show it a second time. */
-function showPersonUrl(name, token, mailed, base){
+function showPersonUrl(name, token, mailed, base, pid){
   /* On the tab it was asked for. Shown ONCE — so a new link painted onto the
      other tab is somebody locked out, which is the one failure this function
      exists to prevent. */
   const out = $(CURRENT_TAB === 'users' ? 'idhereurl' : 'idurl');
   if (!out) return;
+  /* Whatever was there first, including on the other tab. Two links on screen
+     is one of them stale, and after a reissue the stale one is a token that
+     was revoked the moment this one was minted. */
+  clearPersonUrl();
+  SHOWNPID = pid || '';
   const line = document.createElement('div');
   /* THE BASE THE SERVER JUST USED, and not the list's. It built this one for
      this person — off the endpoint they were enrolled on — and the list's map
@@ -6569,7 +6593,17 @@ async function refreshIdentities(){
                    + 'immediately, and anything granted to them goes with them.'))
         return;
       const j = await idAction('/identities/delete', {id: p.id});
-      if (j){ OPENPID = ''; idNote(''); refreshIdentities(); }
+      if (j){
+        OPENPID = '';
+        idNote('');
+        /* THE URL GOES WITH THE ROW. The link on screen was minted for
+           somebody who no longer exists — it opens nothing, and left there it
+           reads as one that still does, which is how a link gets handed over
+           after the account behind it was deleted. Theirs only: anybody
+           else's is still live and this is still the only copy of it. */
+        if (p.id === SHOWNPID) clearPersonUrl();
+        refreshIdentities();
+      }
     };
     namerow.appendChild(del);
     row.appendChild(namerow);
@@ -6668,7 +6702,7 @@ async function refreshIdentities(){
       if (!j || !j.token) return;
       /* On screen before anything repaints: the old one is already dead, so a
          new one nobody caught is somebody locked out. */
-      showPersonUrl(p.label || p.id, j.token, j.mailed, j.base);
+      showPersonUrl(p.label || p.id, j.token, j.mailed, j.base, p.id);
       idNote('the previous link stopped working just now');
       refreshIdentities();
     };
@@ -6761,7 +6795,7 @@ $('b_idnew').addEventListener('click', async ()=>{
      person — the same reasoning that keeps the screen box's ticks. */
   el.value = '';
   mail.value = '';
-  showPersonUrl(name, j.token, j.mailed, j.base);
+  showPersonUrl(name, j.token, j.mailed, j.base, j.id);
   refreshIdentities();
 });
 $('id_email').addEventListener('keydown', e=>{
@@ -9994,7 +10028,7 @@ async function displayAction(path, body, said){
        link appears. Shown before the repaint: what was just made is what you
        came here to collect. */
     if (j && j.token) showPersonUrl(body && body.name ? body.name : 'the request',
-                                    j.token, j.mailed);
+                                    j.token, j.mailed, j.base, j.pid);
     await refreshDisplays();
     if (j && j.identities) refreshIdentities();
     /* An allow-list that still offers a display somebody just deleted is a

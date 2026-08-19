@@ -8327,6 +8327,13 @@ class Handler(SimpleHTTPRequestHandler):
             # link because it believed it had sent one would be a server you
             # cannot enrol anybody from the day the SMTP host changes.
             return self._json(200, {"ok": True, "token": token, "mailed": sent,
+                                    # WHOSE IT IS. The panel puts this URL on
+                                    # screen and has to be able to take it off
+                                    # again when that row is deleted — a link
+                                    # is only live while the row behind it is,
+                                    # and it cannot tell whose is showing from
+                                    # a name two people could share.
+                                    "id": rec["id"],
                                     # The base this token belongs in front of.
                                     # The list's own map is a refresh behind at
                                     # this moment — the row did not exist when
@@ -8861,12 +8868,21 @@ class Handler(SimpleHTTPRequestHandler):
                 # standing at it — so this is the copy for somebody who filled
                 # the form in and walked away.
                 _made = read_identities().get(made["id"])
-                sent = mail_setup_link(_made, self._person_base(_made), token)
+                _base = self._person_base(_made)
+                sent = mail_setup_link(_made, _base, token)
                 if sent:
                     print("identity %s: setup link mailed to %s"
                           % (made["id"], rec["req_email"]), flush=True)
                 return self._json(200, {"ok": True,
                                         "token": token, "mailed": sent,
+                                        # The same two the mint box gets. `pid`
+                                        # and not `id`: this response already
+                                        # travels through the display action,
+                                        # where `id` means the display row to
+                                        # open — a person's id in that key
+                                        # would open nothing and shut the row
+                                        # somebody was looking at.
+                                        "pid": made["id"], "base": _base,
                                         "identities": admin_identities(),
                                         "displays": admin_displays()})
             if approve:
