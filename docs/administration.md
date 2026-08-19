@@ -209,6 +209,30 @@ nothing else.** Nothing reaches a display until you press SAVE in the profile
 row you are editing, and REVERT does not exist — closing the row without
 saving leaves the stored profile as it was.
 
+### The login alert
+
+**ALERT ▸ Login alert** gives a screen two spoken lines: one when somebody
+signs in, one when a sign-in is refused. It is spoken and the figure moves with
+it, and **nothing is written to the transcript** — a sign-in is not part of
+anybody's conversation and should not be sitting in the log of whoever uses the
+screen next.
+
+**Both are empty by default, which means silent, and that is deliberate.** A
+wall in a shared space announcing *that did not work* tells everybody in
+earshot that somebody just got a password wrong; announcing the success tells
+them who is now signed in. Neither is a thing to switch on for somebody.
+
+**One per line**, and it picks one — the same as the greeting phrases, so a
+screen somebody signs into all day does not repeat itself. `{name}` and the
+other variables work here too.
+
+**It needs the local voice to be reliable.** A browser only starts speech
+synthesis inside the gesture that asked for it, and whether a sign-in worked is
+not known until the server has answered — by which time that gesture has been
+spent. The local engine plays audio instead and is not subject to that rule, so
+on SPEECH ▸ engine LOCAL this always speaks. On the browser voice it may be
+dropped silently. Nothing else breaks either way.
+
 ### Saves that are not that save
 
 Each of these writes a different document, so each has its own button:
@@ -365,29 +389,31 @@ them was put.
 ### Setting a fleet in one place
 
 Eight screens on one assistant are eight rows to set by hand, and they are
-usually all the same kind of place. So an endpoint carries a **display profile
-for the screens named above** — CONNECTIONS ▸ AI, under *Who may use it* — and
-a screen that names no profile of its own takes that one.
+usually all the same kind of place. So an endpoint carries a **display
+profile** — CONNECTIONS ▸ AI ▸ *Display* — and every screen opened on that
+endpoint's **port** takes it.
+
+**The port is the association.** A browser on the Demo port is a Demo screen
+because that is the address it was opened at. Nothing to tick and no list to
+keep in step: a page is loaded from exactly one address, and a port carries one
+endpoint, so there is never more than one answer.
 
 **A screen's own choice always wins.** Nothing an endpoint says moves a row
-somebody decided about. The inheritance is read only where the row's picker is
-left on INHERIT.
+somebody decided about. This is read only where the row's picker is left on
+INHERIT.
 
-**Only endpoints that NAME the screen**, directly or through a group of
-displays. An endpoint set to ANY DISPLAY is *reachable* by every screen in the
-building; it is not every screen's endpoint, and letting it dress the whole
-building is the accident this rule exists to prevent.
+**Which screens an endpoint permits is a separate question**, on *Who may use
+it*. It is about permission and has nothing to do with how a screen looks. An
+earlier version of this setting keyed off that grant instead, and it was wrong
+twice over: a profile set on an endpoint applied to nothing until every screen
+had also been ticked, and a screen granted two endpoints could have two parents
+naming different profiles with no correct way to choose between them.
 
-**Two endpoints that disagree inherit nothing.** A screen can be granted
-several endpoints, so it can have several parents. Where two of them name
-different profiles the picker says so — *INHERIT — Sparky and Resonance
-disagree, pick one* — and you settle it on the row. It is deliberately not
-resolved: first in the list, last saved, alphabetical are all a screen's
-appearance decided by something nobody could see, and the failure would surface
-months later when somebody ticked a second endpoint for an unrelated reason.
+**An endpoint with no port reaches nothing**, this included.
 
-The picker names what it resolved to, so a row explains itself without opening
-another tab: *INHERIT — Hallway, from Sparky*.
+The row's own picker therefore does not claim to know what it will inherit —
+the same device loaded from two addresses inherits differently at each. It
+reads *INHERIT — whatever the endpoint on its port says*.
 
 **One register became four lists, and every row is in exactly one.** Which one
 is two questions: is this thing working, and is it a person or a machine.
