@@ -3586,6 +3586,39 @@ route name, <b>ALERT</b>, <b>refused</b>.</div>
   </section>
 
   <section class="grp wide" data-tab="alerts">
+    <h4>Login alert</h4>
+    <div class="grpbody">
+  <label class="bklab" for="loginok">When somebody signs in</label>
+  <input id="loginok" type="text" spellcheck="false" maxlength="200"
+         placeholder="empty — say nothing">
+  <label class="bklab" for="loginbad">When a sign-in is refused</label>
+  <input id="loginbad" type="text" spellcheck="false" maxlength="200"
+         placeholder="empty — say nothing">
+  <div class="setuprow" style="margin-top:8px">
+    <button id="b_loginalert" class="act-save">SAVE</button>
+  </div>
+  <div class="note" id="loginalertnote"></div>
+  <div class="note help">What a screen <b>says out loud</b> at the sign-in box,
+and nothing else — it is spoken and the figure moves with it, but no line is
+written to the transcript. A sign-in is not part of anybody's conversation.
+
+<b>Both are empty by default, which means silent, and that is deliberate.</b> A
+wall in a shared space announcing <i>that did not work</i> tells everybody in
+earshot that somebody just got a password wrong; announcing the success tells
+them who is now signed in. Neither is a thing to switch on for somebody.
+
+<b>{name}</b> and the other variables work here, the same as in the greeting.
+
+<b>It needs the local voice to be reliable.</b> A browser will only start
+speech synthesis inside the gesture that asked for it, and whether a sign-in
+worked is not known until the server has answered — by which time that gesture
+has been spent. The local engine plays audio instead and is not subject to
+that, so on <b>SPEECH ▸ engine LOCAL</b> this always speaks. On the browser
+voice it may be dropped silently; nothing else breaks.</div>
+    </div>
+  </section>
+
+  <section class="grp wide" data-tab="alerts">
     <h4>Alerts</h4>
     <div class="grpbody">
   <div class="setuprow">
@@ -4565,6 +4598,7 @@ function buildControls(){
   // no wakeword or wakealiases: those are a route's, saved with the route
   ['wakeword','wakealiases',
    'sleepword','sleepaliases','greetings','farewells',
+   'loginok','loginbad',
    'opname','ainame']
     .forEach(id=>{ const el = $(id); if (el) bindField(el, id); });
 
@@ -7060,6 +7094,24 @@ function logCfgNote(m, bad){
   el.className = 'note' + (bad ? ' bad' : '');
   el.textContent = m || '';
 }
+/* Its own SAVE, like every other section on this tab. It writes the shared
+   settings document rather than app.json, because these two are read by the
+   DISPLAY page — they have to be on it before anybody has signed in, which is
+   the one moment they are for. `tabKeys` is the same collector the profile
+   tabs use, and it returns exactly the keys this tab owns. */
+const bla = $('b_loginalert');
+if (bla) bla.addEventListener('click', async ()=>{
+  const note = $('loginalertnote');
+  const say = (m, bad)=>{ note.textContent = m; note.className = 'note' + (bad ? ' bad' : ''); };
+  say('saving…');
+  try{
+    const body = {settings: tabKeys('alerts'), merge: true};
+    await api('/settings', {method:'POST', body: JSON.stringify(body)});
+    const on = [S.loginok && 'signed in', S.loginbad && 'refused'].filter(Boolean);
+    say(on.length ? 'saved · speaks on ' + on.join(' and ') : 'saved · silent');
+  }catch(e){ say(e.message, true); }
+});
+
 const bll = $('b_loglines');
 if (bll) bll.addEventListener('click', async ()=>{
   try{

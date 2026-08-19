@@ -209,6 +209,28 @@ nothing else.** Nothing reaches a display until you press SAVE in the profile
 row you are editing, and REVERT does not exist — closing the row without
 saving leaves the stored profile as it was.
 
+### The login alert
+
+**ALERT ▸ Login alert** gives a screen two spoken lines: one when somebody
+signs in, one when a sign-in is refused. It is spoken and the figure moves with
+it, and **nothing is written to the transcript** — a sign-in is not part of
+anybody's conversation and should not be sitting in the log of whoever uses the
+screen next.
+
+**Both are empty by default, which means silent, and that is deliberate.** A
+wall in a shared space announcing *that did not work* tells everybody in
+earshot that somebody just got a password wrong; announcing the success tells
+them who is now signed in. Neither is a thing to switch on for somebody.
+
+`{name}` and the other variables work here, the same as in the greeting.
+
+**It needs the local voice to be reliable.** A browser only starts speech
+synthesis inside the gesture that asked for it, and whether a sign-in worked is
+not known until the server has answered — by which time that gesture has been
+spent. The local engine plays audio instead and is not subject to that rule, so
+on SPEECH ▸ engine LOCAL this always speaks. On the browser voice it may be
+dropped silently. Nothing else breaks either way.
+
 ### Saves that are not that save
 
 Each of these writes a different document, so each has its own button:

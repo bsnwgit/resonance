@@ -997,8 +997,10 @@ async function doLogin(){
       $('gatepass').value = '';
       note.className = 'bad';
       note.textContent = j.error || 'that did not work';
+      announce(S.loginbad);
       return;
     }
+    announce(S.loginok);
     await gateArrived(j);
   }catch(e){
     note.className = 'bad';
@@ -1917,6 +1919,13 @@ Prefs.load();
 /* ---------------------------------------------------------------- state */
 const S = {
   mode:'ridge', palette:'blue', layout:'hero',
+  /* WHAT THE SCREEN SAYS ALOUD WHEN SOMEBODY SIGNS IN, and when somebody
+     fails to. BOTH EMPTY BY DEFAULT, which means silent — and that is the
+     right default rather than a timid one. A wall in a shared space
+     announcing "that did not work" tells everybody in earshot that somebody
+     just got a password wrong, and announcing the success tells them who is
+     now signed in. Neither is a thing to switch on for somebody. */
+  loginok:'', loginbad:'',
   face:'mono', fs:'1',                 // typography — see setType()
   /* Who the transcript says is speaking. The assistant's label defaults to
      the VARIABLE rather than to a word: with several endpoints a fixed label
@@ -4013,6 +4022,32 @@ function newReply(rid){
    Muting only silences the VOICE — the reply still streams and the geometry
    still reacts, so the surface never looks dead just because audio is off. */
 let muted = false;
+/* A line the screen SAYS but does not RECORD.
+
+   `respond` is the wrong tool for this: it opens a reply in the transcript,
+   and a sign-in is not part of anybody's conversation — it would sit in the
+   log of the next person to use the screen. So the reveal is pointed at two
+   detached nodes that are never inserted anywhere. Nothing is written to the
+   page; the voice and the figure are the whole of the output, which is what
+   was asked for.
+
+   The figure reacts for free: `Speech.speak` sets the phase and the playback
+   analyser drives the geometry, exactly as it does for an answer.
+
+   TIMING, and this is the part that decides whether it works at all. Chrome
+   gates `speechSynthesis` on user activation AT THE MOMENT OF THE CALL, and a
+   sign-in is decided after an await — the activation from the click is spent
+   by then, so on the browser voice this is silently dropped. On the LOCAL
+   engine it goes through `Play`, which is ordinary audio playback and not
+   subject to that gate. So it is reliable on local TTS and best-effort
+   otherwise, which is stated in the panel rather than left to be discovered. */
+function announce(text){
+  text = expand(String(text || '')).trim();
+  if (!text || muted || S.src !== 'tts' || !Speech.supported) return;
+  Speech.speak(text, {body: document.createElement('div'),
+                      caret: document.createElement('span')});
+}
+
 function respond(text, rid){
   clearTimeout(streamTimer);
   Speech.stop();
