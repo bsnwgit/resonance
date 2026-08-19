@@ -1,9 +1,10 @@
 # Appearance & geometry
 
-This tab is the editor for an appearance profile. Move a control and the
-preview responds immediately; nothing reaches anyone else until you save the
-profile you are editing, and what every display gets is whichever profile is
-nominated the default.
+This tab is the editor for an appearance profile — a workbench, not a
+document. Move a control and the preview responds immediately; nothing reaches
+anyone else until you capture it as a profile and a display NAMES that profile.
+There is no shared appearance and no nominated default: a screen naming nothing
+shows what the page ships with.
 
 There is no wrong setting in this document — none of it can break the app —
 so the honest advice is to open the preview and push the sliders around.
@@ -113,19 +114,38 @@ rather than blanked, so a typo is visible instead of silently disappearing.
 
 ### Pattern
 
-Four figures. They are genuinely different shapes rather than presets of one
+Five figures. They are genuinely different shapes rather than presets of one
 shape, so try each rather than assuming.
 
 | Mode | Reads as |
 |---|---|
-| STACK | layered horizontal waves — the most legible for speech |
-| RIDGE | the same waves folded into a landform above its own reflection |
+| RIDGE | a mesh landform above its own exact reflection — fixed, edge to edge |
 | DISC | a rotating ring |
 | ORB | a sphere of lines |
 | KNOT | a closed looping curve |
+| DNA | a ball-and-stick double helix — a sphere per base, four colours |
 
-STACK is the safest default: it maps most directly onto sound, so a viewer
-learns what the movement means fastest.
+**RIDGE is a mesh, and RIDGE does not turn.** The speech only ever pushes UP
+from a spine, and the same shape is drawn inverted below it, so the figure has
+a closed silhouette and a symmetry — a landform above still water rather than a
+wave. It is drawn a few hundred rows deep, fine enough that the rows stop
+reading as lines and start reading as a surface; the moire where near ridges
+cross far ones is the look.
+
+It is the only one of the five held at a **fixed angle**, nearly side-on with a
+little elevation. Its depth comes from that angle rather than from motion, so
+the only thing moving in it is the speech — which makes it the one to reach for
+on a screen somebody walks past all day. Selecting it makes the whole Rotation
+section below inert, and the section says so.
+
+**Lines** buys four rows here rather than one, up to 160. The mesh needs rows
+far more than resolution along one: sixty rows read as a surface where fifteen
+read as fifteen curves.
+
+RIDGE is the safest default: it maps most directly onto sound, it is the
+only one that holds still, and it runs the full width of whatever it is shown
+on — so a viewer learns what the movement means fastest and nothing about the
+figure competes with it.
 
 ### Rotation
 
@@ -135,6 +155,10 @@ correct for something that is on a wall all day.
 **FREE TUMBLE** re-aims itself periodically for a looser, less mechanical
 feel. **re-aim every** sets how often, and **RE-AIM NOW** does it immediately
 so you can see what a re-aim looks like without waiting.
+
+None of this reaches RIDGE, which carries its own fixed viewing angle. The
+controls go dim while RIDGE is the pattern rather than moving and doing
+nothing.
 
 | Control | Effect |
 |---|---|

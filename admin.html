@@ -1001,6 +1001,26 @@
   .note{font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);
         margin-top:8px;line-height:1.6;white-space:pre-line}
   .note.bad{color:#ff8a8a}
+  /* The full-screen command, set under the LABEL of the tick it belongs to
+     rather than under its checkbox — a note starting at the margin reads as
+     belonging to the whole row instead of to the one control above it.
+
+     The indent is two parts because they scale differently: the checkbox and
+     its 7px flex gap are fixed, and the width of "Full " is five characters
+     of the label's own type, which moves with the type-size setting. Kept in
+     one custom property so it is one number to nudge rather than three. */
+  .note.fsnote{
+    --fsind: calc(20px + 9px * var(--fs) * 3.3);
+    font-size: calc(8px * var(--fs));
+    margin-left: var(--fsind);
+    margin-top: 4px;
+  }
+  /* A command somebody has to type, inside a note. Selectable and set apart
+     from the sentence around it, because it is the one part that has to be
+     copied exactly. */
+  .note code{font-family:var(--face-mono);letter-spacing:0;
+             color:rgba(var(--paper),.98);user-select:all;
+             background:rgba(var(--paper),.07);padding:1px 5px;border-radius:3px}
   #whoname:hover{color:var(--hue);text-decoration-color:var(--hue)}
   /* Your own account, over the panel rather than inside it. */
   .whoami{font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.92);
@@ -1258,6 +1278,8 @@
      display with no profile of its own is showing. Amber, because it is the
      colour this panel already spends on "this is the one that counts" — and
      never grey, which is what every other badge on the row is. */
+  /* UNUSED by the profile lists, which no longer nominate anything. Kept for
+     the endpoint register, which still marks a default assistant. */
   .badge.isdefault{
     border-color:rgba(224,178,110,.75);color:#f0cf9a;
     background:rgba(224,178,110,.14);
@@ -1562,6 +1584,14 @@
   .erow .acts .spacer{flex:1;min-width:8px}
   /* The first control in a box should not sit tight under its heading. */
   .subgrp > .subbody > .bklab:first-child{margin-top:2px}
+  /* A section with nothing left to act on — see syncRotation. Dimmed and
+     inert rather than hidden: a section that vanishes reads as a panel that
+     has lost something, and the reason it is dead is worth being able to see
+     next to it. */
+  #grpbox .grp.inert > .grpbody{opacity:.42;pointer-events:none}
+  #grpbox .grp.inert > h4{opacity:.6}
+  .inertwhy{display:none}
+  .grp.inert > .inertwhy{display:block;color:rgba(var(--paper),.7)}
   .grp.isdefault > h4{border-left:2px solid rgba(122,201,160,.9);padding-left:7px}
   .grp.isoff > h4{opacity:.55}
   /* Which assistant the topic below belongs to. With one topic open at a
@@ -2125,11 +2155,11 @@
   <section class="grp" data-prof="motion" data-tab="motion">
     <h4>Pattern</h4>
     <div class="grpbody">  <div class="seg" data-set="mode">
-    <button data-v="stack" class="on">STACK</button>
-    <button data-v="ridge">RIDGE</button>
+    <button data-v="ridge" class="on">RIDGE</button>
     <button data-v="disc">DISC</button>
     <button data-v="orb">ORB</button>
     <button data-v="knot">KNOT</button>
+    <button data-v="dna">DNA</button>
   </div></div>
   </section>
   <section class="grp" data-prof="look" data-tab="look">
@@ -2183,8 +2213,13 @@ size it is setting, so you read the choice while making it.</div>
   <div class="sl"><label>Spread</label><output id="o_spread"></output><input id="s_spread" type="range" min="200" max="1100" step="10"></div>
   <div class="sl"><label>Perspective</label><output id="o_persp"></output><input id="s_persp" type="range" min="260" max="3000" step="20"></div></div>
   </section>
-  <section class="grp" data-prof="motion" data-tab="motion">
+  <section class="grp" id="grp_rotation" data-prof="motion" data-tab="motion">
     <h4>Rotation</h4>
+    <!-- Live feedback rather than help: it appears only while the controls
+         under it are actually dead, which is the moment somebody needs to be
+         told why. Outside the body on purpose, so it stays legible while
+         everything it is explaining is dimmed. -->
+    <div class="note inertwhy">RIDGE does not turn — it is held at a fixed angle. These act on every other figure.</div>
     <div class="grpbody">  <div class="seg" data-set="tmode">
     <button data-v="turntable" class="on">TURNTABLE</button>
     <button data-v="free">FREE TUMBLE</button>
@@ -2900,23 +2935,24 @@ thing they belong to.</div>
   <div class="seg addrow">
     <button id="b_addlook" class="act-add">ADD A PROFILE</button>
   </div>
-  <div class="note help">The APPEARANCE tab is <b>one document for everybody</b>, and
-that is right for almost all of it — tune the bloom once and every screen in
-the building gets it. It is wrong for exactly four values.
+  <div class="note help">This tab is a <b>workbench, not a document</b>. Nothing
+you set here reaches a screen on its own: you tune it against the preview and
+then capture it under a name, and a display shows the profiles it NAMES.
 
 A screen in a hallway is read from three metres. A laptop is read from fifty
 centimetres. One type size cannot be right for both, and neither can one
 layout: a wall wants the figure filling the frame, a desk wants room for the
-transcript beside it. So <b>type size, palette, layout and the figure</b>
-become a profile a device names, and everything else stays shared.
+transcript beside it. That is why these are named rather than shared.
 
-A device that names none of these shows what the APPEARANCE tab says, which is what
-every display did before this existed. Deleting a profile puts every device
-that named it back to that, rather than to nothing.
+<b>There is no default and nothing is inherited.</b> A device naming no
+appearance profile shows what the page itself ships with — a working screen
+that nobody has dressed. Deleting a profile puts every device that named it
+there too. Which profile a device names is set on DISPLAYS, one picker each
+for appearance, geometry and speech, and NONE is a real answer.
 
 <b>PREVIEW</b> lays a profile over the preview on the right without saving it,
 and follows the controls as you change them. Pressing STOP — or touching
-anything on APPEARANCE, GEOMETRY or SPEECH — puts the shared document back.
+anything on APPEARANCE, GEOMETRY or SPEECH — puts the workbench back.
 
 <b>Type size tops out at LARGEST</b>, which is the range the APPEARANCE tab offers.
 If that turns out not to be enough on a real wall, the range is the thing to
@@ -4506,10 +4542,22 @@ function bindField(el, key){
   paint(); FIELDS.push(paint);
 }
 
+/* RIDGE is fixed, so while it is selected the rotation controls have nothing
+   to act on. Made inert rather than left live: a slider that moves and changes
+   nothing is worse than one that will not move, and this is the whole reason
+   RIDGE can hold a viewing angle at all. */
+function syncRotation(){
+  const g = $('grp_rotation');
+  if (g) g.classList.toggle('inert', S.mode === 'ridge');
+}
+
 function syncSeg(key){
   document.querySelectorAll('.seg[data-set="'+key+'"] button').forEach(b=>
     b.classList.toggle('on',
       BOOL_KEYS.has(key) ? (b.dataset.v === '1') === !!S[key] : b.dataset.v === S[key]));
+  /* Here rather than on the click handler, so loading a profile and repainting
+     from the shared document both go through it as well. */
+  if (key === 'mode') syncRotation();
 }
 
 function buildControls(){
@@ -5051,7 +5099,7 @@ $('b_appsave').addEventListener('click', async ()=>{
 /* The connection went the way of the greeting and the wake word: a model
    profile carries it, and an endpoint names one. */
 const RT_FIELDS = ['name','speech','model_profile','network','system',
-                   'keep_alive'];
+                   'kiosk_profile','keep_alive'];
 const RT_SLIDERS = {max_tokens:  v=> v,
                     temperature: v=> (+v).toFixed(2),
                     history_turns: v=> v == 0 ? 'none' : v,
@@ -5180,13 +5228,49 @@ Devices enrol themselves and are approved under ACCESS.</div>
     </div>
   </div>
 
+  <!-- Its own section rather than a control inside "Who may use it". A
+       display profile is what a screen LOOKS LIKE, and that group is about
+       permission; somebody going looking for a display setting opens the
+       section called Display. Subsections are collapsed until opened, so a
+       control in the wrong one is a control that does not exist. -->
+  <div class="subgrp" data-g="display">
+    <h5>Display<span class="subsum"></span></h5>
+    <div class="subbody">
+  <select data-f="kiosk_profile" class="ppick"></select>
+  <div class="note help">The <b>display profile</b> the screens this endpoint
+NAMES take, where their own row does not name one. Eight screens on one
+assistant are eight rows to set otherwise, and they are usually all the same
+kind of place.
+
+<b>A screen's own choice always wins.</b> A row that names a profile is a
+screen somebody decided about, and nothing set here moves it — this is read
+only where that row's picker is left on INHERIT.
+
+<b>Every option here is a real profile.</b> There is no "none": a screen that
+inherits nothing already has an answer of its own, so offering the absence as a
+choice made it look like a decision. An endpoint that has never been given one
+reads <i>choose a display profile</i> until it is.
+
+<b>Only screens this endpoint names</b>, directly or through a group of
+displays. An endpoint set to ANY DISPLAY is reachable by every screen in the
+building; it is not every screen's endpoint, and dressing the whole building
+from here is the accident that rule exists to prevent — so this does nothing
+while it is set to ANY DISPLAY.
+
+<b>Two endpoints that disagree inherit nothing.</b> A screen can be granted
+several, so it can have several parents. Where two of them name different
+profiles the screen's own row says so and you settle it there, rather than one
+of them being picked by something nobody can see.</div>
+    </div>
+  </div>
+
   <div class="subgrp" data-g="voice">
     <h5>Speech<span class="subsum"></span></h5>
     <div class="subbody">
   <select data-f="speech" class="ppick"></select>
   <div class="note help">Which <b>speech profile</b> answers for this endpoint —
 the voice, the engine, the rate and pitch, and the greeting phrases. Blank is
-the deployment's default.
+no profile at all — the endpoint speaks in the voice the page ships with.
 
 This used to be a greeting and a voice typed onto each endpoint, which meant
 two endpoints wanting the same voice were two copies of the same choice, and
@@ -5339,9 +5423,9 @@ function blockNote(blk, m, bad){
    that used to branch on it has to resolve the profile instead. */
 function routeModel(r){
   const pool = (DPCFG && DPCFG.models) || [];
-  return pool.filter(x=> x.id === ((r && r.model_profile) || ''))[0]
-      || pool.filter(x=> x.id === ((DPCFG && DPCFG.model_default) || ''))[0]
-      || null;
+  // What it NAMES. An endpoint naming nothing has no model and reads as demo,
+  // which is the truth about it — it used to inherit a nominated default.
+  return pool.filter(x=> x.id === ((r && r.model_profile) || ''))[0] || null;
 }
 function routeProvider(r){
   const m = routeModel(r);
@@ -5479,10 +5563,8 @@ function blockPaint(blk, r){
   if (mp){
     const want = r.model_profile || '';
     const pool = (DPCFG && DPCFG.models) || [];
-    const def = pool.filter(x=> x.id === ((DPCFG && DPCFG.model_default) || ''))[0];
     mp.innerHTML = '';
-    const opts = [['', def ? 'DEFAULT — ' + def.name : 'DEFAULT']]
-                   .concat(pool.map(x=> [x.id, x.name]));
+    const opts = [['', 'NONE — demo replies']].concat(pool.map(x=> [x.id, x.name]));
     if (want && !pool.some(x=> x.id === want))
       opts.push([want, 'a profile that no longer exists']);
     opts.forEach(([v, label])=>{
@@ -5519,6 +5601,16 @@ function blockPaint(blk, r){
      and opening one is for changing it rather than for finding out. */
   const words = (r.aliases || []).length;
   const sums = {
+    display: (()=>{
+      const p = ((DPCFG && DPCFG.kiosks) || [])
+                  .filter(x=> x.id === (r.kiosk_profile || ''))[0];
+      /* Named, and told apart from "set to something that is gone". The third
+         state is the one worth saying out loud: a profile chosen here does
+         nothing at all while the endpoint is open to every display. */
+      return !r.kiosk_profile ? 'none chosen'
+           : !p ? 'a profile that no longer exists'
+           : p.name + (r.restricted ? '' : ' · not applied — open to all');
+    })(),
     wake: (r.wakeword ? '“' + r.wakeword + '”' : 'not set')
         + (words ? ' +' + words + ' more' : '')
         + (r.strict ? ' · exact' : ''),
@@ -5551,8 +5643,7 @@ function blockPaint(blk, r){
          + (r.voice || 'shared voice'),
     conn: (()=>{
       const pool = (DPCFG && DPCFG.models) || [];
-      const p = pool.filter(x=> x.id === (r.model_profile || ''))[0]
-             || pool.filter(x=> x.id === ((DPCFG && DPCFG.model_default) || ''))[0];
+      const p = pool.filter(x=> x.id === (r.model_profile || ''))[0];
       return p ? p.name : 'no model profile';
     })(),
     limits: routeProvider(r) === 'homeassistant' ? r.timeout + 's'
@@ -5568,15 +5659,52 @@ function blockPaint(blk, r){
     if (h) h.textContent = sums[g];
   });
   /* The speech profiles, by name. A profile that has been deleted is still
-     offered on the row that names it, marked, rather than silently becoming
-     "the default" in a select the admin never touched. */
+     offered on the row that names it, marked, rather than disappearing out of
+     a select the admin never touched. NONE is a real answer here and not a
+     missing setting: the endpoint speaks in whatever voice the page ships
+     with. */
+  /* The display profile this endpoint hands to the screens it names. Eight
+     screens on one assistant are eight rows to set otherwise, and they are
+     all the same kind of place. A screen's own row still wins — this is only
+     read where that row names none, and only where the answer is unambiguous;
+     the rule is on the server, in inherited_kiosk, so there is one of it. */
+  const kp = F(blk, 'kiosk_profile');
+  if (kp){
+    const want = r.kiosk_profile || '';
+    const pool = (DPCFG && DPCFG.kiosks) || [];
+    kp.innerHTML = '';
+    /* NO "NONE" OPTION. Every entry in this list is a real display profile,
+       because "none" here is not a thing an endpoint can usefully say — a
+       screen that inherits nothing already has an answer of its own, and
+       offering the absence as a choice made it look like a decision somebody
+       had taken.
+
+       What remains is an UNSET state, which is not the same thing: it is the
+       question still open. It reads as a prompt rather than as a value, and it
+       disappears from the list the moment a real profile is chosen, so it can
+       never be selected back into deliberately. Every endpoint that existed
+       before this setting did starts there. */
+    const opts = [];
+    if (!pool.length)
+      opts.push(['', 'no display profiles yet — make one under DISPLAYS']);
+    else if (!want || !pool.some(x=> x.id === want))
+      opts.push(['', 'choose a display profile']);
+    pool.forEach(x=> opts.push([x.id, x.name]));
+    if (want && !pool.some(x=> x.id === want))
+      opts.push([want, 'a profile that no longer exists']);
+    opts.forEach(([v, label])=>{
+      const o = document.createElement('option');
+      o.value = v; o.textContent = label; kp.appendChild(o);
+    });
+    kp.value = want;
+  }
+
   const sp = F(blk, 'speech');
   if (sp){
     const want = r.speech || '';
     const pool = (DPCFG && DPCFG.speeches) || [];
-    const def  = pool.filter(x=> x.id === ((DPCFG && DPCFG.speech_default) || ''))[0];
     sp.innerHTML = '';
-    const opts = [['', def ? 'DEFAULT — ' + def.name : 'DEFAULT']]
+    const opts = [['', "NONE — the page's own voice"]]
                    .concat(pool.map(x=> [x.id, x.name]));
     if (want && !pool.some(x=> x.id === want))
       opts.push([want, 'a profile that no longer exists']);
@@ -7180,11 +7308,10 @@ function paintDpSettings(){
   $('dp_pending').value = DPCFG.max_pending;
   $('dp_codemins').value = DPCFG.code_minutes;
   paintDpForm(DPCFG.form || []);
-  PROFILE_KINDS.forEach(k=> paintProfiles(k, DPCFG[k.key] || [],
-                                          DPCFG[DEF_KEY[k.key]] || ''));
+  PROFILE_KINDS.forEach(k=> paintProfiles(k, DPCFG[k.key] || []));
   paintSavers(DPCFG.savers || []);
-  paintKiosks(DPCFG.kiosks || [], DPCFG.kiosk_default || '');
-  paintModels(DPCFG.models || [], DPCFG.model_default || '');
+  paintKiosks(DPCFG.kiosks || []);
+  paintModels(DPCFG.models || []);
   paintNetworks(DPCFG.networks || []);
   paintNewSetup();
 }
@@ -7201,6 +7328,31 @@ async function refreshProfiles(){
   if (!ME || ME.role !== 'admin') return;
   await loadDisplays();
   paintDpSettings();
+  syncProfileKeys();
+}
+
+/* The server needs to know which settings key belongs to which of the three
+   profile tabs — it is what it leaves out of a display's document, and the
+   answer only exists here, read off the sections. Saving a profile list sends
+   it, but a deployment that has never saved one would leave the server with
+   nothing and every display inheriting the whole document, which is the
+   arrangement this replaced.
+
+   So it is reconciled on load as well, and WRITTEN ONLY WHEN IT DIFFERS. A
+   panel that saved on every open would rewrite the deployment's settings file
+   every time somebody looked at it. */
+async function syncProfileKeys(){
+  if (!DPCFG || !S) return;
+  const want = profileKeyMap();
+  const have = DPCFG.profile_keys || {};
+  const same = ['look', 'motion', 'speech'].every(t=>
+    (want[t] || []).slice().sort().join(',') === (have[t] || []).slice().sort().join(','));
+  if (same) return;
+  try{
+    const j = await api('/displays/settings', {method:'POST',
+                          body: JSON.stringify({profile_keys: want})});
+    DPCFG = j.settings;
+  }catch(e){ /* the panel still works; the next list save carries it */ }
 }
 
 /* One row per field. Rebuilt from an array rather than read off the DOM,
@@ -7334,20 +7486,18 @@ $('b_formsave').addEventListener('click', ()=>{
    as every other list; the key is the one field that is never read back from
    the server, so an empty box means "keep what is stored" rather than "clear
    it". */
-let DPMODELS = [], DPMDEF = '', OPENMD = -1;
+let DPMODELS = [], OPENMD = -1;
 
 const PROVIDERS = [['demo','DEMO'], ['openai','OPENAI-COMPATIBLE'],
                    ['anthropic','ANTHROPIC'], ['homeassistant','HOME ASSISTANT']];
 
-function paintModels(list, def){
-  if (def !== undefined) DPMDEF = def || '';
+function paintModels(list){
   DPMODELS = (list || []).map(m=> ({id: m.id || '', _new: !!m._new,
                                     name: m.name || '', has_key: !!m.has_key,
                                     values: Object.assign({}, m.values || {})}));
   const box = $('dp_models');
   if (!box) return;
   box.innerHTML = '';
-  if (!DPMDEF && DPMODELS.length) DPMDEF = DPMODELS[0].id;
   DPMODELS.forEach((m, i)=>{
     const v = m.values;
     const row = document.createElement('div');
@@ -7359,16 +7509,12 @@ function paintModels(list, def){
     top.appendChild(nmt);
     const sum = document.createElement('span'); sum.className = 'badge';
     top.appendChild(sum);
-    const dflag = document.createElement('span');
-    dflag.className = 'badge isdefault'; dflag.textContent = 'DEFAULT';
-    top.appendChild(dflag);
     const retitle = ()=>{
       nmt.textContent = (m.name || '').trim() || 'unnamed profile';
       sum.textContent = v.provider === 'demo' ? 'demo — built-in replies'
         : v.provider === 'homeassistant'
           ? 'Home Assistant · ' + (v.agent_id || 'default agent')
           : (v.model || 'no model') + (m.has_key ? ' · key stored' : '');
-      dflag.style.display = (m.id && m.id === DPMDEF) ? '' : 'none';
     };
     retitle();
     top.onclick = (e)=>{
@@ -7430,12 +7576,6 @@ function paintModels(list, def){
     }
 
     const acts = document.createElement('div'); acts.className = 'acts';
-    const mk = document.createElement('button');
-    mk.textContent = 'MAKE DEFAULT';
-    if (m.id && m.id === DPMDEF){ mk.disabled = true;
-      mk.title = 'an endpoint naming no profile gets this one'; }
-    else mk.onclick = ()=>{ DPMDEF = m.id; paintModels(DPMODELS); };
-    acts.appendChild(mk);
     const gap = document.createElement('span'); gap.className = 'spacer';
     acts.appendChild(gap);
 
@@ -7443,21 +7583,23 @@ function paintModels(list, def){
     save.textContent = 'SAVE'; save.className = 'act-save';
     save.onclick = ()=>{
       const keep = DPMODELS.filter(x=> (x.name || '').trim());
-      if (!keep.length){
+      if (DPMODELS.length && !keep.length){
         dpNote('a profile needs a name before it can be saved', true, 'modelnote');
         return;
       }
       m._new = false; OPENMD = -1;
-      saveDp({models: keep.map(x=> ({id:x.id, name:x.name, values:x.values})),
-              model_default: DPMDEF}, 'modelnote');
+      saveDp({models: keep.map(x=> ({id:x.id, name:x.name, values:x.values}))},
+             'modelnote');
     };
     acts.appendChild(save);
 
     const del = document.createElement('button');
     del.textContent = 'REMOVE'; del.className = 'act-danger';
-    if (m.id && m.id === DPMDEF){ del.disabled = true;
-      del.title = 'make another profile the default first'; }
-    else del.onclick = ()=>{
+    /* Removable whatever names it. Nothing is nominated any more, so there is
+       no profile the deployment cannot do without — an endpoint left naming a
+       profile that has gone falls back to `demo`, visibly, rather than being
+       moved onto somebody else's credential. */
+    del.onclick = ()=>{
       OPENMD = -1; DPMODELS.splice(i, 1); paintModels(DPMODELS);
     };
     acts.appendChild(del);
@@ -7743,18 +7885,10 @@ function profileSum(kind, pr){
        + (bits.length ? ' · ' + bits.join(' · ') : '');
 }
 
-/* Which profile each list hands to a display that names none. */
-const DPDEF = {looks: '', motions: '', speeches: ''};
-/* Seeded at most once per list per page. Without this a failed save would seed
-   again on the repaint that followed it, and again on the next. */
-const SEEDED = {looks: false, motions: false, speeches: false};
-const DEF_KEY = {looks: 'look_default', motions: 'motion_default',
-                 speeches: 'speech_default'};
-
-function defaultOf(kind){
-  const arr = PROFILES[kind.key] || [];
-  return arr.filter(p=> p.id === DPDEF[kind.key])[0] || arr[0] || null;
-}
+/* No DPDEF, no DEF_KEY and no seeding. Nothing in any of these lists is
+   nominated: a display gets the profiles it NAMES and the page's own settings
+   for the ones it does not, so there is nothing for the deployment to pick on
+   an admin's behalf and nothing to recreate when a profile is removed. */
 
 /* A profile becomes the live document for its tab: every control on the tab
    reads the live document, and so does the preview, so this is all it takes to
@@ -7768,36 +7902,49 @@ function loadProfile(kind, pr){
   push();
 }
 
-/* One list at a time, and the nomination with it. The DEFAULT profile is also
-   what an ordinary display gets, so saving it publishes its values to the
-   shared document — that document is what a screen with no profile reads, and
-   leaving the two to drift would mean the default said one thing and every
-   plain browser tab showed another. */
+/* One list at a time, and the tab's key map with it.
+
+   Nothing is published to the shared document any anymore, because no display
+   reads the shared document for these keys: a screen shows the profiles it
+   names and the page's own settings otherwise. What DOES have to go up is
+   which settings key belongs to which of the three tabs — the server needs it
+   to know what to leave out of a display's document, and this page is the only
+   place that knows, because the mapping is read off the sections themselves.
+   Sent on every list save so a control moved between tabs corrects itself. */
+function profileKeyMap(){
+  const out = {look: [], motion: [], speech: []};
+  Object.keys(KEY_TAB).forEach(k=>{
+    if (out[KEY_TAB[k]]) out[KEY_TAB[k]].push(k);
+  });
+  return out;
+}
 /* On the tab the button is on. These used to write to the PROFILES tab's note,
    which is not on screen while you are editing an appearance profile — so a
    refused save, and a successful one, both looked like nothing happening. */
 function prNote(kind, m, bad){ dpNote(m, bad, 'prnote_' + kind.key); }
 
+/* An EMPTY LIST saves, and has to. Removing the last profile is a legal act
+   now that nothing is nominated, and refusing the save would leave the row
+   sitting on the server looking deleted. What is still refused is rows that
+   EXIST and have no name — that is somebody halfway through typing. Same rule
+   on the kiosk and model lists. */
 async function saveProfileList(kind){
-  const named = (PROFILES[kind.key] || [])
+  const rows = PROFILES[kind.key] || [];
+  const named = rows
     .filter(x=> (x.name || '').trim())
     .map(x=> ({id: x.id, name: x.name, values: x.values}));
-  if (!named.length){
+  if (rows.length && !named.length){
     prNote(kind, 'a profile needs a name before it can be saved', true);
     return;
   }
   const body = {};
   body[kind.key] = named;
-  body[DEF_KEY[kind.key]] = DPDEF[kind.key];
+  body.profile_keys = profileKeyMap();
   try{
     const j = await api('/displays/settings', {method:'POST',
                                                body: JSON.stringify(body)});
     DPCFG = j.settings;
-    const def = defaultOf(kind);
-    if (def)
-      await api('/settings', {method:'POST', body: JSON.stringify(
-        {settings: def.values, merge: true})});
-    paintProfiles(kind, DPCFG[kind.key] || [], DPCFG[DEF_KEY[kind.key]] || '');
+    paintProfiles(kind, DPCFG[kind.key] || []);
     reRender();
     prNote(kind, 'saved');
   }catch(e){ prNote(kind, e.message, true); }
@@ -7844,29 +7991,20 @@ function syncSections(kind){
   reRender();
 }
 
-function paintProfiles(kind, list, def){
+function paintProfiles(kind, list){
   stashSections(kind.tab);
-  if (def !== undefined) DPDEF[kind.key] = def || '';
-  /* A list is never empty. The first profile is seeded from what the tab is
-     showing right now — which is what every display is already showing — so a
-     deployment arrives with "what this looks like today" under a name rather
-     than with nothing and no way back. */
-  let seeding = false;
-  if (!(list || []).length && S && !SEEDED[kind.key]){
-    list = [{id: profileId(kind.pre), name: 'Default', values: tabKeys(kind.tab)}];
-    /* Once, and then written. Seeding only in memory is what made these lists
-       look blank on every reload: the Default was invented on each paint and
-       never reached the server, so nothing was ever there to come back. */
-    SEEDED[kind.key] = true;
-    seeding = true;
-  }
+  /* An EMPTY LIST IS A REAL STATE and is left alone. This used to invent a
+     profile called "Default" out of whatever the tab happened to be showing,
+     so that a list was never empty — which is the same act as nominating one,
+     done earlier and without being asked. A deployment that has built no
+     profiles has displays showing what the page ships with, which is a working
+     screen and an honest empty list. */
   const arr = PROFILES[kind.key] = (list || []).map(p=> ({
     id: p.id || '', _new: !!p._new, name: p.name || '',
     values: Object.assign({}, p.values || {})}));
   const box = $(kind.box);
   if (!box) return;
   box.innerHTML = '';
-  if (!DPDEF[kind.key] && arr.length) DPDEF[kind.key] = arr[0].id;
   arr.forEach((pr, i)=>{
     const row = document.createElement('div');
     row.className = 'erow';
@@ -7881,17 +8019,9 @@ function paintProfiles(kind, list, def){
     const sum = document.createElement('span');
     sum.className = 'badge';
     top.appendChild(sum);
-    /* Which one an ordinary display gets, on the shut row. It is the single
-       most useful fact about a list of profiles and it was only discoverable
-       by opening each one to see whether MAKE DEFAULT was greyed out. */
-    const dflag = document.createElement('span');
-    dflag.className = 'badge isdefault';
-    dflag.textContent = 'DEFAULT';
-    top.appendChild(dflag);
     const retitle = ()=>{
       nmt.textContent = (pr.name || '').trim() || 'unnamed profile';
       sum.textContent = profileSum(kind, pr);
-      dflag.style.display = (pr.id && pr.id === DPDEF[kind.key]) ? '' : 'none';
     };
     retitle();
     top.onclick = (e)=>{
@@ -7903,10 +8033,9 @@ function paintProfiles(kind, list, def){
       /* The settings for this tab ARE this profile while it is open: its
          values go into the live document, so every control on the tab and the
          preview beside it are showing the profile and nothing else. Closing it
-         puts back what the default says, which is what an ordinary display
-         gets. */
+         leaves them there — there is no nominated profile to put back, and the
+         tab is a workbench rather than a description of the deployment. */
       if (opening) loadProfile(kind, pr);
-      else loadProfile(kind, defaultOf(kind));
       syncSections(kind);
       const ab = $(kind.add);
       if (ab) ab.hidden = OPENPR[kind.key] >= 0 || arr.some(x=> x._new);
@@ -7929,16 +8058,6 @@ function paintProfiles(kind, list, def){
     const acts = document.createElement('div');
     acts.className = 'acts';
 
-    const mk = document.createElement('button');
-    mk.textContent = 'MAKE DEFAULT';
-    if (pr.id && pr.id === DPDEF[kind.key]){
-      mk.disabled = true;
-      mk.title = 'this is what a display with no profile gets';
-    }else{
-      mk.onclick = ()=>{ DPDEF[kind.key] = pr.id; saveProfileList(kind); };
-    }
-    acts.appendChild(mk);
-
     const gap = document.createElement('span');
     gap.className = 'spacer';
     acts.appendChild(gap);
@@ -7952,12 +8071,10 @@ function paintProfiles(kind, list, def){
       pr._new = false;
       retitle();
       /* Closed on save: the row is finished with, and leaving it open leaves
-         the tab showing a profile you have stopped editing. Closing also puts
-         the default back into the live settings, which is what an ordinary
-         display gets — so the tab goes back to describing the deployment
-         rather than one profile in it. */
+         the tab showing a profile you have stopped editing. The tab keeps
+         showing what was just captured — there is no nominated profile to put
+         back, and reloading one would silently discard what is on screen. */
       OPENPR[kind.key] = -1;
-      loadProfile(kind, defaultOf(kind));
       saveProfileList(kind);
       reRender();
     };
@@ -7966,28 +8083,21 @@ function paintProfiles(kind, list, def){
     const del = document.createElement('button');
     del.textContent = 'REMOVE';
     del.className = 'act-danger';
-    if (pr.id && pr.id === DPDEF[kind.key]){
-      /* The default cannot go. Every display naming no profile is showing it,
-         so removing it would take the appearance off every ordinary screen —
-         nominate another one first, which is a deliberate act with a button
-         of its own. */
-      del.disabled = true;
-      del.title = 'make another profile the default first';
-    }else{
-      del.onclick = ()=>{
-        OPENPR[kind.key] = -1;
-        arr.splice(i, 1);
-        loadProfile(kind, defaultOf(kind));
-        paintProfiles(kind, arr);
-        reRender();
-        saveProfileList(kind);
-      };
-    }
+    /* Any profile can go, including the last one. Nothing is nominated, so
+       there is no profile the deployment cannot do without — a display left
+       naming one that has gone shows the page's own settings, which is exactly
+       what it would show having named nothing. */
+    del.onclick = ()=>{
+      OPENPR[kind.key] = -1;
+      arr.splice(i, 1);
+      paintProfiles(kind, arr);
+      reRender();
+      saveProfileList(kind);
+    };
     acts.appendChild(del);
     row.appendChild(acts);
     box.appendChild(row);
   });
-  if (seeding) saveProfileList(kind);
   const btn = $(kind.add);
   if (btn){
     /* Hidden while any profile is open — one being written and one being
@@ -8261,10 +8371,9 @@ function paintSavers(list){
    screensaver instead of copying their values, so changing a hallway's look
    once still reaches every kiosk using it. */
 let DPKIOSKS = [];
-let DPKDEF = '';
 let OPENKI = -1;
 
-function paintKiosks(list, def){
+function paintKiosks(list){
   DPKIOSKS = (list || []).map(k=> ({id: k.id || '', _new: !!k._new,
                                     name: k.name || '',
                                     voice_only: k.voice_only !== false,
@@ -8274,9 +8383,9 @@ function paintKiosks(list, def){
                                     saver: k.saver || '',
                                     fullscreen: k.fullscreen !== false,
                                     keep_awake: k.keep_awake !== false,
+                                    listen: !!k.listen,
                                     prompt: k.prompt !== false,
                                     prompt_text: k.prompt_text || ''}));
-  if (def !== undefined) DPKDEF = def || '';
   const box = $('dp_kiosks');
   if (!box) return;
   box.innerHTML = '';
@@ -8300,11 +8409,6 @@ function paintKiosks(list, def){
     const sum = document.createElement('span');
     sum.className = 'badge';
     top.appendChild(sum);
-    const dflag = document.createElement('span');
-    dflag.className = 'badge isdefault';
-    dflag.textContent = 'DEFAULT';
-    top.appendChild(dflag);
-
     /* What a shut row says, so a list of eight reads without opening any of
        them — and it follows what is being typed, because the title of the row
        somebody is editing must not still say what it used to. */
@@ -8322,7 +8426,6 @@ function paintKiosks(list, def){
       if (!k.keep_awake) bits.push('may sleep');
       if (!k.prompt) bits.push('no prompt');
       sum.textContent = bits.join(' · ');
-      dflag.style.display = (k.id && k.id === DPKDEF) ? '' : 'none';
     };
     retitle();
     top.onclick = (e)=>{
@@ -8371,7 +8474,19 @@ function paintKiosks(list, def){
     };
     tick('Voice only', 'voice_only');
     tick('Full screen on first touch', 'fullscreen');
+    /* Always shown rather than behind the ?, by the user's decision: the
+       command is what an admin ticking the box above actually needs. Why a
+       reload drops full screen is in the manual, not here. */
+    const fsn = document.createElement('div');
+    fsn.className = 'note fsnote';
+    fsn.appendChild(document.createTextNode(
+      'To load firefox full screen use this command\n'));
+    const cmd = document.createElement('code');
+    cmd.textContent = 'firefox --kiosk https://HOST:PORT/';
+    fsn.appendChild(cmd);
+    row.appendChild(fsn);
     tick('Keep the screen awake', 'keep_awake');
+    tick('Listen from the moment it loads', 'listen');
 
     /* The text belongs to the tick above it and is meaningless without it, so
        it goes away with it rather than sitting there inert. */
@@ -8407,30 +8522,27 @@ function paintKiosks(list, def){
       field(label, sel);
     };
     /* Short option text on purpose. A select is as wide as its longest option
-       whatever you do to it, so the sentence that used to sit in the empty
-       slot — "whatever the APPEARANCE tab says" — set the width of the control
-       and pushed it past the edge of the box. What it means is under the ?. */
+       whatever you do to it, so a sentence in the empty slot set the width of
+       the control and pushed it past the edge of the box. What it means is
+       under the ?.
+
+       NONE, on all four, and it means the same on all four: this profile names
+       nothing for that tab and the screen shows what the page ships with. The
+       first three used to read SHARED, which was true of an arrangement that
+       no longer exists — there is no shared document behind them to fall into
+       any more. */
     /* The summary is the profile's own one-liner now, because a profile is a
        bag of settings rather than four named fields. */
     const psum = (p)=> Object.keys(p.values || {}).length + ' settings';
-    picker('Appearance', 'look', 'SHARED', (DPCFG && DPCFG.looks) || [], psum);
-    picker('Geometry', 'motion', 'SHARED', (DPCFG && DPCFG.motions) || [], psum);
-    picker('Speech', 'speech', 'SHARED', (DPCFG && DPCFG.speeches) || [], psum);
+    picker('Appearance', 'look', 'NONE', (DPCFG && DPCFG.looks) || [], psum);
+    picker('Geometry', 'motion', 'NONE', (DPCFG && DPCFG.motions) || [], psum);
+    picker('Speech', 'speech', 'NONE', (DPCFG && DPCFG.speeches) || [], psum);
     picker('Screensaver', 'saver', 'NONE',
       (DPCFG && DPCFG.savers) || [],
       p=> (p.delay ? p.delay + 's · ' + p.scale + '%' : 'off'));
 
     const acts = document.createElement('div');
     acts.className = 'acts';
-    const mk = document.createElement('button');
-    mk.textContent = 'MAKE DEFAULT';
-    if (k.id === DPKDEF){
-      mk.disabled = true;
-      mk.title = 'this is already the default';
-    }else{
-      mk.onclick = ()=>{ DPKDEF = k.id; paintKiosks(DPKIOSKS); };
-    }
-    acts.appendChild(mk);
 
     /* Each profile commits itself, the way appearance, geometry and speech do.
        One SAVE at the foot of the tab published every row at once, including
@@ -8444,7 +8556,7 @@ function paintKiosks(list, def){
     save.className = 'act-save';
     save.onclick = ()=>{
       const keep = DPKIOSKS.filter(x=> (x.name || '').trim());
-      if (!keep.length){
+      if (DPKIOSKS.length && !keep.length){
         dpNote('a profile needs a name before it can be saved', true, 'kiosknote');
         return;
       }
@@ -8453,9 +8565,9 @@ function paintKiosks(list, def){
       saveDp({kiosks: keep.map(x=> ({id:x.id, name:x.name, voice_only:x.voice_only,
                                      look:x.look, motion:x.motion, speech:x.speech,
                                      saver:x.saver, fullscreen:x.fullscreen,
-                                     keep_awake:x.keep_awake,
-                                     prompt:x.prompt, prompt_text:x.prompt_text})),
-              kiosk_default: DPKDEF}, 'kiosknote');
+                                     keep_awake:x.keep_awake, listen:x.listen,
+                                     prompt:x.prompt, prompt_text:x.prompt_text}))},
+             'kiosknote');
     };
     acts.appendChild(save);
 
@@ -8466,12 +8578,7 @@ function paintKiosks(list, def){
       // Removing renumbers everything after it, so the open row is no longer
       // the one it was found under.
       OPENKI = -1;
-      const gone = DPKIOSKS[i].id;
       DPKIOSKS.splice(i, 1);
-      // A default pointing at a row that is no longer there would leave every
-      // unconfigured screen naming nothing. Move it rather than clear it.
-      if (gone && gone === DPKDEF)
-        DPKDEF = (DPKIOSKS.filter(x=> x.id)[0] || {}).id || '';
       paintKiosks(DPKIOSKS);
     };
     acts.appendChild(del);
@@ -8505,7 +8612,8 @@ $('b_addkiosk').addEventListener('click', ()=>{
   if (DPKIOSKS.length >= 8) return;
   DPKIOSKS.push({id:newProfileId(), _new:true, name:'', voice_only:true,
                  look:'', motion:'', speech:'', saver:'',
-                 fullscreen:true, keep_awake:true, prompt:true, prompt_text:''});
+                 fullscreen:true, keep_awake:true, listen:false,
+                 prompt:true, prompt_text:''});
   OPENKI = DPKIOSKS.length - 1;
   paintKiosks(DPKIOSKS);
 });
@@ -8643,25 +8751,42 @@ function kioskBlock(d){
   sel.className = 'ppick';
 
   const kiosks = (DPCFG && DPCFG.kiosks) || [];
-  const defId  = (DPCFG && DPCFG.kiosk_default) || '';
-  const defOne = kiosks.filter(k=> k.id === defId)[0];
-  /* Naming the default rather than saying "default" alone. A row left on this
-     is the commonest state in a building, and somebody reading the register
-     should not have to open another tab to find out what it means. */
   /* THREE kinds of answer, and all three already exist in the stored row: not
-     a display-mode screen at all, one that is but names no profile so it
-     follows whichever is default, and one that names its own. NONE is new and
-     is what the tick used to say; DEFAULT is kept because rows are sitting in
-     exactly that state and rendering them as NONE would turn a save into a
-     silent change of what the screen does. */
-  const none = document.createElement('option');
-  none.value = '__off';
-  none.textContent = 'NONE';
-  sel.appendChild(none);
+     a display-mode screen at all, one that is but names no profile, and one
+     that names its own. The middle one used to read DEFAULT and follow
+     whichever profile was nominated; nothing is nominated any more, so it says
+     what it now does — the screen is in display mode and shows the settings
+     the page itself ships with. Rows already sitting on it keep working and
+     keep the same stored value. */
+  /* THERE IS NO "NOT A DISPLAY" ANY MORE. It was a real state once, when a
+     shared settings document dressed every screen whether or not it was in
+     display mode. That document is gone — a screen now shows the profiles it
+     names and nothing else — so a row in that state has nothing dressing it at
+     all, and an ordinary browser tab pointed at this server came out looking
+     broken rather than plain. A state whose only outcome is a page that looks
+     wrong is not a choice worth offering. Every row is a display now, and the
+     only question left is which profile. */
+  /* INHERIT, and it says WHAT FROM. The server resolves this — one rule, in
+     one place — and hands back the profile it landed on and the endpoints
+     that had an opinion. All four outcomes are worth different words, because
+     "inherit" alone is the state somebody would have to open another tab to
+     understand:
+       nothing named it        — nothing to inherit, so the page's own settings
+       one named it            — say which, so the row explains itself
+       several, all agreeing   — same, and no reason to complain
+       several, disagreeing    — REFUSED rather than resolved, and it names the
+                                 endpoints so the fix is obvious. Picking one
+                                 here would be this screen's appearance decided
+                                 by something nobody can see. */
+  const inh = d.inherit || {};
+  const from = inh.from || [];
   const dflt = document.createElement('option');
   dflt.value = '';
-  dflt.textContent = defOne ? 'DEFAULT — ' + defOne.name
-                            : 'DEFAULT — none set yet';
+  dflt.textContent =
+      inh.profile ? 'INHERIT — ' + inh.name + ', from ' + from.join(' and ')
+    : from.length > 1 ? 'INHERIT — ' + from.join(' and ') + ' disagree, pick one'
+    : from.length === 1 ? 'INHERIT — ' + from[0] + ' names a profile that has gone'
+    : "INHERIT — nothing to inherit, so the page's own settings";
   sel.appendChild(dflt);
   kiosks.forEach(k=>{
     const o = document.createElement('option');
@@ -8683,7 +8808,7 @@ function kioskBlock(d){
     o.title = bits.join(', ');
     sel.appendChild(o);
   });
-  sel.value = d.kiosk ? (d.kiosk_profile || '') : '__off';
+  sel.value = d.kiosk_profile || '';
   line.appendChild(pair('Display mode', sel));
   box.appendChild(line);
 
@@ -8711,10 +8836,11 @@ function kioskBlock(d){
     try{
       const j = await api('/displays/kiosk', {method:'POST', body: JSON.stringify({
         id: d.id,
-        /* One picker, two stored fields — NONE is "not a display-mode screen",
-           DEFAULT is "one that names no profile". */
-        kiosk: sel.value !== '__off',
-        kiosk_profile: sel.value === '__off' ? '' : sel.value,
+        /* Always. See the picker: the row's only question is which profile,
+           and a display that is not a display has nothing to draw itself
+           with. */
+        kiosk: true,
+        kiosk_profile: sel.value,
         endpoints: gl.ticks.filter(c=> c.checked).map(c=> c.dataset.r)})});
       /* The cache, not the list. Rebuilding the rows here would throw away the
          row somebody has open and this message with it, and nothing else on
@@ -8754,7 +8880,7 @@ function kioskBlock(d){
     /* Back to what the server holds for THIS row, read off the record the list
        was drawn from rather than re-fetched — a revert undoes what is on
        screen, it does not go looking for what changed elsewhere meanwhile. */
-    sel.value = d.kiosk ? (d.kiosk_profile || '') : '__off';
+    sel.value = d.kiosk_profile || '';
     gl.ticks.forEach(c=>{
       c.checked = (d.granted || []).indexOf(c.dataset.r) >= 0;
     });
@@ -8766,12 +8892,19 @@ function kioskBlock(d){
      it may be here — reads as two things to press rather than one place to
      look. */
   /* What the shut row prints. Resolved here because this is where the profile
-     list already is, and the row should not have to work out what "default"
-     means a second time. */
-  const named = kiosks.filter(k=> k.id === (d.kiosk_profile || ''))[0]
-              || (defOne || null);
-  const label = !d.kiosk ? '—'
-              : 'DISPLAY MODE' + (named ? ' · ' + named.name : '');
+     list already is, and the row should not have to work out a second time
+     what it is showing.
+
+     The row's own profile, then what it inherits — and it SAYS which, because
+     "Hallway" and "Hallway, because Sparky says so" are different facts about
+     a screen and only one of them survives you unticking an endpoint. */
+  const ownProf = kiosks.filter(k=> k.id === (d.kiosk_profile || ''))[0] || null;
+  const inhProf = ownProf ? null
+                : (kiosks.filter(k=> k.id === (inh.profile || ''))[0] || null);
+  const named = ownProf || inhProf;
+  const label = 'DISPLAY MODE'
+              + (named ? ' · ' + named.name + (inhProf ? ' · inherited' : '')
+                       : ' · no profile');
   return {box: box, save: save, undo: undo, said: said, label: label};
 }
 
@@ -8820,9 +8953,6 @@ function paintBulk(){
       o.value = k.id; o.textContent = 'Display mode · ' + k.name;
       sel.appendChild(o);
     });
-    const off = document.createElement('option');
-    off.value = '__off'; off.textContent = 'No display mode';
-    sel.appendChild(off);
     sel.value = want || sel.value;
   }
 }
@@ -9434,10 +9564,8 @@ $('b_bulkapply').addEventListener('click', async ()=>{
   const ids = [...PICKED];
   if (!ids.length) return;
   const want = $('bulkprofile').value;
-  const off = want === '__off';
-  const name = off ? 'not a kiosk'
-                   : (((DPCFG && DPCFG.kiosks) || [])
-                      .filter(k=> k.id === want)[0] || {}).name || 'that profile';
+  const name = (((DPCFG && DPCFG.kiosks) || [])
+                .filter(k=> k.id === want)[0] || {}).name || 'that profile';
   if (!confirm('Set ' + ids.length + ' device' + (ids.length === 1 ? '' : 's')
                + ' to ' + name + '?')) return;
   const btn = $('b_bulkapply');
@@ -9448,8 +9576,7 @@ $('b_bulkapply').addEventListener('click', async ()=>{
   for (const id of ids){
     try{
       await api('/displays/kiosk', {method:'POST', body: JSON.stringify(
-        off ? {id: id, kiosk: false}
-            : {id: id, kiosk: true, kiosk_profile: want})});
+        {id: id, kiosk: true, kiosk_profile: want})});
       done++;
     }catch(e){
       const d = DISPLAYS.filter(x=> x.id === id)[0];
@@ -9542,11 +9669,10 @@ $('b_adddisp').addEventListener('click', async ()=>{
   el.value = '';
   const j = await displayAction('/displays/new', {
     name,
-    /* One control, two fields: choosing a profile IS switching display mode
-       on, and NONE is both "no profile" and "not a display-mode screen".
-       There is no way to say "on, but whichever profile is default" from here
-       any more — that was the state nobody could see they were in. */
-    kiosk: !!$('dp_newprofile').value,
+    /* Always a display, like every other row — see the picker on the register.
+       Leaving the profile blank is a row that inherits from its endpoint, not
+       a row that is not a display. */
+    kiosk: true,
     kiosk_profile: $('dp_newprofile').value,
     /* However many were ticked. The row's own grant list is the same set in
        the same words, so this is the first half of one control rather than a

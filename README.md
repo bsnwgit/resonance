@@ -2284,6 +2284,73 @@ on a desk. A tablet bolted to a wall, answering a household, moves them:
 
 Newest first.
 
+### 2026-08-19 — nothing stands in for a choice nobody made
+
+Two threads, and they turned out to be the same one. Every list in the panel
+had a nominated DEFAULT, and every figure on the wall was a variation on the
+same figure. Both were things the deployment decided on an admin's behalf.
+
+- **The five nominated defaults are gone** — appearance, geometry, speech,
+  models and display profiles. A row naming nothing is not quietly handed
+  somebody else's profile: an endpoint with no model profile is on `demo` and
+  says so, a route with no speech profile speaks in the page's own voice, a
+  screen with no appearance profile shows what the page ships with. What made
+  them worth removing rather than merely defaulting to empty is that they
+  **recreated themselves**: a default pointing at a deleted profile silently
+  re-pointed at the first in the list, and an empty list invented a profile
+  called *Default* out of whatever the tab happened to be showing. Clearing one
+  was not something the panel could express.
+- **There is no shared appearance document.** It was the other half of the same
+  arrangement — the thing a screen fell into when it named nothing. A display's
+  settings now have the keys those three tabs own dropped out of them on the
+  way to it, so the tabs are a workbench and a profile is what reaches a
+  screen. The panel publishes which key belongs to which tab, because the panel
+  is the only thing that knows.
+- **RIDGE was STACK with a post-process, twice.** First it was the same layered
+  polylines rectified and folded; then, after that was rebuilt as vertical
+  bars, it was the same signal drawn a different way and still not what was
+  asked for. What it is now is a mesh a few hundred rows deep, rectified into a
+  landform above its own exact reflection, held at a FIXED angle — the only
+  figure here that does not turn — and run edge to edge by taking its span from
+  the canvas rather than from the Spread slider. The lesson was not about
+  geometry: **a figure is separated from another figure by its topology, not by
+  what is done to it afterwards.**
+- **STACK went**, since RIDGE stopped being a fold of it. Stored settings still
+  name it, so `RETIRED_MODES` rewrites it on the way out, and the builder
+  dispatch became a named map with a fallback — the old `?:` chain ended in
+  `buildKnot`, so a retired mode drew a KNOT and looked like a bug in KNOT.
+- **DNA**, a sixth figure and the first built out of parts: a sphere per base,
+  a rod to the axis, and no backbone drawn at all. Three attempts, and the
+  first two failed for the same reason — a continuous stroke down the strand is
+  what makes a helix read as wire in a spiral. The chain of spheres carries the
+  eye instead. The spheres are camera-facing filled spirals rather than
+  wireframe rings, because this renderer only strokes lines and a ball drawn as
+  rings looks like a ball drawn as rings.
+- **A screen with its microphone open could never reach its screensaver.**
+  `Mic.start` set `Drive.phase = 'speaking'` and left it there, and the idle
+  clock only advances while the phase is `idle`. It was doing nothing for the
+  geometry either — `Drive.step` ignores the phase entirely whenever the mic is
+  feeding it. Opening a microphone is not the display speaking.
+- **The figure now goes quiet while the assistant is asleep**, so the
+  screensaver reads as one. The gate is on what the mic SHOWS and not on what
+  it hears: the first attempt put it at the top of `Mic.step` as an early
+  return, which took the voice-activity detector and the recorder with it and
+  stopped the display hearing its own name.
+- **A display profile can say *listen from the moment it loads*.** A wall
+  screen has nobody to press TALK, and every reload left it deaf. It is a
+  request rather than a guarantee — the browser decides — so a refusal falls
+  back to the first touch, which is the same touch that asks for full screen.
+- **An endpoint can hand a display profile to the screens it names**, and a
+  screen's own choice always wins. Only endpoints that NAME it, and only when
+  the answer is unambiguous: a screen can be granted several endpoints, so it
+  can have several parents, and two that disagree resolve to nothing rather
+  than to whichever the code happened to reach first. That tie-break is the
+  same one that once put two assistants on one port.
+- **Full screen cannot survive a reload and no setting can change that.**
+  Leaving it on navigation is in the specification and the request needs a
+  gesture. The panel says so and gives the command that does work — the browser
+  started in kiosk mode, which is a window state rather than a page permission.
+
 ### 2026-08-19 — a review that found what testing had not
 
 A read of everything the day before had changed, looking for dead code and

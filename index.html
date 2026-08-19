@@ -1280,6 +1280,10 @@ const Kiosk = {
        off. */
     this.fullscreen = w.fullscreen !== false;
     this.keepAwake = w.keep_awake !== false;
+    /* Unlike the two above it this defaults OFF where the server said
+       nothing: those are conveniences a preview should show, and this one
+       opens a microphone. */
+    this.listen = !!w.listen;
     this.prompt = w.prompt !== false;
     this.promptText = w.prompt_text || '';
     Saver.configure(w.saver);
@@ -1331,6 +1335,48 @@ const Kiosk = {
       setTextVisible(PREVIEW ? true : Prefs.get('text', true));
     }
     if (typeof paintPrompt === 'function') paintPrompt();
+    if (this.listen) this.startListening();
+  },
+
+  /* WHY THIS EXISTS. A wall screen has nobody standing at it, and TALK is a
+     button. Every reload — a settings change the panel published, a network
+     blip, the browser restarting overnight — otherwise left the hallway deaf
+     until somebody walked up and touched it, which is exactly the person the
+     screen was supposed to save the walk.
+
+     WHAT IT CANNOT PROMISE. The browser decides whether a page may open a
+     microphone without a gesture, and the answer is no until the permission
+     has been granted persistently for this origin. So this is a REQUEST: it
+     tries, and when it is refused it says so on the status line and arms the
+     first touch to try again — which is the same single touch that asks for
+     the full screen and ends the screensaver. A screen hung for the first
+     time still needs one visit; after that it comes back by itself.
+
+     `_tried` rather than a retry loop: a display refused permission is
+     refused for a reason, and asking again sixty times a second is how a
+     page gets its microphone permission revoked for good. */
+  _tried: false,
+  async startListening(){
+    if (this._tried || PREVIEW || EMBED) return;
+    if (Mic.active || Listen.on) return;
+    if (!Mic.ok || !window.isSecureContext) return;   // already said on the line
+    this._tried = true;
+    try {
+      await Mic.start();
+    } catch(e){ /* Mic.start reports on the status line itself */ }
+    if (Mic.active){ Listen.start(Mic.stream); return; }
+    /* Refused, or not granted yet. Hand it to the first touch. */
+    this._pending = true;
+    micNote('waiting for permission — touch the screen once to start listening');
+  },
+
+  /* Called from the one first-touch handler. A gesture is the thing that was
+     missing, so this is the moment it can work. */
+  touched(){
+    if (!this._pending) return;
+    this._pending = false;
+    this._tried = false;
+    this.startListening();
   },
 };
 
@@ -1870,7 +1916,7 @@ Prefs.load();
 
 /* ---------------------------------------------------------------- state */
 const S = {
-  mode:'stack', palette:'blue', layout:'hero',
+  mode:'ridge', palette:'blue', layout:'hero',
   face:'mono', fs:'1',                 // typography — see setType()
   /* Who the transcript says is speaking. The assistant's label defaults to
      the VARIABLE rather than to a word: with several endpoints a fixed label
@@ -2243,93 +2289,112 @@ const phaseOf = k => k * S.lag * 0.012;
    rather than as unrelated bumps per line. */
 const layerGain = k => 0.72 + 0.28*Math.cos(5.5*(now + phaseOf(k)*2.2));
 
-function buildStack(){
-  const N = 190, lines = S.lines;
-  const tab = basisOpen(N);
-  const out = [];
-  for (let k=0;k<lines;k++){
-    const kt  = lines>1 ? k/(lines-1) : .5;
-    const z   = (kt-0.5) * S.depth;
-    const fade= 1 - Math.abs(kt-0.5)*0.55;       // centre layers loudest
-    lineCoef(phaseOf(k));
-    const gain = layerGain(k);
-    const pts = new Float32Array(N*3), amp = new Float32Array(N);
-    for (let i=0;i<N;i++){
-      const it = i/(N-1);
-      // taper the ends so the static dissolves instead of stopping dead
-      const env = Math.pow(Math.sin(Math.PI*it), 1.35);
-      const v = modeSum(tab,i)*S.body*fade
-              + fieldAtU(it)*gain*env
-              + lineNoise(k,i)*env;
-      pts[i*3  ] = (it-0.5) * S.spread;
-      pts[i*3+1] = -v * 130 * S.amp;
-      pts[i*3+2] = z;
-      amp[i] = v;                     // pre-scale, so colour is scale-free
-    }
-    out.push({p:pts, a:amp});
-  }
-  return out;
+/* RIDGE — a MESH. The density is the figure, not a detail of it.
+
+   This is a landform above its own reflection: the speech rectified so it only
+   ever pushes UP from a spine, drawn again inverted below, and repeated through
+   depth in rows fine enough that they stop reading as lines and start reading
+   as a surface. The moire where near ridgelines cross far ones is the whole
+   look — it is what makes a few hundred strokes read as fabric.
+
+   THREE THINGS MAKE IT A SURFACE rather than a heap of curves, and it needs all
+   three: the signal is ABSOLUTE, so nothing crosses the spine and the form has
+   a closed silhouette; the lower half is an EXACT inversion, so it is one
+   object with a symmetry instead of a field of waves; and there are FOUR ROWS
+   PER LINE instead of one, so what lands is a skin. Two of the three were
+   tried alone and neither was enough.
+
+   FIXED, and the only figure here that is. The tumble is what gives DISC,
+   ORB, KNOT and DNA their depth; this one is held dead side-on with a little
+   elevation, so the rows recede up the frame and nothing moves but the
+   speech. The angle belongs to the mode rather than to a slider, because a
+   slider that can return it to dead-on is a slider that collapses every row
+   onto the one in front of it — the rotation controls go inert while this is
+   selected rather than pretending to act on it. */
+/* DEAD SIDE-ON. `y` is zero and is meant to be: any turn about the vertical
+   foreshortens the span, and this figure is supposed to run the full width of
+   the screen. The depth still reads, because the elevation alone lifts each
+   receding row up the frame — which is what looking along a ridge from its
+   side actually looks like. Turning it even slightly, which was tried, buys
+   nothing the elevation does not already give and costs the width. */
+const RIDGE_VIEW = {x: 0.30, y: 0, z: 0};
+/* EDGE TO EDGE, and it IGNORES SPREAD to get there — the second control this
+   figure does not answer to, for the same kind of reason as the first.
+
+   Every other form takes its width from the Spread slider, which is a width in
+   MODEL space; the projection then scales by min(W,H), so on a wide monitor a
+   model width that fills a square frame stops well short of the sides, and no
+   setting of the slider fixes it for every window. A ribbon that is supposed
+   to touch both edges cannot be specified that way. So this one asks the
+   CANVAS instead: the projection multiplies by `zoom` at the mid row, so a
+   span of W/zoom lands exactly on the two edges whatever the window is doing —
+   including while the screensaver has scaled the whole projection down.
+
+   The rows in front of the middle sit at negative z and come out a little
+   wider than the frame. That is deliberate and is what edge to edge means: the
+   near edge of the ribbon runs off the sides rather than stopping just inside
+   them. */
+function ridgeSpan(){
+  const zoom = Math.min(W,H)/(760*DPR)*DPR*Math.max(0.01, Saver.scale);
+  return W / zoom;
 }
+/* Points across a row, and how many rows one `Lines` buys. The mesh needs
+   rows far more than it needs resolution along one: 64 rows of 150 points read
+   as a surface where 16 rows of 600 read as sixteen curves. Capped, because
+   the cost is rows x 2 x points and the slider goes to forty. */
+const RIDGE_N = 150, RIDGE_PER_LINE = 4, RIDGE_ROWS_MAX = 160;
 
-/* RIDGE — a range of hills seen end-on, mirrored in still water.
-
-   The same signal STACK draws, folded twice. Where STACK gives every layer
-   the same span and lets the waveform swing either side of a centre line,
-   this takes the ABSOLUTE displacement and pushes it up from a spine, then
-   repeats it downward at a fraction of the height — so the figure reads as a
-   landform above its own reflection rather than as a wave.
-
-   Two things make it a range rather than a fin. Each layer is drawn from its
-   own moment (the layer phase STACK already has), so peaks do not line up
-   front to back and the eye reads depth from the disagreement. And the whole
-   span is multiplied by a SPINDLE envelope, fat in the middle and pinched to
-   nothing at both ends, which is what turns a rectangle of lines into a
-   single object with a silhouette.
-
-   The reflection is deliberately not a mirror. It is shorter, and it is
-   smoothed by dropping the noise term — water does not reproduce a skyline,
-   it suggests one, and an exact copy reads as a graph with two halves rather
-   than as one thing sitting on a surface. */
 function buildRidge(){
-  const N = 220, lines = Math.max(4, S.lines);
+  const N = RIDGE_N;
+  const rows = Math.min(RIDGE_ROWS_MAX, Math.max(8, (S.lines|0) * RIDGE_PER_LINE));
+  const span = ridgeSpan();
   const tab = basisOpen(N);
   const out = [];
-  for (let k=0;k<lines;k++){
-    const kt   = lines>1 ? k/(lines-1) : .5;
-    const z    = (kt-0.5) * S.depth;
-    /* Front layers loudest. STACK fades from its middle because its middle is
-       the one nearest the viewer; here the range recedes, so the falloff runs
-       front to back and the far ridges sit down into the haze. */
-    const fade = 1 - kt*0.45;
-    lineCoef(phaseOf(k));
-    const gain = layerGain(k);
-    const up = new Float32Array(N*3),   ua = new Float32Array(N);
-    const dn = new Float32Array(N*3),   da = new Float32Array(N);
+  for (let k=0;k<rows;k++){
+    const kt = rows>1 ? k/(rows-1) : 0;
+    const z  = (kt-0.5) * S.depth;
+    /* Front rows loudest, the far ones sitting down into the haze. With
+       nothing rotating this and the perspective divide are the only depth cues
+       there are. */
+    const fade = 1 - kt*0.42;
+    /* A row's own moment, and THE SPREAD IS FIXED rather than per-row. The
+       shared `phaseOf` multiplies by the row index, which suits a handful of
+       curves and is wrong for a hundred: at four rows to the line it put
+       seconds between the front of the mesh and the back, every row disagreed
+       with its neighbour, and the result was a tangle instead of a skin. Held
+       to a third of a second across the whole depth, consecutive rows very
+       nearly agree — which is what a surface is — and the slight disagreement
+       is what ridges it. */
+    lineCoef(kt * S.lag * 0.085);
+    const gain = layerGain(Math.round(kt * 8));
+    const up = new Float32Array(N*3), ua = new Float32Array(N);
+    const dn = new Float32Array(N*3), da = new Float32Array(N);
     for (let i=0;i<N;i++){
       const it = i/(N-1);
-      /* The silhouette. sin gives the pinch at both ends; the power sharpens
-         it so the taper happens near the tips rather than eating the middle,
-         and the second term keeps a thin spine running the whole width so the
-         ends come to a line instead of stopping in mid-air. */
-      const env = Math.pow(Math.sin(Math.PI*it), 0.85);
-      const spindle = env*0.94 + 0.06;
+      /* The silhouette. sin pinches both ends; the power sharpens the pinch so
+         the taper happens near the tips instead of eating the middle, and the
+         constant keeps a thin spine running the whole width so the form comes
+         to a line at each end rather than stopping in mid-air. */
+      const env = Math.pow(Math.sin(Math.PI*it), 0.9);
+      const spindle = env*0.93 + 0.07;
       const body  = modeSum(tab,i)*S.body*fade;
       const live  = fieldAtU(it)*gain;
       const grain = lineNoise(k,i);
-      /* ABSOLUTE, which is the whole difference. A signed value would swing
-         through the spine and the two halves would cross each other. */
-      const h = Math.abs(body + live) * spindle + Math.abs(grain)*env*0.7;
-      const x = (it-0.5) * S.spread;
-      up[i*3  ] = x;
-      up[i*3+1] = -h * 150 * S.amp;
-      up[i*3+2] = z;
-      ua[i] = h;
-      /* The reflection: shorter, and without the grain. */
-      const hr = (Math.abs(body + live) * spindle) * 0.46;
-      dn[i*3  ] = x;
-      dn[i*3+1] = hr * 150 * S.amp;
-      dn[i*3+2] = z;
-      da[i] = hr;
+      /* ABSOLUTE, and this is what closes the silhouette. A signed value would
+         swing through the spine, the two halves would cross, and the whole
+         thing would be a wave field again. */
+      const h = Math.abs(body + live) * spindle + Math.abs(grain)*env*0.6;
+      const x = (it-0.5) * span;
+      /* Modest, because this draws BOTH halves: a taller figure at the same
+         amp would be a lens standing on its end, and what this wants is a long
+         low ribbon. `amp` still scales it — this only sets where the slider's
+         middle lands. */
+      const y = h * 105 * S.amp;
+      up[i*3  ] = x;  up[i*3+1] = -y;  up[i*3+2] = z;  ua[i] = h;
+      /* Exact. Shortening the reflection or smoothing it — both were tried —
+         reads as one graph with two unequal halves. Mirrored properly it reads
+         as a single object sitting on a surface. */
+      dn[i*3  ] = x;  dn[i*3+1] =  y;  dn[i*3+2] = z;  da[i] = h;
     }
     out.push({p:up, a:ua});
     out.push({p:dn, a:da});
@@ -2391,6 +2456,153 @@ function buildDisc(){
   return out;
 }
 
+/* DNA — BALL AND STICK, with the balls actually solid.
+
+   The chain of spheres IS the backbone; none is drawn. Earlier passes drew one
+   as a line and then as a two-railed ribbon, and both read as wire in a
+   spiral, because a continuous stroke down the strand is the one thing that
+   makes this look like a coil rather than a molecule.
+
+   A BALL IS A CAMERA-FACING SPIRAL, and this is the part that stops it looking
+   like a schoolbook diagram. Three wireframe rings say "ball" and look like
+   wire saying it. A spiral wound from the centre out, at a stroke weight wider
+   than the gap between its turns, FILLS — so what lands on the canvas is a
+   disc, not an outline. Its amplitude falls from the middle to the rim, and
+   since a chunk takes its peak, the inner chunk comes out brightest: a core
+   with a falloff, which is the whole of what makes a flat disc read as a
+   sphere.
+
+   Square to the viewer, always. A disc drawn in any fixed plane collapses to a
+   line when the tumble turns edge-on to it. `dnaFacing` reads back the two
+   model-space directions that map to screen right and screen up — the rotation
+   is orthonormal, so those are simply two rows of it — and the ball is built
+   in that plane. It cannot be seen edge-on because there is no edge to find.
+
+   RODS HAVE WIDTH for the same reason: one stroke is a hairline whatever it is
+   joining. Three, offset perpendicular to the rod IN SCREEN SPACE, read as a
+   cylinder. Screen space rather than model space matters — offsetting along a
+   fixed axis makes the rod thin out and vanish whenever it happens to point
+   that way.
+
+   THE GROOVE IS WHAT MAKES IT DNA. Two strands half a turn apart make a
+   twisted ladder: symmetric, evenly spaced, a spring. Real B-DNA puts them
+   about a third of a turn apart, opening a WIDE gap on one side and a NARROW
+   one on the other — the major and minor grooves. That alternation is what the
+   eye recognises.
+
+   PITCH BEATS DIAMETER. A helix fatter than the distance it advances per turn
+   is a coil spring whatever else is done to it. This advances about one and a
+   half diameters per turn, roughly what B-DNA does.
+
+   IT IGNORES DEPTH, deliberately, and it is the only figure that does. Scaling
+   z would make the cross-section an ellipse, and a helix with an elliptical
+   cross-section is a flattened coil that changes shape as it turns.
+
+   WHAT THE VOICE DOES. The local level swells the radius at that point along
+   the axis, so a loud passage fattens the stretch it lands on rather than the
+   whole strand — small and clamped, because the twist is what makes this
+   legible. It also lights the bases: a base is never dark, but how far up the
+   ramp it climbs is the sound.
+
+   THE COLOURS ARE THE BASES. Four, in fixed rotation, each at a different point
+   on the palette ramp, and a pair is always COMPLEMENTARY — the sphere at one
+   end of a rod is never the same colour as the one at the other. The rods are
+   held low on the ramp: dim is what a stick is, and it keeps every bright
+   thing on screen a base. */
+const DNA_N = 360;              // resolution of the underlying helix path
+const DNA_TURNS = 4;            // full twists across the span
+const DNA_R = 0.085;            // helix radius as a fraction of the span
+/* How far round the second strand sits, in turns. A third, not a half. */
+const DNA_GROOVE = 0.36;
+/* How far the level may fatten the helix. Small on purpose — see above. */
+const DNA_SWELL = 0.38;
+const DNA_PAIRS = [0.34, 0.58, 0.8, 1.0];
+/* Ball radius as a fraction of the helix radius. Balls that touch their
+   neighbours stop being a chain of beads and become one lumpy tube. */
+const DNA_BALL = 0.24;
+/* Turns in the fill spiral and points along it. The turn count is what decides
+   whether it fills: too few and it is a spiral, too many and it is wasted
+   strokes on a ball nine pixels across. */
+const DNA_BALL_TURNS = 5, DNA_BALL_N = 46;
+/* Half the rod's width, as a fraction of the ball radius. */
+const DNA_ROD_W = 0.30;
+/* Where a rod stops short of the axis, so the two of a pair nearly meet
+   instead of crossing through each other. */
+const DNA_ROD_END = 0.94;
+
+/* The two model-space directions that come out as screen right and screen up.
+   The projection is a product of rotations and therefore orthonormal, so these
+   are two of its rows — no inverse to compute. Valid for this frame only:
+   setAngles() runs immediately before the builders. */
+function dnaFacing(){
+  return {ux: cy_*cz_, uy: sx_*sy_*cz_ - cx_*sz_, uz: cx_*sy_*cz_ + sx_*sz_,
+          vx: cy_*sz_, vy: sx_*sy_*sz_ + cx_*cz_, vz: cx_*sy_*sz_ - sx_*cz_};
+}
+
+/* A filled disc square to the viewer: one polyline, wound out from the middle,
+   brightest at the core. */
+function dnaBall(out, cx, cy, cz, r, amp, F){
+  const n = DNA_BALL_N;
+  const pts = new Float32Array(n*3), a = new Float32Array(n);
+  for (let i=0;i<n;i++){
+    const t  = i/(n-1);
+    const th = t*DNA_BALL_TURNS*Math.PI*2, rr = t*r;
+    const c  = Math.cos(th)*rr, s = Math.sin(th)*rr;
+    pts[i*3  ] = cx + F.ux*c + F.vx*s;
+    pts[i*3+1] = cy + F.uy*c + F.vy*s;
+    pts[i*3+2] = cz + F.uz*c + F.vz*s;
+    a[i] = amp * (1 - 0.45*t);
+  }
+  out.push({p:pts, a:a});
+}
+
+function buildDna(){
+  const N = DNA_N;
+  const R = S.spread*DNA_R;
+  const bases = Math.min(72, Math.max(16, Math.round((S.lines|0) * 1.5)));
+  const tab = basisOpen(N);
+  const out = [];
+  const F = dnaFacing();
+  lineCoef(0);
+  const gain = layerGain(0);
+
+  const at = (u, half)=>{
+    const i = Math.min(N-1, Math.max(0, Math.round(u*(N-1))));
+    const s = modeSum(tab,i)*S.body + fieldAtU(u)*gain;
+    const v = Math.abs(s + lineNoise(half ? 1 : 0, i)*0.5);
+    const ang = (u*DNA_TURNS + (half ? DNA_GROOVE : 0))*Math.PI*2 + now*0.5;
+    const rr  = R * (1 + Math.min(1.2, v) * DNA_SWELL * S.amp);
+    return {x: (u-0.5)*S.spread, y: Math.cos(ang)*rr, z: Math.sin(ang)*rr, v};
+  };
+
+  const br = R*DNA_BALL, w = br*DNA_ROD_W;
+  for (let j=0;j<bases;j++){
+    const u = (j+0.5)/bases;
+    const lit = 0.45 + 0.55*Math.min(1, at(u,0).v * 1.5);
+    for (let h=0;h<2;h++){
+      const p = at(u, h);
+      const ix = p.x, iy = p.y*(1-DNA_ROD_END), iz = p.z*(1-DNA_ROD_END);
+      /* Perpendicular to the rod IN SCREEN SPACE, so the width never
+         collapses whichever way the rod happens to be pointing. */
+      const ex = p.x-ix, ey = p.y-iy, ez = p.z-iz;
+      const sx = ex*F.ux + ey*F.uy + ez*F.uz;
+      const sy = ex*F.vx + ey*F.vy + ez*F.vz;
+      const L  = Math.hypot(sx, sy) || 1;
+      const qx = -sy/L, qy = sx/L;
+      const ox = F.ux*qx + F.vx*qy, oy = F.uy*qx + F.vy*qy, oz = F.uz*qx + F.vz*qy;
+      for (const d of [-w, 0, w]){
+        out.push({p: new Float32Array([p.x+ox*d, p.y+oy*d, p.z+oz*d,
+                                       ix +ox*d, iy +oy*d, iz +oz*d]),
+                  a: new Float32Array([0.15, 0.15])});
+      }
+      /* Complementary: the two ends of one rod are never the same base. The
+         ball last, so it is stroked over the stick it sits on. */
+      dnaBall(out, p.x, p.y, p.z, br, DNA_PAIRS[(j & 3) ^ h] * lit, F);
+    }
+  }
+  return out;
+}
+
 function buildKnot(){
   const strands = Math.max(1, Math.round(S.lines/3)), N = 340;
   const R = S.spread*0.22, out = [];
@@ -2416,12 +2628,19 @@ function buildKnot(){
   return out;
 }
 
+const BUILDERS = {ridge: buildRidge, disc: buildDisc, orb: buildOrb,
+                  knot: buildKnot, dna: buildDna};
+
 /* ========================================================== PROJECTION */
 let cx_=1,sx_=0,cy_=1,sy_=0,cz_=1,sz_=0;
 function setAngles(){
-  cx_=Math.cos(ang.x); sx_=Math.sin(ang.x);
-  cy_=Math.cos(ang.y); sy_=Math.sin(ang.y);
-  cz_=Math.cos(ang.z); sz_=Math.sin(ang.z);
+  /* RIDGE reads its own locked view instead of the tumble. The tumble goes on
+     integrating underneath while it is selected, so switching back to a form
+     that turns resumes where it was rather than snapping to a cold start. */
+  const a = S.mode === 'ridge' ? RIDGE_VIEW : ang;
+  cx_=Math.cos(a.x); sx_=Math.sin(a.x);
+  cy_=Math.cos(a.y); sy_=Math.sin(a.y);
+  cz_=Math.cos(a.z); sz_=Math.sin(a.z);
 }
 const P = {x:0,y:0,z:0};
 function rot(x,y,z){
@@ -2442,10 +2661,11 @@ const chunks = [];
 function render(){
   setAngles();
   buildField();
-  const build = S.mode==='stack' ? buildStack
-              : S.mode==='ridge' ? buildRidge
-              : S.mode==='disc'  ? buildDisc
-              : S.mode==='orb'   ? buildOrb : buildKnot;
+  /* Named rather than chained, and RIDGE rather than the last one for
+     anything unrecognised: the chain's final `else` silently drew whatever
+     happened to sit at the end of it, so a settings file naming a figure that
+     had been removed showed a KNOT and looked like a bug in KNOT. */
+  const build = BUILDERS[S.mode] || buildRidge;
   const polys = build();
 
   /* The screensaver moves the whole projection rather than the canvas: the
@@ -2726,7 +2946,13 @@ const Saver = {
          whatever the wake gate happens to be doing. Read off Drive rather
          than off the wake word, because a display with no wake word at all
          still thinks and still speaks — and that path never touches Wake. */
-      if (Drive.phase === 'idle') this.idle += dt; else this.idle = 0;
+      const busy = Drive.phase !== 'idle'
+                || (typeof Wake !== 'undefined' && Wake.armed() && Wake.awake);
+      /* `awake` as well as the phase, now that opening the mic no longer
+         claims to be speaking. Between two sentences of a conversation the
+         phase is genuinely idle for a few seconds, and a screen somebody is
+         standing in front of talking to must not start dimming at them. */
+      if (!busy) this.idle += dt; else this.idle = 0;
       if (this.idle >= this.delay) this.on = true;
     }
     this.p = Math.min(1, Math.max(0, this.p + dt / (this.on ? this.IN : -this.OUT)));
@@ -2871,9 +3097,14 @@ FullScreen.init();
    canvas but the request form and the verdict are not.
 
    The same gesture that ends the screensaver is the one that can ask for the
-   full screen — there is only ever one first touch, and both want it. */
+   full screen, and the one that can open a microphone the browser would not
+   let the page open by itself — there is only ever one first touch, and all
+   three want it. */
 ['pointerdown', 'touchstart', 'keydown', 'wheel'].forEach(ev=>
-  window.addEventListener(ev, ()=>{ Saver.poke(); FullScreen.ask(); }, {passive: true}));
+  window.addEventListener(ev, ()=>{
+    Saver.poke(); FullScreen.ask();
+    if (typeof Kiosk !== 'undefined') Kiosk.touched();
+  }, {passive: true}));
 
 /* ================================================================ LOOP */
 let now=0, last=performance.now(), frames=0, fpsT=0;
@@ -2909,7 +3140,7 @@ resize(); requestAnimationFrame(frame);
    makes the motion read as speech. */
 const REPLIES = [
   "Interface check. I am rendering from a simulated token stream — no telemetry is attached to this surface. Every impulse you see in the geometry is one token arriving, nothing more.",
-  "Four forms are loaded. STACK is a scrolling waveform given depth: each line reads the same signal a few frames further back, so rotation turns the delay into a twist. RIDGE folds that same signal into a landform above its own reflection. ORB is a sphere of latitude rings displaced radially. KNOT is a parametric torus knot that breathes.",
+  "Five forms are loaded. RIDGE is the one that does not turn — the speech rectified into a landform above its own exact reflection, drawn as a mesh a few hundred rows deep, held at a fixed angle and run edge to edge of the frame. DISC is a rotating ring. ORB is a sphere of latitude rings displaced radially. KNOT is a parametric torus knot that breathes. DNA is a ball-and-stick double helix: a sphere for every base, a thin rod in to the axis, and no backbone drawn at all — the chain of spheres is the backbone.",
   "The tumble is continuous angular velocity on all three axes, re-aimed on an interval. It drifts most of the time, then visibly reorients — which is the behaviour you described, rather than a fixed spin.",
   "Depth cueing is painter's-algorithm only. Chunks are sorted back to front and stroked with alpha and weight falling off with distance, so crossings occlude correctly without any real z-buffer.",
   "Speech synthesis is live. The browser engine will not route through an audio analyser, so there is no real envelope to read — what it gives is one boundary event per word. Each word is split into its estimated syllables and pulsed at speech rate, which is what you are watching now.",
@@ -3005,7 +3236,14 @@ const Mic = {
     }
     this.active = true;
     this.floor = -1;                                    // reseed per session
-    Drive.phase = 'speaking';
+    /* THE PHASE IS NOT TOUCHED HERE, and this line used to say
+       `Drive.phase = 'speaking'`. It was doing nothing for the geometry —
+       Drive.step ignores the phase entirely whenever extLevel is set, which
+       is every frame the mic is open — and it was quietly holding the whole
+       display awake: Saver counts idle time only while the phase is 'idle',
+       so a screen with its microphone on never reached its screensaver, ever.
+       Opening a microphone is not this display speaking. The phase belongs to
+       the conversation, and the conversation sets it. */
     micNote('live · ' + Math.round(this.ctx.sampleRate/1000) + ' kHz · ' +
             (this.stream.getAudioTracks()[0] || {}).label);
     syncMic();
@@ -3013,6 +3251,10 @@ const Mic = {
 
   stop(){
     this.active = false;
+    /* Whatever was holding the gate open, the microphone it was holding it
+       for is gone. Cleared rather than decremented: a tool interrupted by the
+       mic closing never gets to release. */
+    this.override = 0;
     Drive.extLevel = null;
     Drive.phase = 'idle';
     try { if (this.stream) this.stream.getTracks().forEach(t=>t.stop()); } catch(e){}
@@ -3024,6 +3266,17 @@ const Mic = {
 
   open:false,        // push-to-talk gate; ignored when S.ptt is off
   raw:0, level:0, floor:0.010, thresh:0.010, vadOpen:false,
+
+  /* Reasons the mic may drive the figure even with the assistant asleep.
+     MIC ONLY is the one that needs it: the rig opens the microphone FOR the
+     figure, so gating it would remove the entire point of the toggle.
+     CALIBRATE does not, and briefly did — `raw` and the meter are measured
+     above the gate now, so calibration reads the room whether the display is
+     awake or not. A COUNT rather than a flag, so two holders cannot release
+     each other's hold. */
+  override:0,
+  hold(){ this.override++; },
+  release(){ this.override = Math.max(0, this.override - 1); },
 
   step(){
     if (!this.active || !this.analyser) return;
@@ -3057,12 +3310,29 @@ const Mic = {
 
     const lvl = raw < S.micgate ? 0 : raw;              // visual gate only
     this.level = lvl;
-    Drive.extLevel = Math.min(1.25, lvl);
+
+    /* ASLEEP: THE FIGURE ONLY. Everything above this line runs whatever the
+       wake gate says, and it has to — the floor, the threshold and `vadOpen`
+       ARE the speech detector, and `Listen.feed` below is what captures the
+       utterance the wake word arrives in. Gating this as an early return, the
+       way the two guards at the top of this function do, stopped the display
+       hearing its own name at all.
+
+       Those two guards can return early because they are cases where there is
+       nothing worth measuring: its own voice echoing back, or a closed
+       push-to-talk key. Asleep is the opposite — it is the state in which
+       listening matters most. So only the two writes that reach the geometry
+       are gated: the level, and the formant bins below. See Wake.engaged. */
+    const show = this.override
+              || typeof Wake === 'undefined' || Wake.engaged();
+    Drive.extLevel = show ? Math.min(1.25, lvl) : null;
     Listen.feed(raw, this.vadOpen);
     meter();
 
     this.analyser.getByteFrequencyData(this.fd);
-    const gateOpen = lvl > 0;
+    /* Writing zeros rather than skipping the loop, so the bins DECAY to
+       silence instead of freezing at whatever was last heard. */
+    const gateOpen = show && lvl > 0;
     for (let j=0;j<BINS;j++){
       let m = 0;
       for (let i=this.lo[j]; i<this.hi[j]; i++) if (this.fd[i] > m) m = this.fd[i];
@@ -4551,6 +4821,31 @@ const Wake = {
     return true;
   },
 
+  /* MAY THE ROOM DRIVE THE FIGURE. Asked once per frame by Mic.step, and the
+     reason a wall screen can ever reach its screensaver.
+
+     The screensaver was never blocked — the idle clock runs perfectly well
+     while a display sits listening, because an utterance that named no
+     assistant pokes nothing. What it could not do was stop the FIGURE:
+     Drive.extLevel overrides the phase outright, so a screen that had
+     properly dimmed and shrunk went on dancing to the room, which is not a
+     screensaver in any sense that matters on a panel left on all day.
+
+     So the mic keeps hearing — it has to, or the wake word is never caught —
+     and only what it shows is gated.
+
+     No gate at all means this is not a wall: `wake` off, or auto with
+     push-to-talk, is somebody at a desk who turned the microphone on to watch
+     it, and taking the figure away from them would be removing the feature.
+     Thinking and speaking are read off Drive rather than off `awake`, because
+     an answer that runs past the end of the window is still this screen
+     talking, and it must not go still mid-sentence. */
+  engaged(){
+    if (!this.armed()) return true;
+    if (this.awake && wallNow() < this.until) return true;
+    return Drive.phase === 'thinking' || Drive.phase === 'speaking';
+  },
+
   gate(text){
     if (!this.armed()) return text;
     if (this.awake && wallNow() < this.until){
@@ -4878,7 +5173,11 @@ talkBtn.addEventListener('click', async ()=>{
 // rig: mic without transcription
 CMD.calibrate = calibrate;
 CMD.miconly = ()=>{
-  if (Mic.active) Mic.stop(); else { Speech.stop(); Mic.start(); }
+  /* The rig's visual-work toggle: the mic is being opened FOR the figure, so
+     it drives it whether or not anything has said the wake word. Mic.stop
+     clears the hold on the way out. */
+  if (Mic.active) Mic.stop();
+  else { Speech.stop(); Mic.start(); Mic.hold(); }
 };
 
 if (!window.isSecureContext || !Mic.ok){
