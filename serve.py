@@ -1793,11 +1793,6 @@ DISPLAY_SETTINGS = {
     # profile still has to answer somewhere, and that somewhere is this one.
     # A default network profile is always SHARED, or endpoints naming nothing
     # would be pointed at a port that refuses to carry more than one.
-    # WHICH PROFILE OWNS THE BUILT-IN DISPLAY PORT, and nothing else. It was
-    # also where an endpoint naming no profile landed, and that second job is
-    # gone: it put two assistants on one port whenever two of them had simply
-    # never been given one. Naming no profile now means no port at all.
-    "network_default": "",
     "model_default": "",
     "look_default": "",
     "motion_default": "",
@@ -2506,15 +2501,6 @@ def validate_display_settings(obj, current):
             r["values"]["port"] = pv
             r["values"]["redirect"] = rv
         cfg["networks"] = rows
-        # There is always a default: it is where an endpoint naming no profile
-        # answers, which is the display port. It no longer has to be "shared",
-        # because nothing is — it carries ONE endpoint like every other port,
-        # and a second endpoint naming no profile is refused at the endpoint.
-        want = str(obj.get("network_default") or cfg.get("network_default") or "")
-        by_id = {r["id"]: r for r in rows}
-        if want not in by_id:
-            want = rows[0]["id"] if rows else ""
-        cfg["network_default"] = want
     for key, prefix in (("motions", "m"), ("speeches", "p")):
         if key not in obj:
             continue
@@ -2706,31 +2692,25 @@ def migrate_networks():
     cfg = ddoc.get("settings")
     cfg = dict(cfg) if isinstance(cfg, dict) else {}
     rows = clean_profiles(cfg.get("networks"), "w", MAX_LOOKS)
-    have = str(cfg.get("network_default") or "")
-    if have and any(r["id"] == have for r in rows):
-        return                                          # already nominated
-    # A profile list built before there was a default is not a reason to
-    # invent a second display port. Take the first one there is; otherwise the
-    # app's own ports become the profile they always were in everything but
-    # name.
-    pick = rows[0]["id"] if rows else ""
-    if not pick:
+    # THE APP'S OWN PORTS BECOME A PROFILE, once. Nothing is nominated
+    # afterwards — there is no default profile, and a profile list that
+    # already has something in it is an install that has been configured.
+    if rows:
+        return
+    if True:                       # kept as a block: the migration is one step
         app = read_app()
         prof = {"id": "w" + secrets.token_hex(4), "name": "Display",
                 "values": {"port": app["https_port"],
                            "redirect": app["http_port"]}}
         rows = [prof] + rows
-        pick = prof["id"]
         print("network migration: display ports %d/%d -> profile "
               "\u201cDisplay\u201d"
               % (app["https_port"], app["http_port"]), flush=True)
     cfg["networks"] = rows
-    cfg["network_default"] = pick
     ddoc["settings"] = cfg
     _write_displays_doc(ddoc)
-    print("network migration: default port profile is \u201c%s\u201d; ADMIN "
-          "SETTINGS now holds the admin portal's port only"
-          % next(r["name"] for r in rows if r["id"] == pick), flush=True)
+    print("network migration: ADMIN SETTINGS now holds the admin portal's "
+          "port only", flush=True)
 
 
 def ensure_default_kiosk():
@@ -9174,18 +9154,20 @@ def main():
             return int(os.environ[name])
         except (KeyError, ValueError):
             return None
-    # The display's ports are the DEFAULT network profile's now; app.json holds
-    # the admin portal's and nothing else that is read. The stored values are
-    # still the fallback for one case only — a settings document with no
-    # network profiles at all, which is an install somebody has edited by hand
-    # — because a server that cannot serve the display is worse than one on an
+    # THERE IS NO DISPLAY LISTENER. Every network profile is a listener and
+    # none of them is special — that was the last thing the nominated default
+    # was for, and it is gone with the rest of it. app.json holds the admin
+    # portal's port and nothing else that is read.
+    #
+    # The stored display ports survive as the ONE fallback: a settings document
+    # with no network profiles at all, which is an install somebody has edited
+    # by hand. A server that cannot serve anything is worse than one on an
     # unexpected port, and the admin portal is how it gets fixed either way.
-    _dnet = net_profile(display_settings()["network_default"]) or {}
-    _dvals = _dnet.get("values") or {}
+    _bare = not display_settings()["networks"]
     shifted = _env("PORT") is not None
     tls_port = _env("HTTPS_PORT") or (_env("PORT") + 1 if shifted
-                                      else _dvals.get("port") or app["https_port"])
-    port = _env("PORT") or (_dvals.get("redirect") or 0)
+                                      else app["https_port"])
+    port = _env("PORT") or 0
     adm_port = _env("ADMIN_PORT") or (_env("PORT") + 2 if shifted
                                       else app["admin_port"])
     SESSION_IDLE = app["session_idle_minutes"] * 60
@@ -9224,9 +9206,6 @@ def main():
     if voice_list():
         threading.Thread(target=get_voice, args=(voice_list()[0],), daemon=True).start()
 
-    # The pair, reported as a pair. Not a name for the combination — a name
-    # goes stale the moment one half of it changes.
-    _dflt = display_settings()["network_default"]
     # EXISTING SHARERS, named out loud. The one-endpoint-per-port rule is
     # enforced where a save is made, not by rewriting somebody's configuration
     # on an upgrade — moving an assistant to a different port is a decision
@@ -9268,14 +9247,17 @@ def main():
         "every interface on this machine" if host == "0.0.0.0" else host,
         _shut, _all), flush=True)
 
-    if have_tls:
-        # Pinned to the default profile, so an endpoint moved onto a port of
-        # its own leaves this one. An endpoint belongs to exactly one network
-        # profile; a port carrying several is what SHARED is for.
-        start_tls(tls_port, cert, key, host=host, pinned_net=_dflt)
+    if have_tls and _bare:
+        # NO PROFILES AT ALL — a hand-edited settings document. One listener on
+        # the stored ports so the product is reachable and the panel can be
+        # used to build a profile. Every configured install takes the loop
+        # below instead, where nothing is nominated and nothing is special.
+        start_tls(tls_port, cert, key, host=host)
         RUNNING["https_port"] = tls_port
-        print("HTTPS on %s:%d  (mic + local STT work here)" % (host, tls_port),
-              flush=True)
+        print("HTTPS on %s:%d  (no network profiles — fallback listener)"
+              % (host, tls_port), flush=True)
+    elif have_tls:
+        pass                         # the profiles below are the listeners
     elif personal:
         # Not a degraded install. http://localhost is a secure context, so the
         # microphone works here with no certificate and no browser warning.
@@ -9305,12 +9287,12 @@ def main():
     # not something to open and close under an admin's mouse, which is the
     # same reason the admin portal's port has always taken a restart.
     #
-    # The NOMINATED profile is skipped — it is the display listener started
-    # above, and binding it twice would be the server colliding with itself.
-    _dflt_id = display_settings()["network_default"]
+    # NOTHING IS SKIPPED. There used to be a nominated profile bound above
+    # this loop as "the display listener", and skipping it here was what kept
+    # the server from colliding with itself. There is no such nomination now:
+    # every profile is a port with one assistant on it, and they are all
+    # started the same way.
     for _n in display_settings()["networks"]:
-        if _n["id"] == _dflt_id:
-            continue
         _mine = [r for r in net_members(_doc, _n["id"])
                  if _doc["routes"][r].get("enabled", True)]
         if not _mine:
@@ -9421,14 +9403,16 @@ def main():
         print("", flush=True)
 
     if port:
-        make_server(port, host=host, pinned_net=_dflt,
+        # Only the fallback path reaches this — a settings document with no
+        # profiles at all, where `port` came from the stored display ports.
+        # Everything else is a profile listener on a daemon thread above.
+        make_server(port, host=host,
                     redirect_to=tls_port if redirect_plain else None
                     ).serve_forever()
     else:
-        # The default profile names no plain HTTP port, so there is no
-        # foreground listener to run. Everything is on daemon threads, and a
-        # process that returned from main() here would take them with it.
-        print("no plain HTTP port on the default network profile", flush=True)
+        # Every listener is a profile's, and every one of them is on a daemon
+        # thread. A process that returned from main() here would take them
+        # with it, so it waits instead.
         threading.Event().wait()
 
 

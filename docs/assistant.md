@@ -246,9 +246,10 @@ running or already known to be broken — so it is not allowed to refuse an edit
 to a different row.
 
 **An endpoint belongs to exactly one network profile**, and answers there and
-nowhere else. One that names none answers on whichever profile is nominated
-**DEFAULT**, which is where they all were before this existed: an upgrade turns
-the display ports into a profile called *Display*, shared, and nothing moves
+nowhere else. One that names none **answers nowhere** — there is no nominated
+default to fall back to, and that fallback is precisely what used to put two
+assistants on one port. An upgrade turns the built-in display ports into a
+profile called *Display*, and nothing moves
 until you move it.
 
 **Shared or not** is the whole difference between the two things you might
@@ -285,9 +286,11 @@ endpoints that had simply never been given one both landed there, chosen by
 nobody. The server names such endpoints at startup, and the endpoint's Network
 heading reads *no port — answers nowhere*.
 
-There is no MAKE DEFAULT on this page. One profile is still nominated
-internally as the owner of the built-in display port, because the display
-listener has to be some profile's port, but it collects nothing.
+There is no MAKE DEFAULT on this page, and nothing is nominated behind it
+either. Every profile is a listener and none of them is special: the built-in
+display ports became a profile on upgrade and are treated exactly like one you
+made yourself. A profile no endpoint has been given is not bound at all, and
+the server says so at startup.
 
 **Whether a caller has to sign in is on the endpoint**, under CONNECTIONS ▸ AI
 ▸ Sign in — not here. See *Who may use it*.

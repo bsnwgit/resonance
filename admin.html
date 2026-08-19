@@ -5380,15 +5380,19 @@ function blockPaint(blk, r){
     /* A port already answering for another endpoint is not offered: one
        port, one endpoint, so choosing it would be choosing a refusal. */
     const pool = all.filter(x=> !taken[x.id]);
-    const def = all.filter(x=> x.id === ((DPCFG && DPCFG.network_default) || ''))[0];
     nw.innerHTML = '';
     /* NO PORT MEANS NO PORT. It used to fall back to a nominated default,
        which is what quietly put two assistants on one port: two endpoints
        that had simply never been given one both landed there, chosen by
        nobody. An endpoint naming no profile is now attached to nothing and
        answers nowhere — said here, on the row, rather than discovered. */
+    /* EVERY free profile, the nominated one included. That filter excluded it
+       because the blank option USED to represent it — pick "default" and you
+       got that port. The blank option means "no port" now, so excluding the
+       profile as well left it in the list on the NETWORK page and impossible
+       to choose here: a port nothing was using that nothing could be put on. */
     const opts = [['', 'NOT ATTACHED TO A PORT — answers nowhere']]
-                   .concat(pool.filter(x=> !def || x.id !== def.id).map(x=> [x.id,
+                   .concat(pool.map(x=> [x.id,
                      x.name + ((x.values || {}).port ? ' · ' + x.values.port : '')]));
     if (want && !pool.some(x=> x.id === want))
       opts.push([want, 'a profile that no longer exists']);
@@ -5898,7 +5902,12 @@ async function blockAction(blk, act, btn){
          that had worked perfectly — which reads as a hang, and is the sort of
          thing that makes somebody press SAVE a second time. Resolved after
          the repaint and by id, because the block may have been reordered. */
-      const now = document.querySelector('#panel .grp[data-rid="' + j.id + '"]');
+      /* `.erow`, not `.grp`. An endpoint block has always been an `.erow` —
+         this selector never matched anything, so `now` was null every time and
+         the branch below was skipped in silence. The note it was added to
+         replace stayed on "saving…" for ever, which is exactly the symptom it
+         was written to fix. */
+      const now = document.querySelector('#panel .erow[data-rid="' + j.id + '"]');
       const rec = RT.routes.find(x=> x.id === j.id) || {};
       if (now) blockNote(now, 'saved · say “' + rec.wakeword + '” to reach '
         + rec.name + ' · ' + (()=>{
@@ -7090,7 +7099,7 @@ function paintDpSettings(){
   paintSavers(DPCFG.savers || []);
   paintKiosks(DPCFG.kiosks || [], DPCFG.kiosk_default || '');
   paintModels(DPCFG.models || [], DPCFG.model_default || '');
-  paintNetworks(DPCFG.networks || [], DPCFG.network_default || '');
+  paintNetworks(DPCFG.networks || []);
   paintNewSetup();
 }
 
@@ -7362,10 +7371,9 @@ function paintModels(list, def){
    MAKE DEFAULT. Every other list has one because a row naming nothing still
    has to look like something; an endpoint naming no network profile is not
    missing a setting, it is on the display port. */
-let DPNETS = [], DPNWDEF = '', OPENNW = -1;
+let DPNETS = [], OPENNW = -1;
 
-function paintNetworks(list, def){
-  if (def !== undefined) DPNWDEF = def || '';
+function paintNetworks(list){
   DPNETS = (list || []).map(n=> ({id: n.id || '', _new: !!n._new,
                                   name: n.name || '',
                                   values: Object.assign({}, n.values || {})}));
@@ -7503,11 +7511,17 @@ function paintNetworks(list, def){
         return;
       }
       n._new = false; OPENNW = -1;
+      /* THE ADDRESS TRAVELS TOO. It never has: the IP address picker wrote
+         `v.address`, the summary line read it back, and the save quietly left
+         it out of the payload — so choosing an interface looked like it took,
+         survived a repaint from local state, and was gone the moment the
+         document was re-read from the server. A control writing to something
+         nothing sends is the same fault as one nothing reads. */
       saveDp({networks: keep.map(x=> ({id:x.id, name:x.name,
-                values:{port: parseInt(x.values.port, 10),
+                values:{address: String(x.values.address || ''),
+                        port: parseInt(x.values.port, 10),
                         redirect: parseInt(x.values.redirect, 10) || 0,
-                        }})),
-              network_default: DPNWDEF}, 'networknote');
+                        }}))}, 'networknote');
     };
     acts.appendChild(save);
 
@@ -7518,12 +7532,7 @@ function paintNetworks(list, def){
        to the shared port at the next restart, which is a port disappearing
        with nothing said about it. */
     const on = (RT.routes || []).filter(r=> r.network === n.id)[0];
-    /* Guarded because this profile owns the built-in display port — the one
-       listener the server always starts. Removing it is not a thing an admin
-       does from here; it is what the app's own ports are. */
-    if (n.id && n.id === DPNWDEF){ del.disabled = true;
-      del.title = 'this is the built-in display port'; }
-    else if (on){ del.disabled = true;
+    if (on){ del.disabled = true;
       del.title = on.name + ' answers on this port — point it elsewhere first'; }
     else del.onclick = ()=>{
       OPENNW = -1; DPNETS.splice(i, 1); paintNetworks(DPNETS);
