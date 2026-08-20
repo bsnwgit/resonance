@@ -347,8 +347,9 @@ late — is taken from the server. The time in the room is the opposite: it is
 read by somebody standing in the room, and a tablet whose clock is wrong is a
 tablet whose owner should find out.
 
-**It changes as soon as you save.** A screen picks the new format up on its
-next check-in, the way every other published change arrives.
+**It is committed by the tab's own SAVE**, at the foot of ADMIN with everything
+else on that tab — this box has no button of its own. A screen picks the new
+format up on its next check-in, the way every other published change arrives.
 
 ## Accounts
 

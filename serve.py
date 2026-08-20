@@ -2124,30 +2124,22 @@ DISPLAY_SETTINGS = {
     "quiet_on": 0,
     "quiet_from": 22,
     "quiet_to": 7,
-    # HOW A CLOCK READS, on the screens whose layout shows one. Here and not on
-    # the layout profile, because it is a house convention rather than a
-    # property of a place: a building where one hallway said 13:45 and the next
-    # said 1:45 PM would be a building with two answers to a question that has
-    # one. The layout decides WHETHER a screen shows the time; this decides
-    # what it says when it does.
+    # NO CLOCK FORMAT HERE. It was, for an afternoon, and it was the wrong
+    # document: this one is kept beside the displays and is deliberately not
+    # world readable, so a display never receives it — the format would have
+    # been stored where the screen that has to render it cannot read it.
     #
-    # `locale` is the browser's own, and it is the default because it is
-    # already right almost everywhere: the region a device is set to carries
-    # the 24-hour convention, the date order and the month names, so a
-    # deployment that wants none of this decided has to decide none of it.
-    "clock_time": "locale",
-    "clock_date": "locale",
+    # It lives in the INTERFACE document instead (`clock_time`, `clock_date`),
+    # which is what /settings hands every screen, and its defaults are declared
+    # by the display page the way every other interface setting's are. The
+    # layout's `clock` tick stays here, because whether a place shows a clock is
+    # a fact about the place.
     # Kept so an existing document round-trips rather than losing a key on the
     # first save. `user` was the second DISPLAY kind and folded into `device`;
     # nothing reads this now, and nothing writes it either.
     "user_group": "",
 }
-#: WHAT A CLOCK MAY SAY, as a fixed list rather than a format string in a box.
-#: A strftime pattern is a small language, and a wall screen printing `%-I:%M`
-#: at three metres because somebody mistyped is a fault nobody at the tablet
-#: can fix. `24` is military time; `none` drops the date and leaves the hour.
-CLOCK_TIME_FORMATS = ("locale", "24", "12")
-CLOCK_DATE_FORMATS = ("locale", "weekday", "dmy", "mdy", "iso", "none")
+
 MAX_FORM_FIELDS = 5
 #: (low, high) for each number the panel can set
 DISPLAY_LIMITS = {"event_days": EVENT_DAYS_LIMITS,
@@ -2608,17 +2600,6 @@ def validate_display_settings(obj, current):
         if not (5 <= dm <= 1440):
             return None, "the digest interval runs from 5 minutes to a day"
         cfg["digest_minutes"] = dm
-    for key, allowed in (("clock_time", CLOCK_TIME_FORMATS),
-                         ("clock_date", CLOCK_DATE_FORMATS)):
-        if key in obj:
-            want = str(obj[key] or "").strip()
-            if want not in allowed:
-                # Named, because the panel is not the only caller and an
-                # integrator posting `military` wants to be told what the word
-                # is rather than that something was wrong.
-                return None, ("%s must be one of: %s"
-                              % (key, ", ".join(allowed)))
-            cfg[key] = want
     if "quiet_on" in obj:
         cfg["quiet_on"] = 1 if obj["quiet_on"] else 0
     for k in ("quiet_from", "quiet_to"):

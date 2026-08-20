@@ -2971,15 +2971,19 @@ order of the day and the month, and the names of the months in the language
 people are reading. Choose one of the others where the deployment and the
 devices disagree, or where you want military time on a screen whose region
 does not use it.</div>
+  <!-- The ids ARE the settings keys, which is what puts these on the tab's own
+       SAVE at the foot of the box with everything else on it. A box of its own
+       would have been a second commit row on one tab and no way to tell from
+       the buttons which half you had written. -->
   <div class="setuprow">
-    <label class="bklab" for="ck_time">Time</label>
-    <select id="ck_time">
+    <label class="bklab" for="clock_time">Time</label>
+    <select id="clock_time">
       <option value="locale">The device's own</option>
       <option value="24">24-hour — 13:45</option>
       <option value="12">12-hour — 1:45 PM</option>
     </select>
-    <label class="bklab" for="ck_date">Date</label>
-    <select id="ck_date">
+    <label class="bklab" for="clock_date">Date</label>
+    <select id="clock_date">
       <option value="locale">The device's own</option>
       <option value="weekday">Thursday 20 August</option>
       <option value="dmy">20/08/2026</option>
@@ -2987,10 +2991,6 @@ does not use it.</div>
       <option value="iso">2026-08-20</option>
       <option value="none">No date — the time alone</option>
     </select>
-  </div>
-  <div class="note" id="clocknote"></div>
-  <div class="seg actrow">
-    <button id="b_clocksave" class="act-save">SAVE</button>
   </div>
     </div>
   </section>
@@ -5189,6 +5189,7 @@ function buildControls(){
   ['wakeword','wakealiases',
    'sleepword','sleepaliases','greetings','farewells',
    'loginok','loginbad',
+   'clock_time','clock_date',
    'opname','ainame']
     .forEach(id=>{ const el = $(id); if (el) bindField(el, id); });
 
@@ -7757,8 +7758,6 @@ function paintSyslog(cfg){
      one already stored" — which is also what an empty box SAVES. */
   $('ha_token').placeholder = cfg.ha_has_token
     ? 'a token is stored — leave blank to keep it' : 'paste the token';
-  $('ck_time').value = cfg.clock_time || 'locale';
-  $('ck_date').value = cfg.clock_date || 'locale';
   $('ml_on').checked = !!cfg.mail_on;
   $('ml_host').value = cfg.mail_host || '';
   $('ml_port').value = cfg.mail_port == null ? 587 : cfg.mail_port;
@@ -8468,11 +8467,6 @@ function dpNote(m, bad, which){
    settings document rather than app.json — the tab's own SAVE publishes
    app.json, and one button writing two documents is a button whose failure
    mode nobody can describe. */
-$('b_clocksave').addEventListener('click', ()=>{
-  saveDp({clock_time: $('ck_time').value,
-          clock_date: $('ck_date').value}, 'clocknote');
-});
-
 $('b_mailsave').addEventListener('click', ()=>{
   const body = {
     mail_host: ($('ml_host').value || '').trim(),
