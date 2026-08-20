@@ -119,3 +119,49 @@ Directions worth weighing, each of which is a different product:
 - **Nothing is versioned.** The message API has no version field, so the day a
   `cmd` changes shape there is no way for a host to know which it is talking
   to.
+
+---
+
+## 4 · "transcribing…" still shows on the Home Assistant wall display
+
+**Reported again**, on a display in full screen. Two rounds of fixes have gone
+at this already — the first asked the wake gate and was silently useless
+(`Wake.armed()` is false in auto and push-to-talk, so it hushed nothing), the
+second moved the question to whether the screen is in a conversation and also
+hushed the error-flagged notes, which are the frequent ones. It is still
+appearing, so **reproduce it on that screen and find out what `hush()` actually
+returns before changing `hush()` a third time.** Both previous attempts were
+reasoned about rather than watched.
+
+What it tests today — `index.html`, `hush()`:
+
+```
+Drive.phase !== 'idle'   -> do not hush (it is in a conversation)
+Wake.awake               -> do not hush (somebody woke it)
+otherwise                -> hush unless the screen was touched in the last few seconds
+```
+
+Both note surfaces go through it: `micNote()` writes `#micnote`, `note()`
+writes `#ttsnote`, and each takes the same gate. `relay()` still sends
+everything to the panel either way, so the panel is not evidence that hushing
+failed.
+
+**`hush()` never asks what kind of surface this is.** `Kiosk.on` and
+`Kiosk.fullscreen` are not in it. That is the gap the report points at: a
+browser tab somebody is using should narrate itself, and a screen on a wall
+should not, and the current test cannot tell them apart — it only asks whether
+anybody is mid-conversation with it.
+
+Three candidates, in the order worth checking:
+
+1. **`Wake.awake` is stuck true** on that screen. It is set on a wake hit and
+   cleared in four places; if the HA endpoint's arrangement leaves it set, every
+   note paints and the gate is working exactly as written.
+2. **Something is updating `lastTouch` that is not a person** — a pushed
+   command, a poll, a synthetic event — which buys `TOUCH_GRACE` seconds of
+   narration each time.
+3. **`Drive.phase` never returns to `idle`** on that endpoint, which would
+   disable the gate outright.
+
+If it turns out to be none of those, the answer is probably that a wall screen
+should hush on being a wall screen rather than on nobody talking to it.
