@@ -359,6 +359,13 @@
     /* the topics tile against THIS width, not the window's — the panel is one
        column of a grid and the two are not the same number */
     container-type:inline-size;
+    /* THE GUTTER IS ALWAYS THERE, whether or not there is anything to scroll.
+       The panel header is inside this box, so the moment the topics populate
+       and a scrollbar appears, every row above them loses its width — the
+       profiles row was laid out against one measure on the first paint and a
+       narrower one a moment later, which is why it fitted and then did not.
+       Reserving the gutter makes the two paints the same width. */
+    scrollbar-gutter:stable;
   }
   /* Everything above the topics stays a column at a readable measure. A
      search field and a row of tabs stretched to 1300px is not more usable
