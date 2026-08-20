@@ -953,6 +953,43 @@ device list, it gives RELOAD somewhere to be answered, it carries the settings
 on this page out to every screen, and it is how a screen notices on its own
 that the server has returned.
 
+### How a change reaches a screen, and when it does not
+
+Two different things travel on that check-in, and knowing which is which is the
+difference between a screen that fixes itself and one that looks stuck.
+
+**A stamp.** The server sends a value built from the endpoints document, the
+shared settings and the app settings — anything a screen renders from. A screen
+keeps the value it booted with, and reloads itself when it moves. It cannot say
+*what* changed and does not need to: the answer to all of them is the same
+reload.
+
+**A request.** RELOAD on a device's row asks one named screen to reload, and the
+check-in is where it hears about it. A request older than the screen's own boot
+has already been carried out, so it fires once rather than for ever.
+
+**The stamp is only acted on by an APPROVED display.** This is the part worth
+knowing before you go looking for a fault. A screen that has not been approved —
+a tablet somebody opened the page on, which is a legitimate working state — sees
+the stamp move and ignores it. The reason is that approval itself moves the
+stamp, and a screen reloading at that moment would replace the words explaining
+what just happened with a page that came back silently approved.
+
+The consequence is that **an unapproved screen does not pick up configuration
+changes on its own**, including one that changes what it is allowed to do. Turn
+sign-in on for an endpoint while such a screen is sitting on it and the screen
+carries on with the permissions it fetched when it loaded; it finds out the next
+time it actually asks the endpoint for something, and what it gets is a refusal
+in the status line rather than a sign-in page.
+
+**A RELOAD request is not gated that way** and reaches an unapproved screen
+normally, which is the way to bring one up to date by hand.
+
+**Neither ever interrupts a conversation.** A reload waits while the screen is
+speaking, while a question is outstanding, and while somebody is typing into the
+composer — a reload landing between a question and its answer is indistinguish-
+able from a crash to the person who asked.
+
 **Check in every (seconds)** — 20 by default, 2 to 300. Faster than a couple of
 seconds is a denial of service somebody configured by accident; slower than five
 minutes is a screen that stays dead through a lunch break.
