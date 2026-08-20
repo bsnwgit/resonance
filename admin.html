@@ -2544,11 +2544,11 @@ it, which is why it lives beside the microphone and the voices.</div>
        the same sentence. They are read together and set together, so they sit
        together, in the order they are decided.
 
-       THE BINDING IS THE WHOLE SERVER'S, not the portal's alone: a network
-       profile cannot reach further than it, which is what the help says and
-       what net_host enforces. It lives here because this is the one address
-       you can never afford to lose your way back into, so the page that sets
-       it is the page that has to state it.
+       THE BINDING IS THIS PAGE'S ALONE. It was the server's, and net_host
+       clamped every other listener to it — right while nothing else could
+       state an address, wrong the moment they all could. A profile names its
+       interface and so does enrolment, so this is the last listener without
+       one, and this is it.
 
        Two settings, not one mode. A single label covering both starts lying
        the moment somebody changes half of it, so the panel shows the pair and
@@ -2558,14 +2558,9 @@ it, which is why it lives beside the microphone and the voices.</div>
     <div class="grpbody">
   <div class="pending" id="posturewarn" hidden></div>
 
-  <!-- Under its own label, like every other field on this tab. It was the one
-       row of a grid built for a column of ports that no longer exists — the
-       app's ports are network profiles now — which left the only thing you
-       can type hard right with nothing beside it. -->
-  <label class="bklab" for="ap_admin">Port</label>
-  <input id="ap_admin" type="number" inputmode="numeric" class="num">
-  <div class="now" id="now_admin"></div>
-
+  <!-- WHICH INTERFACE, THEN WHICH PORT, the same order every other pair on
+       this panel is in — a network profile, the mail server, the syslog sink.
+       Which machine it answers as comes before which door on it. -->
   <label class="bklab">Reachable at</label>
   <div class="seg" id="ap_bind">
     <button data-v="loopback">THIS MACHINE ONLY</button>
@@ -2577,6 +2572,14 @@ it, which is why it lives beside the microphone and the voices.</div>
     <select id="ap_bindaddr"></select>
   </div>
 
+  <!-- Under its own label, like every other field on this tab. It was the one
+       row of a grid built for a column of ports that no longer exists — the
+       app's ports are network profiles now — which left the only thing you
+       can type hard right with nothing beside it. -->
+  <label class="bklab" for="ap_admin">Port</label>
+  <input id="ap_admin" type="number" inputmode="numeric" class="num">
+  <div class="now" id="now_admin"></div>
+
   <div class="note" id="posturenow"></div>
   <div class="note help"><b>The port is this page's, and only this page's.</b>
 What the app answers on is a <b>network profile</b> — PROFILES ▸ NETWORK —
@@ -2587,10 +2590,12 @@ purpose: it is the way back in when what is over there is wrong.
 1024–65535, and not a port a network profile or enrolment is using. Below 1024
 needs root, and the server runs as an ordinary user.
 
-<b>Reachable at is the whole server's</b>, not just this page's — a network
-profile cannot reach further than what is set here, so binding one address
-rather than every interface is worth doing on its own account: a laptop that
-later joins another network does not follow you onto it.
+<b>Reachable at is this page's alone.</b> It was the whole server's, and every
+other listener was pinned to it; each of them names its own interface now — a
+network profile under PROFILES ▸ NETWORK, enrolment below — so this one is the
+last that needed a setting, and it moves nothing but the panel. Binding one
+address rather than every interface is worth doing on its own account: a laptop
+that later joins another network does not follow you onto it.
 
 <b>This machine only</b> needs no certificate — browsers already treat
 http://localhost as a secure origin, so the microphone works unprompted and
@@ -2606,16 +2611,16 @@ nothing crosses a network. Start it, open localhost, talk to it.</div>
   <section class="grp wide" data-tab="app">
     <h4>Enrolment</h4>
     <div class="grpbody">
-  <!-- STACKED, like the two below it rather than like the port grid above.
-       In the grid a port is one of a column of them and the label carries the
-       row; alone, it put the only thing you can type at the far right of a
-       wide section with nothing beside it, which is a field people scroll
-       past. The three settings here are one question and now read as one. -->
+  <!-- WHICH INTERFACE, THEN WHICH PORT, then what to call the interface —
+       the same order every other pair on this panel is in, and the order the
+       three are decided in. Stacked rather than laid out in a grid: a grid is
+       for a column of ports, and one field at the far right of a wide section
+       is a field people scroll past. -->
+  <label class="bklab">Interface</label>
+  <select id="ap_enroladdr"></select>
   <label class="bklab" for="ap_enrolport">Port</label>
   <input id="ap_enrolport" type="number" inputmode="numeric" class="num">
   <div class="now" id="now_enrol"></div>
-  <label class="bklab">Interface</label>
-  <select id="ap_enroladdr"></select>
   <label class="bklab" for="ap_enrolhost">Address in the link</label>
   <input id="ap_enrolhost" type="text" spellcheck="false" autocomplete="off"
          autocapitalize="none" placeholder="join.example.com — optional">

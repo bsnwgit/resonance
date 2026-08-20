@@ -11,13 +11,20 @@ both starts lying the moment somebody changes half of it — "personal" would
 still read personal after the binding moved to every interface on the machine.
 
 They are two topics for the same reason, and they now sit on two tabs:
-**IP Address**, under ADMIN, holds where the server can be reached
-from; **Sign in**, under SECURITY, holds what it takes to get past the door —
-with the rest of who-gets-in, which is what that tab is about. **Sessions**
-went with it, since how long a session lasts is the same subject.
+**Admin Portal**, under ADMIN, holds the panel's own interface and port;
+**Sign in**, under SECURITY, holds what it takes to get past the door — with
+the rest of who-gets-in, which is what that tab is about. **Sessions** went
+with it, since how long a session lasts is the same subject.
+
+**That binding is the panel's alone.** It was the whole server's and every
+other listener was pinned to it; a network profile names its own interface and
+so does enrolment, so it is the last one that needed a setting. Whether
+anything is *exposed* — which is what decides that a password may not be typed
+over plain HTTP — is asked of every listener, not of this one: a panel on
+loopback with an assistant on the network is still a server on the network.
 
 The posture line — what it is reachable at and what the door is, in the words
-it actually means — stays under IP Address, because what it warns about is
+it actually means — stays under Admin Portal, because what it warns about is
 exposure, and it still reports the pair whichever tab you set half of it on.
 
 Both moved topics still write `app.json`, so they still need a restart — and

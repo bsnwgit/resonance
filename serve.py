@@ -248,9 +248,17 @@ LOOPBACK = "127.0.0.1"
 
 
 def bind_host(cfg):
-    """The address the listeners actually bind. Binding one address rather
-    than every interface is worth doing on its own account: a laptop that
-    later joins another network does not follow you onto it."""
+    """THE ADMIN PORTAL'S address, and its alone.
+
+    It used to be the whole server's, and every other listener was clamped to
+    it — see net_host, where the clamp was. That was right while nothing else
+    could state an address of its own. Every one of them can now: a network
+    profile names an interface, and so does enrolment. So the last listener
+    without a setting of its own is this one, and this is that setting.
+
+    Binding one address rather than every interface is worth doing on its own
+    account: a laptop that later joins another network does not follow you
+    onto it."""
     if cfg.get("bind") == "loopback":
         return LOOPBACK
     if cfg.get("bind") == "address" and cfg.get("bind_address"):
@@ -259,9 +267,40 @@ def bind_host(cfg):
 
 
 def exposed(cfg):
-    """Can anything other than this machine reach it? The question that
-    decides whether skipping authentication is structural or a risk."""
-    return bind_host(cfg) != LOOPBACK
+    """Can anything other than this machine reach ANY of this server's
+    listeners? The question that decides whether skipping authentication is
+    structural or a risk.
+
+    EVERY LISTENER, not the admin portal's binding. It was that binding, back
+    when it was the whole server's; the day it became the portal's alone, this
+    reading of it became a hole — put the panel on loopback and this would go
+    false while three assistants sat on the LAN, taking the plain-HTTP password
+    refusal with it. So it asks all three kinds: the portal, enrolment, and
+    every profile something actually answers on.
+
+    A PROFILE NOBODY ANSWERS ON IS NOT BOUND, so it does not count — the
+    listener loop skips it for the same reason. And an empty address is every
+    interface, which is the widest answer there is rather than the narrowest."""
+    if bind_host(cfg) != LOOPBACK:
+        return True
+    if int(cfg.get("enrol_port") or 0) \
+       and str(cfg.get("enrol_address") or "").strip() != LOOPBACK:
+        return True
+    doc = read_routes()
+    live = {str(r.get("network") or "") for r in doc["routes"].values()
+            if r.get("enabled", True)}
+    for n in display_settings()["networks"]:
+        if n["id"] not in live:
+            continue
+        vals = n.get("values") or {}
+        try:
+            if not int(vals.get("port") or 0):
+                continue
+        except (TypeError, ValueError):
+            continue
+        if str(vals.get("address") or "").strip() != LOOPBACK:
+            return True
+    return False
 
 
 def posture_warning(cfg):
@@ -489,22 +528,18 @@ def local_interfaces():
 
 
 def net_host(vals, fallback):
-    """The address a network profile binds.
+    """The address a listener binds: what it names, or everything.
 
-    Empty means ANY, which is this server's own binding. And a named address
-    is only honoured while the server is not pinned tighter than it: the
-    comment here used to claim a profile never reaches further than the app it
-    belongs to, and the code did not enforce it — set the server to THIS
-    MACHINE ONLY and a profile naming a LAN address would have bound the LAN
-    address anyway, which is that setting quietly not meaning what it says.
+    NOTHING CLAMPS IT ANY MORE. There was a clamp — the app-level binding won
+    over anything a profile named, so that a server told THIS MACHINE ONLY
+    meant it. That was the right rule while the app-level setting was the
+    whole server's and a profile had no other constraint. It is the wrong one
+    now: that setting is the admin portal's own address, and a portal on
+    loopback has nothing to say about where an assistant answers.
 
-    Bound to one address, that address wins for everything. Bound to
-    everything, a profile may choose. There is no arrangement where a profile
-    is offered a reach the app was told not to have."""
-    addr = str((vals or {}).get("address") or "").strip()
-    if fallback not in ("0.0.0.0", ""):
-        return fallback              # the app is pinned; nothing outruns it
-    return addr or fallback
+    Every listener states its own reach instead, and each of them means it.
+    Empty is every interface, which is what it has always meant."""
+    return str((vals or {}).get("address") or "").strip() or fallback
 
 
 def port_free_anywhere(port, addrs):
@@ -6990,6 +7025,22 @@ class Handler(SimpleHTTPRequestHandler):
             bits.insert(3, "Secure")
         self.send_header("Set-Cookie", "; ".join(bits))
 
+    def _local_only(self):
+        """Could this request have come from another machine?
+
+        Asked of THE LISTENER IT ARRIVED ON, which is the only honest form of
+        the question — this server has several and they no longer share one
+        binding. A password typed over plain HTTP is a password somebody else
+        has, unless nothing it crossed left the machine.
+
+        Read off the socket rather than off the configuration: what is bound is
+        what is true, and a setting saved but not yet restarted into is not.
+        Anything unreadable answers False, which refuses rather than allows."""
+        try:
+            return self.server.server_address[0] == LOOPBACK
+        except Exception:                        # noqa: BLE001
+            return False
+
     def _same_origin(self):
         """Every state-changing call must come from this interface itself.
         Belt and braces over SameSite=Strict, which older browsers ignore."""
@@ -8538,7 +8589,7 @@ class Handler(SimpleHTTPRequestHandler):
             if not self._same_origin():
                 return self._json(403, {"error": "cross-origin request refused"})
             if not isinstance(self.connection, ssl.SSLSocket) \
-               and exposed(read_app()):
+               and not self._local_only():
                 return self._json(400, {"error": "signing in needs a secure "
                                                  "connection"})
             obj = self._json_body()
@@ -8612,7 +8663,7 @@ class Handler(SimpleHTTPRequestHandler):
             if not self._same_origin():
                 return self._json(403, {"error": "cross-origin request refused"})
             if not isinstance(self.connection, ssl.SSLSocket) \
-               and exposed(read_app()):
+               and not self._local_only():
                 return self._json(400, {"error": "choosing a password needs a "
                                                  "secure connection"})
             # Read from the jar rather than through `_identity`, which answers
@@ -9799,7 +9850,10 @@ def main():
     # leaves the machine. Start it, open localhost, talk to it — none of the
     # certificate ceremony applies. Anywhere else it is still required, and
     # the admin interface still refuses to exist without it.
-    personal = not exposed(app)
+    # THE PORTAL'S OWN REACH, not the server's. This decides one thing — may
+    # the admin interface run without a certificate — and the answer is about
+    # the listener that would be serving the password, which is this one.
+    personal = host == LOOPBACK
     # Retire the plain listener into a redirect — but only where there is
     # somewhere to redirect TO. Beyond loopback with no certificate, HTTPS
     # does not exist, and sending every visitor to a dead port would take the
@@ -10044,7 +10098,7 @@ def main():
             print("ENROL on %s:%d  (%s, invitations only) → %s://%s:%d/p/"
                   % (_ehost, _enr, "HTTPS" if have_tls else "HTTP",
                      "https" if have_tls else "http", _ename, _enr), flush=True)
-            if not have_tls and exposed(app):
+            if not have_tls and _ehost != LOOPBACK:
                 # Said here rather than discovered by somebody halfway through
                 # accepting: /user/setup refuses a password over plain HTTP off
                 # loopback, so this listener is up and cannot finish the job.

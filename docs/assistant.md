@@ -262,11 +262,13 @@ Two profiles may share a port when they answer on different addresses, because
 the machine can carry that. ANY collides with everything on its port, which is
 what ANY means.
 
-**A profile never reaches further than the server itself.** With ADMIN
-▸ IP Address set to one address — or to this machine only — that address wins
-for every profile, whatever they name. A setting that says *this machine only*
-has to mean it, and a profile able to bind a LAN address anyway would be that
-setting quietly not applying.
+**A profile binds what it names, and nothing overrides it.** It used to be
+clamped: an app-level binding won over every profile, so *this machine only*
+meant it for the whole server. That was right while a profile had no other
+constraint. Each listener states its own interface now — a profile here,
+enrolment under ADMIN, and the panel's own under ADMIN ▸ Admin Portal — so the
+setting that says *this machine only* still means it, about the listener it
+belongs to.
 
 **The port is checked before anything is allowed to use it.** Saving tries the
 port on the address chosen; on **ANY** it must be free on *every* address the
