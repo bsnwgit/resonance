@@ -711,7 +711,7 @@
     border:1px solid rgba(var(--glass),.16);outline:0;text-align:right;
   }
   #portgrid input:focus,#ap_session:focus,#em_ttl:focus,.num:focus{border-color:var(--hue-dim)}
-  #ap_session,#em_ttl{display:block;margin:4px 0}
+  #ap_session,#em_ttl,#ap_enrolport{display:block;margin:4px 0}
   /* the spinner arrows are the operating system's, and look it */
   #portgrid input::-webkit-outer-spin-button,
   #portgrid input::-webkit-inner-spin-button,
@@ -725,8 +725,12 @@
   #pw_cur:focus,#pw_new:focus,#nu_name:focus,#nu_pw:focus,
   #em_name:focus,#em_origins:focus,
   #panel input[data-f]:focus,#panel textarea[data-f]:focus{border-color:var(--hue-dim)}
-  #portgrid .now{grid-column:1/-1;font-size:calc(8.5px * var(--fs));letter-spacing:.06em;
-                 color:rgba(var(--paper),.7);margin:-2px 0 4px}
+  /* What is actually bound, under the field that sets it — in the port grid
+     and out of it. The enrolment port is not in the grid, and the line saying
+     what it is running on belongs with it either way. */
+  .now{font-size:calc(8.5px * var(--fs));letter-spacing:.06em;
+       color:rgba(var(--paper),.7);margin:-2px 0 4px}
+  #portgrid .now{grid-column:1/-1}
   /* The panel's own bar, matching #stagebar across the window so the two
      read as one line rather than as a header on one side and a heading on
      the other. */
@@ -2595,14 +2599,17 @@ using. Below 1024 needs root, and the server runs as an ordinary user.</div>
   <section class="grp wide" data-tab="app">
     <h4>Enrolment</h4>
     <div class="grpbody">
-  <div id="portgrid">
-    <label for="ap_enrolport">port</label>
-    <input id="ap_enrolport" type="number" inputmode="numeric">
-    <div class="now" id="now_enrol"></div>
-  </div>
+  <!-- STACKED, like the two below it rather than like the port grid above.
+       In the grid a port is one of a column of them and the label carries the
+       row; alone, it put the only thing you can type at the far right of a
+       wide section with nothing beside it, which is a field people scroll
+       past. The three settings here are one question and now read as one. -->
+  <label class="bklab" for="ap_enrolport">Port</label>
+  <input id="ap_enrolport" type="number" inputmode="numeric" class="num">
+  <div class="now" id="now_enrol"></div>
   <label class="bklab">Interface</label>
   <select id="ap_enroladdr"></select>
-  <label class="bklab">Address in the link</label>
+  <label class="bklab" for="ap_enrolhost">Address in the link</label>
   <input id="ap_enrolhost" type="text" spellcheck="false" autocomplete="off"
          autocapitalize="none" placeholder="join.example.com — optional">
   <div class="note" id="enrolnow"></div>
