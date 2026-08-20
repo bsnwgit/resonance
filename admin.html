@@ -5577,7 +5577,7 @@ $('b_appsave').addEventListener('click', async ()=>{
    a stale copy beside the pair, and reading controls that no longer exist sent
    every endpoint back as DEMO on no port — the same failure the provider
    fields had when they moved onto the model profile. */
-const RT_FIELDS = ['name','speech','connection','system',
+const RT_FIELDS = ['name','connection','system',
                    'kiosk_profile','keep_alive'];
 const RT_SLIDERS = {max_tokens:  v=> v,
                     temperature: v=> (+v).toFixed(2),
@@ -5769,24 +5769,10 @@ to nothing and answers nowhere, which the Network section says.</div>
     </div>
   </div>
 
-  <div class="subgrp" data-g="voice">
-    <h5>Speech<span class="subsum"></span></h5>
-    <div class="subbody">
-  <select data-f="speech" class="ppick"></select>
-  <div class="note help">Which <b>speech profile</b> answers for this endpoint —
-the voice, the engine, the rate and pitch, and the greeting phrases. Blank is
-no profile at all — the endpoint speaks in the voice the page ships with.
-
-This used to be a greeting and a voice typed onto each endpoint, which meant
-two endpoints wanting the same voice were two copies of the same choice, and
-changing it was a change in as many places as you had endpoints. Build it once
-under SPEECH and point at it.
-
-Give the endpoints different profiles and you can tell which replied without
-looking at the screen — which is all a kiosk offers.</div>
-    </div>
-  </div>
-
+  <!-- THE SPEECH PICKER WENT ONTO THE LAYOUT. What an endpoint sounds like
+       is part of what it IS, and the layout already said what it looks like —
+       two pickers side by side answering one question. Set it under
+       PROFILES ▸ LAYOUT, on the profile this endpoint hands out. -->
   <div class="subgrp" data-g="conn">
     <h5>Connection<span class="subsum"></span></h5>
     <div class="subbody">
@@ -6057,6 +6043,62 @@ function blockPaint(blk, r){
      would collide is offering a save the server is going to refuse — and the
      collision is a property of the pair now, not of a picker beside it. Its
      own stays offered, obviously. */
+  /* THE COLLAPSED HEADINGS. Restored after the connection change took the
+     whole block out with the two pickers it sat between — every one of these
+     is what a shut subgroup says about itself, and without them a closed
+     endpoint said nothing at all. */
+  const sums = {
+    display: (()=>{
+      const p = ((DPCFG && DPCFG.kiosks) || [])
+                  .filter(x=> x.id === (r.kiosk_profile || ''))[0];
+      /* WHAT IT IS CALLED, as well as which layout. The wake word lives here
+         now, so the layout is the answer to "what is this assistant" rather
+         than only to "what does it look like". */
+      return !r.kiosk_profile ? 'none chosen — answers to nothing'
+           : !p ? 'a profile that no longer exists'
+           : p.name + ' · ' + (p.wakeword ? 'wakes to \u201c' + p.wakeword + '\u201d'
+                                          : 'no wake word');
+    })(),
+    who: !r.restricted ? 'any display'
+       : ((r.groups || []).length + (r.displays || []).length
+          + (r.identities || []).length)
+         ? [(r.groups || []).length
+              ? (r.groups || []).length + ' group' + ((r.groups || []).length === 1 ? '' : 's')
+              : '',
+            (r.displays || []).length
+              ? (r.displays || []).length + ' named' : '',
+            (r.identities || []).length
+              ? (r.identities || []).length
+                + ((r.identities || []).length === 1 ? ' person' : ' people')
+              : ''].filter(Boolean).join(' + ')
+         : 'nobody',
+    signin: r.needs_signin ? 'required' : 'not required',
+    /* THE PAIR, AND BOTH HALVES OF IT. An endpoint with no connection speaks
+       to nothing and answers nowhere, which is exactly the state a silent
+       fallback used to hide — so it is the one thing this line is unmissable
+       about. */
+    conn: (()=>{
+      const c = routeConn(r);
+      if (!c) return 'no connection — speaks to nothing, answers nowhere';
+      const m = routeModel(r), n = routeNet(r);
+      return c.name + ' · ' + (m ? m.name : 'no model')
+                    + ' · ' + (n ? n.name + ((n.values || {}).port
+                                             ? ' ' + n.values.port : '')
+                                 : 'no port');
+    })(),
+    limits: routeProvider(r) === 'homeassistant' ? r.timeout + 's'
+          : r.max_tokens + ' tokens · '
+          + (r.history_turns ? r.history_turns + ' turns' : 'no context') + ' · '
+          + r.timeout + 's',
+    prompt: routeProvider(r) === 'demo' ? 'not used in demo'
+          : routeProvider(r) === 'homeassistant' ? 'set in Home Assistant'
+          : ((r.system || '').trim().split(/\s+/).filter(Boolean).length + ' words'),
+  };
+  Object.keys(sums).forEach(g=>{
+    const h = blk.querySelector('[data-g="' + g + '"] .subsum');
+    if (h) h.textContent = sums[g];
+  });
+
   const cn = F(blk, 'connection');
   if (cn){
     const want = r.connection || '';
@@ -6139,21 +6181,6 @@ function blockPaint(blk, r){
     kp.value = want;
   }
 
-  const sp = F(blk, 'speech');
-  if (sp){
-    const want = r.speech || '';
-    const pool = (DPCFG && DPCFG.speeches) || [];
-    sp.innerHTML = '';
-    const opts = [['', "NONE — the page's own voice"]]
-                   .concat(pool.map(x=> [x.id, x.name]));
-    if (want && !pool.some(x=> x.id === want))
-      opts.push([want, 'a profile that no longer exists']);
-    opts.forEach(([v, label])=>{
-      const o = document.createElement('option');
-      o.value = v; o.textContent = label; sp.appendChild(o);
-    });
-    sp.value = want;
-  }
   // buttons that only mean something once it exists on the server
   const set = (a, hide, label)=>{
     const b = blk.querySelector('[data-a="' + a + '"]');
@@ -9276,6 +9303,10 @@ function paintKiosks(list){
                                     speech: k.speech || '',
                                     saver: k.saver || '',
                                     fullscreen: k.fullscreen !== false,
+                                    wakeword: k.wakeword || '',
+                                    wakealiases: k.wakealiases || '',
+                                    sleepword: k.sleepword || '',
+                                    sleepaliases: k.sleepaliases || '',
                                     keep_awake: k.keep_awake !== false,
                                     listen: !!k.listen,
                                     prompt: k.prompt !== false,
@@ -9399,6 +9430,38 @@ function paintKiosks(list){
     ptWrap.style.display = k.prompt ? '' : 'none';
     row.appendChild(ptWrap);
 
+    /* WHAT THIS ASSISTANT IS CALLED, and what ends a conversation with it.
+       They were elsewhere: the wake word on the speech profile an endpoint
+       named, the sleep word in the shared settings — one word for the whole
+       server, so every assistant said goodbye to the same thing.
+
+       Here because this profile is what an endpoint IS. A port carries one
+       endpoint, an endpoint names one layout: so a layout is one assistant's
+       face, and the name it answers to belongs on it. Which is also why two
+       endpoints cannot share one — the server refuses it, naming the other. */
+    const word = (label, key, ph, note)=>{
+      const w = document.createElement('div');
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.className = 'nmedit';
+      inp.spellcheck = false; inp.value = k[key] || ''; inp.placeholder = ph;
+      inp.oninput = ()=>{ DPKIOSKS[i][key] = k[key] = inp.value; retitle(); };
+      field(label, inp);
+      if (note){
+        const n = document.createElement('div');
+        n.className = 'note'; n.textContent = note;
+        row.appendChild(n);
+      }
+    };
+    word('Wakes to', 'wakeword', 'resonance',
+         'What somebody says to reach this assistant. Blank and it answers to '
+         + 'nothing — no screen on its port can address it by name.');
+    word('Also accepts', 'wakealiases', 'one per line');
+    word('Ends with', 'sleepword', 'goodbye',
+         'What ends a conversation with it. Blank takes the word the page '
+         + 'ships with, which is what every assistant used before this was '
+         + 'here.');
+    word('…or', 'sleepaliases', 'one per line');
+
     const picker = (label, key, blank, pool, summary)=>{
       const sel = document.createElement('select');
       sel.className = 'ppick';
@@ -9460,6 +9523,10 @@ function paintKiosks(list){
                                      look:x.look, motion:x.motion, speech:x.speech,
                                      saver:x.saver, fullscreen:x.fullscreen,
                                      keep_awake:x.keep_awake, listen:x.listen,
+                                     wakeword:x.wakeword,
+                                     wakealiases:x.wakealiases,
+                                     sleepword:x.sleepword,
+                                     sleepaliases:x.sleepaliases,
                                      prompt:x.prompt, prompt_text:x.prompt_text}))},
              'kiosknote');
     };
