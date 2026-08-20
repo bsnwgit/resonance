@@ -6188,13 +6188,18 @@ function blockPaint(blk, r){
     display: (()=>{
       const p = ((DPCFG && DPCFG.kiosks) || [])
                   .filter(x=> x.id === (r.kiosk_profile || ''))[0];
-      /* WHAT IT IS CALLED, as well as which layout. The wake word lives here
-         now, so the layout is the answer to "what is this assistant" rather
-         than only to "what does it look like". */
+      /* WHAT IT IS CALLED, as well as which layout — read THROUGH the layout's
+         speech profile, which is where the word lives. Read off the layout it
+         said "no wake word" about every endpoint the moment the words moved,
+         which is a shut heading lying about the one thing it is there to
+         say. */
+      const sp = ((DPCFG && DPCFG.speeches) || [])
+                   .filter(x=> x.id === ((p && p.speech) || ''))[0];
+      const word = (sp && sp.values && sp.values.wakeword) || (p && p.wakeword) || '';
       return !r.kiosk_profile ? 'none chosen — answers to nothing'
            : !p ? 'a profile that no longer exists'
-           : p.name + ' · ' + (p.wakeword ? 'wakes to \u201c' + p.wakeword + '\u201d'
-                                          : 'no wake word');
+           : p.name + ' · ' + (word ? 'wakes to \u201c' + word + '\u201d'
+                                    : 'no wake word');
     })(),
     /* ONE LINE FOR BOTH QUESTIONS, because they are one pointer now. The
        count is read through the permission rather than off the record, whose
@@ -10115,37 +10120,17 @@ function paintKiosks(list){
     ptWrap.style.display = k.prompt ? '' : 'none';
     row.appendChild(ptWrap);
 
-    /* WHAT THIS ASSISTANT IS CALLED, and what ends a conversation with it.
-       They were elsewhere: the wake word on the speech profile an endpoint
-       named, the sleep word in the shared settings — one word for the whole
-       server, so every assistant said goodbye to the same thing.
+    /* NO WAKE WORD AND NO SLEEP WORD HERE. They were, for one afternoon, on
+       the reasoning that a layout is what an endpoint IS. What an assistant is
+       CALLED turned out to belong with how it sounds rather than with how it
+       looks — so both words live on the speech profile this layout names,
+       under SETTINGS ▸ SPEECH, and are edited once there for every endpoint
+       wearing it.
 
-       Here because this profile is what an endpoint IS. A port carries one
-       endpoint, an endpoint names one layout: so a layout is one assistant's
-       face, and the name it answers to belongs on it. Which is also why two
-       endpoints cannot share one — the server refuses it, naming the other. */
-    const word = (label, key, ph, note)=>{
-      const w = document.createElement('div');
-      const inp = document.createElement('input');
-      inp.type = 'text'; inp.className = 'nmedit';
-      inp.spellcheck = false; inp.value = k[key] || ''; inp.placeholder = ph;
-      inp.oninput = ()=>{ DPKIOSKS[i][key] = k[key] = inp.value; retitle(); };
-      field(label, inp);
-      if (note){
-        const n = document.createElement('div');
-        n.className = 'note'; n.textContent = note;
-        row.appendChild(n);
-      }
-    };
-    word('Wakes to', 'wakeword', 'resonance',
-         'What somebody says to reach this assistant. Blank and it answers to '
-         + 'nothing — no screen on its port can address it by name.');
-    word('Also accepts', 'wakealiases', 'one per line');
-    word('Ends with', 'sleepword', 'goodbye',
-         'What ends a conversation with it. Blank takes the word the page '
-         + 'ships with, which is what every assistant used before this was '
-         + 'here.');
-    word('…or', 'sleepaliases', 'one per line');
+       The profile is chosen below, in the Speech picker. A layout that names
+       none keeps whatever words it was left with — the server still falls back
+       to them so nothing goes quiet — but there is nowhere here to change
+       them, which is the point: one setting, one place. */
 
     const picker = (label, key, blank, pool, summary)=>{
       const sel = document.createElement('select');

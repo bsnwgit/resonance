@@ -140,9 +140,11 @@ edge:
 
 - **LAYOUTS** — **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER / LAYOUT**.
   What a screen is. LAYOUT reads last because it is the one that *names* the
-  four before it rather than describing anything itself, and it carries the
-  wake word: the face, the voice and the word it answers to are one answer to
-  "what is this assistant".
+  four before it rather than describing anything itself. **The wake word and
+  the sleep word are on SPEECH**, with the voice — what an assistant is called
+  is part of how it sounds — so a layout points at them rather than carrying
+  them, and changing the word once reaches every endpoint wearing that
+  profile.
 - **PERMISSIONS** — **AUTHENTICATE / AUTHORIZE / PERMISSION**. Who may use an
   endpoint. AUTHENTICATE is whether a caller must be known and how long being
   known lasts; AUTHORIZE is which callers are allowed; PERMISSION is one of
