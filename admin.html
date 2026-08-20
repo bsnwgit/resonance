@@ -9982,6 +9982,13 @@ function paintKiosks(list){
                                     keep_awake: k.keep_awake !== false,
                                     listen: !!k.listen,
                                     prompt: k.prompt !== false,
+                                    /* EVERY FIELD THE PROFILE HAS, or the one
+                                       left out is a control that appears to
+                                       work: this map is what the editor edits
+                                       and what SAVE posts, so a key missing
+                                       here is ticked, sent once, and then
+                                       stripped by the next repaint. */
+                                    clock: !!k.clock,
                                     prompt_text: k.prompt_text || ''}));
   const box = $('dp_kiosks');
   if (!box) return;
@@ -10205,6 +10212,13 @@ function paintKiosks(list){
                                      wakealiases:x.wakealiases,
                                      sleepword:x.sleepword,
                                      sleepaliases:x.sleepaliases,
+                                     /* THE THIRD PLACE THIS LIST IS WRITTEN
+                                        OUT — clean_kiosks on the server,
+                                        paintKiosks above, and here. A field
+                                        added to two of the three is a control
+                                        that ticks, posts once and comes back
+                                        off. */
+                                     clock:x.clock,
                                      prompt:x.prompt, prompt_text:x.prompt_text}))},
              'kiosknote');
     };
