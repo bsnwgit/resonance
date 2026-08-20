@@ -455,9 +455,12 @@ because that is the address it was opened at. Nothing to tick and no list to
 keep in step: a page is loaded from exactly one address, and a port carries one
 endpoint, so there is never more than one answer.
 
-**A screen's own choice always wins.** Nothing an endpoint says moves a row
-somebody decided about. This is read only where the row's picker is left on
-INHERIT.
+**A screen has no choice of its own any more.** It had one, and it beat the
+endpoint's — which is one question with two answers, and the second was only
+ever a way for the two to disagree. A port carries one endpoint, an endpoint
+names one layout, and a page is loaded from exactly one address, so there is
+never more than one right answer. Set it on the endpoint and every screen on
+that port takes it.
 
 **Which screens an endpoint permits is a separate question**, on *Who may use
 it*. It is about permission and has nothing to do with how a screen looks. An
@@ -468,9 +471,9 @@ naming different profiles with no correct way to choose between them.
 
 **An endpoint with no port reaches nothing**, this included.
 
-The row's own picker therefore does not claim to know what it will inherit —
-the same device loaded from two addresses inherits differently at each. It
-reads *INHERIT — whatever the endpoint on its port says*.
+There is nothing on the row to read it against, which is the point: the same
+device loaded from two addresses would have inherited differently at each, so a
+per-row answer was one the register could never honestly print.
 
 **One register became four lists, and every row is in exactly one.** Which one
 is two questions: is this thing working, and is it a person or a machine.
@@ -856,12 +859,16 @@ it waits until they have finished. RELOAD on a row under ACCESS asks one
 directly.
 
 
-### Layout assignment — changing several at once
+### Changing several at once
 
-The bar above the two lists on **ACCESS**. Tick the rows you want, choose
-a layout profile, and APPLY TO SELECTED gives all of them that profile in one
-gesture — which is what a building of identical hallway screens wants after a
-profile is renamed or a new one is made.
+The bar above the two lists on **ACCESS**. Tick the rows you want and the
+controls under it apply to all of them at once.
+
+**Layout is no longer one of them.** It was — pick a profile, press APPLY TO
+SELECTED — and it went with the per-screen override in 2026-08-20: what a
+building of identical hallway screens wants is one change on the endpoint their
+port carries, which reaches all of them without a selection at all. What the
+selection is for now is the **status line**.
 
 **ALL means all of this screen**, which is the two lists the bar sits under —
 People and Devices. It does not reach the rows still arriving under

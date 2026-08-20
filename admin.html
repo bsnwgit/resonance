@@ -351,11 +351,9 @@
      sits in a band of its own rather than floating at the top of the page.
      `flex:0 0 auto` beside #panelscroll's `1 1 auto`: it keeps its height and
      the scrolling area takes the rest. */
-  #signoutbar{
-    flex:0 0 auto;display:flex;justify-content:flex-end;
-    padding:6px 14px;
-    border-bottom:1px solid rgba(var(--glass),.1);
-  }
+  /* `#signoutbar` is gone — SIGN OUT is in the stack at the top right with
+     the other three, inside the border that says they are one subject. The
+     bar above already draws the line this strip was drawing under itself. */
   #panelscroll{
     flex:1 1 auto;min-height:0;overflow-y:auto;padding:12px 14px 24px;
     /* the topics tile against THIS width, not the window's — the panel is one
@@ -967,17 +965,28 @@
      The bar is three button-rows tall as a result. It sits outside
      #panelscroll, so what that costs is a taller header, not a header that
      moves. */
+  /* A BOX AROUND THE FOUR. Who you are signed in as, the way back to the
+     start, what the screens are doing, and the way out — one subject, and the
+     border is what says so without a heading. The bar's other occupants are
+     places you can go; these are about YOU, and they sit apart from the row
+     rather than at the end of it. */
   #whostack{
     display:grid;
     grid-template-columns:auto auto;
     grid-template-rows:auto auto auto;
     gap:4px 8px;align-items:center;
+    border:1px solid rgba(var(--glass),.34);
+    padding:6px 8px;
   }
   /* Column two, top to bottom, in the order they are reached for: back to the
      start, what the screens are doing, and the way out last — a control that
      ENDS something belongs at the bottom. */
   #whostack #b_home    {grid-column:2;grid-row:1}
   #whostack #tab_status{grid-column:2;grid-row:2}
+  /* Bottom of the column, where a control that ENDS something belongs, and
+     spanning both so it reads as the box's own foot rather than as a fourth
+     item in a list of three. */
+  #whostack #b_signout {grid-column:1 / -1;grid-row:3;width:100%}
   #whostack button{width:100%;text-align:center}
   /* Who you are, boxed. Spans the two rows it sits beside so the border is
      one rectangle rather than two, and the pair inside it is spread across
@@ -1765,7 +1774,25 @@
   /* Between each pair and never after the label: the label already has an edge
      of its own, and a rule against it is a line beside a line. */
   .tabs button + button{border-left:1px solid rgba(var(--glass),.28)}
-  .tabs button.on{color:var(--hue);border-bottom-color:var(--hue-dim)}
+  /* THE SELECTED TAB'S UNDERLINE runs the five palette colours rather than one
+     of them. They are the five a display can be set to, taken from the same
+     values the labels are shaded from — so the line under whichever tab you
+     are standing on is the whole palette, and the tabs above it are each one
+     colour out of it.
+
+     A background rather than a border, because a border cannot hold a
+     gradient: the border stays as the transparent placeholder that keeps the
+     row from moving by a pixel when a tab is selected, and the paint is a
+     background image sitting in its place. */
+  .tabs button.on{
+    color:var(--hue);
+    background-image:linear-gradient(90deg,
+      rgb(var(--pal-blue)), rgb(var(--pal-ice)), rgb(var(--pal-milk)),
+      rgb(var(--pal-amber)), rgb(var(--pal-rust)));
+    background-size:100% 1px;
+    background-position:0 100%;
+    background-repeat:no-repeat;
+  }
   /* Brightening, the way a link in the bar does — not a border appearing on
      something that has none. */
   .tabs button:hover:not(:disabled){color:rgba(var(--paper),.95)}
@@ -2233,19 +2260,15 @@
       <button id="b_home" title="back to the start — reloads the panel">HOME</button>
       <button id="tab_status" data-tab="status"
               title="what the screens are reporting — health, alerts and the log">STATUS</button>
+      <!-- BACK IN THE STACK. It sat below the rule on a strip of its own,
+           on the reasoning that a control which ENDS what you are doing should
+           not read as a third destination beside the way home and the way to
+           STATUS. The box around the four does that job now, and does it
+           better: what is inside the border is who you are and what you can do
+           about it, which is one subject and reads as one. -->
+      <button id="b_signout" title="end this session">SIGN OUT</button>
       </span>
     </span>
-  </div>
-  <!-- BELOW THE RULE, on its own. Everything above that line is somewhere you
-       go; this is the one control on the panel that ENDS what you are doing,
-       and the divider is what says the difference. It was sitting in the same
-       grid as the way home and the way to STATUS, which read as a third
-       destination.
-
-       Its own strip rather than the top of #panelscroll: a control that signs
-       you out should not scroll away under the settings you are reading. -->
-  <div id="signoutbar">
-    <button id="b_signout" title="end this session">SIGN OUT</button>
   </div>
   <div id="panelscroll">
   <!-- Wrapped so the header keeps a readable measure while the topics below
@@ -3660,10 +3683,11 @@ they came through.</div>
          AI answers on, so it is read back off the ticks below rather than
          asked for twice. -->
     <div class="setuprow">
-      <span class="setpair">
-        <label class="bklab" for="dp_newprofile">Layout mode</label>
-        <select id="dp_newprofile" class="ppick"></select>
-      </span>
+      <!-- NO LAYOUT HERE EITHER. It was one of two things an admin already
+           knew about a screen and could set before switching it on; the other
+           is below. Which layout it wears is not one of them any more — it is
+           decided by the endpoint whose port the screen is opened at, and is
+           set once there rather than per screen. -->
     </div>
     <!-- TICKS AND NOT A PICKER, under the two above rather than beside them.
          A screen may be given several assistants — that is the ordinary case
@@ -3719,13 +3743,15 @@ to all of them is one tick.</div>
     <div class="grpbody">
   <!-- Named for what it does. It was a row of controls with no title, so the
        only way to find out what APPLY TO SELECTED applied was to press it. -->
+  <!-- THE LAYOUT ASSIGNMENT WENT WITH THE PICKER IT APPLIED. Which layout a
+       screen wears is the endpoint's to say, and an endpoint hands it to every
+       screen on its port at once — which is what this bar was for, done in one
+       place instead of a selection at a time. The selection itself stays: the
+       status line below uses it. -->
   <div class="bulkbar" id="bulkbar" hidden>
-    <span class="bulktitle">Layout mode assignment</span>
+    <span class="bulktitle">Selection</span>
     <label><input type="checkbox" id="bulkall"> ALL</label>
     <span id="bulkcount">nothing selected</span>
-    <span class="spacer"></span>
-    <select id="bulkprofile" class="nmedit"></select>
-    <button id="b_bulkapply" class="act-save">APPLY TO SELECTED</button>
   </div>
   <!-- THE SECOND THING A SELECTION IS FOR. Its own row rather than a third
        control on the one above, because that one is a picker with one APPLY
@@ -9512,57 +9538,12 @@ function kioskBlock(d){
     return sp;
   };
 
-  const sel = document.createElement('select');
-  sel.className = 'ppick';
-
-  const kiosks = (DPCFG && DPCFG.kiosks) || [];
-  /* THREE kinds of answer, and all three already exist in the stored row: not
-     a display-mode screen at all, one that is but names no profile, and one
-     that names its own. The middle one used to read DEFAULT and follow
-     whichever profile was nominated; nothing is nominated any more, so it says
-     what it now does — the screen is in layout mode and shows the settings
-     the page itself ships with. Rows already sitting on it keep working and
-     keep the same stored value. */
-  /* THERE IS NO "NOT A DISPLAY" ANY MORE. It was a real state once, when a
-     shared settings document dressed every screen whether or not it was in
-     layout mode. That document is gone — a screen now shows the profiles it
-     names and nothing else — so a row in that state has nothing dressing it at
-     all, and an ordinary browser tab pointed at this server came out looking
-     broken rather than plain. A state whose only outcome is a page that looks
-     wrong is not a choice worth offering. Every row is a display now, and the
-     only question left is which profile. */
-  /* INHERIT, and the row deliberately does not claim to know WHAT FROM. What
-     a blank picker gets depends on the PORT the screen is opened at, and a row
-     in a register has not been opened at one — the same device loaded from two
-     addresses inherits differently at each. So this states the rule rather
-     than a per-row answer it cannot have. */
-  const dflt = document.createElement('option');
-  dflt.value = '';
-  dflt.textContent = 'INHERIT — whatever the endpoint on its port says';
-  sel.appendChild(dflt);
-  kiosks.forEach(k=>{
-    const o = document.createElement('option');
-    o.value = k.id;
-    /* The name and nothing else. A select is as wide as its longest option, so
-       a summary here set the width of the control on every device row — and
-       what a profile holds is one tab away, stated once, instead of restated
-       on every screen that uses it. The summary stays on the title attribute
-       for anybody who wants it without leaving the row. */
-    o.textContent = k.name;
-    const bits = [k.voice_only ? 'voice only' : 'with transcript'];
-    const lk = ((DPCFG && DPCFG.looks) || []).filter(x=> x.id === k.look)[0];
-    const sv = ((DPCFG && DPCFG.savers) || []).filter(x=> x.id === k.saver)[0];
-    if (lk) bits.push(lk.name);
-    if (sv) bits.push(sv.name);
-    if (!k.fullscreen) bits.push('no full screen');
-    if (!k.keep_awake) bits.push('may sleep');
-    if (!k.prompt) bits.push('no prompt line');
-    o.title = bits.join(', ');
-    sel.appendChild(o);
-  });
-  sel.value = d.kiosk_profile || '';
-  line.appendChild(pair('Layout mode', sel));
-  box.appendChild(line);
+  /* NO LAYOUT PICKER. A screen carried its own and it beat the endpoint's,
+     which is one question with two answers — a port carries one endpoint, an
+     endpoint names one layout, and a page is loaded from exactly one address,
+     so the second place to state it could only ever disagree with the first.
+     Which layout a screen wears is read at ACCESS ▸ AI, on the endpoint, and
+     changing it there changes every screen on that port at once. */
 
   /* Which assistants it may use, ticked here as well as at the moment a code
      is minted — the same control in the same words, so a screen's grant is
@@ -9588,11 +9569,9 @@ function kioskBlock(d){
     try{
       const j = await api('/displays/kiosk', {method:'POST', body: JSON.stringify({
         id: d.id,
-        /* Always. See the picker: the row's only question is which profile,
-           and a display that is not a display has nothing to draw itself
-           with. */
+        /* Always a display, and the only thing this row still says about
+           itself. Which layout it wears comes from its endpoint. */
         kiosk: true,
-        kiosk_profile: sel.value,
         endpoints: gl.ticks.filter(c=> c.checked).map(c=> c.dataset.r)})});
       /* The cache, not the list. Rebuilding the rows here would throw away the
          row somebody has open and this message with it, and nothing else on
@@ -9632,7 +9611,6 @@ function kioskBlock(d){
     /* Back to what the server holds for THIS row, read off the record the list
        was drawn from rather than re-fetched — a revert undoes what is on
        screen, it does not go looking for what changed elsewhere meanwhile. */
-    sel.value = d.kiosk_profile || '';
     gl.ticks.forEach(c=>{
       c.checked = (d.granted || []).indexOf(c.dataset.r) >= 0;
     });
@@ -9643,17 +9621,15 @@ function kioskBlock(d){
      a row with two action rows — one for what this screen is, one for whether
      it may be here — reads as two things to press rather than one place to
      look. */
-  /* What the shut row prints. Resolved here because this is where the profile
-     list already is, and the row should not have to work out a second time
-     what it is showing.
+  /* NOTHING FOR THE SHUT ROW TO PRINT about its layout. It printed the row's
+     own profile, or that it inherited — and there is only inheriting now, so
+     the line said the same words on every row in the register. A label that
+     cannot differ between two rows is not telling you which row you are
+     looking at. What a screen wears is on its endpoint, one place, said once.
 
-     Its own profile where it names one. Where it does not, the row cannot say
-     which — that is decided by the port it is opened at, not by anything
-     stored here. */
-  const ownProf = kiosks.filter(k=> k.id === (d.kiosk_profile || ''))[0] || null;
-  const label = 'LAYOUT MODE · '
-              + (ownProf ? ownProf.name : 'inherits from its port');
-  return {box: box, save: save, undo: undo, said: said, label: label};
+     `label` stays in the shape this returns because the caller reads it; empty
+     is how it says there is nothing to add. */
+  return {box: box, save: save, undo: undo, said: said, label: ''};
 }
 
 /* What a row IS, and it decides which list it belongs in as well as what the
@@ -9692,19 +9668,9 @@ function paintBulk(){
     all.checked = n > 0 && n === here.length;
     all.indeterminate = n > 0 && n < here.length;
   }
-  const btn = $('b_bulkapply');
-  if (btn) btn.disabled = !n;
-  const sel = $('bulkprofile');
-  if (sel){
-    const want = sel.value;
-    sel.innerHTML = '';
-    ((DPCFG && DPCFG.kiosks) || []).forEach(k=>{
-      const o = document.createElement('option');
-      o.value = k.id; o.textContent = 'Layout mode · ' + k.name;
-      sel.appendChild(o);
-    });
-    sel.value = want || sel.value;
-  }
+  /* Nothing to fill and nothing to enable: what this bar applied went with
+     the per-screen layout. The selection it keeps is used by the status line
+     bar under it. */
 }
 
 /* Four lists, on three tabs, and every row lands in exactly one of them.
@@ -10379,42 +10345,6 @@ const bso = $('b_bulkstaton'), bsf = $('b_bulkstatoff');
 if (bso) bso.addEventListener('click', bulkStatus(true));
 if (bsf) bsf.addEventListener('click', bulkStatus(false));
 
-$('b_bulkapply').addEventListener('click', async ()=>{
-  const ids = [...PICKED];
-  if (!ids.length) return;
-  const want = $('bulkprofile').value;
-  const name = (((DPCFG && DPCFG.kiosks) || [])
-                .filter(k=> k.id === want)[0] || {}).name || 'that profile';
-  if (!confirm('Set ' + ids.length + ' device' + (ids.length === 1 ? '' : 's')
-               + ' to ' + name + '?')) return;
-  const btn = $('b_bulkapply');
-  btn.disabled = true;
-  const note = $('bulknote');
-  let done = 0;
-  const failed = [];
-  for (const id of ids){
-    try{
-      await api('/displays/kiosk', {method:'POST', body: JSON.stringify(
-        {id: id, kiosk: true, kiosk_profile: want})});
-      done++;
-    }catch(e){
-      const d = DISPLAYS.filter(x=> x.id === id)[0];
-      failed.push((d ? d.label : id) + ' — ' + e.message);
-    }
-  }
-  /* Kept selected on failure. The whole point of the list is to try again on
-     what did not take, and clearing it would make somebody rebuild it from a
-     message that has already gone. */
-  if (!failed.length) PICKED.clear();
-  await refreshDisplays();
-  if (note){
-    note.className = failed.length ? 'note bad' : 'note';
-    note.textContent = failed.length
-      ? done + ' changed, ' + failed.length + ' refused: ' + failed.join('; ')
-      : done + ' device' + (done === 1 ? '' : 's') + ' changed';
-  }
-});
-
 /* Name it, get a code. The row exists from this moment, so its endpoints can
    be ticked before the screen it is for has ever been switched on. */
 /* The two pickers on GET A CODE, filled from the same document the profile
@@ -10455,26 +10385,12 @@ function paintPersonEndpoint(){
 
 function paintNewSetup(){
   paintPersonEndpoint();
-  const prof = $('dp_newprofile'), ends = $('dp_newends');
-  if (!prof || !ends) return;
-  const fill = (sel, rows, blank)=>{
-    const had = sel.value;
-    sel.innerHTML = '';
-    const none = document.createElement('option');
-    none.value = ''; none.textContent = blank;
-    sel.appendChild(none);
-    (rows || []).forEach(r=>{
-      const o = document.createElement('option');
-      o.value = r.id; o.textContent = r.name;
-      sel.appendChild(o);
-    });
-    sel.value = had;
-  };
-  /* NONE, first and default: a screen is an ordinary display unless somebody
-     says otherwise, and the blank option is now the whole of saying nothing
-     rather than "inherit the default profile" — which was a third state you
-     could only reach by ticking a box and leaving the picker alone. */
-  fill(prof, (DPCFG && DPCFG.kiosks) || [], 'NONE');
+  /* ONE PICKER LEFT, and it is the ticks. The layout picker that used to be
+     painted here went with the per-screen override — and its element going
+     took the early return with it, which would have stopped this before the
+     ticks were drawn at all. */
+  const ends = $('dp_newends');
+  if (!ends) return;
   /* Ticked already, kept. This repaints whenever the display list is
      refetched — which happens on a timer and after every action — and a form
      somebody is halfway through filling in must not be emptied underneath
@@ -10524,7 +10440,7 @@ $('b_adddisp').addEventListener('click', async ()=>{
        Leaving the profile blank is a row that inherits from its endpoint, not
        a row that is not a display. */
     kiosk: true,
-    kiosk_profile: $('dp_newprofile').value,
+
     /* However many were ticked. The row's own grant list is the same set in
        the same words, so this is the first half of one control rather than a
        second way of saying it. */

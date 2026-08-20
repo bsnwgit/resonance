@@ -1773,10 +1773,13 @@ DISPLAY_DEFAULTS = {
     # hung on a wall and never configured still behaves like the other screens
     # in the building rather than like nothing.
     #
-    # An ID rather than the settings themselves. That is the whole point of a
-    # profile: change what a hallway screen does once, and every hallway screen
-    # changes with it, instead of twelve rows drifting out of step with no way
-    # to see which had.
+    # RETIRED 2026-08-20. Which layout a screen wears comes from the endpoint
+    # it is loaded from and from nowhere else — a port carries one endpoint, an
+    # endpoint names one layout, and a page is loaded from exactly one address,
+    # so a second place to state it could only ever be a way for the two to
+    # disagree. Kept so an existing document round-trips rather than losing a
+    # key on its first save; nothing reads it and nothing writes it, the same
+    # retirement `kind` above had.
     "kiosk_profile": "",
     # HOW THIS ROW GOT HERE: "code" for one an admin named and minted a code
     # for, "page" for one that arrived because somebody opened the display
@@ -3003,7 +3006,10 @@ def display_label(rec):
     return display_named(rec) or "unnamed display"
 
 
-KIOSK_FIELDS = ("kiosk", "kiosk_profile")
+#: What a screen still carries about being a kiosk. `kiosk_profile` went in
+#: 2026-08-20 — which layout a screen wears is the endpoint's to say, and a
+#: field only one of the two could win was a disagreement waiting to be had.
+KIOSK_FIELDS = ("kiosk",)
 
 
 def kiosk_of(rec, savers=None, looks=None, kiosks=None,
@@ -3034,9 +3040,18 @@ def kiosk_of(rec, savers=None, looks=None, kiosks=None,
     # The row's own choice first, and only then the port it came in on. A
     # screen that names a profile is a screen somebody decided about, and
     # nothing the endpoint says may move it.
-    want = str(rec.get("kiosk_profile") or "")
-    if not want:
-        want, _ = kiosk_from_port(nid, kiosks=kiosks)
+    # THE PORT, AND ONLY THE PORT. A screen carried its own profile and it beat
+    # whatever the endpoint said, on the reasoning that a row somebody decided
+    # about should not be moved by an endpoint. That is one question with two
+    # answers, which is the shape this panel keeps removing: a port carries one
+    # endpoint, an endpoint names one layout, and a page is loaded from exactly
+    # one address — so there is never more than one right answer, and a second
+    # place to state it is only a way for the two to disagree.
+    #
+    # The row's `kiosk_profile` is left on the record so an existing document
+    # round-trips rather than losing a key on its first save. Nothing reads it
+    # and nothing writes it — the same retirement `kind` had.
+    want, _ = kiosk_from_port(nid, kiosks=kiosks)
     prof = find_kiosk(want, kiosks) or {}
     # The three snapshots are merged into ONE map of settings before it leaves
     # here. The display already knows how to take a map of settings and apply
@@ -3071,7 +3086,7 @@ def kiosk_of(rec, savers=None, looks=None, kiosks=None,
 
 
 def validate_kiosk(obj, rec, kiosks):
-    """Returns (the two fields, error). Separate from
+    """Returns (the fields, error). Separate from
     validate_display_settings for the same reason the panel has a SAVE per
     block: these belong to one screen, those to the deployment, and one commit
     writing both would publish an edit somebody was halfway through.
@@ -3088,12 +3103,11 @@ def validate_kiosk(obj, rec, kiosks):
     # person pressing save must be told, or a panel left open while somebody
     # else deleted a profile silently sets a device to something it did not
     # choose.
-    if "kiosk_profile" in obj:
-        pid = str(obj["kiosk_profile"] or "")[:16]
-        if pid and not any(p["id"] == pid for p in kiosks):
-            return None, ("that kiosk profile no longer exists — reload the "
-                          "panel to see the current list")
-        out["kiosk_profile"] = pid
+    # THERE IS NO "kiosk_profile" HERE either, and for the same kind of reason
+    # the network went: a screen does not choose its layout any more than it
+    # chooses its port. Both come from the endpoint it is loaded from. A caller
+    # still sending one is simply ignored rather than refused — it is a stale
+    # panel, not a mistake anybody made.
     # There is no "network" here. A screen does not choose a port: it is
     # loaded from the port its endpoints answer on, which display_network
     # reads back off the grant.
@@ -3147,9 +3161,9 @@ def _displays_stamp(did=None):
     if isinstance(rows, dict):
         rows = [dict(r, id=k) for k, r in rows.items()]
     facts = sorted(
-        "%s|%s|%s|%s|%s|%s" % (r.get("id"), bool(r.get("approved")),
-                               bool(r.get("denied")), bool(r.get("kiosk")),
-                               r.get("kiosk_profile") or "", r.get("name") or "")
+        "%s|%s|%s|%s|%s" % (r.get("id"), bool(r.get("approved")),
+                            bool(r.get("denied")), bool(r.get("kiosk")),
+                            r.get("name") or "")
         for r in rows
         if isinstance(r, dict) and (did is None or r.get("id") == did))
     facts.append(json.dumps(raw.get("settings") or {}, sort_keys=True))
@@ -3378,7 +3392,6 @@ def invite_display(name, by, setup=None):
     # rather than found and filled in afterwards on a row among fifty.
     if isinstance(setup, dict):
         rec["kiosk"] = bool(setup.get("kiosk"))
-        rec["kiosk_profile"] = str(setup.get("kiosk_profile") or "")[:16]
         # `network` is NOT set here any more. Where a screen is loaded from is
         # derived from the endpoints it is granted — see display_network.
     displays[did] = rec
@@ -9283,13 +9296,12 @@ class Handler(SimpleHTTPRequestHandler):
             # Validated here rather than trusted: a profile id that does not
             # exist would leave a screen naming nothing, which reads on the row
             # as a setting somebody chose.
+            #
+            # NO LAYOUT HERE ANY MORE. A screen named one when it was created
+            # and that beat the endpoint's; layout comes from the endpoint now,
+            # so there is nothing to name and nothing to validate.
             cfg = display_settings()
-            kp = str(obj.get("kiosk_profile") or "")[:16]
             nw = str(obj.get("network") or "")[:16]
-            if kp and not any(k["id"] == kp for k in cfg["kiosks"]):
-                return self._json(400, {"error": "that layout profile no "
-                                                 "longer exists — reload the "
-                                                 "panel to see the list"})
             if nw and not any(n["id"] == nw for n in cfg["networks"]):
                 return self._json(400, {"error": "that network profile no "
                                                  "longer exists — reload the "
@@ -9316,7 +9328,7 @@ class Handler(SimpleHTTPRequestHandler):
             rec, err = invite_display(str(obj.get("name") or "").strip()[:40],
                                       s["user"],
                                       {"kiosk": obj.get("kiosk"),
-                                       "kiosk_profile": kp, "network": nw})
+                                       "network": nw})
             if err:
                 return self._json(400, {"error": err})
             # Granted through the same call the row's own ticks use, so there
