@@ -537,6 +537,12 @@
   .profrow{flex-wrap:wrap;align-items:flex-start}
   .profrow .tabbox:last-child{margin-left:auto}
   .profhead{margin:2px 0 10px}
+  /* A side is a column that the box fills, so the border reaches the width the
+     row gave it rather than shrinking to its buttons. */
+  .tabside > .tabbox{width:100%}
+  /* The foot's rows align at the bottom, so the boxes there do too — otherwise
+     the taller of the two hangs below the other's border. */
+  #panelfoot .tabbox{align-self:flex-end}
 
   .profbox{
     border-left:1px solid rgba(var(--glass),.55);
@@ -4491,12 +4497,17 @@ key inside an example sends you to a line that cannot answer you.</div>
     <div class="tabrow">
     <!-- What this server is wired to, and which machines are here. -->
     <div class="tabside connside">
-      <div class="tabs">
+      <!-- BOXED, and it names itself in its own top edge — the same shape the
+           two groups at the head of the panel have. What is inside the border
+           is one subject, and the label saying so from the border is what
+           stops it reading as a fourth link. -->
+      <fieldset class="tabbox">
         <!-- ACCESS, not CONNECTIONS. The word moved: it names the two profile
              lists at the top of the panel now — what an assistant speaks to
              and what it answers on — and this row is the other question
              entirely, which is who and what may reach this server. -->
-        <span class="tablabel">ACCESS</span>
+        <legend><span class="tablabel">ACCESS</span></legend>
+      <div class="tabs">
         <button id="tab_ai" data-tab="ai">AI</button>
         <!-- The register: every device this server knows about. NODES rather
              than CONNECTIONS, which is now the label over the row — a link
@@ -4513,6 +4524,7 @@ key inside an example sends you to a line that cannot answer you.</div>
              itself. -->
         <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
       </div>
+      </fieldset>
     </div>
     <!-- THE MANUAL, IN THE MIDDLE OF THE ROW. It was at the far end of the
          bar at the top, past the way out. Down here it sits between the two
@@ -4533,8 +4545,11 @@ key inside an example sends you to a line that cannot answer you.</div>
          than a setting at the head of the page you are already on. Two thirds
          to the links and one third to this. -->
     <div class="tabside findside">
+      <!-- The same box, because it is the other half of the same row. A
+           labelled box beside a bare one reads as one of them being unfinished. -->
+      <fieldset class="tabbox">
+        <legend><span class="tablabel">SEARCH</span></legend>
       <div class="tabs">
-        <span class="tablabel">SEARCH</span>
         <input id="rigfind" type="search" placeholder="filter settings…"
                spellcheck="false" autocomplete="off">
         <!-- Red, and the only red in the row: it takes something away. A field
@@ -4543,6 +4558,7 @@ key inside an example sends you to a line that cannot answer you.</div>
              half its settings. -->
         <button id="b_findclear" type="button" title="clear the search">✕</button>
       </div>
+      </fieldset>
     </div>
     </div>
   </div>
