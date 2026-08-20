@@ -5930,12 +5930,29 @@ const Watch = {
     this.down = false; this.said = false; this.fails = 0;
     this.offline(false);
     if (j.reload) this.want = this.want || 'asked by an admin';
-    /* A stamp that moved: something a screen renders from was edited. Not
-       while this one is still waiting to be approved, though — the approval
-       itself moves the stamp, and Display.watch() is already handling that
-       case in place, with the words for it. Reloading here would replace those
-       words with a page that came back silently approved. */
-    else if (this.gen && j.gen !== this.gen && Display.state === 'approved')
+    /* A stamp that moved: something a screen renders from was edited.
+       TWO STATES ARE EXEMPT, and only two.
+
+       `requested` is a screen waiting on a decision. The approval itself moves
+       the stamp, Display.watch() is already handling that case in place with
+       the words for it, and reloading here would replace those words with a
+       page that came back silently approved.
+
+       `setup` is a screen approved into an account and about to send somebody
+       to choose a password. Reloading that one out from under itself is worse
+       than anything the stamp could be telling it.
+
+       IT USED TO READ `state === 'approved'`, which exempted everything else
+       as well — and an unapproved screen is a legitimate working state, not a
+       transient one. A tablet somebody opened the page on would sit there for
+       days ignoring every configuration change, including one that took away
+       what it was allowed to do: it went on using the permissions it fetched
+       at load and found out only when it next asked an endpoint for something,
+       which answered with a refusal in the status line rather than a sign-in
+       page. Reported on 2026-08-20, on an endpoint changed to sign-in-required
+       underneath a tablet that was already on it. */
+    else if (this.gen && j.gen !== this.gen
+             && Display.state !== 'requested' && Display.state !== 'setup')
       this.want = 'settings changed';
     this.gen = j.gen || this.gen;
     if (!this.boot) this.boot = j.now || 0;

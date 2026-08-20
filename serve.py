@@ -7412,6 +7412,14 @@ class Handler(SimpleHTTPRequestHandler):
                                     # explain why the switch will not move.
                                     "endpoints": [{"id": r, "name": doc["routes"][r]["name"],
                                                    "restricted": doc["routes"][r].get("restricted"),
+                                                   # WHETHER A DEVICE CAN USE IT
+                                                   # AT ALL. Sign-in required
+                                                   # refuses a screen outright,
+                                                   # whatever it was ticked for,
+                                                   # so a tick list that does not
+                                                   # know this offers grants that
+                                                   # reach nothing.
+                                                   "needs_signin": doc["routes"][r].get("needs_signin"),
                                                    "is_default": r == doc["default"]}
                                                   for r in route_order(doc)],
                                     "open_default": open_default(doc),
@@ -7584,6 +7592,7 @@ class Handler(SimpleHTTPRequestHandler):
                                     "endpoints": [
                                         {"id": r, "name": _doc["routes"][r]["name"],
                                          "restricted": _doc["routes"][r].get("restricted"),
+                                         "needs_signin": _doc["routes"][r].get("needs_signin"),
                                          "is_default": r == _doc["default"]}
                                         for r in route_order(_doc)],
                                     "max": MAX_IDENTITIES,

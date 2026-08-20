@@ -7076,7 +7076,7 @@ async function refreshIdentities(){
     alab.className = 'bklab';
     alab.textContent = 'AI';
     ends.appendChild(alab);
-    const gl = grantList(p, false);
+    const gl = grantList(p, false, 'person');
     ends.appendChild(gl.el);
     row.appendChild(ends);
     /* Its own line under the ticks, the way the wake word's is. The list's
@@ -9440,7 +9440,7 @@ function kioskBlock(d){
   elab.className = 'bklab';
   elab.textContent = 'AI';
   ends.appendChild(elab);
-  const gl = grantList(d, false);
+  const gl = grantList(d, false, 'device');
   ends.appendChild(gl.el);
   box.appendChild(ends);
 
@@ -9894,7 +9894,7 @@ async function refreshDisplays(){
        APPROVE grants is whatever is ticked at that moment. */
     const canGrant = d.enrolled
                   && (undecided || st === 'denied' || st === 'expired');
-    const gl = canGrant ? grantList(d) : null;
+    const gl = canGrant ? grantList(d, true, 'person') : null;
     const grant = (label)=>{
       const b = document.createElement('button');
       b.textContent = label;
@@ -10243,10 +10243,8 @@ function paintPersonEndpoint(){
     cb.type = 'checkbox'; cb.dataset.r = e.id;
     cb.checked = had.has(e.id);
     lab.appendChild(cb);
-    /* The same sentence every other copy of this list carries: an endpoint
-       open to everyone is reachable already, and ticking it grants nothing. */
-    lab.appendChild(document.createTextNode(
-      ' ' + e.name + (e.restricted ? '' : ' — open to all anyway')));
+    lab.appendChild(document.createTextNode(' ' + e.name
+                                            + grantNote(e, 'person')));
     box.appendChild(lab);
   });
 }
@@ -10293,10 +10291,8 @@ function paintNewSetup(){
     cb.type = 'checkbox'; cb.dataset.r = e.id;
     cb.checked = had.has(e.id);
     lab.appendChild(cb);
-    /* The same sentence the row's own ticks carry: an endpoint open to any
-       display is reachable already, and ticking it grants nothing. */
-    lab.appendChild(document.createTextNode(
-      ' ' + e.name + (e.restricted ? '' : ' — open to all anyway')));
+    lab.appendChild(document.createTextNode(' ' + e.name
+                                            + grantNote(e, 'device')));
     ends.appendChild(lab);
   });
 }
@@ -10352,7 +10348,35 @@ $('dp_name').addEventListener('keydown', e=>{
 
    Returns the element and its checkboxes, because the button that commits them
    is built elsewhere and has to read them at the moment it is pressed. */
-function grantList(d, heading){
+/* WHAT TICKING THIS ENDPOINT IS ACTUALLY WORTH, in the words of the population
+   being ticked. Three answers, and the first one is the one that was missing:
+
+     SIGN-IN REQUIRED refuses a DEVICE outright, whatever it was granted — see
+     subject_may. So on a device's list the tick reaches nothing at all, and
+     saying "open to all anyway" there is worse than saying nothing: it reads
+     as an endpoint anybody can use, about the one setting that means no screen
+     can. That is the label reported wrong on 2026-08-20, after an endpoint was
+     changed from open to sign-in-required and every device list went on
+     describing it as it had been.
+
+     A PERSON is not refused by it — signing in is the whole of what it asks —
+     so for them an unrestricted endpoint is open to anyone who has, and a
+     restricted one is worth ticking.
+
+   Read from the endpoint list on every repaint, so a change made on ACCESS ▸ AI
+   is described correctly the next time either of these lists is drawn. */
+function grantNote(e, kind){
+  if (kind === 'device' && e.needs_signin)
+    return ' — needs a person signed in, so a screen cannot use it';
+  if (e.restricted) return '';
+  /* Unrestricted, so the tick is worth nothing either way — but to WHOM it is
+     open still differs: with sign-in required it is everybody who has, and
+     without it, everybody. */
+  return e.needs_signin ? ' — open to anyone signed in anyway'
+                        : ' — open to all anyway';
+}
+
+function grantList(d, heading, kind){
   const grant = document.createElement('div');
   grant.className = 'grant';
   /* Its own heading where it stands alone on a row being decided, and none
@@ -10380,11 +10404,11 @@ function grantList(d, heading){
        these are controls somebody is going to click several of. */
     lab.onclick = (ev)=> ev.stopPropagation();
     lab.appendChild(cb);
-    /* An endpoint open to any display needs no tick to be reachable, and
-       ticking it grants nothing — say so rather than let somebody believe
-       the tick is what did it. */
-    lab.appendChild(document.createTextNode(
-      ' ' + e.name + (e.restricted ? '' : ' — open to all anyway')));
+    /* Say what the tick is worth rather than let somebody believe it did
+       something. Which sentence depends on which population this list is
+       for — see grantNote. */
+    lab.appendChild(document.createTextNode(' ' + e.name
+                                            + grantNote(e, kind || 'device')));
     cks.appendChild(lab);
   });
   grant.appendChild(cks);

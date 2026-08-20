@@ -968,22 +968,25 @@ reload.
 check-in is where it hears about it. A request older than the screen's own boot
 has already been carried out, so it fires once rather than for ever.
 
-**The stamp is only acted on by an APPROVED display.** This is the part worth
-knowing before you go looking for a fault. A screen that has not been approved —
-a tablet somebody opened the page on, which is a legitimate working state — sees
-the stamp move and ignores it. The reason is that approval itself moves the
-stamp, and a screen reloading at that moment would replace the words explaining
-what just happened with a page that came back silently approved.
+**Two states ignore the stamp, and only two.** A screen **waiting on a
+decision** does — the approval itself moves the stamp, and reloading at that
+moment would replace the words explaining what just happened with a page that
+came back silently approved. So does a screen that has just been **approved into
+an account** and is about to send somebody to choose a password: reloading that
+one out from under itself is worse than anything the stamp could be telling it.
 
-The consequence is that **an unapproved screen does not pick up configuration
-changes on its own**, including one that changes what it is allowed to do. Turn
-sign-in on for an endpoint while such a screen is sitting on it and the screen
-carries on with the permissions it fetched when it loaded; it finds out the next
-time it actually asks the endpoint for something, and what it gets is a refusal
-in the status line rather than a sign-in page.
+Every other screen acts on it, approved or not. Until 2026-08-20 only an
+approved one did, and an unapproved screen is a legitimate working state rather
+than a transient one — so a tablet somebody had opened the page on would sit for
+days ignoring every configuration change, including one that took away what it
+was allowed to do. Turn sign-in on for an endpoint underneath such a screen and
+it carried on with the permissions it had fetched at load, finding out only when
+it next asked that endpoint for something — which answered with a refusal in the
+status line rather than a sign-in page.
 
-**A RELOAD request is not gated that way** and reaches an unapproved screen
-normally, which is the way to bring one up to date by hand.
+**A RELOAD request is not gated at all** and reaches any screen with a row,
+whatever its state. That is the way to bring one up to date by hand, and the way
+to reach a screen still running a page from before a deploy.
 
 **Neither ever interrupts a conversation.** A reload waits while the screen is
 speaking, while a question is outstanding, and while somebody is typing into the
