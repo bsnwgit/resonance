@@ -396,7 +396,7 @@ question this list is read to answer.
 | **Get a code** | name it, and the code appears with the clock already running |
 | **Waiting for their code** | rows minted and not yet used, with REISSUE for one that ran out |
 
-**CONNECTIONS ▸ NODES** — everything that is working, in one register. A row
+**ACCESS ▸ NODES** — everything that is working, in one register. A row
 moves here on its own the moment it is connected, and leaves the tab it arrived
 through; the door it came through stays with it as a badge, **ASKED** or
 **INVITED**, rather than deciding which list it lands in.
@@ -438,7 +438,7 @@ them was put.
 
 Eight screens on one assistant are eight rows to set by hand, and they are
 usually all the same kind of place. So an endpoint carries a **display
-profile** — CONNECTIONS ▸ AI ▸ *Display* — and every screen opened on that
+profile** — ACCESS ▸ AI ▸ *Display* — and every screen opened on that
 endpoint's **port** takes it.
 
 **The port is the association.** A browser on the Demo port is a Demo screen
@@ -806,7 +806,7 @@ draws from has moved — its own row, or the settings every screen shares.
 Another device arriving, being approved or being deleted is not that, and does
 not disturb the screens it has nothing to do with — so a profile edited here reaches the wall without anybody
 walking to it. Never while somebody is talking to the screen or typing into it;
-it waits until they have finished. RELOAD on a row under CONNECTIONS asks one
+it waits until they have finished. RELOAD on a row under ACCESS asks one
 directly.
 
 
@@ -987,7 +987,7 @@ is held and carried out as part of coming back.
 
 ### Asking a screen to reload
 
-**RELOAD**, on a device's row under CONNECTIONS, asks that screen to reload
+**RELOAD**, on a device's row under ACCESS, asks that screen to reload
 itself
 at its next check-in. What it actually repairs is a display that is alive but
 stuck: it is still checking in, so it is still listening, and a reload is the

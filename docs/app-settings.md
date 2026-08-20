@@ -45,7 +45,7 @@ The **admin panel** always asks for a password. It holds the assistant's API
 key, every credential the server stores, and the power to grant anybody access
 to anything — a switch that opened it would be a switch somebody leaves on.
 
-The **displays** ask per endpoint, under CONNECTIONS ▸ AI, on **MUST SIGN
+The **displays** ask per endpoint, under ACCESS ▸ AI, on **MUST SIGN
 IN**. "Must there be a person" is a property of the thing being reached rather
 than of the server: three assistants on one box can want three different
 answers — a house one anybody in the room may talk to, a hosted model worth
@@ -97,7 +97,7 @@ but it **warns at every startup and in the admin panel**, because a laptop
 configured this way that later joins an office network will not have changed
 on the day that matters.
 
-**The warning is on the endpoint**, under CONNECTIONS ▸ AI ▸ *Sign in*, because
+**The warning is on the endpoint**, under ACCESS ▸ AI ▸ *Sign in*, because
 that is the control that causes it — one line saying what being open costs,
 shown only where that endpoint asks nobody to sign in and this machine can be
 reached. This page keeps the count and a pointer, since being reachable is what

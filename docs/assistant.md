@@ -344,7 +344,7 @@ display ports became a profile on upgrade and are treated exactly like one you
 made yourself. A profile no endpoint has been given is not bound at all, and
 the server says so at startup.
 
-**Whether a caller has to sign in is on the endpoint**, under CONNECTIONS ▸ AI
+**Whether a caller has to sign in is on the endpoint**, under ACCESS ▸ AI
 ▸ Sign in — not here. See *Who may use it*.
 
 TLS is the same certificate the display port uses — the microphone needs a
