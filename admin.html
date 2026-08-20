@@ -7464,6 +7464,17 @@ async function refreshIdentities(){
     erow.appendChild(em);
     row.appendChild(erow);
 
+    /* Theirs follows them to whatever they sign in at, which is why it is on
+       the person and not only on the screen — and on a line of its own,
+       halfway down the row, because it belongs to NEITHER set of buttons it
+       sits between: it takes effect as it is pressed, so it is not waiting on
+       the SAVE below it, and it is not part of the link and the deletion
+       above it. Against either of them it would read as one of them. */
+    const strow = document.createElement('div');
+    strow.className = 'seg actrow';
+    strow.appendChild(statusButton(p, '/identities/status', refreshIdentities));
+    row.appendChild(strow);
+
     /* WHICH ASSISTANTS THEY MAY USE — the display row's control, one
        population over, writing the same allow-lists through the identity half
        of the same function. The ticks existed in two places already, beside
@@ -7484,16 +7495,6 @@ async function refreshIdentities(){
     const gnote = document.createElement('div');
     gnote.className = 'note';
     row.appendChild(gnote);
-
-    /* Theirs follows them to whatever they sign in at, which is why it is on
-       the person and not only on the screen — and on a line of its own,
-       between the link at the top of the row and SAVE at the foot of it,
-       because it is neither of those: it takes effect as it is pressed, so it
-       has nothing to save, and it is not part of recovering an account. */
-    const strow = document.createElement('div');
-    strow.className = 'seg actrow';
-    strow.appendChild(statusButton(p, '/identities/status', refreshIdentities));
-    row.appendChild(strow);
 
     const acts = document.createElement('div');
     acts.className = 'seg actrow';
