@@ -11,13 +11,20 @@ both starts lying the moment somebody changes half of it — "personal" would
 still read personal after the binding moved to every interface on the machine.
 
 They are two topics for the same reason, and they now sit on two tabs:
-**IP Address**, under ADMIN, holds where the server can be reached
-from; **Sign in**, under SECURITY, holds what it takes to get past the door —
-with the rest of who-gets-in, which is what that tab is about. **Sessions**
-went with it, since how long a session lasts is the same subject.
+**Admin Portal**, under ADMIN, holds the panel's own interface and port;
+**Sign in**, under SECURITY, holds what it takes to get past the door — with
+the rest of who-gets-in, which is what that tab is about. **Sessions** went
+with it, since how long a session lasts is the same subject.
+
+**That binding is the panel's alone.** It was the whole server's and every
+other listener was pinned to it; a network profile names its own interface and
+so does enrolment, so it is the last one that needed a setting. Whether
+anything is *exposed* — which is what decides that a password may not be typed
+over plain HTTP — is asked of every listener, not of this one: a panel on
+loopback with an assistant on the network is still a server on the network.
 
 The posture line — what it is reachable at and what the door is, in the words
-it actually means — stays under IP Address, because what it warns about is
+it actually means — stays under Admin Portal, because what it warns about is
 exposure, and it still reports the pair whichever tab you set half of it on.
 
 Both moved topics still write `app.json`, so they still need a restart — and
@@ -38,7 +45,7 @@ The **admin panel** always asks for a password. It holds the assistant's API
 key, every credential the server stores, and the power to grant anybody access
 to anything — a switch that opened it would be a switch somebody leaves on.
 
-The **displays** ask per endpoint, under CONNECTIONS ▸ AI, on **MUST SIGN
+The **displays** ask per endpoint, under ACCESS ▸ AI, on **MUST SIGN
 IN**. "Must there be a person" is a property of the thing being reached rather
 than of the server: three assistants on one box can want three different
 answers — a house one anybody in the room may talk to, a hosted model worth
@@ -90,6 +97,19 @@ but it **warns at every startup and in the admin panel**, because a laptop
 configured this way that later joins an office network will not have changed
 on the day that matters.
 
+**The warning is on the endpoint**, under ACCESS ▸ AI ▸ *Sign in*, because
+that is the control that causes it — one line saying what being open costs,
+shown only where that endpoint asks nobody to sign in and this machine can be
+reached. This page keeps the count and a pointer, since being reachable is what
+makes it matter rather than what decides it.
+
+**It can be answered, two ways.** *Not now* lasts as long as the tab. *I know*
+is recorded against your admin account, so it follows you to another machine
+and leaves a colleague still being told — a shared "never show this again" on a
+security notice is a notice worth nothing. Either way it is an acknowledgement
+of a **state**: close the endpoint and every acknowledgement of it is forgotten,
+so reopening it later is a new fact rather than a repeat of an old one.
+
 It used to banner the display as well. That is gone: a description of this
 server's exposure is not something to hand to every browser that loads a
 screen. The reasoning that made it safe — anybody reading it could have opened
@@ -130,15 +150,25 @@ address and password they set from their enrolment link. On **nothing**, they
 do not — opening the link is the whole of it. One switch, because "is this
 server reachable by people I have not met" is one question.
 
-## Ports
+## Admin Portal
 
-**One port is configured here: the admin portal's**, 9702 by default — the page
-you are reading this in, which requires a sign-in.
+**Two settings, one answer: where this page is.** They were two sections — a
+binding under *IP Address* and a port under *Ports* — which asked somebody to
+already know they were halves of the same sentence. One section now, interface
+first and then the port, the order every other pair on the panel is in.
+
+**The port is 9702 by default** — the page you are reading this in, which
+requires a sign-in — and it is the only port set here.
 
 Everything the app answers on is a **network profile** instead, under
 PROFILES ▸ NETWORK. A deployment can want several, and which endpoint each one
 carries is a question about the app rather than about the portal. See
 *Assistants* → *Network profiles*.
+
+**Where invitations are accepted is its own section below this one** —
+*Enrolment* — with a port, the interface it answers on and, optionally, a name
+to put in front of it in the link. It is the only listener a setup link opens
+on; see *Administration* → *Where a link is opened*.
 
 **A port carries one endpoint.** Ports were shareable once — several
 assistants on one, told apart by wake word — and that went when signing in

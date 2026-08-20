@@ -55,8 +55,8 @@ rather than tabs, because they do not switch which controls you are editing;
 they change the subject entirely.
 
 **Every label is shaded from the display's own palette**, a colour per subject
-— the three in the bar in **blue**, PROFILES and CONNECTIONS in **ice**, SEARCH
-in **milk**. They are the same five colours a display can be set to, taken from
+— the three in the bar in **blue**, PROFILES, LAYOUTS, CONNECTIONS and
+ACCESS in **ice**, SEARCH in **milk**. They are the same five colours a display can be set to, taken from
 the same values rather than matched by eye, so the panel and the thing it
 configures are not two people's idea of one palette. The colour is there to
 tell the rows apart at a glance; it is not saying anything you have to decode.
@@ -74,7 +74,7 @@ a URL and talks to the display.
 is here already, SETTINGS on its right configures the server, and this is the
 one in the middle because it is the one somebody is waiting on.
 
-- **USER** — the people you have minted a URL for, the request form, and
+- **USER** — the people you have minted a URL for, and
   everybody who has asked to be here and not yet been decided about.
 - **DEVICE** — where a screen is set up: named, given a code, and watched until
   it takes it.
@@ -129,16 +129,25 @@ a word against a key inside an example sends you to a line that cannot answer
 you. Whether it found anything is said directly under the field.
 
 Below the bar, two more rows built the same way — a boxed label, then links
-marked by colour and a rule underneath rather than by a box of their own:
+marked by colour and a rule underneath rather than by a box of their own.
 
-- **PROFILES** — and after it **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER /
-  MODELS / NETWORK / DISPLAY**. Each is a list of profiles, and the controls
-  for one appear inside it when you open it. MODELS and NETWORK are the two
-  halves of an endpoint that are not the endpoint: what it speaks to, and what
-  it answers on.
+**PROFILES** names the first of them, on a line of its own with the row boxed
+beneath it: the line runs above the label, turns down at the end of it and
+carries on along the top of the row, so what is inside the turn is one subject.
+Everything in it is a list of profiles, and the controls for one appear inside
+it when you open it. Two groups, at opposite ends of the row:
 
-**CONNECTIONS**, at the foot — what this server is wired to, as opposed to what
-you administer about it:
+- **LAYOUTS** — **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER / LAYOUT**.
+  What a screen is. LAYOUT reads last because it is the one that *names* the
+  four before it rather than describing anything itself.
+- **CONNECTIONS**, at the right edge — **MODELS / NETWORK**. The two halves of
+  an endpoint that are not the endpoint: what it speaks to, and what it answers
+  on. They sat among the five until 2026-08-20, which made the row a list of
+  seven unrelated things.
+
+**ACCESS**, at the foot — who and what may reach this server, as opposed to
+what you administer about it. It was called CONNECTIONS until the word was
+needed for the pair above:
 
 - **AI** — the endpoints, each naming a speech profile, a model profile and a
   network profile.
@@ -296,8 +305,13 @@ that both end up connected, so neither has to read the other's queue.
 | | |
 |---|---|
 | **People** | the ones you have minted a link for who have not used it yet |
-| **The request form** | what a request asks for, under a fixed email field |
 | **Waiting for approval** | everybody who has asked and not been decided about |
+
+What a request *asks* is **SETTINGS ▸ ADMIN ▸ Enrollment Request Form**. It
+sat here, above the queue it feeds, which reads well and put a thing written
+once in your own words on the page you open to decide about the people who
+have already answered it. Those are different jobs at different moments: one
+is configuration, the other is work.
 
 ### A person, as against a device
 
@@ -309,6 +323,44 @@ not the same kind of row and they are not created the same way.
 **People**, give them an email address, and you are handed a link to send.
 There is no self-registration here and nothing that verifies an address, so
 anybody who could create their own account could create somebody else's.
+
+**Tick their assistants while you are there.** The **AI** ticks on that box are
+the grant, and the same grant each endpoint's own *Who may use it* list makes.
+Tick none and they reach whatever is open to everyone; an endpoint that is open
+to everyone is reachable already, so ticking it grants nothing. The same ticks
+are on the person's own row afterwards, so a grant made here can be changed
+there.
+
+### Where a link is opened
+
+**Every invitation opens on one port, and an admin chose it.** It is under
+SETTINGS ▸ ADMIN ▸ **Enrolment** — a port, the interface it answers on, and
+optionally a name to put in front of it. The default is **9703**.
+
+**The same link on any other port of this server answers 404.** That is the
+point of the port existing: somebody holding a link who also knows a working
+address cannot substitute one for the other. It used to be spendable anywhere,
+which made the address in the link a guess that happened to work — nothing to
+firewall, and nothing a deployment could state.
+
+**Nothing else is on that port.** No assistant, no microphone, no device
+enrolment — a browser that opens an invitation must not come away holding a
+display token. It answers the link, the page that asks for a password, and that
+password being set, and 404s everything else.
+
+**Once the password is set, that page hands over the addresses** of the
+assistants they may use, because the enrolment port is deliberately not one of
+them. The list is computed with the same test that will be applied when they
+arrive, so every line on it is a door that opens.
+
+**The name is optional and is not a second binding.** The listener answers on
+the interface whatever the name says; the name is the word put in front of the
+port when a link is minted, so it has to resolve to that interface — and the
+certificate has to carry it, or every browser will complain. `./make-cert.sh
+<name>` writes the SAN.
+
+Changing the port or the interface needs a restart. The name does not: it is
+read at the moment a link is made.
 
 **The link buys one thing: the page that asks them to choose a password.** It
 is shown once — what is stored is a hash of it, so the panel cannot show it to
@@ -332,6 +384,11 @@ password, and signs out every browser they had open. A forgotten password and
 a leaked link want the same answer, and neither of them is an admin typing a
 password they would then know.
 
+It comes out at the enrolment address, the same as the first one did — there is
+only one, so a recovery link can never arrive from a different host than the
+one somebody was originally sent, which is how a legitimate link gets treated
+as a phishing attempt.
+
 **A session is a person or a device, never both, and the URL decides which.** A
 device you approved operates as a device; opening a person's URL on one is
 refused where it is attempted, and the URL is not spent by the refusal. Signing
@@ -348,7 +405,7 @@ question this list is read to answer.
 | **Get a code** | name it, and the code appears with the clock already running |
 | **Waiting for their code** | rows minted and not yet used, with REISSUE for one that ran out |
 
-**CONNECTIONS ▸ NODES** — everything that is working, in one register. A row
+**ACCESS ▸ NODES** — everything that is working, in one register. A row
 moves here on its own the moment it is connected, and leaves the tab it arrived
 through; the door it came through stays with it as a badge, **ASKED** or
 **INVITED**, rather than deciding which list it lands in.
@@ -365,12 +422,12 @@ screen looks like and what it is allowed to do were never the same question:
 |---|---|
 | **Appearance profiles** | what a place looks like, for the handful of values that cannot be shared |
 | **Screensaver profiles** | what a kiosk does when nobody is there |
-| **Display profiles** | what a public screen is: voice only, full screen, the prompt line, and which of the lists above it uses |
+| **Layout profiles** | what a public screen is: voice only, full screen, the prompt line, and which of the lists above it uses |
 
 They are in that order on the tab because it is the order you build in: the two
 pieces first, then the thing that names them.
 
-**A display profile is composed, not self-contained.** It names an appearance and
+**A layout profile is composed, not self-contained.** It names an appearance and
 a screensaver rather than carrying copies of their values, so changing what a
 hallway looks like once still reaches every kiosk using it. Day and night in
 one hallway share an appearance and differ only in the dim — that case is the
@@ -390,7 +447,7 @@ them was put.
 
 Eight screens on one assistant are eight rows to set by hand, and they are
 usually all the same kind of place. So an endpoint carries a **display
-profile** — CONNECTIONS ▸ AI ▸ *Display* — and every screen opened on that
+profile** — ACCESS ▸ AI ▸ *Display* — and every screen opened on that
 endpoint's **port** takes it.
 
 **The port is the association.** A browser on the Demo port is a Demo screen
@@ -426,7 +483,7 @@ neither wants to read the other's queue while doing it.
 
 So an arrival is under **ENROLLMENTS** — ▸ USER while a person waits on a
 decision, ▸ DEVICE while a screen has not taken its code — and everything
-working is under **CONNECTIONS**, in its own area. A row
+working is under **ACCESS**, in its own area. A row
 moves itself the moment it starts working.
 
 Ordering survives inside each list: anything waiting sorts by how much it wants
@@ -439,7 +496,7 @@ knew it was coming.
 if you already know them, set the two things you would otherwise come back and
 fill in on the row afterwards:
 
-- **Kiosk mode**, and which display profile it is — what the screen will look
+- **Kiosk mode**, and which layout profile it is — what the screen will look
   like and behave as, chosen before it has ever been switched on
 - **Network** — which profile it answers on, which also decides the address and
   port in the code you are about to be given. A building with several ports has
@@ -525,7 +582,7 @@ for them.
 
 Most rows in a real deployment are not kiosks — a guest's laptop, somebody's
 phone — so it is one tick. Tick **Kiosk mode** on a device and one control
-appears: **which kiosk it is**, chosen from the DISPLAY profiles.
+appears: **which kiosk it is**, chosen from the LAYOUT profiles.
 Untick it and the screen goes back to being an ordinary page, with the choice
 kept: putting the device back up restores what you had.
 
@@ -604,7 +661,7 @@ looks like.
 
 **Every row is a display**, and there is no longer a state where it is not
 one. There was, while a shared settings document dressed every screen whether
-or not it was in display mode; that document is gone, so a row in that state
+or not it was in layout mode; that document is gone, so a row in that state
 had nothing dressing it and came out looking broken rather than plain. The only
 question a row answers now is which profile — its own, or the one it inherits.
 
@@ -758,14 +815,14 @@ draws from has moved — its own row, or the settings every screen shares.
 Another device arriving, being approved or being deleted is not that, and does
 not disturb the screens it has nothing to do with — so a profile edited here reaches the wall without anybody
 walking to it. Never while somebody is talking to the screen or typing into it;
-it waits until they have finished. RELOAD on a row under CONNECTIONS asks one
+it waits until they have finished. RELOAD on a row under ACCESS asks one
 directly.
 
 
-### Kiosk assignment — changing several at once
+### Layout assignment — changing several at once
 
-The bar above the two lists on **CONNECTIONS**. Tick the rows you want, choose
-a display profile, and APPLY TO SELECTED gives all of them that profile in one
+The bar above the two lists on **ACCESS**. Tick the rows you want, choose
+a layout profile, and APPLY TO SELECTED gives all of them that profile in one
 gesture — which is what a building of identical hallway screens wants after a
 profile is renamed or a new one is made.
 
@@ -939,7 +996,7 @@ is held and carried out as part of coming back.
 
 ### Asking a screen to reload
 
-**RELOAD**, on a device's row under CONNECTIONS, asks that screen to reload
+**RELOAD**, on a device's row under ACCESS, asks that screen to reload
 itself
 at its next check-in. What it actually repairs is a display that is alive but
 stuck: it is still checking in, so it is still listening, and a reload is the

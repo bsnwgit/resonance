@@ -1918,10 +1918,36 @@ it. Each entry below carries its own panel scope.
   Guessing backs off geometrically per account, on its own ledger so somebody
   fumbling a password cannot lock an admin out of the panel.
 
+  **An invitation is accepted on a listener of its own**, and that is the whole
+  of what it is for: the link, the page that asks for a password, and that
+  password being set. No assistant, no microphone, no device enrolment — a
+  browser that opens an invitation must not come away holding a display token.
+
+  **The same link answers 404 on every other port**, which is the property that
+  makes it a door rather than a hint. It used to be spendable at any bound
+  listener, on the reasoning that spending a link is not an endpoint's
+  business. True, and the cost was that the address in the link was a guess
+  that happened to work: nothing could be firewalled to it, no deployment could
+  state where people accept invitations, and anybody holding a link could
+  substitute any other port they knew.
+
+  So the port is a setting, with the interface it answers on and — optionally —
+  a name to put in front of it, because an address people can read beats four
+  numbers nobody checks. The name is not a second binding: the listener answers
+  on the interface whatever the name says, so the name has to resolve there and
+  the certificate has to carry it.
+
+  **What a person may use is a separate question from where they accept.** It
+  is a set of endpoint grants, ticked when they are invited and editable on
+  their row afterwards, and it is what the acceptance page reads to tell
+  somebody where to go next — computed with the same test that will be applied
+  when they arrive, so every address it prints is a door that opens.
+
   Recovery is one gesture: reissue the link. It mints a new one, clears the
   old password, and signs out every browser that was open — a forgotten
   password and a leaked link want the same answer, and neither of them is an
-  admin typing something they would then know.
+  admin typing something they would then know. It comes out at the same address
+  as the first, because it is read off the same endpoint.
 
   Signing in grants a session, measured in hours and **persistent on that
   browser**. Being asked again every half hour would end with people avoiding
@@ -2291,7 +2317,7 @@ had a nominated DEFAULT, and every figure on the wall was a variation on the
 same figure. Both were things the deployment decided on an admin's behalf.
 
 - **The five nominated defaults are gone** — appearance, geometry, speech,
-  models and display profiles. A row naming nothing is not quietly handed
+  models and layout profiles. A row naming nothing is not quietly handed
   somebody else's profile: an endpoint with no model profile is on `demo` and
   says so, a route with no speech profile speaks in the page's own voice, a
   screen with no appearance profile shows what the page ships with. What made
@@ -2336,11 +2362,11 @@ same figure. Both were things the deployment decided on an admin's behalf.
   it hears: the first attempt put it at the top of `Mic.step` as an early
   return, which took the voice-activity detector and the recorder with it and
   stopped the display hearing its own name.
-- **A display profile can say *listen from the moment it loads*.** A wall
+- **A layout profile can say *listen from the moment it loads*.** A wall
   screen has nobody to press TALK, and every reload left it deaf. It is a
   request rather than a guarantee — the browser decides — so a refusal falls
   back to the first touch, which is the same touch that asks for full screen.
-- **An endpoint can hand a display profile to the screens it names**, and a
+- **An endpoint can hand a layout profile to the screens it names**, and a
   screen's own choice always wins. Only endpoints that NAME it, and only when
   the answer is unambiguous: a screen can be granted several endpoints, so it
   can have several parents, and two that disagree resolve to nothing rather
@@ -3184,10 +3210,14 @@ the assistant tab became a list rather than a form.
 - **Binding to one address** rather than every interface, chosen from the
   addresses the machine actually has. An address it does not have is a server
   that will not start, and it would take the admin page with it.
-- **Beyond loopback with no sign-in is allowed and never quiet** — a banner in
-  the panel before saving, a warning on save, a loud one at every startup, and
-  a banner across the display itself. A machine set up this way on a network
-  its owner controls may later join one they do not.
+- **Beyond loopback with no sign-in is allowed and never quiet** — a line on
+  the endpoint that is open, a warning on save, and a loud one at every
+  startup. A machine set up this way on a network its owner controls may later
+  join one they do not. The endpoint is where the line lives because that is
+  the control that decides it; the exposure page keeps a count and a pointer.
+  It is dismissable — for the tab, or against the admin account — because a
+  warning that cannot be answered is one people learn to read past, and the
+  dismissal is of a state: closing the endpoint forgets it.
 - **The plain listener redirects to HTTPS**, keeping bookmarks, kiosk URLs and
   QR codes alive with path and query intact. **307, not a permanent redirect**
   — the target is configuration an admin can change, and a cached permanent

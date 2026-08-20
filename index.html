@@ -373,6 +373,44 @@
   #gatenote{font-size:calc(10px * var(--fs));line-height:1.6;
             color:rgba(var(--paper),.62)}
   #gatenote.bad{color:#ff8a8a}
+  /* One per line, name over address: the two are read at different moments —
+     the name is what somebody was told to use, the address is what they type
+     on a machine that did not follow this link. */
+  #gateplaces{display:flex;flex-direction:column;gap:8px}
+  #gateplaces a{
+    display:flex;flex-direction:column;gap:2px;text-decoration:none;
+    padding:9px 11px;border:1px solid rgba(var(--glass),.30);
+    border-radius:3px;color:rgba(var(--paper),.62);
+    font-size:calc(10px * var(--fs));line-height:1.5;word-break:break-all;
+  }
+  #gateplaces a b{
+    font-size:calc(11px * var(--fs));letter-spacing:.10em;
+    text-transform:uppercase;color:rgba(var(--paper),.92);word-break:normal;
+  }
+  #gateplaces a:hover{border-color:rgba(var(--glass),.65);
+                      color:rgba(var(--paper),.85)}
+
+  /* ---------- the enrolment listener ----------
+     A door and nothing else. Every one of these is a control wired to a route
+     that does not answer on this port — the composer would post to an
+     assistant that is not here, the status line would report a microphone
+     nothing listens to, and the transcript would never have a line in it.
+     The figure stays: it is the product's face, and this is still the product.
+     Same shape as the screensaver's rules below, and for a similar reason —
+     what is left is what belongs on screen. */
+  body[data-enrolonly] #log,
+  body[data-enrolonly] #bar,
+  body[data-enrolonly] #status,
+  body[data-enrolonly] #enrol,
+  body[data-enrolonly] #reqhead,
+  body[data-enrolonly] #reqform,
+  /* REQUEST ACCESS and its row. The button is a direct child of #request
+     rather than of the form, so hiding the form left it behind — and asking
+     to be let in is a thing you do at an assistant, which this port has none
+     of. The wrapper goes with it, or the page keeps its gap. */
+  body[data-enrolonly] #request > .seg,
+  body[data-enrolonly] #fps{display:none}
+  body[data-enrolonly] #screen{flex:1 1 auto}
   #gatego_row{display:flex;gap:8px;flex-wrap:wrap}
   #enrolhead{
     font-size:calc(12px * var(--fs));line-height:1.6;color:rgba(var(--paper),.88);
@@ -660,6 +698,11 @@
         </div>
       </div>
       <div id="gatenote"></div>
+      <!-- WHERE THIS ACCOUNT CAN BE USED, once it has a password. Only ever
+           drawn on the enrolment listener, which is the one place somebody
+           finishes setting up and is then standing somewhere that will never
+           answer them. Each line is a door the server has already tested. -->
+      <div id="gateplaces" style="display:none"></div>
       <!-- The two exceptions, as links. Each one swaps the box above for the
            thing it names and offers the way back; a person only ever sees the
            routes they are NOT currently on. -->
@@ -851,6 +894,14 @@ if (ENROL && window.history && history.replaceState)
    outcome of a thing that happened once has no business surviving a reload.
    Three answers now: `setup` for an account with no password yet, `ready` for
    a link that has already been spent, `bad` for one that means nothing. */
+/* THE ENROLMENT LISTENER, or not. A door and nothing else: no assistant, no
+   microphone, no device token to be issued. Everything this page normally does
+   on load answers 404 there, so it does none of it — see enrolOnly. */
+let ENROL_ONLY = false;
+/* Where this account can actually be used, handed over by /user/setup once a
+   password exists. This listener is not one of them and never will be. */
+let PLACES = [];
+
 const PERSON_ARRIVED = (new URLSearchParams(location.search).get('person') || '')
   .replace(/[^a-z]/g, '').slice(0, 12);
 if (PERSON_ARRIVED && window.history && history.replaceState)
@@ -868,6 +919,13 @@ const Person = {
        is the thing that follows them. */
     if (p.settings) Prefs.adopt(p.settings);
     paintGate();
+    /* THE TRANSCRIPT, RELABELLED. Signing in is the one moment the answer to
+       "who is speaking" changes without a setting being touched, and the
+       lines already on screen were attributed to whatever this browser was
+       before — on a page that does not reload, that label would sit there
+       for the rest of the session. Guarded because this object is taken at
+       load, before the transcript exists. */
+    if (typeof repaintNames === 'function') repaintNames();
   },
 };
 
@@ -888,7 +946,15 @@ function paintGate(){
   const box = $('gate');
   if (!box) return;
   const setup = GATE === 'setup';
-  const signing = GATE === 'login' || setup;
+  const done = GATE === 'done';
+  /* THE THREE STATES THE ENROLMENT LISTENER HAS. It is one door: an
+     invitation is accepted here and nothing else is, so there is no sign-in
+     to offer, no code to type and nobody to ask for access — every one of
+     those posts to a route that does not exist on this port. Saying so is the
+     alternative to a form that fails for a reason nobody can see. */
+  const invite = GATE === 'invite';
+  const spent = GATE === 'spent';
+  const signing = (GATE === 'login' || setup) && !invite && !spent;
   /* The two failures a link can have. Said here rather than nowhere: the
      server answers a redirect with one word, and somebody who followed a link
      that did not work should be told, not left looking at a page behaving as
@@ -912,7 +978,10 @@ function paintGate(){
 
   if (head){
     head.textContent =
-        setup   ? 'Choose a password'
+        done    ? 'You are set up'
+      : invite  ? 'Invitations are accepted here'
+      : spent   ? 'That link has been used'
+      : setup   ? 'Choose a password'
       : GATE === 'code'    ? 'Setting this screen up?'
       : GATE === 'request' ? 'Ask to be let in'
       : failed && PERSON_ARRIVED === 'isdevice'
@@ -924,7 +993,16 @@ function paintGate(){
      leaves its own message here and repainting the mode must not wipe it. */
   if (note && !note.classList.contains('bad')){
     note.textContent =
-        setup   ? 'It is how you sign in from now on, and this link only '
+        done    ? (PLACES.length
+                    ? 'Sign in with your email address and the password you '
+                      + 'just chose, at whichever of these you want:'
+                    : 'Nothing has been granted to this account yet — an '
+                      + 'administrator has to say which assistant you may use.')
+      : invite  ? 'Open the link you were sent. It is the only way in from '
+                  + 'this address, and it works nowhere else.'
+      : spent   ? 'A password was already chosen with it. Sign in where your '
+                  + 'assistant is, or ask an administrator for a new link.'
+      : setup   ? 'It is how you sign in from now on, and this link only '
                   + 'works once. Choose something long.'
       : GATE === 'code'    ? ''
       : GATE === 'request' ? ''
@@ -940,14 +1018,42 @@ function paintGate(){
   /* The links name where you are NOT. Nothing to press that lands you where
      you already are, and no way out of setup at all. */
   if (links){
-    links.style.display = setup ? 'none' : '';
+    /* Neither of those routes answers on the enrolment listener, so offering
+       them would be two buttons that 404. */
+    links.style.display = (setup || ENROL_ONLY) ? 'none' : '';
     const code = $('gatecode'), req = $('gatereq');
     if (code) code.textContent = GATE === 'code' ? 'Sign In Instead'
                                                  : 'Use Code Instead';
     if (req) req.textContent = GATE === 'request' ? 'Sign In Instead'
                                                   : 'Request Access';
   }
+  paintPlaces(done);
   paintGateAreas();
+}
+
+/* WHERE TO GO NOW, once there is a password. The server works this out with
+   the same test that will be applied when they arrive, so every line here is
+   a door that opens — and this listener is deliberately not one of them, so
+   without this somebody finishes enrolling and is left standing on a port
+   that will never answer them. */
+function paintPlaces(show){
+  const box = $('gateplaces');
+  if (!box) return;
+  box.innerHTML = '';
+  box.style.display = (show && PLACES.length) ? '' : 'none';
+  if (!show) return;
+  PLACES.forEach(p=>{
+    const a = document.createElement('a');
+    a.href = p.url;
+    /* A NAME AND ITS ADDRESS, both. The name is what an admin called it and
+       what somebody will be told to use; the address is what they have to
+       type on a machine that did not follow this link. */
+    const n = document.createElement('b');
+    n.textContent = p.name;
+    a.appendChild(n);
+    a.appendChild(document.createTextNode(p.url));
+    box.appendChild(a);
+  });
 }
 
 /* The code box and the request form. They live outside #gate because they
@@ -1051,6 +1157,15 @@ async function gateArrived(j){
   if ($('gatepass2')) $('gatepass2').value = '';
   if (j && j.settings) Prefs.adopt(j.settings);
   if (note){ note.className = ''; note.textContent = ''; }
+  /* ON THE ENROLMENT LISTENER THIS IS THE END OF IT. There is nothing here to
+     become — asking `hello` again would 404, and the product this account now
+     opens is on other ports. So the page says which, and stops. */
+  if (ENROL_ONLY){
+    PLACES = (j && j.places) || [];
+    GATE = 'done';
+    paintGate();
+    return;
+  }
   await Display.hello();
   /* AND THE ROUTES AGAIN. `allowed` is this caller's answer, computed when the
      list was fetched — and the caller has just changed from nobody to a
@@ -1087,7 +1202,7 @@ if (PERSON_ARRIVED === 'setup') GATE = 'setup';
    it, see it appear in the admin list, approve it, and it starts working —
    which is a better first five minutes than a screen that looks broken. */
 const Display = {
-  id: '', name: DISPLAY_NAME, approved: false, known: false,
+  id: '', name: DISPLAY_NAME, named: DISPLAY_NAME, approved: false, known: false,
   /* What the server last said about this device. `state` is one of none,
      requested, approved, expired, denied — and the page is built from it
      rather than from three booleans that can disagree with each other. */
@@ -1141,6 +1256,10 @@ const Display = {
   take(d){
     this.id = d.id || '';
     this.name = d.name || DISPLAY_NAME;
+    /* A NAME OR NOTHING — see display_named. `name` above carries the list's
+       placeholder for a row nobody has named, which is right in a note about
+       this screen and wrong as the speaker of a line of transcript. */
+    this.named = d.named || DISPLAY_NAME;
     this.approved = !!d.approved;
     this.state = d.state || 'none';
     /* Where this browser goes to choose a password, on a request that was
@@ -1438,7 +1557,7 @@ function paintRequest(){
     if (note){
       note.className = '';
       note.textContent = 'No assistant answers here yet. An administrator '
-                       + 'gives one this port under CONNECTIONS ▸ AI.';
+                       + 'gives one this port under ACCESS ▸ AI.';
     }
     ['reqhead', 'reqform', 'reqsend', 'reqnote', 'enrol'].forEach(id=>{
       const el = $(id);
@@ -1833,7 +1952,18 @@ const VARS = {
      one and the declared name until then. The same place either way, so a
      {display} written into a greeting before approval keeps meaning what it
      meant after it. */
-  display: ()=> Display.name || DISPLAY_NAME,
+  display: ()=> Display.named || DISPLAY_NAME,
+  /* WHO IS SIGNED IN, which nothing here could say before. Every name this
+     table held was a machine's or an assistant's, because the transcript
+     label predates accounts entirely: the only way to attribute a line was
+     the device it was typed at, and {display} in `the person` is a laptop
+     labelling its owner's words with the laptop's name.
+
+     It falls through to the device, so ONE setting is right in both places a
+     screen can be. A personal browser has somebody signed in and says their
+     name; a wall screen has nobody and says the room's. Without the fallback
+     an admin would have to choose which of the two to get wrong. */
+  user: ()=> Person.name || Display.named || DISPLAY_NAME,
 };
 function expand(s, rid){
   return String(s == null ? '' : s).replace(/\{(\w+)\}/g, (m, k)=>{
@@ -5399,6 +5529,11 @@ const Settings = {
       const r = await fetch('settings', {cache:'no-store'});
       const j = await r.json();
       const got = j && j.settings || {};
+      /* WHICH LISTENER THIS PAGE IS ON. The enrolment port answers this call
+         and almost nothing else — see ENROL_GET — so this is where the page
+         finds out, and it has to be read before anything is concluded from a
+         404 somewhere else. */
+      ENROL_ONLY = !!got.enrol_only;
       let n = 0;
       Object.keys(got).forEach(k=>{ if (k in S){ S[k] = got[k]; n++; } });
       if (n) repaintAll();
@@ -5883,6 +6018,12 @@ applyPrefs();
    until the next reload. The shared settings have no such dependency and
    still load in parallel. */
 Promise.all([Settings.load(), Display.hello().then(()=> Routes.load())]).then(()=>{
+  /* THE DOOR, AND NOTHING ELSE. Both calls above have already answered 404 on
+     this listener and both of them fail quietly, which is what makes asking
+     them harmless — but nothing below this line may run: it would start a
+     poll against routes that are not there and end up telling somebody
+     accepting an invitation that the screen has lost the server. */
+  if (ENROL_ONLY) return enrolOnly();
   /* After BOTH, and not merely when the display answered. The two race, and
      loading the shared settings overwrites S wholesale — so a place's own
      appearance applied when hello came back first would be silently undone a
@@ -5921,6 +6062,35 @@ Promise.all([Settings.load(), Display.hello().then(()=> Routes.load())]).then(()
   loadEmbed();
   announcePreview();
 });
+
+/* Everything this page is on the enrolment listener: the house style, and one
+   of four things to say. No watcher, no poll, no microphone and no endpoint —
+   see the gate at the top of do_GET for what is actually reachable here. */
+function enrolOnly(){
+  document.body.dataset.enrolonly = '1';
+  /* THE GATE IS THE PAGE HERE, and both of these have to be said or it is not
+     drawn at all: `#request` is display:none without the first and `#gate` is
+     without the second. They are normally set by paintRequest, off a display
+     record — and there is no display record on this listener, which is how
+     this shipped as a figure with nothing in front of it.
+
+     Set outright rather than by calling paintRequest: that function decides
+     whether somebody may ask for access and what a screen is allowed to show,
+     and every one of those answers is about a device. There is no device
+     here and never will be. */
+  document.body.toggleAttribute('data-request', true);
+  document.body.toggleAttribute('data-gate', true);
+  /* Still dressed. The appearance settings are public and they arrived, so
+     this looks like the rest of the product rather than like a form somebody
+     forgot to style. */
+  Kiosk.applyLook();
+  /* `setup` is already forced before anything paints — see PERSON_ARRIVED.
+     The other three are decided here, because a page loaded at this address
+     without a live link is somebody who typed the port in. */
+  if (GATE !== 'setup')
+    GATE = PERSON_ARRIVED === 'ready' ? 'spent' : 'invite';
+  paintGate();
+}
 
 /* The settled document, handed to the admin page — and it can be handed over
    more than once, because the panel is allowed to ask for it again. See the
