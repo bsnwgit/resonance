@@ -351,11 +351,9 @@
      sits in a band of its own rather than floating at the top of the page.
      `flex:0 0 auto` beside #panelscroll's `1 1 auto`: it keeps its height and
      the scrolling area takes the rest. */
-  #signoutbar{
-    flex:0 0 auto;display:flex;justify-content:flex-end;
-    padding:6px 14px;
-    border-bottom:1px solid rgba(var(--glass),.1);
-  }
+  /* `#signoutbar` is gone — SIGN OUT is in the stack at the top right with
+     the other three, inside the border that says they are one subject. The
+     bar above already draws the line this strip was drawing under itself. */
   #panelscroll{
     flex:1 1 auto;min-height:0;overflow-y:auto;padding:12px 14px 24px;
     /* the topics tile against THIS width, not the window's — the panel is one
@@ -376,7 +374,7 @@
      of links behind a label now, and a menu bar that wraps onto three lines at
      560px is one nobody can scan. The search that used to sit above them, and
      was held to that measure, is in the foot with the other row. */
-  #panelhead > .profbox{max-width:none}
+  #panelhead > .profrow{max-width:none}
   /* …but the tab row itself runs the whole width, out to the edge of the
      preview, because it now carries two groups that have to sit apart. */
   #panelhead > .tabrow{max-width:none}
@@ -423,15 +421,33 @@
   /* The only red on the row, because it is the only thing here that takes
      something away. Not styled as a link: a ✕ that looked like the three
      beside it would read as a fourth place to go. */
+  /* IN A CIRCLE OF ITS OWN. It was a bare glyph the colour of a warning, and
+     next to a field with text in it that is a small red mark somebody has to
+     go looking for. A ring makes it a control: round rather than square
+     because nothing else on this row is round, and the one thing here that
+     TAKES SOMETHING AWAY should not be the same shape as the things that take
+     you somewhere.
+
+     Rust is --rust, the deeper one SIGN OUT wears, not the palette's rust
+     swatch — that is a pale salmon meant to be read as a tint behind a label,
+     and it disappears at this size against a dark row. Both are red-ish; only
+     one of them is a colour you can see at 22 pixels. */
   #b_findclear,
   #b_docfindclear{
-    flex:0 0 auto;padding:2px 9px;cursor:pointer;
-    background:none;border:0;border-bottom:1px solid transparent;
-    font:inherit;font-size:calc(11px * var(--fs));line-height:1;
-    color:#e0716b;
+    flex:0 0 auto;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    width:22px;height:22px;padding:0;margin-left:6px;
+    border-radius:50%;
+    border:1px solid rgba(var(--rust),.85);
+    background:rgba(var(--rust),.30);
+    font:inherit;font-size:calc(10px * var(--fs));line-height:1;
+    color:rgba(var(--paper),.96);
   }
   #b_findclear:hover,
-  #b_docfindclear:hover{color:#ff8a8a}
+  #b_docfindclear:hover{
+    background:rgba(var(--rust),.62);
+    border-color:rgba(var(--rust),1);
+  }
 
   /* The app tab's own commit row, at the foot of the box. Hidden outright
      on every other tab: a save button that belongs to settings you cannot
@@ -498,6 +514,64 @@
      put on the box it would start at the very top and leave a stub of line
      above the step with nothing to meet. The left side is the box's, since
      that one does run the whole height. */
+  /* A GROUP OF TABS THAT NAMES ITSELF. A fieldset because a legend cuts a real
+     gap in the border — the panel's ground is translucent over the page, so a
+     label with a background laid over the line would be a slightly different
+     colour than whatever is behind it.
+
+     `min-width:0` because a fieldset refuses to shrink below its content by
+     default, which on a narrow panel pushes the row off the edge instead of
+     wrapping it. */
+  .tabbox{
+    border:1px solid rgba(var(--glass),.55);
+    margin:0;padding:2px 10px 4px;min-width:0;
+  }
+  /* The legend carries a CHIP, not text: these are the same labels the bar
+     and the lists use, and they should not stop looking like one because they
+     have moved into a border. The legend itself is only the notch — its
+     padding is the gap either side of the box. */
+  .tabbox > legend{padding:0 8px}
+  /* RUST on the groups, ice on the row that holds them. Milk first, on the
+     reasoning that a group is a division of the row and should be quieter than
+     it — and quieter is exactly wrong here: the row's label names the page you
+     are on, the group labels name the three subjects you choose between, and
+     those are the ones the eye should land on. */
+  .tabbox > legend .tablabel{
+    border-color:rgba(var(--pal-rust),.75);
+    background:rgba(var(--pal-rust),.30);
+  }
+  /* …and the heading over them keeps ice, which is what it always had. */
+  .profhead .tablabel{
+    border-color:rgba(var(--pal-ice),.70);
+    background:rgba(var(--pal-ice),.26);
+  }
+  /* The rule either side runs to the label rather than under it, so the two
+     lines of `.rulehead` meet the chip's edges. */
+  /* The chip brings its own type, so the heading's is only for a rulehead
+     that has bare text in it — the group list's Defaults and Custom. */
+  .rulehead .tablabel{flex:0 0 auto;text-transform:none;
+                      font-size:calc(9px * var(--fs))}
+  .tabbox .tabs{margin:0}
+  /* The two groups at opposite ends of the row, the same way they were inside
+     one box. `wrap` so a narrow panel stacks them instead of shrinking both
+     past reading. */
+  .profrow{flex-wrap:wrap;align-items:flex-start}
+  .profrow .tabbox:last-child{margin-left:auto}
+  .profhead{margin:2px 0 10px}
+  /* THE BOX IS AS WIDE AS WHAT IS IN IT, like the two at the head of the
+     panel — a border drawn out to the width its side happens to have is a box
+     around a row of buttons and a lot of nothing.
+
+     SEARCH is the exception and has to be: the field inside it grows to fill
+     what it is given, so a box that shrank to its content would shrink the
+     thing you type in along with it. */
+  .findside > .tabbox{width:100%}
+  /* NOTHING HERE ABOUT THE BOTTOM. There was `align-self:flex-end`, meant to
+     line the two boxes up at the foot of the row — and a side is a COLUMN, so
+     align-self on its child is the HORIZONTAL axis: it pushed the box to the
+     right of its side instead. The row already aligns its sides at the bottom
+     — see #panelfoot .tabrow — which is where that job belongs. */
+
   .profbox{
     border-left:1px solid rgba(var(--glass),.55);
     border-bottom:1px solid rgba(var(--glass),.55);
@@ -530,6 +604,21 @@
      other, so a hairline with a row's own spacing either side of it reads as
      one more row. */
   .grouprule{margin:14px 0 12px}
+  /* A RULE WITH A WORD IN IT, naming the rows under it. Two lines that grow to
+     fill whatever the label leaves, rather than one background with a gap cut
+     out of it — the label can be any length and the halves stay even without
+     anybody measuring. */
+  .rulehead{
+    display:flex;align-items:center;gap:10px;margin:14px 0 10px;
+    font-size:calc(8.5px * var(--fs));letter-spacing:.2em;
+    text-transform:uppercase;color:rgba(var(--paper),.62);
+  }
+  /* The first one heads the list rather than dividing anything, so it gets
+     less air above it than between two sections. */
+  .rulehead:first-child{margin-top:4px}
+  .rulehead::before,.rulehead::after{
+    content:'';flex:1 1 auto;height:1px;background:rgba(var(--glass),.55);
+  }
 
   /* The topics are bounded, so it is obvious where the list of them starts
      and stops rather than the column running on into the foot. Same strength
@@ -645,6 +734,9 @@
     background:rgba(var(--glass),.035);
     padding:0 11px 10px;
   }
+  /* The box's own foot closes the last section on a tab, so that one does not
+     draw a second line ten pixels above it. See render(). */
+  #grpbox .grp.lastvis:not(.shut){border-bottom:0}
   /* …and it goes when that section is the only one on the tab. See render().
      TRANSPARENT rather than `border:0`, so the box model does not change and
      nothing on the page moves by a pixel when a profile is expanded and the
@@ -808,7 +900,8 @@
     border-bottom:1px solid transparent;
   }
   #navlinks button:hover{color:rgba(var(--paper),.95)}
-  #navlinks button.on{color:var(--hue);border-bottom-color:var(--hue-dim)}
+  /* Selected is painted with the tab rows' rule, further down — one gradient,
+     one place. What stays here is the transparent border it paints into. */
   /* One between each pair, and only between a pair. There used to be one
      before the first link as well, separating the places you can go from the
      title of the page you are on — and it came off when that title moved into
@@ -877,11 +970,20 @@
     border-color:rgba(var(--pal-rust),.70);
     background:rgba(var(--pal-rust),.30);
   }
-  /* Milk is the palest of the five, so it carries a little more of itself to
-     land at the same visual weight as the other two. */
+  /* ICE, the same as PROFILES above it. SEARCH is not a subject you choose
+     between — it is a way into the ones already there — so it takes the
+     heading's colour rather than a fifth one of its own. It wore milk, and
+     inherited the group boxes' rust edge on top of it, which read as a third
+     kind of label made by accident. */
   .findside .tablabel{
-    border-color:rgba(var(--pal-milk),.70);
-    background:rgba(var(--pal-milk),.30);
+    border-color:rgba(var(--pal-ice),.70);
+    background:rgba(var(--pal-ice),.30);
+  }
+  /* Past `.tabbox > legend .tablabel`, which is a rule deeper and would
+     otherwise keep the rust edge under an ice fill. */
+  .findside > .tabbox > legend .tablabel{
+    border-color:rgba(var(--pal-ice),.70);
+    background:rgba(var(--pal-ice),.30);
   }
   /* The foot has a darker ground of its own — rgba(0,0,0,.5) laid over the
      panel's own .35 — so an identical tint reads weaker down there than the
@@ -889,7 +991,7 @@
      reason while the ones above it were already shaded. A few points more so
      all five land at one weight rather than at one number. */
   #panelfoot .tablabel{background:rgba(var(--pal-ice),.34)}
-  #panelfoot .findside .tablabel{background:rgba(var(--pal-milk),.38)}
+  #panelfoot .findside .tablabel{background:rgba(var(--pal-ice),.38)}
   #navlinks .bartitle{margin-left:10px}
   /* …except the one that opens the bar. That margin is what holds a label off
      the link before it, and there is no link before the first — left in, it
@@ -949,17 +1051,28 @@
      The bar is three button-rows tall as a result. It sits outside
      #panelscroll, so what that costs is a taller header, not a header that
      moves. */
+  /* A BOX AROUND THE FOUR. Who you are signed in as, the way back to the
+     start, what the screens are doing, and the way out — one subject, and the
+     border is what says so without a heading. The bar's other occupants are
+     places you can go; these are about YOU, and they sit apart from the row
+     rather than at the end of it. */
   #whostack{
     display:grid;
     grid-template-columns:auto auto;
     grid-template-rows:auto auto auto;
     gap:4px 8px;align-items:center;
+    border:1px solid rgba(var(--glass),.34);
+    padding:6px 8px;
   }
   /* Column two, top to bottom, in the order they are reached for: back to the
      start, what the screens are doing, and the way out last — a control that
      ENDS something belongs at the bottom. */
   #whostack #b_home    {grid-column:2;grid-row:1}
   #whostack #tab_status{grid-column:2;grid-row:2}
+  /* Bottom of the column, where a control that ENDS something belongs, and
+     spanning both so it reads as the box's own foot rather than as a fourth
+     item in a list of three. */
+  #whostack #b_signout {grid-column:1 / -1;grid-row:3;width:100%}
   #whostack button{width:100%;text-align:center}
   /* Who you are, boxed. Spans the two rows it sits beside so the border is
      one rectangle rather than two, and the pair inside it is spread across
@@ -1325,7 +1438,10 @@
     grid-template-columns:auto minmax(0,1.4fr) minmax(0,1fr) auto;
     align-items:center;column-gap:8px;row-gap:5px;
   }
-  .erow > .top.drow .dpick{margin:0;flex:0 0 auto;accent-color:var(--hue)}
+  /* Both registers. It was scoped to `.top.drow`, which is the device row's
+     own class — the people's rows carry the same tick and would have had the
+     browser's default sitting among styled controls. */
+  .erow > .top .dpick{margin:0;flex:0 0 auto;accent-color:var(--hue)}
   /* Wide enough and the actions sit on the same line as the name; narrow and
      they take one of their own rather than pushing the row off the edge. */
   /* The bar's own name, at the weight a section heading has: it is the only
@@ -1744,17 +1860,50 @@
   /* Between each pair and never after the label: the label already has an edge
      of its own, and a rule against it is a line beside a line. */
   .tabs button + button{border-left:1px solid rgba(var(--glass),.28)}
-  .tabs button.on{color:var(--hue);border-bottom-color:var(--hue-dim)}
+  /* THE UNDERLINE UNDER WHATEVER IS SELECTED, wherever one is drawn — the
+     links in the bar at the top and the tab rows under it. ONE RULE rather
+     than a five-stop gradient written out twice: they are the same mark
+     meaning the same thing, and two copies is two things to keep in step.
+
+     It runs the five palette colours rather than one of them. They are the
+     five a display can be set to, taken from the same values the labels are
+     shaded from — so the line under wherever you are standing is the whole
+     palette, and each label above it is one colour out of it.
+
+     A background rather than a border, because a border cannot hold a
+     gradient: the transparent border stays as the placeholder that keeps a row
+     from moving by a pixel when something is selected, and the paint is a
+     background image sitting in its place. */
+  #navlinks button.on,
+  .tabs button.on{
+    color:var(--hue);
+    background-image:linear-gradient(90deg,
+      rgb(var(--pal-blue)), rgb(var(--pal-ice)), rgb(var(--pal-milk)),
+      rgb(var(--pal-amber)), rgb(var(--pal-rust)));
+    background-size:100% 1px;
+    background-position:0 100%;
+    background-repeat:no-repeat;
+  }
   /* Brightening, the way a link in the bar does — not a border appearing on
      something that has none. */
   .tabs button:hover:not(:disabled){color:rgba(var(--paper),.95)}
   .findrow{display:flex;margin:0 0 4px}
+  /* A BLUE EDGE, because this is the one thing on the row you TYPE IN. The
+     glass grey it wore is the border every inert box on the panel has, so the
+     field read as another panel rather than as somewhere to put a cursor.
+     Blue is the palette's own — the same colour the bar's subject labels are
+     shaded from — so it stands out without introducing a colour. */
   #rigfind,
   #docfind{
     flex:1;min-width:0;margin:0;font:inherit;font-size:calc(9.5px * var(--fs));padding:5px 7px;
     background:rgba(0,0,0,.5);color:var(--text);
-    border:1px solid rgba(var(--glass),.18);outline:0;-webkit-appearance:none;appearance:none;
+    border:1px solid rgba(var(--pal-blue),.85);outline:0;-webkit-appearance:none;appearance:none;
   }
+  /* …and brighter with the cursor in it. A field that looks the same typed in
+     as not is the reason somebody leaves one filtered and reports the panel
+     having lost half its settings. */
+  #rigfind:focus,
+  #docfind:focus{border-color:rgba(var(--pal-blue),.95)}
   #rigfind::placeholder,
   #docfind::placeholder{color:rgba(var(--paper),.62)}
 
@@ -2212,19 +2361,15 @@
       <button id="b_home" title="back to the start — reloads the panel">HOME</button>
       <button id="tab_status" data-tab="status"
               title="what the screens are reporting — health, alerts and the log">STATUS</button>
+      <!-- BACK IN THE STACK. It sat below the rule on a strip of its own,
+           on the reasoning that a control which ENDS what you are doing should
+           not read as a third destination beside the way home and the way to
+           STATUS. The box around the four does that job now, and does it
+           better: what is inside the border is who you are and what you can do
+           about it, which is one subject and reads as one. -->
+      <button id="b_signout" title="end this session">SIGN OUT</button>
       </span>
     </span>
-  </div>
-  <!-- BELOW THE RULE, on its own. Everything above that line is somewhere you
-       go; this is the one control on the panel that ENDS what you are doing,
-       and the divider is what says the difference. It was sitting in the same
-       grid as the way home and the way to STATUS, which read as a third
-       destination.
-
-       Its own strip rather than the top of #panelscroll: a control that signs
-       you out should not scroll away under the settings you are reading. -->
-  <div id="signoutbar">
-    <button id="b_signout" title="end this session">SIGN OUT</button>
   </div>
   <div id="panelscroll">
   <!-- Wrapped so the header keeps a readable measure while the topics below
@@ -2241,56 +2386,61 @@
        are different subjects that happen to share a row. -->
   <!-- One group, the full width of the panel. What a display looks and
        sounds like: nothing else shares this row. -->
-  <!-- PROFILES ON A LINE OF ITS OWN. The row beneath carries two labelled
-       groups now, and a third label sitting inline among them would read as a
-       third group rather than as the name of the row. Everything under it is a
-       profile; the two labels below say which KIND. -->
-  <!-- ONE BOX, with a stepped top edge. The line runs above the label, turns
-       down at the end of it, and carries on along the bottom of that row for
-       the rest of the width; the left side runs the whole height, the right
-       side picks up where the step left off, and the foot closes it.
+  <!-- PROFILES NAMES THE ROW, and the two boxes under it are its parts. It
+       was one box with both groups inside and a stepped top edge; two groups
+       in one box need a label each anyway, and a label inside a box is a box
+       inside a box — the thing this panel has been taking out everywhere else.
 
-       Six borders on four elements, and each one is on the element whose edge
-       it actually is — nothing is positioned, so a longer label or a wrapped
-       row moves the corners with it. -->
-  <div class="profbox">
-  <div class="tabhead">
-    <span class="stepnest"><span class="tablabel">PROFILES</span></span>
-    <span class="steprest"></span>
+       So the heading is a heading, and each group is a box that says its own
+       name in its own top edge. A FIELDSET rather than a label painted over a
+       border: the panel's ground is translucent, so a patch of "background"
+       laid over the line would be a slightly different colour than the thing
+       behind it. A legend cuts a real gap. -->
+  <div class="rulehead profhead"><span class="tablabel">PROFILES</span></div>
+  <div class="tabrow profrow">
+    <fieldset class="tabbox">
+      <legend><span class="tablabel">LAYOUTS</span></legend>
+      <!-- WHAT A SCREEN IS, in five parts: the four that describe it and the
+           one that names them. LAYOUT reads last because it is built from the
+           four before it. -->
+      <div class="tabs">
+        <!-- APPEARANCE rather than LOOK, so the tab and the "Appearance
+             profiles" read as the same subject. data-tab stays "look": it is
+             the storage key, and renaming it would rewrite every stored
+             document for a label. -->
+        <button data-tab="look" class="on">APPEARANCE</button>
+        <!-- GEOMETRY rather than MOTION, and data-tab stays "motion" for the
+             same reason. -->
+        <button data-tab="motion">GEOMETRY</button>
+        <button data-tab="speech">SPEECH</button>
+        <button data-tab="savers">SCREENSAVER</button>
+        <button data-tab="devprof">LAYOUT</button>
+      </div>
+    </fieldset>
+    <!-- BETWEEN THE TWO, because it is the third thing an endpoint is made
+         of: what it looks like, who may use it, and what it is wired to. -->
+    <fieldset class="tabbox">
+      <legend><span class="tablabel">PERMISSIONS</span></legend>
+      <!-- The two halves and then the pair, the order they are built in —
+           the same shape LAYOUTS and CONNECTIONS have. -->
+      <div class="tabs">
+        <button data-tab="authn">AUTHENTICATE</button>
+        <button data-tab="authz">AUTHORIZE</button>
+        <button data-tab="perm">PERMISSION</button>
+      </div>
+    </fieldset>
+    <fieldset class="tabbox">
+      <legend><span class="tablabel">CONNECTIONS</span></legend>
+      <!-- The two halves of an endpoint that are not the endpoint — what it
+           speaks to and what it answers on — and then the pair of them under
+           one name, which is the order they are built in. -->
+      <div class="tabs">
+        <button data-tab="models">MODELS</button>
+        <button data-tab="network">NETWORK</button>
+        <button data-tab="connection">CONNECTION</button>
+      </div>
+    </fieldset>
   </div>
-  <div class="tabs">
-    <!-- WHAT A SCREEN IS, in five parts. The four that describe it and the one
-         that names them: a layout profile points at an appearance and a
-         screensaver rather than carrying copies. -->
-    <span class="tablabel">LAYOUTS</span>
-    <!-- APPEARANCE rather than LOOK, so the tab and the "Appearance
-     profiles" read as the same subject. data-tab stays "look": it is
-     the storage key, and renaming it would rewrite every stored
-     document for a label. -->
-    <button data-tab="look" class="on">APPEARANCE</button>
-    <!-- GEOMETRY rather than MOTION, and data-tab stays "motion" for the
-     same reason. -->
-    <button data-tab="motion">GEOMETRY</button>
-    <button data-tab="speech">SPEECH</button>
-    <button data-tab="savers">SCREENSAVER</button>
-    <!-- LAST of the five, where it used to be last of seven — it is the one
-         that NAMES the others, so it reads after the pieces it is built from.
-         data-tab stays "devprof" for the same reason APPEARANCE keeps "look":
-         it is the storage key, and renaming it would rewrite every stored
-         document for a label. -->
-    <button data-tab="devprof">LAYOUT</button>
-    <!-- The gap is what says these are a different subject, the same way the
-         one in the bar at the top does. Left of it is what a screen IS; right
-         of it is what an assistant is wired to. -->
-    <span class="tabgap"></span>
-    <!-- The two halves of an endpoint that are not the endpoint: what it
-         speaks to, and what it answers on. They were among the five above,
-         which made the row a list of seven unrelated things. -->
-    <span class="tablabel">CONNECTIONS</span>
-    <button data-tab="models">MODELS</button>
-    <button data-tab="network">NETWORK</button>
-  </div>
-  </div><!-- /profbox — its foot is the rule that used to sit here -->
   </div><!-- /panelhead -->
 
   <div id="grpbox">
@@ -2951,6 +3101,18 @@ above.</div>
        pressed on — the same reason the note below it is duplicated. -->
   <div id="idhereurl" class="idurl"></div>
   <div class="note" id="idherenote"></div>
+  <!-- The same bar the device register has, one population over. Only the
+       diagnostic strip so far: a person has no layout profile to be given,
+       and everything else on these rows is one person's own. -->
+  <div class="bulkbar" id="idbulkbar" hidden>
+    <span class="bulktitle">Status line</span>
+    <label><input type="checkbox" id="idbulkall"> ALL</label>
+    <span id="idbulkcount">nothing selected</span>
+    <span class="spacer"></span>
+    <button id="b_idstaton" class="act-save">SHOW ON SELECTED</button>
+    <button id="b_idstatoff" class="act-undo">HIDE ON SELECTED</button>
+  </div>
+  <div class="note" id="idbulknote"></div>
   <div id="idhere"></div>
   <div class="note help">Everybody who has finished arriving: they opened the
 link you handed them, chose a password, and sign in with their email address
@@ -3280,6 +3442,113 @@ pointed at.</div>
   <!-- A port, under a name. The ports on ADMIN are the admin
        portal's own; what the app answers on is here, with the rest of what an
        endpoint is made of. -->
+  <!-- A MODEL AND A PORT UNDER ONE NAME. The two halves of an endpoint that
+       are not the endpoint, named together so the pair can be picked once
+       instead of twice. It holds their IDS and not copies of them: change
+       which model a connection speaks to and everything using that connection
+       changes with it, which is the whole point of a profile. -->
+  <!-- MUST THERE BE A PERSON AT ALL, and how long a sign-in survives. The
+       first half of a permission. -->
+  <section class="grp bare proflist" data-tab="authn">
+    <div class="barehead"><span class="listtitle">Authenticate</span></div>
+    <div class="grpbody">
+  <div id="dp_authns"></div>
+  <div class="note" id="authnnote"></div>
+  <div class="seg addrow">
+    <button id="b_addauthn" class="act-add">ADD A PROFILE</button>
+  </div>
+  <div class="note help">Whether a caller has to be <b>known</b>, and how long
+being known lasts.
+
+<b>REQUIRED means no anonymous caller</b> — somebody signed in, or a screen you
+enrolled with a code, because minting that code and carrying it to the device is
+the same act of vouching a password is. A browser that merely opened the display
+page is neither.
+
+<b>The session limit is the gap between conversations</b>, not a lifetime. A
+session being used does not run out; one nobody has spoken to for that long
+does. <b>0 is no limit</b>, which is a real answer for a wall nobody signs in at
+and the wrong one for anything else.
+
+This is where the limit lives and the only place it does. It used to be a field
+on every person with nothing anywhere that could set it.</div>
+    </div>
+  </section>
+
+  <!-- …AND GIVEN A CALLER, IS IT ONE OF THE ONES ALLOWED. The other half. -->
+  <section class="grp bare proflist" data-tab="authz">
+    <div class="barehead"><span class="listtitle">Authorize</span></div>
+    <div class="grpbody">
+  <div id="dp_authzs"></div>
+  <div class="note" id="authznote"></div>
+  <div class="seg addrow">
+    <button id="b_addauthz" class="act-add">ADD A PROFILE</button>
+  </div>
+  <div class="note help">Which callers may use whatever names this — screens,
+people, and groups of either.
+
+<b>ANY DISPLAY</b> and the list is not consulted: anything that gets past
+Authenticate is through. <b>ONLY THESE</b> and a caller has to be named, either
+directly or by a group it is in. Grants add up; nothing here takes anything
+away.
+
+<b>A LIST IS SHARED.</b> That is the point of it being a profile — a
+department's screens named once rather than ticked on every endpoint — and it
+is the thing to know before ticking: what you tick here reaches every
+permission using this profile, and every endpoint using those.</div>
+    </div>
+  </section>
+
+  <!-- …and the pair of them under a name, which is what an endpoint points
+       at. The same shape a connection has, one subject over. -->
+  <section class="grp bare proflist" data-tab="perm">
+    <div class="barehead"><span class="listtitle">Permissions</span></div>
+    <div class="grpbody">
+  <div id="dp_perms"></div>
+  <div class="note" id="permnote"></div>
+  <div class="seg addrow">
+    <button id="b_addperm" class="act-add">ADD A PERMISSION</button>
+  </div>
+  <div class="note help">An <b>authenticate</b> profile and an <b>authorize</b>
+one, under a name. Those are the two questions the server asks of every caller
+before it answers anything: must there be a person, and is this one allowed.
+
+<b>Both are required.</b> Half a permission decides nothing.
+
+An endpoint names one of these instead of carrying the answers itself. An
+endpoint naming <b>none</b> is refused outright — not opened — because a
+missing pointer is a deployment mid-edit, and mid-edit is not a state to be
+permissive in.</div>
+    </div>
+  </section>
+
+  <section class="grp bare proflist" data-tab="connection">
+    <div class="barehead"><span class="listtitle">Connections</span></div>
+    <div class="grpbody">
+  <div id="dp_conns"></div>
+  <div class="note" id="connnote"></div>
+  <div class="seg addrow">
+    <button id="b_addconn" class="act-add">ADD A CONNECTION</button>
+  </div>
+  <div class="note help">A <b>model</b> and a <b>network profile</b>, under one
+name. Those are the two halves of an endpoint that are not the endpoint: what
+it speaks to, and what it answers on.
+
+<b>Both are required.</b> Half a connection is not a connection — there is
+nothing useful to do with a model that answers nowhere, or a port with nothing
+behind it.
+
+<b>It names them rather than copying them.</b> Change which model a connection
+speaks to and everything using that connection changes with it, instead of a
+set of endpoints drifting apart with nothing on screen saying which had. A
+profile something names cannot be deleted out from under it: point the
+connection elsewhere first.
+
+Nothing references a connection yet — this is the list, built before the thing
+that will pick from it.</div>
+    </div>
+  </section>
+
   <section class="grp bare proflist" data-tab="network">
     <div class="barehead"><span class="listtitle">Network profiles</span></div>
     <div class="grpbody">
@@ -3513,8 +3782,8 @@ browser and is the same person in all three.
 link.</b> The address is what they will sign in with; the link is what lets
 them choose a password, and it buys exactly that one thing.
 
-<b>The ticks are the grant</b>, and the same grant each endpoint's own
-<i>Who may use it</i> list makes. Tick none and they reach whatever is open to
+<b>The ticks are the grant</b>, and the same grant an <i>authorize</i> profile
+makes under PROFILES ▸ PERMISSIONS. Tick none and they reach whatever is open to
 everyone; an endpoint that is open to everyone is reachable already, so ticking
 it grants nothing. They can be changed afterwards on the person's own row, or
 from the endpoint.
@@ -3627,10 +3896,11 @@ they came through.</div>
          AI answers on, so it is read back off the ticks below rather than
          asked for twice. -->
     <div class="setuprow">
-      <span class="setpair">
-        <label class="bklab" for="dp_newprofile">Layout mode</label>
-        <select id="dp_newprofile" class="ppick"></select>
-      </span>
+      <!-- NO LAYOUT HERE EITHER. It was one of two things an admin already
+           knew about a screen and could set before switching it on; the other
+           is below. Which layout it wears is not one of them any more — it is
+           decided by the endpoint whose port the screen is opened at, and is
+           set once there rather than per screen. -->
     </div>
     <!-- TICKS AND NOT A PICKER, under the two above rather than beside them.
          A screen may be given several assistants — that is the ordinary case
@@ -3686,13 +3956,24 @@ to all of them is one tick.</div>
     <div class="grpbody">
   <!-- Named for what it does. It was a row of controls with no title, so the
        only way to find out what APPLY TO SELECTED applied was to press it. -->
-  <div class="bulkbar" id="bulkbar" hidden>
-    <span class="bulktitle">Layout mode assignment</span>
+  <!-- THE LAYOUT ASSIGNMENT WENT WITH THE PICKER IT APPLIED. Which layout a
+       screen wears is the endpoint's to say, and an endpoint hands it to every
+       screen on its port at once — which is what this bar was for, done in one
+       place instead of a selection at a time. The selection itself stays: the
+       status line below uses it. -->
+
+  <!-- THE SECOND THING A SELECTION IS FOR. Its own row rather than a third
+       control on the one above, because that one is a picker with one APPLY
+       and this is two presses with no picker — sharing a row would put a
+       button next to a dropdown it has nothing to do with. Same selection
+       either way: what is ticked is ticked. -->
+  <div class="bulkbar" id="bulkstatusbar" hidden>
+    <span class="bulktitle">Status line</span>
     <label><input type="checkbox" id="bulkall"> ALL</label>
     <span id="bulkcount">nothing selected</span>
     <span class="spacer"></span>
-    <select id="bulkprofile" class="nmedit"></select>
-    <button id="b_bulkapply" class="act-save">APPLY TO SELECTED</button>
+    <button id="b_bulkstaton" class="act-save">SHOW ON SELECTED</button>
+    <button id="b_bulkstatoff" class="act-undo">HIDE ON SELECTED</button>
   </div>
   <!-- On THIS tab. The result used to be written to the Created Access note,
        which is on ACCESS — a message nobody standing here could see. -->
@@ -4350,12 +4631,17 @@ key inside an example sends you to a line that cannot answer you.</div>
     <div class="tabrow">
     <!-- What this server is wired to, and which machines are here. -->
     <div class="tabside connside">
-      <div class="tabs">
+      <!-- BOXED, and it names itself in its own top edge — the same shape the
+           two groups at the head of the panel have. What is inside the border
+           is one subject, and the label saying so from the border is what
+           stops it reading as a fourth link. -->
+      <fieldset class="tabbox">
         <!-- ACCESS, not CONNECTIONS. The word moved: it names the two profile
              lists at the top of the panel now — what an assistant speaks to
              and what it answers on — and this row is the other question
              entirely, which is who and what may reach this server. -->
-        <span class="tablabel">ACCESS</span>
+        <legend><span class="tablabel">ACCESS</span></legend>
+      <div class="tabs">
         <button id="tab_ai" data-tab="ai">AI</button>
         <!-- The register: every device this server knows about. NODES rather
              than CONNECTIONS, which is now the label over the row — a link
@@ -4372,6 +4658,7 @@ key inside an example sends you to a line that cannot answer you.</div>
              itself. -->
         <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
       </div>
+      </fieldset>
     </div>
     <!-- THE MANUAL, IN THE MIDDLE OF THE ROW. It was at the far end of the
          bar at the top, past the way out. Down here it sits between the two
@@ -4392,8 +4679,11 @@ key inside an example sends you to a line that cannot answer you.</div>
          than a setting at the head of the page you are already on. Two thirds
          to the links and one third to this. -->
     <div class="tabside findside">
+      <!-- The same box, because it is the other half of the same row. A
+           labelled box beside a bare one reads as one of them being unfinished. -->
+      <fieldset class="tabbox">
+        <legend><span class="tablabel">SEARCH</span></legend>
       <div class="tabs">
-        <span class="tablabel">SEARCH</span>
         <input id="rigfind" type="search" placeholder="filter settings…"
                spellcheck="false" autocomplete="off">
         <!-- Red, and the only red in the row: it takes something away. A field
@@ -4402,6 +4692,7 @@ key inside an example sends you to a line that cannot answer you.</div>
              half its settings. -->
         <button id="b_findclear" type="button" title="clear the search">✕</button>
       </div>
+      </fieldset>
     </div>
     </div>
   </div>
@@ -5462,8 +5753,15 @@ $('b_appsave').addEventListener('click', async ()=>{
    the speech profile carries them, and an endpoint names a profile. */
 /* The connection went the way of the greeting and the wake word: a model
    profile carries it, and an endpoint names one. */
-const RT_FIELDS = ['name','speech','model_profile','network','system',
-                   'kiosk_profile','keep_alive'];
+/* `model_profile` and `network` are gone from here: an endpoint names a
+   CONNECTION, which is the pair of them. Sending the retired two would publish
+   a stale copy beside the pair, and reading controls that no longer exist sent
+   every endpoint back as DEMO on no port — the same failure the provider
+   fields had when they moved onto the model profile. */
+/* `system` and `keep_alive` are gone with the limits: they are the model
+   profile's, and sending them from a block that no longer has the controls
+   would publish an empty string over what the profile holds. */
+const RT_FIELDS = ['name','connection','permission','kiosk_profile'];
 const RT_SLIDERS = {max_tokens:  v=> v,
                     temperature: v=> (+v).toFixed(2),
                     history_turns: v=> v == 0 ? 'none' : v,
@@ -5536,21 +5834,24 @@ never spoken and never matched against.</div>
        belongs to. An endpoint is a port and a model and a bill; three of them
        on one machine legitimately want three different answers, and a single
        deployment-wide switch could only ever be set to the strictest. -->
-  <div class="subgrp" data-g="signin">
-    <h5>Sign in<span class="subsum"></span></h5>
-    <div class="subbody">
-  <div class="seg" data-f="needs_signin">
-    <button data-v="0" class="on">NOT REQUIRED</button>
-    <button data-v="1">REQUIRED</button>
-  </div>
-  <!-- WHAT NOT REQUIRED COSTS, said on the endpoint it is true of. It used to
-       be one long block on ADMIN ▸ IP Address, which is a page nobody opens
-       twice — so the warning was furthest from the control that causes it and
-       nearest to the setting that merely makes it matter.
+  <!-- ONE PICKER WHERE SIGN IN AND WHO MAY USE IT WERE. Those are the two
+       questions the server asks of every caller, and they are a named pair
+       now — an authenticate profile and an authorize one — built under
+       PROFILES ▸ PERMISSIONS and pointed at from here.
 
-       Dismissable, because a warning that cannot be is one people learn to
-       read past. Two answers: not now, which lasts as long as this tab, and
-       one recorded against this admin account. -->
+       They were five fields on this block: needs_signin, restricted and three
+       allow-lists. A department's screens were ticked again on every endpoint
+       that served them, and a change of rule was a change in as many places as
+       there were endpoints. -->
+  <div class="subgrp" data-g="perm">
+    <h5>Permission<span class="subsum"></span></h5>
+    <div class="subbody">
+  <select data-f="permission" class="ppick"></select>
+  <!-- THE POSTURE WARNING, still on the endpoint it is about. It followed
+       needs_signin off this block and onto the permission, so it is driven by
+       the resolved answer now rather than by a control sitting beside it —
+       but it is shown here, where the endpoint is, because that is the thing
+       anyone can reach. -->
   <div class="openwarn" data-r="openwarn" hidden>
     <div data-r="openwarntext"></div>
     <div class="seg">
@@ -5558,65 +5859,35 @@ never spoken and never matched against.</div>
       <button type="button" data-r="openackever">I KNOW — STOP TELLING ME</button>
     </div>
   </div>
+  <div class="note" data-r="permnote"></div>
   <div class="note" data-r="signinnote"></div>
-  <div class="note help">Whether somebody must be <b>signed in as a person</b>
-to use this endpoint at all. Nothing here is about which people — that is
-<i>Who may use it</i>, below, and the two are independent: an endpoint can be
-open to everybody and still insist they sign in.
+  <div class="note help">Which <b>permission</b> decides who may use this
+endpoint — an authenticate profile and an authorize one, under one name.
 
-<b>REQUIRED refuses a device outright</b>, approved or not. A wall screen has
-no person on it and never will, so an endpoint set this way is one your kiosks
-stop answering on. That is what makes this the control that limits what a
-model costs, where an allow-list of screens only limits which rooms it is
-heard in.
+<b>Authenticate</b> is whether a caller has to be known at all, and how long
+being known lasts. <b>Authorize</b> is which callers are allowed given that. A
+sign-in box appears on a display when the answer to either is no.
 
-They sign in at the display itself, with the email address and password they
-set from their enrolment link. The admin panel is not affected by this and
-never was: that always asks for a password, whatever is set here.</div>
+<b>An endpoint naming none is refused outright</b>, not opened. A missing
+pointer is a deployment mid-edit, and mid-edit is not a state to be permissive
+in — the old default was open, and that was only safe because it was the shape
+an endpoint was born in rather than one it could fall into.
+
+<b>A permission is shared on purpose.</b> Change the rule once and every
+endpoint using it changes — which is also the thing to know before editing one:
+what you change there reaches all of them.</div>
     </div>
   </div>
 
-  <div class="subgrp" data-g="who">
-    <h5>Who may use it<span class="subsum"></span></h5>
-    <div class="subbody">
-  <div class="seg" data-f="restricted">
-    <button data-v="0" class="on">ANY DISPLAY</button>
-    <button data-v="1">ONLY THESE</button>
-  </div>
-  <label class="bklab" data-r="grouplab">Groups</label>
-  <div class="cks" data-r="groups"></div>
-  <!-- People, in a box of their own. A person's grant is theirs and travels
-       with them to whatever machine they open their URL on, where a group or a
-       display is a grant to a machine — different populations, so a list that
-       could hold either would be one nobody could audit. -->
-  <label class="bklab" data-r="peoplelab">People</label>
-  <div class="cks" data-r="identities"></div>
-  <div class="note" data-r="whonote"></div>
-  <div class="note help">Two reasons to restrict one. <b>A room with several
-microphones in it</b> — one person addresses the wall screen and every other
-device in earshot hears it too. And <b>what an endpoint costs</b> — a hosted
-model worth giving to some people and not to everyone.
+  <!-- Its own section, and not part of the permission above it. A layout is
+       what a screen LOOKS LIKE and what it is CALLED; the section above is
+       about who may use it. Somebody going looking for the first opens the
+       section called Layout — and subsections are collapsed until opened, so
+       a control in the wrong one is a control that does not exist.
 
-Either way the rule is enforced <b>here</b> rather than in anybody's browser
-settings, because push-to-talk on a phone is the right setting and is not a
-control: nothing makes anybody set it.
-
-ANY DISPLAY is what every endpoint was before this existed. ONLY THESE names
-the devices — a wall screen, a TV, a laptop, a phone — that may reach it.
-
-A display that hears a name it may not use <b>drops the utterance</b> — it
-does not answer, does not pass it to whatever it was already talking to, and
-says nothing out loud. The person was addressing another device.
-
-Devices enrol themselves and are approved under ACCESS.</div>
-    </div>
-  </div>
-
-  <!-- Its own section rather than a control inside "Who may use it". A
-       layout profile is what a screen LOOKS LIKE, and that group is about
-       permission; somebody going looking for what a screen looks like opens
-       the section called Layout. Subsections are collapsed until opened, so a
-       control in the wrong one is a control that does not exist. -->
+       IT WAS DELETED BY ACCIDENT on 2026-08-20 and restored the same day: it
+       sat between the two sections that became the permission picker, and a
+       removal taken as one span took it with them. -->
   <div class="subgrp" data-g="display">
     <h5>Layout<span class="subsum"></span></h5>
     <div class="subbody">
@@ -5644,35 +5915,24 @@ to nothing and answers nowhere, which the Network section says.</div>
     </div>
   </div>
 
-  <div class="subgrp" data-g="voice">
-    <h5>Speech<span class="subsum"></span></h5>
-    <div class="subbody">
-  <select data-f="speech" class="ppick"></select>
-  <div class="note help">Which <b>speech profile</b> answers for this endpoint —
-the voice, the engine, the rate and pitch, and the greeting phrases. Blank is
-no profile at all — the endpoint speaks in the voice the page ships with.
-
-This used to be a greeting and a voice typed onto each endpoint, which meant
-two endpoints wanting the same voice were two copies of the same choice, and
-changing it was a change in as many places as you had endpoints. Build it once
-under SPEECH and point at it.
-
-Give the endpoints different profiles and you can tell which replied without
-looking at the screen — which is all a kiosk offers.</div>
-    </div>
-  </div>
-
   <div class="subgrp" data-g="conn">
-    <h5>Model<span class="subsum"></span></h5>
+    <h5>Connection<span class="subsum"></span></h5>
     <div class="subbody">
-  <select data-f="model_profile" class="ppick"></select>
-  <div class="note help">Which <b>model profile</b> answers for this endpoint —
-the provider, the base URL, the model and the key. Built once under MODELS and
-named here, so two endpoints on the same model are one connection rather than
-the same credential typed twice. Blank is the deployment's default.
+  <select data-f="connection" class="ppick"></select>
+  <div class="note help">Which <b>connection</b> this endpoint uses — a model
+and a port, under one name, built under PROFILES ▸ CONNECTION.
+
+It was two pickers here: a model profile and a network profile, chosen
+separately on every endpoint that wanted the same combination. They are one
+choice now, because they are one thing — an assistant is something to speak to
+and somewhere to reach it, and either without the other is not an assistant.
 
 <b>DEMO</b> answers from built-in text and reaches nothing, which is how you
-tell a fault in the interface from a fault in whatever it is pointed at.</div>
+tell a fault in the interface from a fault in whatever it is pointed at.
+
+<b>A port carries one endpoint</b>, so two endpoints cannot use connections
+that name the same port — saving the second is refused, with the first one
+named.</div>
 
   <div data-r="harows">
   <label class="bklab">When it recognises nothing, ask</label>
@@ -5686,86 +5946,15 @@ nothing for one of those.</div>
   </div>
     </div>
   </div>
-  <div class="subgrp" data-g="net">
-    <h5>Network<span class="subsum"></span></h5>
-    <div class="subbody">
-  <select data-f="network" class="ppick"></select>
-  <div class="note help">A <b>port of this server's own</b> that reaches this
-endpoint and nothing else — built under PROFILES ▸ NETWORK and named here.
-Leave it at the display port and this endpoint is the one reached there.
-
-<b>A port carries one endpoint.</b> Ports were shareable once, several
-assistants told apart by wake word; that went when signing in became a
-property of the port, because a door with two assistants behind it can only
-have one lock and would have to answer for the looser of them. Choosing a port
-another endpoint already answers on is refused, and such a port is not offered
-in the list above.
-
-A browser opening that port gets the ordinary interface built from this
-endpoint's settings, with no other endpoint offered and nothing to address by
-name. One port reaches one endpoint, so a profile another endpoint already
-answers on is not offered here.
-
-<b>The port is bound when the server starts</b>, so choosing one here takes a
-restart to come into effect — the same as the ports on ADMIN.</div>
-    </div>
-  </div>
-<div class="subgrp" data-g="limits">
-    <h5>Limits<span class="subsum"></span></h5>
-    <div class="subbody">
-  <div class="sl" data-r="maxrow"><label>Reply limit (tokens)</label><output data-o="max_tokens"></output><input data-s="max_tokens" type="range" min="16" max="2000" step="16"></div>
-  <div class="sl" data-r="temprow"><label>Temperature</label><output data-o="temperature"></output><input data-s="temperature" type="range" min="0" max="1.5" step=".05"></div>
-  <div class="sl" data-r="ctxrow"><label>Turns of context</label><output data-o="history_turns"></output><input data-s="history_turns" type="range" min="0" max="24" step="1"></div>
-  <div class="sl"><label>Timeout</label><output data-o="timeout"></output><input data-s="timeout" type="range" min="5" max="600" step="5"></div>
-  <div data-r="keepaliverow">
-  <label class="bklab">Keep model loaded</label>
-  <input data-f="keep_alive" type="text" spellcheck="false" autocomplete="off"
-         placeholder="30m">
-  </div>
-  <div class="note" data-r="anthnote" style="display:none">Temperature and
-keep-alive are not sent to Anthropic.</div>
-  <!-- One line, because it is STATE: which of these apply to what this
-       endpoint is currently pointed at. The reasoning behind it moved under
-       the ? with the rest of the prose. -->
-  <div class="note" data-r="hanote" style="display:none">Only the timeout
-applies to Home Assistant.</div>
-  <div class="note help">A cold model can take half a minute to load before it
-says anything, so keep the timeout generous — one tuned to a warm model looks
-like a dead server every morning. <b>turns of context</b> is how much of the
-conversation goes back with each question: at zero, "and the other one?" means
-nothing. <b>keep model loaded</b> is an Ollama extension that holds it in
-memory so the next question isn't the slow one.
-
-<b>Home Assistant holds the conversation itself</b>, and what the agent is told
-is configured over there — so the reply limit, the temperature, the context
-length and the whole System prompt section are not shown when it is pointed at
-one: nothing would read them. Any wording already typed is kept, and comes back
-if this endpoint is pointed at a model again.
-
-Set the timeout to the <b>agent</b>, not to "Home Assistant": the built-in
-intent engine answers in about a tenth of a second, while an LLM-backed one is
-two model passes with your exposed entities in the prompt each time. On modest
-hardware that is tens of seconds, and a timeout chosen for the first cuts off
-the second just before it succeeds.
-
-<b>Anthropic</b> is not sent the temperature or the keep-alive — steer it with
-the system prompt.</div>
-    </div>
-  </div>
-
-  <div class="subgrp" data-g="prompt">
-    <h5>System prompt<span class="subsum"></span></h5>
-    <div class="subbody">
-  <textarea data-f="system" rows="7" spellcheck="false"></textarea>
-  <div class="seg actrow">
-    <button data-a="resetprompt" class="act-undo" title="back to the wording this ships with">RESET</button>
-  </div>
-  <div class="note help">Sent ahead of every question this endpoint is asked.
-Each has its own — a house controller and a general assistant want different
-instructions, and one wording covering both suits neither. The reply is read
-out loud, so ask for plain prose.</div>
-    </div>
-  </div>
+  <!-- THE NETWORK SUBGROUP WENT WITH THE MODEL PICKER. Which port an
+       endpoint answers on is half of its connection, chosen with the other
+       half under one name, rather than a second question asked here. -->
+<!-- LIMITS AND THE SYSTEM PROMPT MOVED ONTO THE MODEL PROFILE. A context
+       window, a token ceiling and the instructions sent ahead of every question
+       are facts about what is being spoken to, not about the assistant in
+       front of it — and two endpoints on one model wanting two different
+       ceilings is not a case anybody has. They are set once, under
+       PROFILES ▸ MODELS, where the model is. -->
 
   </div><!-- /subwrap -->
 
@@ -5801,11 +5990,50 @@ function blockNote(blk, m, bad){
    stale credential cannot sit in routes.json looking live, which means
    reading r.provider gives 'demo' for every endpoint on the server. Anything
    that used to branch on it has to resolve the profile instead. */
+/* THE CONNECTION AN ENDPOINT NAMES, and the two halves through it. One
+   indirection in one place, the same shape route_conn has on the server: the
+   endpoint holds the name of a pair, and everything that used to read a model
+   id or a network id reads it out of that pair. */
+function routeConn(r){
+  const pool = (DPCFG && DPCFG.connections) || [];
+  return pool.filter(c=> c.id === ((r && r.connection) || ''))[0] || null;
+}
 function routeModel(r){
+  const c = routeConn(r);
   const pool = (DPCFG && DPCFG.models) || [];
-  // What it NAMES. An endpoint naming nothing has no model and reads as demo,
-  // which is the truth about it — it used to inherit a nominated default.
-  return pool.filter(x=> x.id === ((r && r.model_profile) || ''))[0] || null;
+  // What it NAMES, through its connection. An endpoint naming none has no
+  // model and reads as demo, which is the truth about it.
+  return pool.filter(x=> x.id === ((c && c.values && c.values.model) || ''))[0]
+         || null;
+}
+function routeNet(r){
+  const c = routeConn(r);
+  const pool = (DPCFG && DPCFG.networks) || [];
+  return pool.filter(x=> x.id === ((c && c.values && c.values.network) || ''))[0]
+         || null;
+}
+/* THE SAME ONE INDIRECTION THE SERVER DOES, so the panel says what the server
+   will do rather than what this block used to hold. Null where none is named,
+   which is refused rather than open — see route_perm in serve.py. */
+function routePerm(r){
+  const pool = (DPCFG && DPCFG.permissions) || [];
+  const p = pool.filter(x=> x.id === ((r && r.permission) || ''))[0];
+  if (!p) return null;
+  const v = p.values || {};
+  const an = ((DPCFG && DPCFG.authns) || []).filter(x=> x.id === (v.authn || ''))[0];
+  const az = ((DPCFG && DPCFG.authzs) || []).filter(x=> x.id === (v.authz || ''))[0];
+  /* HALF A PAIR IS NULL TOO, exactly as the server has it. An empty authorize
+     profile means UNRESTRICTED, so reading a missing one as empty would draw a
+     panel saying ANY DISPLAY over a server refusing everybody — and of the two
+     ways to be wrong about that, the panel promising access is the worse. */
+  if (!an || !az) return null;
+  const a = an.values || {}, b = az.values || {};
+  return {perm: p, authn: an, authz: az,
+          needs_signin: !!a.needs_signin,
+          session_idle: a.session_idle,
+          restricted: !!b.restricted,
+          displays: b.displays || [], groups: b.groups || [],
+          identities: b.identities || []};
 }
 function routeProvider(r){
   const m = routeModel(r);
@@ -5817,8 +6045,8 @@ function blockSyncProvider(blk){
      provider is the profile's now. Reading a control that no longer exists
      made every endpoint look like DEMO, which hid its limits and its system
      prompt. */
-  const sel = blk.querySelector('[data-f="model_profile"]');
-  const v = routeProvider({model_profile: sel ? sel.value : ''});
+  const sel = blk.querySelector('[data-f="connection"]');
+  const v = routeProvider({connection: sel ? sel.value : ''});
   const connected = v !== 'demo', anth = v === 'anthropic',
         ha = v === 'homeassistant';
   const show = (name, yes)=>{ const el = R(blk, name); if (el) el.style.display = yes ? '' : 'none'; };
@@ -5891,10 +6119,8 @@ function blockPaint(blk, r){
   });
   blk.querySelectorAll('[data-f="strict"] button').forEach(b=>
     b.classList.toggle('on', (b.dataset.v === '1') === !!r.strict));
-  blk.querySelectorAll('[data-f="restricted"] button').forEach(b=>
-    b.classList.toggle('on', (b.dataset.v === '1') === !!r.restricted));
-  blk.querySelectorAll('[data-f="needs_signin"] button').forEach(b=>
-    b.classList.toggle('on', (b.dataset.v === '1') === !!r.needs_signin));
+  /* NOTHING TO FILL for who may use it or whether they must sign in: both
+     are the permission's, and this block only names one. */
   /* The two answers. NOT NOW is this page's alone; the other is recorded
      against the account, so it follows this admin to the next machine and
      leaves a colleague still being told. */
@@ -5917,7 +6143,8 @@ function blockPaint(blk, r){
     }
     blockSyncOpen(blk);
   };
-  blockFillWho(blk, r);
+  fillPermPicker(blk, r);
+  blockSyncPerm(blk);
   blockSyncSignin(blk);
   /* Painted with the rest of the block, so a row opened fresh already carries
      the answer rather than waiting for somebody to touch the control. */
@@ -5925,154 +6152,109 @@ function blockPaint(blk, r){
   /* The model picker, by profile name. A profile that has been deleted is
      still offered on the endpoint naming it, marked, rather than silently
      reading as the default. */
-  /* The ports, less the ones another endpoint already answers on — a port
-     reaches one endpoint, so offering a taken one would be offering a save
-     the server is going to refuse. Its own stays offered, obviously. */
-  const nw = F(blk, 'network');
-  if (nw){
-    const want = r.network || '';
-    /* A SHARED port is always on offer — carrying several endpoints is what it
-       is for. An exclusive one another endpoint already answers on is not:
-       offering it would be offering a save the server is going to refuse. */
-    const taken = {};
-    (RT.routes || []).forEach(x=>{ if (x.id !== r.id && x.network)
-                                     taken[x.network] = x.name; });
-    const all = (DPCFG && DPCFG.networks) || [];
-    /* A port already answering for another endpoint is not offered: one
-       port, one endpoint, so choosing it would be choosing a refusal. */
-    const pool = all.filter(x=> !taken[x.id]);
-    nw.innerHTML = '';
-    /* NO PORT MEANS NO PORT. It used to fall back to a nominated default,
-       which is what quietly put two assistants on one port: two endpoints
-       that had simply never been given one both landed there, chosen by
-       nobody. An endpoint naming no profile is now attached to nothing and
-       answers nowhere — said here, on the row, rather than discovered. */
-    /* EVERY free profile, the nominated one included. That filter excluded it
-       because the blank option USED to represent it — pick "default" and you
-       got that port. The blank option means "no port" now, so excluding the
-       profile as well left it in the list on the NETWORK page and impossible
-       to choose here: a port nothing was using that nothing could be put on. */
-    const opts = [['', 'NOT ATTACHED TO A PORT — answers nowhere']]
-                   .concat(pool.map(x=> [x.id,
-                     x.name + ((x.values || {}).port ? ' · ' + x.values.port : '')]));
-    if (want && !pool.some(x=> x.id === want))
-      opts.push([want, 'a profile that no longer exists']);
-    opts.forEach(([v, label])=>{
-      const o = document.createElement('option');
-      o.value = v; o.textContent = label; nw.appendChild(o);
-    });
-    nw.value = want;
-  }
-
-  const mp = F(blk, 'model_profile');
-  if (mp){
-    const want = r.model_profile || '';
-    const pool = (DPCFG && DPCFG.models) || [];
-    mp.innerHTML = '';
-    const opts = [['', 'NONE — demo replies']].concat(pool.map(x=> [x.id, x.name]));
-    if (want && !pool.some(x=> x.id === want))
-      opts.push([want, 'a profile that no longer exists']);
-    opts.forEach(([v, label])=>{
-      const o = document.createElement('option');
-      o.value = v; o.textContent = label; mp.appendChild(o);
-    });
-    mp.value = want;
-  }
-
-  /* Every OTHER endpoint, because falling through to yourself is a loop and
-     falling through to a house is asking the thing that just declined. Built
-     from what is on the server rather than from what is on screen: a draft
-     nobody has saved has no id to point at. */
-  const ft = F(blk, 'fallthrough');
-  if (ft && ft.dataset.touched !== '1'){
-    const want = r.fallthrough || '';
-    ft.innerHTML = '';
-    /* DEMO is left out because it answers from the display's own text: the
-       server would find nothing to say and the question would die there.
-       Another house is offered — two of them in one building is a real
-       arrangement, and one may know a room the other does not. */
-    const opts = [['', 'nothing — it answers for itself']].concat(
-      (RT.routes || []).filter(x=> x.id !== r.id && routeProvider(x) !== 'demo')
-                       .map(x=> [x.id, x.name]));
-    if (want && !opts.some(([v])=> v === want)) opts.push([want, 'an endpoint that is gone']);
-    opts.forEach(([v, label])=>{
-      const o = document.createElement('option');
-      o.value = v; o.textContent = label; ft.appendChild(o);
-    });
-    ft.value = want;
-  }
-
-  /* What each closed box holds, so the whole endpoint reads off the headings
-     and opening one is for changing it rather than for finding out. */
-  const words = (r.aliases || []).length;
+  /* THE CONNECTIONS, less the ones whose PORT another endpoint already
+     answers on. A port reaches one endpoint, so offering a connection that
+     would collide is offering a save the server is going to refuse — and the
+     collision is a property of the pair now, not of a picker beside it. Its
+     own stays offered, obviously. */
+  /* THE COLLAPSED HEADINGS. Restored after the connection change took the
+     whole block out with the two pickers it sat between — every one of these
+     is what a shut subgroup says about itself, and without them a closed
+     endpoint said nothing at all. */
   const sums = {
     display: (()=>{
       const p = ((DPCFG && DPCFG.kiosks) || [])
                   .filter(x=> x.id === (r.kiosk_profile || ''))[0];
-      /* Named, and told apart from "set to something that is gone". The third
-         state is the one worth saying out loud: a profile chosen here does
-         nothing at all while the endpoint is open to every display. */
-      return !r.kiosk_profile ? 'none chosen'
+      /* WHAT IT IS CALLED, as well as which layout. The wake word lives here
+         now, so the layout is the answer to "what is this assistant" rather
+         than only to "what does it look like". */
+      return !r.kiosk_profile ? 'none chosen — answers to nothing'
            : !p ? 'a profile that no longer exists'
-           : p.name + (r.restricted ? '' : ' · not applied — open to all');
+           : p.name + ' · ' + (p.wakeword ? 'wakes to \u201c' + p.wakeword + '\u201d'
+                                          : 'no wake word');
     })(),
-    wake: (r.wakeword ? '“' + r.wakeword + '”' : 'not set')
-        + (words ? ' +' + words + ' more' : '')
-        + (r.strict ? ' · exact' : ''),
-    who: !r.restricted ? 'any display'
-       : ((r.groups || []).length + (r.displays || []).length
-          + (r.identities || []).length)
-         ? [(r.groups || []).length
-              ? (r.groups || []).length + ' group' + ((r.groups || []).length === 1 ? '' : 's')
-              : '',
-            (r.displays || []).length
-              ? (r.displays || []).length + ' named' : '',
-            (r.identities || []).length
-              ? (r.identities || []).length
-                + ((r.identities || []).length === 1 ? ' person' : ' people')
-              : ''].filter(Boolean).join(' + ')
-         : 'nobody',
-    signin: r.needs_signin ? 'required' : 'not required',
-    /* WHERE IT ANSWERS, on the collapsed heading. An endpoint with no port
-       answers nowhere, and that is exactly the state that used to be hidden
-       behind a silent fallback — so it is the one thing this line has to be
-       unmissable about. */
-    net: (()=>{
-      const prof = ((DPCFG && DPCFG.networks) || [])
-                     .filter(n=> n.id === (r.network || ''))[0];
-      if (!prof) return 'no port — answers nowhere';
-      return prof.name + ((prof.values || {}).port ? ' · ' + prof.values.port : '');
+    /* ONE LINE FOR BOTH QUESTIONS, because they are one pointer now. The
+       count is read through the permission rather than off the record, whose
+       own copy of the lists stopped being consulted. */
+    perm: (()=>{
+      const p = routePerm(r);
+      if (!p) return (r.permission ? 'a permission that is gone or half gone'
+                                   : 'no permission') + ' — refused to everybody';
+      const n = (p.groups || []).length + (p.displays || []).length
+              + (p.identities || []).length;
+      return (p.perm.name || 'unnamed') + ' · '
+           + (p.needs_signin ? 'sign in' : 'no sign-in') + ' · '
+           + (!p.restricted ? 'any display' : n ? n + ' named' : 'nobody');
     })(),
-    voice: (r.greeting ? '“' + r.greeting.slice(0, 28)
-                       + (r.greeting.length > 28 ? '…' : '') + '” · ' : 'shared greeting · ')
-         + (r.voice || 'shared voice'),
+    /* THE PAIR, AND BOTH HALVES OF IT. An endpoint with no connection speaks
+       to nothing and answers nowhere, which is exactly the state a silent
+       fallback used to hide — so it is the one thing this line is unmissable
+       about. */
     conn: (()=>{
-      const pool = (DPCFG && DPCFG.models) || [];
-      const p = pool.filter(x=> x.id === (r.model_profile || ''))[0];
-      return p ? p.name : 'no model profile';
+      const c = routeConn(r);
+      if (!c) return 'no connection — speaks to nothing, answers nowhere';
+      const m = routeModel(r), n = routeNet(r);
+      return c.name + ' · ' + (m ? m.name : 'no model')
+                    + ' · ' + (n ? n.name + ((n.values || {}).port
+                                             ? ' ' + n.values.port : '')
+                                 : 'no port');
     })(),
-    limits: routeProvider(r) === 'homeassistant' ? r.timeout + 's'
-          : r.max_tokens + ' tokens · '
-          + (r.history_turns ? r.history_turns + ' turns' : 'no context') + ' · '
-          + r.timeout + 's',
-    prompt: routeProvider(r) === 'demo' ? 'not used in demo'
-          : routeProvider(r) === 'homeassistant' ? 'set in Home Assistant'
-          : ((r.system || '').trim().split(/\s+/).filter(Boolean).length + ' words'),
   };
   Object.keys(sums).forEach(g=>{
     const h = blk.querySelector('[data-g="' + g + '"] .subsum');
     if (h) h.textContent = sums[g];
   });
-  /* The speech profiles, by name. A profile that has been deleted is still
-     offered on the row that names it, marked, rather than disappearing out of
-     a select the admin never touched. NONE is a real answer here and not a
-     missing setting: the endpoint speaks in whatever voice the page ships
-     with. */
-  /* The layout profile this endpoint hands to the screens it names. Eight
-     screens on one assistant are eight rows to set otherwise, and they are
-     all the same kind of place. A screen's own row still wins — this is only
-     read where that row names none, and only where the answer is unambiguous;
-     the rule is on the server, in inherited_kiosk, so there is one of it. */
+
+  const cn = F(blk, 'connection');
+  if (cn){
+    const want = r.connection || '';
+    const all = (DPCFG && DPCFG.connections) || [];
+    /* Which PORT each other endpoint is on, by way of its connection. */
+    const byId = {};
+    all.forEach(c=> { byId[c.id] = (c.values || {}).network || ''; });
+    const takenPort = {};
+    (RT.routes || []).forEach(x=>{
+      if (x.id === r.id || !x.connection) return;
+      const p = byId[x.connection];
+      if (p) takenPort[p] = x.name;
+    });
+    const pool = all.filter(c=> c.id === want
+                                || !takenPort[(c.values || {}).network || '']);
+    cn.innerHTML = '';
+    /* NONE is a real answer and reads as one: no connection is an endpoint
+       that speaks to nothing and answers nowhere, which is exactly what a
+       half-built one is. */
+    /* THE NAME AND NOTHING ELSE. A select is as wide as its longest option, so
+       spelling the pair out here set the width of the control from the longest
+       model name on the server — and what the pair holds is one tab away,
+       stated once, rather than restated on every endpoint that uses it. The
+       shut row's own line still says both halves, which is where you read it
+       without opening anything. */
+    const opts = [['', 'NONE — demo replies, no port']]
+      .concat(pool.map(c=> [c.id, c.name]));
+    if (want && !all.some(c=> c.id === want))
+      opts.push([want, 'a connection that no longer exists']);
+    opts.forEach(([v, label])=>{
+      const o = document.createElement('option');
+      o.value = v; o.textContent = label;
+      cn.appendChild(o);
+    });
+    cn.value = want;
+    /* Said where it is true rather than left to a refusal on save: an endpoint
+       whose port is spoken for has nothing to pick, and the reason is not on
+       this tab. */
+    const note = R(blk, 'connnote');
+    if (note){
+      const lost = all.length - pool.length;
+      note.textContent = !all.length
+        ? 'No connections yet — make one under PROFILES ▸ CONNECTION.'
+        : lost ? lost + ' not offered: another endpoint already answers on '
+                 + (lost === 1 ? 'that port' : 'those ports') + '.'
+             : '';
+      note.className = 'note';
+    }
+  }
+
   const kp = F(blk, 'kiosk_profile');
   if (kp){
     const want = r.kiosk_profile || '';
@@ -6104,21 +6286,6 @@ function blockPaint(blk, r){
     kp.value = want;
   }
 
-  const sp = F(blk, 'speech');
-  if (sp){
-    const want = r.speech || '';
-    const pool = (DPCFG && DPCFG.speeches) || [];
-    sp.innerHTML = '';
-    const opts = [['', "NONE — the page's own voice"]]
-                   .concat(pool.map(x=> [x.id, x.name]));
-    if (want && !pool.some(x=> x.id === want))
-      opts.push([want, 'a profile that no longer exists']);
-    opts.forEach(([v, label])=>{
-      const o = document.createElement('option');
-      o.value = v; o.textContent = label; sp.appendChild(o);
-    });
-    sp.value = want;
-  }
   // buttons that only mean something once it exists on the server
   const set = (a, hide, label)=>{
     const b = blk.querySelector('[data-a="' + a + '"]');
@@ -6158,19 +6325,32 @@ function blockFillWho(blk, r){
       && !(pbox && pbox.contains(document.activeElement))){
     if (pbox){
       pbox.innerHTML = '';
-      IDENTITIES.forEach(p=>{
+      /* ONLY THE ONES WHO HAVE ARRIVED. A person with a setup link still
+         outstanding has not chosen a password, cannot sign in, and so cannot
+         satisfy the tick that would be made for them — an entry that grants
+         nothing and reads as though it granted something. They appear here the
+         moment they use their link.
+
+         One already ticked is still shown, whatever state it is in: hiding a
+         grant that exists would take it away on the next save without anybody
+         asking for that. */
+      const people = IDENTITIES.filter(p=> p.ready || wantP.indexOf(p.id) >= 0);
+      people.forEach(p=>{
         const lab = document.createElement('label');
         const cb = document.createElement('input');
         cb.type = 'checkbox'; cb.dataset.p = p.id;
         cb.checked = wantP.indexOf(p.id) >= 0;
         lab.appendChild(cb);
-        lab.appendChild(document.createTextNode(' ' + (p.label || p.id)));
+        lab.appendChild(document.createTextNode(
+          ' ' + (p.label || p.id) + (p.ready ? '' : ' — link not used yet')));
         pbox.appendChild(lab);
       });
-      if (!IDENTITIES.length){
+      if (!people.length){
         const em = document.createElement('span');
-        em.textContent = 'nobody yet — people are created under '
-                       + 'ENROLLMENTS ▸ USER';
+        em.textContent = IDENTITIES.length
+          ? 'nobody has finished enrolling yet — a person appears here once '
+            + 'they have used their link and chosen a password'
+          : 'nobody yet — people are created under ENROLLMENTS ▸ USER';
         pbox.appendChild(em);
       }
     }
@@ -6215,7 +6395,14 @@ function blockFillWho(blk, r){
     }
     if (box){
     box.innerHTML = '';
-    DISPLAYS.forEach(d=>{
+    /* APPROVED ONLY, the same rule as the people above. A screen that has not
+       been approved is one nobody has decided should be here yet, and it is
+       refused whatever this list says — so offering it made a tick that could
+       not do anything and looked like it had. Approve it under ACCESS and it
+       appears. One already ticked stays visible, so a grant is never taken
+       away by a list quietly dropping it. */
+    const screens = DISPLAYS.filter(d=> d.approved || want.indexOf(d.id) >= 0);
+    screens.forEach(d=>{
       const lab = document.createElement('label');
       const cb = document.createElement('input');
       cb.type = 'checkbox'; cb.dataset.d = d.id;
@@ -6225,9 +6412,12 @@ function blockFillWho(blk, r){
         ' ' + d.label + (d.approved ? '' : ' — not approved')));
       box.appendChild(lab);
     });
-    if (!DISPLAYS.length){
+    if (!screens.length){
       const em = document.createElement('span');
-      em.textContent = 'no displays have loaded the page yet';
+      em.textContent = DISPLAYS.length
+        ? 'no approved screens yet — one appears here once it is approved '
+          + 'under ACCESS ▸ NODES'
+        : 'no displays have loaded the page yet';
       box.appendChild(em);
     }
     }
@@ -6260,13 +6450,102 @@ function blockFillWho(blk, r){
 
    Read from the CONTROL rather than the record, so it appears and disappears
    as the segmented control is pressed rather than after a save. */
+/* WHAT THE CHOSEN PERMISSION ACTUALLY DOES, in this endpoint's terms. The two
+   answers used to be controls on this block, so they were self-evident; named
+   somewhere else they are not, and the pointer alone tells nobody whether a
+   caller gets in. */
+function blockSyncPerm(blk){
+  const note = R(blk, 'permnote');
+  if (!note) return;
+  const rec = blkRoute(blk);
+  const p = routePerm(rec);
+  /* Which of the two nulls this is: nothing named, or something named that
+     has since been half deleted. They read the same to the server and want
+     different things done about them. */
+  const named = ((DPCFG && DPCFG.permissions) || [])
+                  .filter(x=> x.id === (rec.permission || ''))[0];
+  let msg = '', bad = false;
+  if (!p && !named){
+    msg = (rec.permission ? 'That permission no longer exists'
+                          : 'No permission')
+        + ' — this endpoint is refused to everybody until one is chosen. '
+        + 'It is not open.';
+    bad = true;
+  }else if (!p){
+    msg = '“' + (named.name || 'it') + '” is missing a half — an authenticate '
+        + 'or authorize profile it names has gone. The endpoint is refused to '
+        + 'everybody until that is put right.';
+    bad = true;
+  }else{
+    const n = (p.groups || []).length + (p.displays || []).length
+            + (p.identities || []).length;
+    const who = !p.restricted ? 'any display'
+              : n ? n + (n === 1 ? ' named caller' : ' named callers')
+                  : 'nobody — nothing is ticked on it';
+    msg = (p.needs_signin ? 'must sign in' : 'no sign-in')
+        + ' · ' + who
+        + (p.authn ? ' · ' + p.authn.name : ' · authenticate profile missing')
+        + (p.authz ? ' · ' + p.authz.name : ' · authorize profile missing');
+    bad = !p.authn || !p.authz || (p.restricted && !n);
+  }
+  note.textContent = msg;
+  note.className = 'note' + (bad ? ' bad' : '');
+}
+
+/* The record as it stands IN THE PANEL — the picker's value rather than the
+   saved one, so every note answers to what somebody has just chosen instead of
+   to what was last written. */
+/* THE PERMISSIONS, by name. Unlike a connection none is deliberately shared
+   between endpoints, so nothing is filtered out of this list: two endpoints
+   answering to the same rule is the point of naming it once.
+
+   Its own function because the notes under it read the picker, and they run
+   before the rest of the block is filled. */
+function fillPermPicker(blk, r){
+  const pm = F(blk, 'permission');
+  if (!pm) return;
+  const want = r.permission || '';
+  const all = (DPCFG && DPCFG.permissions) || [];
+  /* NONE reads as the refusal it is. It was the shape of a half-built endpoint
+     before and it meant OPEN then; saying so at the control is the cheapest
+     place to correct that expectation. */
+  const opts = [['', 'NONE — refused to everybody']]
+    .concat(all.map(p=> [p.id, p.name]));
+  if (want && !all.some(p=> p.id === want))
+    opts.push([want, 'a permission that no longer exists']);
+  pm.innerHTML = '';
+  opts.forEach(([v, label])=>{
+    const o = document.createElement('option');
+    o.value = v; o.textContent = label;
+    pm.appendChild(o);
+  });
+  pm.value = want;
+}
+
+function blkRoute(blk){
+  const rec = Object.assign({}, blk._rec || {});
+  /* ONLY ONCE IT HAS OPTIONS. A select with none cannot hold a value, so
+     reading it during the paint that fills it returned "" for every endpoint
+     — and every note under it then said the endpoint named no permission
+     while the picker beside it, filled a moment later, showed the right one.
+     Empty means not drawn yet, not chosen nothing. */
+  const sel = F(blk, 'permission');
+  if (sel && sel.options.length) rec.permission = sel.value;
+  const cn = F(blk, 'connection');
+  if (cn && cn.options.length) rec.connection = cn.value;
+  return rec;
+}
+
 function blockSyncOpen(blk){
   const box = blk.querySelector('[data-r="openwarn"]');
   if (!box) return;
   const rec = blk._rec || {};
   const rid = rec.id || '';
-  const on = blk.querySelector('[data-f="needs_signin"] button.on');
-  const needsIn = !!on && on.dataset.v === '1';
+  /* THROUGH THE PERMISSION now. An endpoint naming none is refused rather than
+     open, so there is nothing to warn about — the note under the picker says
+     that, and says it as a fault. */
+  const p = routePerm(blkRoute(blk));
+  const needsIn = !p || p.needs_signin;
   const enabled = rec.enabled !== false;
   const acked = OPENACK_NOW.has(rid) || (RT.acked || []).indexOf(rid) >= 0;
   const show = !needsIn && enabled && RT.exposed && !acked;
@@ -6286,10 +6565,14 @@ function blockSyncOpen(blk){
 function blockSyncSignin(blk){
   const note = blk.querySelector('[data-r="signinnote"]');
   if (!note) return;
-  const on = blk.querySelector('[data-f="needs_signin"] button.on');
-  const needsIn = !!on && on.dataset.v === '1';
   const rec = blk._rec || {};
-  const net = (F(blk, 'network') || {}).value || rec.network || '';
+  const perm = routePerm(blkRoute(blk));
+  const needsIn = !!perm && perm.needs_signin;
+  /* THROUGH THE CONNECTION. The picker beside this one names a pair now, so
+     the port is read out of it rather than off a control of its own. */
+  const cid = (F(blk, 'connection') || {}).value || rec.connection || '';
+  const cc = ((DPCFG && DPCFG.connections) || []).filter(c=> c.id === cid)[0];
+  const net = (cc && (cc.values || {}).network) || '';
   const bits = [];
   if (net){
     const prof = ((DPCFG && DPCFG.networks) || []).filter(n=> n.id === net)[0];
@@ -6300,7 +6583,12 @@ function blockSyncSignin(blk){
       bits.push('this port is marked OPEN, and reaching it is normally the '
               + 'whole grant — that does not cover this endpoint, because no '
               + 'port can prove who is at it');
-    const loose = sharing.filter(r=> !r.needs_signin);
+    /* Each neighbour read through ITS permission, not off a field this block
+       no longer keeps — the copy on the record is stale by design. */
+    const loose = sharing.filter(r=>{
+      const q = routePerm(r);
+      return q && !q.needs_signin;
+    });
     if (needsIn && loose.length)
       bits.push(loose.length + ' other endpoint(s) on this same port do not '
               + 'require it — “' + loose.map(r=> r.name || r.id).join('”, “')
@@ -6311,8 +6599,12 @@ function blockSyncSignin(blk){
 }
 
 function blockSyncWho(blk){
+  /* THE ENDPOINT'S CONTROLS ARE GONE; the block this runs on is an AUTHORIZE
+     profile, whose segmented control carries no data-f. Read the record it was
+     drawn from, and fall back to the control where one exists. */
   const on = blk.querySelector('[data-f="restricted"] button.on');
-  const restricted = !!on && on.dataset.v === '1';
+  const restricted = on ? on.dataset.v === '1'
+                        : !!(blk._who && blk._who.restricted);
   const sIn = blk.querySelector('[data-f="needs_signin"] button.on');
   const needsIn = !!sIn && sIn.dataset.v === '1';
   ['groups', 'grouplab', 'identities', 'peoplelab'].forEach(n=>{
@@ -6365,14 +6657,9 @@ function blockSyncWho(blk){
     if (restricted && blk._rec && blk._rec.is_default)
       msg += ' · this is the default endpoint, so typed questions from any '
            + 'other display are refused too';
-    /* Said HERE because this is where somebody is reasoning about who gets in,
-       and because the two combine in a way worth spelling out: a list of
-       screens plus MUST SIGN IN is a list that can never match, since a screen
-       is not a person. */
-    if (needsIn)
-      msg += (msg ? ' · ' : '')
-           + 'and SIGN IN is set to required above, so no device reaches this '
-           + 'at all, approved or not';
+    /* The screens-plus-sign-in combination moved to the PERMISSION row, which
+       is the only place both halves are visible at once. Reading it here would
+       mean reading a control this block no longer has. */
     note.className = 'note' + (bad ? ' bad' : '');
     note.textContent = msg;
   }
@@ -6395,10 +6682,14 @@ function blockCollect(blk){
      control that is gone sent every endpoint back as DEMO. */
   const strict = blk.querySelector('[data-f="strict"] button.on');
   body.strict = !!strict && strict.dataset.v === '1';
+  /* Guarded like the lists below, and for the same reason: the endpoint block
+     has neither control any more, and answering for a control that is gone
+     would send FALSE for both — quietly rewriting the retired copy on the
+     record and making a rolled-back deployment read as wide open. */
   const who = blk.querySelector('[data-f="restricted"] button.on');
-  body.restricted = !!who && who.dataset.v === '1';
+  if (who) body.restricted = who.dataset.v === '1';
   const signin = blk.querySelector('[data-f="needs_signin"] button.on');
-  body.needs_signin = !!signin && signin.dataset.v === '1';
+  if (signin) body.needs_signin = signin.dataset.v === '1';
   /* Sent whether or not the switch is on, so turning it off and on again
      brings back the displays that were ticked rather than an empty list
      somebody has to fill in twice. */
@@ -6408,8 +6699,9 @@ function blockCollect(blk){
   const dbox = blk.querySelector('[data-r="displays"]');
   if (dbox)
     body.displays = [...dbox.querySelectorAll('input:checked')].map(cb=> cb.dataset.d);
-  body.groups = [...blk.querySelectorAll('[data-r="groups"] input:checked')]
-                  .map(cb=> cb.dataset.g);
+  const gbox = blk.querySelector('[data-r="groups"]');
+  if (gbox)
+    body.groups = [...gbox.querySelectorAll('input:checked')].map(cb=> cb.dataset.g);
   /* Guarded the same way the displays box is: sending an empty list from a
      panel that does not have the box would wipe every grant a route already
      carries, where omitting the field leaves the server's copy alone. */
@@ -6453,11 +6745,17 @@ function wireBlock(blk){
     /* Which limits and which notes apply is the PROFILE's provider, so
        choosing a different profile rearranges the block the same way choosing
        a different provider used to. */
-    if (e.target.closest('[data-f="model_profile"]')) blockSyncProvider(blk);
+    if (e.target.closest('[data-f="connection"]')) blockSyncProvider(blk);
     /* The sign-in note is about this endpoint's PORT and its neighbours on it,
        so moving the endpoint to another network profile changes what it says.
        Without this it would keep describing the port it used to be on. */
-    if (e.target.closest('[data-f="network"]')) blockSyncSignin(blk);
+    if (e.target.closest('[data-f="connection"]')) blockSyncSignin(blk);
+    /* All three of these are the permission's answers, so choosing another one
+       has to redraw them at once — the warning especially, which is about
+       whether anybody at all has to sign in. */
+    if (e.target.closest('[data-f="permission"]')){
+      blockSyncPerm(blk); blockSyncSignin(blk); blockSyncOpen(blk);
+    }
   });
   blk.addEventListener('input', e=>{
     const f = e.target.closest('[data-f]');
@@ -6500,15 +6798,9 @@ function wireBlock(blk){
     const seg = b.closest('.seg[data-f]');
     if (seg){
       seg.querySelectorAll('button').forEach(x=> x.classList.toggle('on', x === b));
-      if (seg.dataset.f === 'restricted'
-          || seg.dataset.f === 'needs_signin') blockSyncWho(blk);
-      if (seg.dataset.f === 'needs_signin'){
-        blockSyncSignin(blk);
-        /* Pressing REQUIRED takes the warning away at once rather than at the
-           next save: the control is the thing being warned about, so what it
-           says now is what the message has to answer to. */
-        blockSyncOpen(blk);
-      }
+      /* WHO MAY USE IT and SIGN IN are not segs on this block any more; the
+         permission picker above stands for both, and is wired as a change
+         rather than a click. */
       return;
     }
     const act = b.dataset.a;
@@ -6520,6 +6812,8 @@ async function blockAction(blk, act, btn){
   const rid = blk.dataset.rid;
   const rec = blk._rec || {};
   if (act === 'resetprompt'){
+    /* The button is on the model profile now; this stays only so an older
+       page in somebody's tab does not throw. */
     const t = F(blk, 'system');
     t.value = SHIPPED_PROMPT; t.dataset.touched = '1';
     return blockNote(blk, 'back to the shipped wording — not saved yet');
@@ -6739,6 +7033,10 @@ async function loadDisplays(){
    nowhere else: there is no email and nothing to vouch for a name, so anybody
    who could mint their own could mint somebody else's. */
 let IDENTITIES = [], IDBASE = '', OPENPID = '', IDPWMIN = 10;
+/* WHO IS TICKED on the register, for the bar above it. Held here rather than
+   read off the boxes because the list is rebuilt on every refresh — a
+   selection living in the DOM would be lost every time the timer fired. */
+const IDPICKED = new Set();
 async function loadIdentities(){
   try{
     const j = await api('/identities');
@@ -6882,6 +7180,57 @@ async function idAction(path, body){
   }
 }
 
+/* The bar over the register: how many are ticked, and whether ALL is. Pruned
+   against the rows actually on screen, so a selection cannot survive somebody
+   being deleted and be applied to nothing. */
+function paintIdBulk(){
+  const bar = $('idbulkbar');
+  if (!bar) return;
+  const here = (IDENTITIES || []).filter(p=> p.ready);
+  [...IDPICKED].forEach(id=>{ if (!here.some(p=> p.id === id)) IDPICKED.delete(id); });
+  bar.hidden = !here.length;
+  const cnt = $('idbulkcount');
+  if (cnt) cnt.textContent = IDPICKED.size ? IDPICKED.size + ' selected'
+                                           : 'nothing selected';
+  const all = $('idbulkall');
+  if (all){
+    all.checked = here.length > 0 && IDPICKED.size === here.length;
+    all.onclick = ()=>{
+      IDPICKED.clear();
+      if (all.checked) here.forEach(p=> IDPICKED.add(p.id));
+      refreshIdentities();
+    };
+  }
+}
+
+/* Both buttons, one request. See bulkStatus one population over — same shape,
+   same reason. */
+function idBulkStatus(on){
+  return async ()=>{
+    const ids = [...IDPICKED];
+    if (!ids.length) return;
+    const note = $('idbulknote');
+    try{
+      const j = await api('/identities/status', {method:'POST',
+        body: JSON.stringify({ids: ids, on: on})});
+      IDENTITIES = j.identities || IDENTITIES;
+      IDPICKED.clear();
+      await refreshIdentities();
+      if (note){
+        note.className = 'note';
+        note.textContent = j.count + (j.count === 1 ? ' person ' : ' people ')
+          + (on ? 'will see the status line' : 'will not see the status line')
+          + ' wherever they sign in.';
+      }
+    }catch(e){
+      if (note){ note.className = 'note bad'; note.textContent = e.message; }
+    }
+  };
+}
+const bIdOn = $('b_idstaton'), bIdOff = $('b_idstatoff');
+if (bIdOn) bIdOn.addEventListener('click', idBulkStatus(true));
+if (bIdOff) bIdOff.addEventListener('click', idBulkStatus(false));
+
 async function refreshIdentities(){
   /* TWO LISTS, AND THE ROW DOES NOT KNOW WHICH IT IS IN. Anybody who has set a
      password is here and belongs under IDENTITY; anybody who has not is still
@@ -6907,6 +7256,7 @@ async function refreshIdentities(){
     if (!row || row.ready) clearPersonUrl();
   }
   watchPersonUrl();                     // re-arm, or stop, on what is left
+  paintIdBulk();
   live.forEach(k=>{ boxes[k].innerHTML = ''; boxes[k].className = ''; });
   const filled = {};
   IDENTITIES.forEach(p=>{
@@ -6922,6 +7272,23 @@ async function refreshIdentities(){
        ever picked the URL up — which is the one thing this list is read for,
        so it is not something you open a row to find. */
     const top = document.createElement('div'); top.className = 'top';
+    /* ONLY ON THE REGISTER. The queue on ENROLLMENTS is people who have not
+       arrived yet — there is nothing to apply to them and a tick there would
+       be a control that does nothing. */
+    if (where === 'here'){
+      const pick = document.createElement('input');
+      /* `dpick` — the class the device register's tick already uses, so the
+         two look and sit the same. Not `pick`, which is a row modifier. */
+      pick.type = 'checkbox'; pick.className = 'dpick';
+      pick.title = 'select for the status line';
+      pick.checked = IDPICKED.has(p.id);
+      pick.onclick = (e)=>{
+        e.stopPropagation();          // the row opens on a click; this is not one
+        if (pick.checked) IDPICKED.add(p.id); else IDPICKED.delete(p.id);
+        paintIdBulk();
+      };
+      top.appendChild(pick);
+    }
     const nmt = document.createElement('span');
     nmt.className = 'nm';
     nmt.textContent = p.label || 'unnamed person';
@@ -7076,7 +7443,7 @@ async function refreshIdentities(){
     alab.className = 'bklab';
     alab.textContent = 'AI';
     ends.appendChild(alab);
-    const gl = grantList(p, false);
+    const gl = grantList(p, false, 'person');
     ends.appendChild(gl.el);
     row.appendChild(ends);
     /* Its own line under the ticks, the way the wake word's is. The list's
@@ -7122,6 +7489,9 @@ async function refreshIdentities(){
       gnote.textContent = 'back to what is saved';
     };
     acts.appendChild(gundo);
+    /* Theirs follows them to whatever they sign in at, which is why it is on
+       the person and not only on the screen. */
+    acts.appendChild(statusButton(p, '/identities/status', refreshIdentities));
     /* THE WHOLE OF ACCOUNT RECOVERY, and deliberately one button. A forgotten
        password and a leaked link want the same answer — a new link, and a
        password only its holder ever chooses. There is no CLEAR THE PASSWORD
@@ -7756,14 +8126,17 @@ async function refreshGroups(){
   const addrow = $('gr_addrow');
   if (addrow) addrow.hidden = !!OPENGR && GROUPS.some(x=> x.id === OPENGR);
   GROUPS.forEach((g, i)=>{
-    /* The server sorts the two it keeps to the top; this draws the line under
-       them. Between the last default and the first custom one, and only where
-       both exist — a rule with nothing on one side of it is a line, not a
-       division. */
-    if (!g.system && i && GROUPS[i - 1].system){
-      const rule = document.createElement('div');
-      rule.className = 'rule grouprule';
-      box.appendChild(rule);
+    /* A HEADING PER SECTION, naming the rows under it rather than dividing
+       two anonymous halves. The server sorts the two it keeps to the top, so
+       this is DEFAULTS and then CUSTOM — and each is drawn at the first row of
+       its own kind, which means a list with only one kind in it gets the one
+       heading that is true rather than a rule with nothing on one side. */
+    const first = !i || GROUPS[i - 1].system !== g.system;
+    if (first){
+      const head = document.createElement('div');
+      head.className = 'rulehead';
+      head.textContent = g.system ? 'Defaults' : 'Custom';
+      box.appendChild(head);
     }
     const row = document.createElement('div');
     row.className = 'erow';
@@ -7939,6 +8312,10 @@ function paintDpSettings(){
   paintKiosks(DPCFG.kiosks || []);
   paintModels(DPCFG.models || []);
   paintNetworks(DPCFG.networks || []);
+  paintConns(DPCFG.connections || []);
+  paintAuthns(DPCFG.authns || []);
+  paintAuthzs(DPCFG.authzs || []);
+  paintPerms(DPCFG.permissions || []);
   paintNewSetup();
 }
 
@@ -8120,6 +8497,13 @@ let DPMODELS = [], OPENMD = -1;
 const PROVIDERS = [['demo','DEMO'], ['openai','OPENAI-COMPATIBLE'],
                    ['anthropic','ANTHROPIC'], ['homeassistant','HOME ASSISTANT']];
 
+/* The shipped values, for a slider on a profile that has never been given one.
+   Same numbers ROUTE_DEFAULTS carries on the server — a slider that opened at
+   its own minimum would read as a setting somebody chose. */
+const RT_DEFAULTS = {max_tokens: 400, temperature: 0.7, history_turns: 8,
+                     timeout: 120};
+
+function paintModelsRows(list){ return list; }
 function paintModels(list){
   DPMODELS = (list || []).map(m=> ({id: m.id || '', _new: !!m._new,
                                     name: m.name || '', has_key: !!m.has_key,
@@ -8204,6 +8588,71 @@ function paintModels(list){
       k.oninput = ()=>{ v.api_key = k.value; };
     }
 
+    /* HOW YOU TALK TO IT, which came off the endpoint. A context window and a
+       token ceiling are facts about what is being spoken to rather than about
+       the assistant in front of it, and two endpoints on one model wanting two
+       different ceilings is not a case anybody has. Set once, where the model
+       is.
+
+       Only what this provider actually reads, the same rule the fields above
+       follow: DEMO answers from the display and reads none of it; Home
+       Assistant holds the conversation and the instructions itself, so only
+       the timeout survives; Anthropic is sent neither the temperature nor the
+       keep-alive. */
+    const slider = (label, key, lo, hi, step, fmt)=>{
+      const w = document.createElement('div'); w.className = 'sl';
+      const b = document.createElement('label'); b.textContent = label;
+      const out = document.createElement('output');
+      const inp = document.createElement('input');
+      inp.type = 'range'; inp.min = lo; inp.max = hi; inp.step = step;
+      inp.value = (v[key] !== undefined && v[key] !== '') ? v[key]
+                : (RT_DEFAULTS[key] !== undefined ? RT_DEFAULTS[key] : lo);
+      const show = ()=>{ out.textContent = fmt ? fmt(inp.value) : inp.value; };
+      show();
+      inp.oninput = ()=>{ v[key] = parseFloat(inp.value); show(); };
+      w.appendChild(b); w.appendChild(out); w.appendChild(inp);
+      row.appendChild(w);
+    };
+    const ha = v.provider === 'homeassistant', demo = v.provider === 'demo',
+          anth = v.provider === 'anthropic';
+    if (!demo){
+      if (!ha){
+        slider('Reply limit (tokens)', 'max_tokens', 16, 2000, 16);
+        if (!anth) slider('Temperature', 'temperature', 0, 1.5, .05,
+                          x=> (+x).toFixed(2));
+        slider('Turns of context', 'history_turns', 0, 24, 1,
+               x=> x == 0 ? 'none' : x);
+      }
+      slider('Timeout', 'timeout', 5, 600, 5, x=> x + 's');
+      if (!ha && !anth) text('Keep model loaded', 'keep_alive', '30m');
+      if (!ha){
+        const b = document.createElement('b');
+        b.textContent = 'System prompt';
+        const ta = document.createElement('textarea');
+        ta.rows = 7; ta.spellcheck = false;
+        ta.value = v.system || '';
+        ta.oninput = ()=>{ v.system = ta.value; };
+        const w = document.createElement('div'); w.className = 'namerow';
+        w.appendChild(b); row.appendChild(w); row.appendChild(ta);
+      }
+      const n = document.createElement('div');
+      n.className = 'note';
+      n.textContent = ha
+        ? 'Home Assistant holds the conversation and instructs its own agent, '
+          + 'so only the timeout reaches it. Set it to the AGENT: an '
+          + 'LLM-backed one is two model passes with your entities in the '
+          + 'prompt, which a timeout chosen for the built-in engine cuts off '
+          + 'just before it succeeds.'
+        : anth
+          ? 'Anthropic is sent neither the temperature nor the keep-alive — '
+            + 'steer it with the system prompt.'
+          : 'A cold model can take half a minute to load before it says '
+            + 'anything, so keep the timeout generous. Turns of context is how '
+            + 'much of the conversation goes back with each question: at zero, '
+            + '\u201cand the other one?\u201d means nothing.';
+      row.appendChild(n);
+    }
+
     const acts = document.createElement('div'); acts.className = 'acts';
     const gap = document.createElement('span'); gap.className = 'spacer';
     acts.appendChild(gap);
@@ -8250,6 +8699,476 @@ function paintModels(list){
    has to look like something; an endpoint naming no network profile is not
    missing a setting, it is on the display port. */
 let DPNETS = [], OPENNW = -1;
+
+/* ------------------------------------------------- authenticate / authorize
+   The two halves of a permission, and the pair. Built like every other profile
+   list here — a local array the rows are drawn from, one row open at a time,
+   SAVE sending the whole list — so there is one shape to learn rather than
+   three. */
+let DPAUTHNS = [], OPENAN = -1;
+let DPAUTHZS = [], OPENAZ = -1;
+let DPPERMS  = [], OPENPM = -1;
+
+/* The shell every one of these rows is: a name, a badge that says what it
+   holds, and a foot with SAVE and REMOVE. Written once because the three
+   differ only in what goes between the name and the foot. */
+function profShell(box, arr, i, rec, openIdx, setOpen, summary, repaint){
+  const row = document.createElement('div');
+  row.className = 'erow';
+  if (openIdx !== i) row.classList.add('shut');
+  const top = document.createElement('div'); top.className = 'top';
+  const nmt = document.createElement('span'); nmt.className = 'nm';
+  const sum = document.createElement('span'); sum.className = 'badge';
+  const retitle = ()=>{
+    nmt.textContent = (rec.name || '').trim() || 'unnamed profile';
+    sum.textContent = summary();
+  };
+  top.appendChild(nmt); top.appendChild(sum);
+  top.onclick = (e)=>{
+    if (e.target.closest('input, button, select, textarea')) return;
+    setOpen(openIdx === i ? -1 : i); repaint();
+  };
+  row.appendChild(top);
+  const namerow = document.createElement('div'); namerow.className = 'namerow';
+  const nlab = document.createElement('b'); nlab.textContent = 'Name';
+  namerow.appendChild(nlab);
+  const nm = document.createElement('input');
+  nm.type = 'text'; nm.className = 'nmedit'; nm.value = rec.name || '';
+  nm.spellcheck = false;
+  nm.oninput = ()=>{ rec.name = nm.value; retitle(); };
+  namerow.appendChild(nm);
+  row.appendChild(namerow);
+  retitle();
+  box.appendChild(row);
+  return {row: row, retitle: retitle};
+}
+
+function profFoot(row, arr, i, rec, setOpen, repaint, save, canRemove){
+  const acts = document.createElement('div'); acts.className = 'acts';
+  const gap = document.createElement('span'); gap.className = 'spacer';
+  acts.appendChild(gap);
+  const b = document.createElement('button');
+  b.textContent = 'SAVE'; b.className = 'act-save';
+  b.onclick = ()=>{ rec._new = false; setOpen(-1); save(); };
+  acts.appendChild(b);
+  const del = document.createElement('button');
+  del.textContent = 'REMOVE'; del.className = 'act-danger';
+  const why = canRemove ? '' : canRemove;
+  del.onclick = ()=>{ setOpen(-1); arr.splice(i, 1); repaint(); };
+  acts.appendChild(del);
+  row.appendChild(acts);
+}
+
+function paintAuthns(list){
+  DPAUTHNS = (list || []).map(a=> ({id: a.id || '', _new: !!a._new,
+                                    name: a.name || '',
+                                    values: Object.assign({}, a.values || {})}));
+  const box = $('dp_authns');
+  if (!box) return;
+  box.innerHTML = '';
+  DPAUTHNS.forEach((a, i)=>{
+    const v = a.values;
+    const sh = profShell(box, DPAUTHNS, i, a, OPENAN, x=>{OPENAN=x;},
+      ()=> (v.needs_signin ? 'known callers only' : 'anyone')
+         + ' · ' + (v.session_idle ? v.session_idle + ' min idle' : 'no limit'),
+      ()=> paintAuthns(DPAUTHNS));
+    /* A SWITCH, not a tick: the two answers are opposites and both are real,
+       which is what a segmented pair says and a checkbox does not. */
+    const r1 = document.createElement('div'); r1.className = 'namerow';
+    const b1 = document.createElement('b'); b1.textContent = 'Sign in';
+    r1.appendChild(b1);
+    const seg = document.createElement('div'); seg.className = 'seg';
+    [['0','NOT REQUIRED'],['1','REQUIRED']].forEach(([val, label])=>{
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.textContent = label;
+      btn.classList.toggle('on', (val === '1') === !!v.needs_signin);
+      btn.onclick = ()=>{ v.needs_signin = val === '1'; paintAuthns(DPAUTHNS); };
+      seg.appendChild(btn);
+    });
+    r1.appendChild(seg); sh.row.appendChild(r1);
+
+    const r2 = document.createElement('div'); r2.className = 'namerow';
+    const b2 = document.createElement('b'); b2.textContent = 'Session limit';
+    r2.appendChild(b2);
+    const inp = document.createElement('input');
+    inp.type = 'number'; inp.className = 'num'; inp.min = 0; inp.max = 480;
+    inp.value = v.session_idle === undefined ? 0 : v.session_idle;
+    inp.oninput = ()=>{ v.session_idle = parseInt(inp.value, 10) || 0;
+                        sh.retitle(); };
+    r2.appendChild(inp); sh.row.appendChild(r2);
+    const n = document.createElement('div'); n.className = 'note';
+    n.textContent = 'Minutes of quiet before a sign-in lapses — the gap '
+                  + 'BETWEEN conversations, not a lifetime, so a session in '
+                  + 'use never runs out. 5 to 480, or 0 for no limit. A screen '
+                  + 'polling this server is not a conversation and does not '
+                  + 'hold one open.';
+    sh.row.appendChild(n);
+
+    profFoot(sh.row, DPAUTHNS, i, a, x=>{OPENAN=x;},
+             ()=> paintAuthns(DPAUTHNS),
+             ()=> saveDp({authns: DPAUTHNS.filter(x=> (x.name||'').trim())
+                    .map(x=> ({id:x.id, name:x.name, values:x.values}))},
+                    'authnnote'), true);
+  });
+  const btn = $('b_addauthn');
+  if (btn){
+    const busy = OPENAN >= 0 || DPAUTHNS.some(x=> x._new);
+    btn.hidden = busy; btn.disabled = busy || DPAUTHNS.length >= 8;
+  }
+}
+
+const bAddAuthn = $('b_addauthn');
+if (bAddAuthn) bAddAuthn.addEventListener('click', ()=>{
+  if (DPAUTHNS.length >= 8) return;
+  DPAUTHNS.push({id: profileId('a'), _new: true, name: '',
+                 values: {needs_signin: true, session_idle: 60}});
+  OPENAN = DPAUTHNS.length - 1;
+  paintAuthns(DPAUTHNS);
+});
+
+function paintAuthzs(list){
+  DPAUTHZS = (list || []).map(a=> ({id: a.id || '', _new: !!a._new,
+                                    name: a.name || '',
+                                    values: Object.assign({restricted:false,
+                                      displays:[], identities:[], groups:[]},
+                                      a.values || {})}));
+  const box = $('dp_authzs');
+  if (!box) return;
+  box.innerHTML = '';
+  DPAUTHZS.forEach((a, i)=>{
+    const v = a.values;
+    const count = ()=> (v.groups||[]).length + (v.displays||[]).length
+                     + (v.identities||[]).length;
+    const sh = profShell(box, DPAUTHZS, i, a, OPENAZ, x=>{OPENAZ=x;},
+      ()=> !v.restricted ? 'any display'
+         : (count() ? count() + ' named' : 'nobody'),
+      ()=> paintAuthzs(DPAUTHZS));
+
+    const r1 = document.createElement('div'); r1.className = 'namerow';
+    const b1 = document.createElement('b'); b1.textContent = 'Who may use it';
+    r1.appendChild(b1);
+    const seg = document.createElement('div'); seg.className = 'seg';
+    [['0','ANY DISPLAY'],['1','ONLY THESE']].forEach(([val, label])=>{
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.textContent = label;
+      btn.classList.toggle('on', (val === '1') === !!v.restricted);
+      btn.onclick = ()=>{ v.restricted = val === '1'; paintAuthzs(DPAUTHZS); };
+      seg.appendChild(btn);
+    });
+    r1.appendChild(seg); sh.row.appendChild(r1);
+
+    /* THE THREE LISTS, only where they decide anything. ANY DISPLAY does not
+       consult them, and a set of ticks that changes nothing is a set of ticks
+       somebody will believe they made. */
+    if (v.restricted){
+      const mk = (label, key, tag)=>{
+        const lab = document.createElement('label');
+        lab.className = 'bklab'; lab.textContent = label;
+        const cks = document.createElement('div');
+        cks.className = 'cks'; cks.dataset.r = tag;
+        sh.row.appendChild(lab); sh.row.appendChild(cks);
+      };
+      mk('Groups', 'groups', 'groups');
+      mk('Screens', 'displays', 'displays');
+      mk('People', 'identities', 'identities');
+      /* The same line the endpoint used to carry under its list — how many are
+         ticked, and which of them are not approved yet and so refused. It is
+         about this list, so it belongs where the list is now. */
+      const wn = document.createElement('div');
+      wn.className = 'note'; wn.dataset.r = 'whonote';
+      sh.row.appendChild(wn);
+      sh.row._who = v;
+      /* Filled by the same function the endpoint block used, because it is the
+         same three lists in the same three boxes — one place that knows how a
+         grant is drawn rather than two that have to agree. */
+      blockFillWho(sh.row, v);
+      /* …and read back out on every tick, so the local record is what SAVE
+         sends rather than the DOM being asked at the last moment. */
+      sh.row.querySelectorAll('[data-r] input').forEach(cb=>{
+        cb.addEventListener('change', ()=>{
+          ['groups','displays','identities'].forEach(k=>{
+            const b = sh.row.querySelector('[data-r="' + k + '"]');
+            /* The keys blockFillWho actually writes — d, g and p. Reading a
+               dataset.id it never set collected a list of undefineds, which
+               saved as a grant to nobody. */
+            if (b) v[k] = [...b.querySelectorAll('input:checked')]
+                            .map(x=> x.dataset.d || x.dataset.g || x.dataset.p);
+          });
+          blockSyncWho(sh.row);
+          sh.retitle();
+        });
+      });
+    }
+    profFoot(sh.row, DPAUTHZS, i, a, x=>{OPENAZ=x;},
+             ()=> paintAuthzs(DPAUTHZS),
+             ()=> saveDp({authzs: DPAUTHZS.filter(x=> (x.name||'').trim())
+                    .map(x=> ({id:x.id, name:x.name,
+                               restricted:x.values.restricted,
+                               displays:x.values.displays,
+                               identities:x.values.identities,
+                               groups:x.values.groups}))}, 'authznote'), true);
+  });
+  const btn = $('b_addauthz');
+  if (btn){
+    const busy = OPENAZ >= 0 || DPAUTHZS.some(x=> x._new);
+    btn.hidden = busy; btn.disabled = busy || DPAUTHZS.length >= 8;
+  }
+}
+
+const bAddAuthz = $('b_addauthz');
+if (bAddAuthz) bAddAuthz.addEventListener('click', ()=>{
+  if (DPAUTHZS.length >= 8) return;
+  DPAUTHZS.push({id: profileId('z'), _new: true, name: '',
+                 values: {restricted:false, displays:[], identities:[], groups:[]}});
+  OPENAZ = DPAUTHZS.length - 1;
+  paintAuthzs(DPAUTHZS);
+});
+
+function paintPerms(list){
+  DPPERMS = (list || []).map(p=> ({id: p.id || '', _new: !!p._new,
+                                   name: p.name || '',
+                                   values: Object.assign({}, p.values || {})}));
+  const box = $('dp_perms');
+  if (!box) return;
+  box.innerHTML = '';
+  const an = (DPCFG && DPCFG.authns) || [], az = (DPCFG && DPCFG.authzs) || [];
+  if (!an.length || !az.length){
+    box.className = 'note';
+    box.textContent = 'Nothing to pair yet — a permission is an authenticate '
+      + 'profile and an authorize one, and there '
+      + (!an.length && !az.length ? 'are none of either.'
+         : !an.length ? 'are no authenticate profiles.'
+                      : 'are no authorize profiles.');
+    const ab = $('b_addperm'); if (ab) ab.hidden = true;
+    return;
+  }
+  box.className = '';
+  DPPERMS.forEach((p, i)=>{
+    const v = p.values;
+    const nm = id=> (an.filter(x=> x.id === id)[0] || {}).name;
+    const zm = id=> (az.filter(x=> x.id === id)[0] || {}).name;
+    const sh = profShell(box, DPPERMS, i, p, OPENPM, x=>{OPENPM=x;},
+      ()=> (nm(v.authn) || 'no authenticate') + ' · ' + (zm(v.authz) || 'no authorize'),
+      ()=> paintPerms(DPPERMS));
+    const pick = (label, key, pool)=>{
+      const r = document.createElement('div'); r.className = 'namerow';
+      const b = document.createElement('b'); b.textContent = label;
+      r.appendChild(b);
+      const sel = document.createElement('select'); sel.className = 'ppick';
+      const none = document.createElement('option');
+      none.value = ''; none.textContent = 'PICK ONE'; sel.appendChild(none);
+      pool.forEach(x=>{
+        const o = document.createElement('option');
+        o.value = x.id; o.textContent = x.name; sel.appendChild(o);
+      });
+      sel.value = v[key] || '';
+      sel.onchange = ()=>{ v[key] = sel.value; paintPerms(DPPERMS); };
+      r.appendChild(sel); sh.row.appendChild(r);
+    };
+    pick('Authenticate', 'authn', an);
+    pick('Authorize', 'authz', az);
+    /* SAID WHERE THE PAIR IS MADE. It used to be a line under the endpoint's
+       own list, because that was where both halves sat; the halves are here
+       now, and this is the only screen that sees them together. */
+    const bits = [];
+    const A = (an.filter(x=> x.id === v.authn)[0] || {}).values || {};
+    const Z = (az.filter(x=> x.id === v.authz)[0] || {}).values || {};
+    if (v.authz && Z.restricted
+        && !(Z.groups || []).length && !(Z.displays || []).length
+        && !(Z.identities || []).length)
+      bits.push('the authorize profile has nothing ticked, so this permission '
+              + 'admits nobody at all');
+    else if (v.authn && v.authz && A.needs_signin && Z.restricted
+             && !(Z.identities || []).length && !(Z.groups || []).length
+             && (Z.displays || []).length
+             && !(Z.displays || []).some(id=>{
+                  const d = DISPLAYS.find(x=> x.id === id);
+                  return d && d.arrived === 'invited';
+                }))
+      /* A SCREEN ENROLLED WITH A CODE SATISFIES SIGN-IN, so naming only
+         screens is not the contradiction it was before 2026-08-20 — minting a
+         code and carrying it to the device is an admin deciding that screen
+         should be here, which is what being known means. What is still a dead
+         end is a screen that merely opened the page and asked: nobody vouched
+         for it, and it cannot become a person. Only that case warns, and only
+         when nothing else on the list could get in either. */
+      bits.push('sign-in is required and the only screens named asked from '
+              + 'the page rather than being given a code — a code is what '
+              + 'makes a screen a known caller, so none of these can get in');
+    if (bits.length){
+      const w = document.createElement('div');
+      w.className = 'note bad'; w.textContent = bits.join(' · ');
+      sh.row.appendChild(w);
+    }
+    profFoot(sh.row, DPPERMS, i, p, x=>{OPENPM=x;},
+             ()=> paintPerms(DPPERMS),
+             ()=>{
+               if (!v.authn || !v.authz)
+                 return dpNote('pick both — half a permission decides nothing',
+                               true, 'permnote');
+               saveDp({permissions: DPPERMS.filter(x=> (x.name||'').trim()
+                                       && x.values.authn && x.values.authz)
+                 .map(x=> ({id:x.id, name:x.name, values:x.values}))}, 'permnote');
+             }, true);
+  });
+  const btn = $('b_addperm');
+  if (btn){
+    const busy = OPENPM >= 0 || DPPERMS.some(x=> x._new);
+    btn.hidden = busy; btn.disabled = busy || DPPERMS.length >= 8;
+  }
+}
+
+const bAddPerm = $('b_addperm');
+if (bAddPerm) bAddPerm.addEventListener('click', ()=>{
+  if (DPPERMS.length >= 8) return;
+  DPPERMS.push({id: profileId('x'), _new: true, name: '',
+                values: {authn: '', authz: ''}});
+  OPENPM = DPPERMS.length - 1;
+  paintPerms(DPPERMS);
+});
+
+/* ------------------------------------------------------- connections
+   A model and a port under one name. Built like every other profile list on
+   this panel — a local array the rows are drawn from, one row open at a time,
+   and SAVE sending the whole list rather than a row — so the three read alike
+   and there is one shape to learn rather than three. */
+let DPCONNS = [], OPENCN = -1;
+
+function paintConns(list){
+  DPCONNS = (list || []).map(c=> ({id: c.id || '', _new: !!c._new,
+                                   name: c.name || '',
+                                   values: Object.assign({}, c.values || {})}));
+  const box = $('dp_conns');
+  if (!box) return;
+  box.innerHTML = '';
+  const models = (DPCFG && DPCFG.models) || [];
+  const nets   = (DPCFG && DPCFG.networks) || [];
+  /* SAID ONCE, not per row. Neither list can be picked from until it has
+     something in it, and a row of two empty pickers explains nothing about
+     why. */
+  if (!models.length || !nets.length){
+    box.className = 'note';
+    box.textContent = !models.length && !nets.length
+      ? 'Nothing to connect yet — a connection is a model and a port, and '
+        + 'there are none of either. Make one of each under MODELS and NETWORK.'
+      : !models.length
+        ? 'No models yet — a connection needs something to speak to. MODELS.'
+        : 'No network profiles yet — a connection needs a port to answer on. '
+          + 'NETWORK.';
+    const ab = $('b_addconn');
+    if (ab) ab.hidden = true;
+    return;
+  }
+  box.className = '';
+  DPCONNS.forEach((c, i)=>{
+    const v = c.values;
+    const row = document.createElement('div');
+    row.className = 'erow';
+    if (OPENCN !== i) row.classList.add('shut');
+
+    const top = document.createElement('div'); top.className = 'top';
+    const nmt = document.createElement('span'); nmt.className = 'nm';
+    nmt.textContent = (c.name || '').trim() || 'unnamed connection';
+    top.appendChild(nmt);
+    /* WHAT IT TIES, on the shut row. It is the whole of what a connection is,
+       so a row that made you open it to find out would be a row that says
+       nothing. */
+    const sum = document.createElement('span'); sum.className = 'badge';
+    const mn = models.filter(m=> m.id === v.model)[0];
+    const wn = nets.filter(n=> n.id === v.network)[0];
+    sum.textContent = (mn ? mn.name : 'no model') + ' · '
+                    + (wn ? wn.name : 'no port');
+    top.appendChild(sum);
+    top.onclick = (e)=>{
+      if (e.target.closest('input, button, select, textarea')) return;
+      OPENCN = (OPENCN === i) ? -1 : i;
+      paintConns(DPCONNS);
+    };
+    row.appendChild(top);
+
+    const namerow = document.createElement('div');
+    namerow.className = 'namerow';
+    const nlab = document.createElement('b'); nlab.textContent = 'Name';
+    namerow.appendChild(nlab);
+    const nm = document.createElement('input');
+    nm.type = 'text'; nm.className = 'nmedit'; nm.value = c.name || '';
+    nm.spellcheck = false;
+    nm.oninput = ()=>{ c.name = nm.value; nmt.textContent =
+                       (nm.value || '').trim() || 'unnamed connection'; };
+    namerow.appendChild(nm);
+    row.appendChild(namerow);
+
+    /* THE TWO ENDS, in the order a connection is built: what it speaks to,
+       then what it answers on. */
+    const pick = (label, key, pool, blank)=>{
+      const r = document.createElement('div');
+      r.className = 'namerow';
+      const b = document.createElement('b'); b.textContent = label;
+      r.appendChild(b);
+      const sel = document.createElement('select');
+      sel.className = 'ppick';
+      const none = document.createElement('option');
+      none.value = ''; none.textContent = blank;
+      sel.appendChild(none);
+      pool.forEach(p=>{
+        const o = document.createElement('option');
+        o.value = p.id; o.textContent = p.name;
+        sel.appendChild(o);
+      });
+      sel.value = v[key] || '';
+      sel.onchange = ()=>{ v[key] = sel.value; paintConns(DPCONNS); };
+      r.appendChild(sel);
+      row.appendChild(r);
+    };
+    pick('Model', 'model', models, 'PICK ONE');
+    pick('Answers on', 'network', nets, 'PICK ONE');
+
+    const acts = document.createElement('div'); acts.className = 'acts';
+    const gap = document.createElement('span'); gap.className = 'spacer';
+    acts.appendChild(gap);
+    const save = document.createElement('button');
+    save.textContent = 'SAVE'; save.className = 'act-save';
+    save.onclick = ()=>{
+      /* Said here rather than by the server, because the server answers about
+         the whole list and this is about the row in front of somebody. */
+      if (!(c.name || '').trim())
+        return dpNote('a connection needs a name before it can be saved',
+                      true, 'connnote');
+      if (!v.model || !v.network)
+        return dpNote('pick both a model and a port — half a connection is '
+                      + 'not a connection', true, 'connnote');
+      c._new = false; OPENCN = -1;
+      saveDp({connections: DPCONNS.filter(x=> (x.name || '').trim()
+                                              && x.values.model
+                                              && x.values.network)
+                .map(x=> ({id: x.id, name: x.name,
+                           values: {model: x.values.model,
+                                    network: x.values.network}}))}, 'connnote');
+    };
+    acts.appendChild(save);
+    const del = document.createElement('button');
+    del.textContent = 'REMOVE'; del.className = 'act-danger';
+    del.onclick = ()=>{ OPENCN = -1; DPCONNS.splice(i, 1); paintConns(DPCONNS); };
+    acts.appendChild(del);
+    row.appendChild(acts);
+    box.appendChild(row);
+  });
+  const btn = $('b_addconn');
+  if (btn){
+    const busy = OPENCN >= 0 || DPCONNS.some(x=> x._new);
+    btn.hidden = busy;
+    btn.disabled = busy || DPCONNS.length >= 8;
+  }
+}
+
+const bAddConn = $('b_addconn');
+if (bAddConn) bAddConn.addEventListener('click', ()=>{
+  if (DPCONNS.length >= 8) return;
+  DPCONNS.push({id: profileId('c'), _new: true, name: '',
+                values: {model: '', network: ''}});
+  OPENCN = DPCONNS.length - 1;
+  paintConns(DPCONNS);
+});
 
 function paintNetworks(list){
   DPNETS = (list || []).map(n=> ({id: n.id || '', _new: !!n._new,
@@ -9014,6 +9933,10 @@ function paintKiosks(list){
                                     speech: k.speech || '',
                                     saver: k.saver || '',
                                     fullscreen: k.fullscreen !== false,
+                                    wakeword: k.wakeword || '',
+                                    wakealiases: k.wakealiases || '',
+                                    sleepword: k.sleepword || '',
+                                    sleepaliases: k.sleepaliases || '',
                                     keep_awake: k.keep_awake !== false,
                                     listen: !!k.listen,
                                     prompt: k.prompt !== false,
@@ -9137,6 +10060,38 @@ function paintKiosks(list){
     ptWrap.style.display = k.prompt ? '' : 'none';
     row.appendChild(ptWrap);
 
+    /* WHAT THIS ASSISTANT IS CALLED, and what ends a conversation with it.
+       They were elsewhere: the wake word on the speech profile an endpoint
+       named, the sleep word in the shared settings — one word for the whole
+       server, so every assistant said goodbye to the same thing.
+
+       Here because this profile is what an endpoint IS. A port carries one
+       endpoint, an endpoint names one layout: so a layout is one assistant's
+       face, and the name it answers to belongs on it. Which is also why two
+       endpoints cannot share one — the server refuses it, naming the other. */
+    const word = (label, key, ph, note)=>{
+      const w = document.createElement('div');
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.className = 'nmedit';
+      inp.spellcheck = false; inp.value = k[key] || ''; inp.placeholder = ph;
+      inp.oninput = ()=>{ DPKIOSKS[i][key] = k[key] = inp.value; retitle(); };
+      field(label, inp);
+      if (note){
+        const n = document.createElement('div');
+        n.className = 'note'; n.textContent = note;
+        row.appendChild(n);
+      }
+    };
+    word('Wakes to', 'wakeword', 'resonance',
+         'What somebody says to reach this assistant. Blank and it answers to '
+         + 'nothing — no screen on its port can address it by name.');
+    word('Also accepts', 'wakealiases', 'one per line');
+    word('Ends with', 'sleepword', 'goodbye',
+         'What ends a conversation with it. Blank takes the word the page '
+         + 'ships with, which is what every assistant used before this was '
+         + 'here.');
+    word('…or', 'sleepaliases', 'one per line');
+
     const picker = (label, key, blank, pool, summary)=>{
       const sel = document.createElement('select');
       sel.className = 'ppick';
@@ -9198,6 +10153,10 @@ function paintKiosks(list){
                                      look:x.look, motion:x.motion, speech:x.speech,
                                      saver:x.saver, fullscreen:x.fullscreen,
                                      keep_awake:x.keep_awake, listen:x.listen,
+                                     wakeword:x.wakeword,
+                                     wakealiases:x.wakealiases,
+                                     sleepword:x.sleepword,
+                                     sleepaliases:x.sleepaliases,
                                      prompt:x.prompt, prompt_text:x.prompt_text}))},
              'kiosknote');
     };
@@ -9379,57 +10338,12 @@ function kioskBlock(d){
     return sp;
   };
 
-  const sel = document.createElement('select');
-  sel.className = 'ppick';
-
-  const kiosks = (DPCFG && DPCFG.kiosks) || [];
-  /* THREE kinds of answer, and all three already exist in the stored row: not
-     a display-mode screen at all, one that is but names no profile, and one
-     that names its own. The middle one used to read DEFAULT and follow
-     whichever profile was nominated; nothing is nominated any more, so it says
-     what it now does — the screen is in layout mode and shows the settings
-     the page itself ships with. Rows already sitting on it keep working and
-     keep the same stored value. */
-  /* THERE IS NO "NOT A DISPLAY" ANY MORE. It was a real state once, when a
-     shared settings document dressed every screen whether or not it was in
-     layout mode. That document is gone — a screen now shows the profiles it
-     names and nothing else — so a row in that state has nothing dressing it at
-     all, and an ordinary browser tab pointed at this server came out looking
-     broken rather than plain. A state whose only outcome is a page that looks
-     wrong is not a choice worth offering. Every row is a display now, and the
-     only question left is which profile. */
-  /* INHERIT, and the row deliberately does not claim to know WHAT FROM. What
-     a blank picker gets depends on the PORT the screen is opened at, and a row
-     in a register has not been opened at one — the same device loaded from two
-     addresses inherits differently at each. So this states the rule rather
-     than a per-row answer it cannot have. */
-  const dflt = document.createElement('option');
-  dflt.value = '';
-  dflt.textContent = 'INHERIT — whatever the endpoint on its port says';
-  sel.appendChild(dflt);
-  kiosks.forEach(k=>{
-    const o = document.createElement('option');
-    o.value = k.id;
-    /* The name and nothing else. A select is as wide as its longest option, so
-       a summary here set the width of the control on every device row — and
-       what a profile holds is one tab away, stated once, instead of restated
-       on every screen that uses it. The summary stays on the title attribute
-       for anybody who wants it without leaving the row. */
-    o.textContent = k.name;
-    const bits = [k.voice_only ? 'voice only' : 'with transcript'];
-    const lk = ((DPCFG && DPCFG.looks) || []).filter(x=> x.id === k.look)[0];
-    const sv = ((DPCFG && DPCFG.savers) || []).filter(x=> x.id === k.saver)[0];
-    if (lk) bits.push(lk.name);
-    if (sv) bits.push(sv.name);
-    if (!k.fullscreen) bits.push('no full screen');
-    if (!k.keep_awake) bits.push('may sleep');
-    if (!k.prompt) bits.push('no prompt line');
-    o.title = bits.join(', ');
-    sel.appendChild(o);
-  });
-  sel.value = d.kiosk_profile || '';
-  line.appendChild(pair('Layout mode', sel));
-  box.appendChild(line);
+  /* NO LAYOUT PICKER. A screen carried its own and it beat the endpoint's,
+     which is one question with two answers — a port carries one endpoint, an
+     endpoint names one layout, and a page is loaded from exactly one address,
+     so the second place to state it could only ever disagree with the first.
+     Which layout a screen wears is read at ACCESS ▸ AI, on the endpoint, and
+     changing it there changes every screen on that port at once. */
 
   /* Which assistants it may use, ticked here as well as at the moment a code
      is minted — the same control in the same words, so a screen's grant is
@@ -9440,7 +10354,7 @@ function kioskBlock(d){
   elab.className = 'bklab';
   elab.textContent = 'AI';
   ends.appendChild(elab);
-  const gl = grantList(d, false);
+  const gl = grantList(d, false, 'device');
   ends.appendChild(gl.el);
   box.appendChild(ends);
 
@@ -9455,11 +10369,9 @@ function kioskBlock(d){
     try{
       const j = await api('/displays/kiosk', {method:'POST', body: JSON.stringify({
         id: d.id,
-        /* Always. See the picker: the row's only question is which profile,
-           and a display that is not a display has nothing to draw itself
-           with. */
+        /* Always a display, and the only thing this row still says about
+           itself. Which layout it wears comes from its endpoint. */
         kiosk: true,
-        kiosk_profile: sel.value,
         endpoints: gl.ticks.filter(c=> c.checked).map(c=> c.dataset.r)})});
       /* The cache, not the list. Rebuilding the rows here would throw away the
          row somebody has open and this message with it, and nothing else on
@@ -9499,7 +10411,6 @@ function kioskBlock(d){
     /* Back to what the server holds for THIS row, read off the record the list
        was drawn from rather than re-fetched — a revert undoes what is on
        screen, it does not go looking for what changed elsewhere meanwhile. */
-    sel.value = d.kiosk_profile || '';
     gl.ticks.forEach(c=>{
       c.checked = (d.granted || []).indexOf(c.dataset.r) >= 0;
     });
@@ -9510,17 +10421,15 @@ function kioskBlock(d){
      a row with two action rows — one for what this screen is, one for whether
      it may be here — reads as two things to press rather than one place to
      look. */
-  /* What the shut row prints. Resolved here because this is where the profile
-     list already is, and the row should not have to work out a second time
-     what it is showing.
+  /* NOTHING FOR THE SHUT ROW TO PRINT about its layout. It printed the row's
+     own profile, or that it inherited — and there is only inheriting now, so
+     the line said the same words on every row in the register. A label that
+     cannot differ between two rows is not telling you which row you are
+     looking at. What a screen wears is on its endpoint, one place, said once.
 
-     Its own profile where it names one. Where it does not, the row cannot say
-     which — that is decided by the port it is opened at, not by anything
-     stored here. */
-  const ownProf = kiosks.filter(k=> k.id === (d.kiosk_profile || ''))[0] || null;
-  const label = 'LAYOUT MODE · '
-              + (ownProf ? ownProf.name : 'inherits from its port');
-  return {box: box, save: save, undo: undo, said: said, label: label};
+     `label` stays in the shape this returns because the caller reads it; empty
+     is how it says there is nothing to add. */
+  return {box: box, save: save, undo: undo, said: said, label: ''};
 }
 
 /* What a row IS, and it decides which list it belongs in as well as what the
@@ -9540,7 +10449,7 @@ const dispState = (d)=> !d.enrolled ? (d.code ? 'code' : 'stale')
 const PICKED = new Set();
 
 function paintBulk(){
-  const bar = $('bulkbar');
+  const bar = $('bulkstatusbar');
   if (!bar) return;
   const here = onThisScreen();
   /* Pruned against what is ON THIS SCREEN, not against every row: a selection
@@ -9557,19 +10466,9 @@ function paintBulk(){
     all.checked = n > 0 && n === here.length;
     all.indeterminate = n > 0 && n < here.length;
   }
-  const btn = $('b_bulkapply');
-  if (btn) btn.disabled = !n;
-  const sel = $('bulkprofile');
-  if (sel){
-    const want = sel.value;
-    sel.innerHTML = '';
-    ((DPCFG && DPCFG.kiosks) || []).forEach(k=>{
-      const o = document.createElement('option');
-      o.value = k.id; o.textContent = 'Layout mode · ' + k.name;
-      sel.appendChild(o);
-    });
-    sel.value = want || sel.value;
-  }
+  /* Nothing to fill and nothing to enable: what this bar applied went with
+     the per-screen layout. The selection it keeps is used by the status line
+     bar under it. */
 }
 
 /* Four lists, on three tabs, and every row lands in exactly one of them.
@@ -9894,7 +10793,7 @@ async function refreshDisplays(){
        APPROVE grants is whatever is ticked at that moment. */
     const canGrant = d.enrolled
                   && (undecided || st === 'denied' || st === 'expired');
-    const gl = canGrant ? grantList(d) : null;
+    const gl = canGrant ? grantList(d, true, 'person') : null;
     const grant = (label)=>{
       const b = document.createElement('button');
       b.textContent = label;
@@ -9983,6 +10882,7 @@ async function refreshDisplays(){
       gap.className = 'spacer';
       r.appendChild(gap);
       if (kb){ r.appendChild(kb.save); r.appendChild(kb.undo); }
+      r.appendChild(statusButton(d, '/displays/status', refreshDisplays));
       const del = document.createElement('button');
       del.textContent = 'DELETE';
       del.className = 'act-danger';
@@ -10175,41 +11075,73 @@ $('bulkall').addEventListener('click', ()=>{
   if (on) onThisScreen().forEach(d=> PICKED.add(d.id));
   refreshDisplays();
 });
-$('b_bulkapply').addEventListener('click', async ()=>{
-  const ids = [...PICKED];
-  if (!ids.length) return;
-  const want = $('bulkprofile').value;
-  const name = (((DPCFG && DPCFG.kiosks) || [])
-                .filter(k=> k.id === want)[0] || {}).name || 'that profile';
-  if (!confirm('Set ' + ids.length + ' device' + (ids.length === 1 ? '' : 's')
-               + ' to ' + name + '?')) return;
-  const btn = $('b_bulkapply');
-  btn.disabled = true;
-  const note = $('bulknote');
-  let done = 0;
-  const failed = [];
-  for (const id of ids){
+/* THE DIAGNOSTIC STRIP, on ONE row. A press and it is done — no SAVE beside
+   it, because there is nothing else on the row it would commit and a switch
+   you flip to watch something is not a form. The label says the state it is
+   in rather than the state it would move to: a button reading OFF that turns
+   it off is the ambiguity this wording avoids.
+
+   `path` is the population's route and `after` the refresh that redraws the
+   list it is in — the two things that differ between a screen and a person. */
+function statusButton(rec, path, after){
+  const b = document.createElement('button');
+  const paint = ()=>{
+    b.className = rec.status ? 'act-save' : 'act-undo';
+    b.textContent = rec.status ? 'STATUS LINE · ON' : 'STATUS LINE · OFF';
+    b.title = rec.status
+      ? 'the microphone and voice line is showing on this one — press to hide it'
+      : 'show the microphone and voice line on this one, for troubleshooting';
+  };
+  paint();
+  b.onclick = async ()=>{
+    const want = !rec.status;
+    b.disabled = true;
     try{
-      await api('/displays/kiosk', {method:'POST', body: JSON.stringify(
-        {id: id, kiosk: true, kiosk_profile: want})});
-      done++;
+      await api(path, {method:'POST',
+                       body: JSON.stringify({id: rec.id, on: want})});
+      /* The record this row was drawn from, brought up to date, so the button
+         is right whether or not the refresh below rebuilds it. */
+      rec.status = want;
+      paint();
+      if (typeof after === 'function') after();
     }catch(e){
-      const d = DISPLAYS.filter(x=> x.id === id)[0];
-      failed.push((d ? d.label : id) + ' — ' + e.message);
+      /* Left as it was, and said out loud: a switch that reports a state it
+         did not reach is worse than one that refuses. */
+      alert(e.message || 'that did not work');
     }
-  }
-  /* Kept selected on failure. The whole point of the list is to try again on
-     what did not take, and clearing it would make somebody rebuild it from a
-     message that has already gone. */
-  if (!failed.length) PICKED.clear();
-  await refreshDisplays();
-  if (note){
-    note.className = failed.length ? 'note bad' : 'note';
-    note.textContent = failed.length
-      ? done + ' changed, ' + failed.length + ' refused: ' + failed.join('; ')
-      : done + ' device' + (done === 1 ? '' : 's') + ' changed';
-  }
-});
+    b.disabled = false;
+  };
+  return b;
+}
+
+/* THE DIAGNOSTIC STRIP, on a selection. One request rather than one per row —
+   unlike the profile above it, which validates a row at a time and says which
+   one it refused, this is a boolean and there is nothing to refuse. */
+function bulkStatus(on){
+  return async ()=>{
+    const ids = [...PICKED];
+    if (!ids.length) return;
+    const note = $('bulknote');
+    try{
+      const j = await api('/displays/status', {method:'POST',
+        body: JSON.stringify({ids: ids, on: on})});
+      if (j.displays) DISPLAYS = j.displays;
+      PICKED.clear();
+      await refreshDisplays();
+      if (note){
+        note.className = 'note';
+        note.textContent = j.count + ' device' + (j.count === 1 ? '' : 's')
+          + (on ? ' will show the status line' : ' will hide the status line')
+          + ' — each takes it at its next check-in.';
+      }
+    }catch(e){
+      if (note){ note.className = 'note bad'; note.textContent = e.message; }
+    }
+  };
+}
+const bso = $('b_bulkstaton'), bsf = $('b_bulkstatoff');
+if (bso) bso.addEventListener('click', bulkStatus(true));
+if (bsf) bsf.addEventListener('click', bulkStatus(false));
 
 /* Name it, get a code. The row exists from this moment, so its endpoints can
    be ticked before the screen it is for has ever been switched on. */
@@ -10243,36 +11175,20 @@ function paintPersonEndpoint(){
     cb.type = 'checkbox'; cb.dataset.r = e.id;
     cb.checked = had.has(e.id);
     lab.appendChild(cb);
-    /* The same sentence every other copy of this list carries: an endpoint
-       open to everyone is reachable already, and ticking it grants nothing. */
-    lab.appendChild(document.createTextNode(
-      ' ' + e.name + (e.restricted ? '' : ' — open to all anyway')));
+    lab.appendChild(document.createTextNode(' ' + e.name
+                                            + grantNote(e, 'person')));
     box.appendChild(lab);
   });
 }
 
 function paintNewSetup(){
   paintPersonEndpoint();
-  const prof = $('dp_newprofile'), ends = $('dp_newends');
-  if (!prof || !ends) return;
-  const fill = (sel, rows, blank)=>{
-    const had = sel.value;
-    sel.innerHTML = '';
-    const none = document.createElement('option');
-    none.value = ''; none.textContent = blank;
-    sel.appendChild(none);
-    (rows || []).forEach(r=>{
-      const o = document.createElement('option');
-      o.value = r.id; o.textContent = r.name;
-      sel.appendChild(o);
-    });
-    sel.value = had;
-  };
-  /* NONE, first and default: a screen is an ordinary display unless somebody
-     says otherwise, and the blank option is now the whole of saying nothing
-     rather than "inherit the default profile" — which was a third state you
-     could only reach by ticking a box and leaving the picker alone. */
-  fill(prof, (DPCFG && DPCFG.kiosks) || [], 'NONE');
+  /* ONE PICKER LEFT, and it is the ticks. The layout picker that used to be
+     painted here went with the per-screen override — and its element going
+     took the early return with it, which would have stopped this before the
+     ticks were drawn at all. */
+  const ends = $('dp_newends');
+  if (!ends) return;
   /* Ticked already, kept. This repaints whenever the display list is
      refetched — which happens on a timer and after every action — and a form
      somebody is halfway through filling in must not be emptied underneath
@@ -10293,10 +11209,8 @@ function paintNewSetup(){
     cb.type = 'checkbox'; cb.dataset.r = e.id;
     cb.checked = had.has(e.id);
     lab.appendChild(cb);
-    /* The same sentence the row's own ticks carry: an endpoint open to any
-       display is reachable already, and ticking it grants nothing. */
-    lab.appendChild(document.createTextNode(
-      ' ' + e.name + (e.restricted ? '' : ' — open to all anyway')));
+    lab.appendChild(document.createTextNode(' ' + e.name
+                                            + grantNote(e, 'device')));
     ends.appendChild(lab);
   });
 }
@@ -10324,7 +11238,7 @@ $('b_adddisp').addEventListener('click', async ()=>{
        Leaving the profile blank is a row that inherits from its endpoint, not
        a row that is not a display. */
     kiosk: true,
-    kiosk_profile: $('dp_newprofile').value,
+
     /* However many were ticked. The row's own grant list is the same set in
        the same words, so this is the first half of one control rather than a
        second way of saying it. */
@@ -10352,7 +11266,38 @@ $('dp_name').addEventListener('keydown', e=>{
 
    Returns the element and its checkboxes, because the button that commits them
    is built elsewhere and has to read them at the moment it is pressed. */
-function grantList(d, heading){
+/* WHAT TICKING THIS ENDPOINT IS ACTUALLY WORTH, in the words of the population
+   being ticked. Three answers, and the first one is the one that was missing:
+
+     SIGN-IN REQUIRED refuses a DEVICE outright, whatever it was granted — see
+     subject_may. So on a device's list the tick reaches nothing at all, and
+     saying "open to all anyway" there is worse than saying nothing: it reads
+     as an endpoint anybody can use, about the one setting that means no screen
+     can. That is the label reported wrong on 2026-08-20, after an endpoint was
+     changed from open to sign-in-required and every device list went on
+     describing it as it had been.
+
+     A PERSON is not refused by it — signing in is the whole of what it asks —
+     so for them an unrestricted endpoint is open to anyone who has, and a
+     restricted one is worth ticking.
+
+   Read from the endpoint list on every repaint, so a change made on ACCESS ▸ AI
+   is described correctly the next time either of these lists is drawn. */
+function grantNote(e, kind){
+  if (e.restricted) return '';
+  /* Unrestricted, so the tick is worth nothing either way — but to WHOM it is
+     open still differs, and differently for each population. Sign-in required
+     means no ANONYMOUS caller: a screen an admin enrolled with a code counts,
+     and a person who signed in counts, and a browser that is neither does not.
+     It said a screen could not use one of these at all, which was true until
+     2026-08-20 and was the setting refusing the population it is most often
+     wanted for. */
+  if (!e.needs_signin) return ' — open to all anyway';
+  return kind === 'device' ? ' — open to any enrolled screen anyway'
+                           : ' — open to anyone signed in anyway';
+}
+
+function grantList(d, heading, kind){
   const grant = document.createElement('div');
   grant.className = 'grant';
   /* Its own heading where it stands alone on a row being decided, and none
@@ -10380,11 +11325,11 @@ function grantList(d, heading){
        these are controls somebody is going to click several of. */
     lab.onclick = (ev)=> ev.stopPropagation();
     lab.appendChild(cb);
-    /* An endpoint open to any display needs no tick to be reachable, and
-       ticking it grants nothing — say so rather than let somebody believe
-       the tick is what did it. */
-    lab.appendChild(document.createTextNode(
-      ' ' + e.name + (e.restricted ? '' : ' — open to all anyway')));
+    /* Say what the tick is worth rather than let somebody believe it did
+       something. Which sentence depends on which population this list is
+       for — see grantNote. */
+    lab.appendChild(document.createTextNode(' ' + e.name
+                                            + grantNote(e, kind || 'device')));
     cks.appendChild(lab);
   });
   grant.appendChild(cks);
@@ -11348,8 +12293,17 @@ function panelNav(){
        there are several, every one keeps its edge, because there the border
        is what tells one topic from the next. */
     const box = $('grpbox');
-    if (box) box.classList.toggle('solo',
-                                  groups.filter(g=> !g.hidden).length === 1);
+    const live = groups.filter(g=> !g.hidden);
+    if (box) box.classList.toggle('solo', live.length === 1);
+    /* THE LAST ONE DOES NOT DRAW ITS OWN FOOT. The box already has one, so a
+       section that closes itself puts two lines a padding's width apart at the
+       bottom of every tab — most visibly where the last section is a list, and
+       the list's own last row is a third. Marked here rather than with
+       :last-of-type because the sections that are not on this tab are hidden,
+       not removed, and the last of them in the document is usually not the
+       last one on screen. */
+    groups.forEach(g=> g.classList.remove('lastvis'));
+    if (live.length) live[live.length - 1].classList.add('lastvis');
   }
   /* Two homes now: the row at the top and the pinned entry at the foot.
      Treat them as one set so exactly one is ever lit. */
@@ -11437,7 +12391,13 @@ function panelNav(){
        to visit PROFILES first, which on a panel that opens on APPEARANCE
        meant they were blank. */
     if (tab === 'savers' || tab === 'devprof' || tab === 'models'
-        || tab === 'network' || PROF_OF[tab]) refreshProfiles();
+        || tab === 'network' || tab === 'connection'
+        || tab === 'authn' || tab === 'authz' || tab === 'perm'
+        || PROF_OF[tab]) refreshProfiles();
+    /* AUTHORIZE ticks displays, people and groups, and those are three
+       documents this tab has never fetched. Without them every box is drawn
+       empty and a grant somebody made reads as nothing ticked. */
+    if (tab === 'authz'){ refreshDisplays(); refreshIdentities(); refreshGroups(); }
     /* NETWORK says which endpoint answers on each port, and that is read off
        the endpoints — which this tab has never fetched. Repainted once they
        arrive rather than left saying "no endpoint" about every port. */

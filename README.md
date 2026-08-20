@@ -1658,6 +1658,17 @@ it. Each entry below carries its own panel scope.
   it. Slow continuous drift rather than a bouncing path — it covers more of
   the panel over a night and is calmer to share a room with.
 
+  **An open microphone is not a conversation**, and the idle clock does not
+  stop for one. A wall display transcribes every noise in the room — it has to,
+  or the wake word is never caught — and none of that is somebody talking to
+  it. What holds the clock is the assistant speaking, a clip playing, a
+  question outstanding, or the wake window still open; between two sentences
+  nothing is speaking for a few seconds, and the window is what stops a screen
+  dimming at somebody mid-thought. It asked the FIGURE's own state until
+  2026-08-20, which is a flag set from six places — any one of them returning
+  early left it set, and that screen never reached its screensaver again with
+  nothing on screen to say why.
+
   **A dim level beside it**, as its own number. Reducing brightness does more
   against burn-in than movement does, and it is independently what a hallway
   screen should do at two in the morning.
@@ -2357,6 +2368,13 @@ same figure. Both were things the deployment decided on an admin's behalf.
   clock only advances while the phase is `idle`. It was doing nothing for the
   geometry either — `Drive.step` ignores the phase entirely whenever the mic is
   feeding it. Opening a microphone is not the display speaking.
+
+  **It came back on 2026-08-20 by a different route**, which is what settled the
+  design. Fixing the caller left the clock still reading a flag that five other
+  places set, and any one of them returning early reproduced the symptom exactly
+  — an open microphone, no conversation, and a screen that never drifts again.
+  A flag that says what the figure should draw is not an answer to whether
+  anybody is here. The clock asks what is happening now instead.
 - **The figure now goes quiet while the assistant is asleep**, so the
   screensaver reads as one. The gate is on what the mic SHOWS and not on what
   it hears: the first attempt put it at the top of `Mic.step` as an early
@@ -2457,9 +2475,20 @@ being reached.
 - **Sign-in became a property of the assistant.** There is no deployment-wide
   switch in either direction. Each endpoint carries its own *Sign in* section,
   because three assistants on one box can want three answers and one switch
-  covering all of them could only ever be set to the strictest. REQUIRED
-  refuses a device outright, approved or not: a wall screen has no person on
-  it, which is what makes this the control that limits what a model costs.
+  covering all of them could only ever be set to the strictest. REQUIRED means
+  **no anonymous caller** — somebody signed in, or a screen enrolled with a
+  code, because minting that code and carrying it to the device is the same act
+  of vouching a password is. A browser that merely opened the display page is
+  neither.
+
+  It refused a device outright until 2026-08-20, and that was the setting
+  turning away the population it is most often wanted for: an admin hangs a
+  hallway screen, ticks the endpoint onto it, and the grant reaches nothing —
+  because being approved is exactly what made it a device, and a device could
+  never sign in. The question is whether the caller is KNOWN; a code is how a
+  screen becomes known. The trade is that a wall satisfying it has no person
+  attached, so it limits a model to callers you vetted rather than attributing
+  the bill to a name.
 - **A port carries one endpoint, and no port means no port.** Sharing went
   with the sign-in requirement — a door with two assistants behind it can only
   have one lock and would answer for the looser of them. The nominated default
@@ -2796,10 +2825,15 @@ reason it was split from phase 2.
 - **The milk wash travels with the figure.** It is drawn from a fixed point in
   the frame, so left alone it would have been the one stationary bright region
   left on the panel — the exact thing the drift exists to prevent.
-- **Idle is read off `Drive.phase`, not off the wake word.** A display with no
-  wake word at all still thinks and still speaks, and that path never touches
-  `Wake`. Every path that keeps a display awake does come through `Wake.touch`,
-  though, which is why that is the single place the wake word ends the drift.
+- **Idle is read off what is HAPPENING, not off a flag and not off the wake
+  word.** The assistant speaking, a clip playing, a question outstanding, or the
+  wake window still open. A display with no wake word at all still thinks and
+  still speaks, and the first three are true on that path — which is why this
+  never asked `Wake` alone. It asked `Drive.phase` until 2026-08-20, and that is
+  a flag set from six places: any one of them returning early left it set, and
+  the screen never drifted again. `Listen.busy` is deliberately not among them —
+  a listening screen transcribes every noise in the room, so one frame of it
+  would reset the whole clock, all day.
 - **Off is the default, on every device.** Same rule that made `ANY DISPLAY` the
   default on a route: an upgrade that quietly started moving every screen in a
   building would be this phase deciding something nobody asked it to.

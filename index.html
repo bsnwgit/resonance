@@ -398,6 +398,12 @@
      The figure stays: it is the product's face, and this is still the product.
      Same shape as the screensaver's rules below, and for a similar reason —
      what is left is what belongs on screen. */
+  /* THE DIAGNOSTIC STRIP, off unless somebody asked for it. It is what the
+     microphone and the voice are doing, and on a screen nobody is debugging it
+     is a line that twitches at conversations in the room and says nothing
+     anybody wanted. Off is the default on both the device and the person, so
+     the ordinary state of every screen is silent — see status_for. */
+  body:not([data-status]) #status{display:none}
   body[data-enrolonly] #log,
   body[data-enrolonly] #bar,
   body[data-enrolonly] #status,
@@ -908,16 +914,23 @@ if (PERSON_ARRIVED && window.history && history.replaceState)
   history.replaceState(null, '', location.pathname);
 
 const Person = {
-  id: '', name: '', email: '',
+  id: '', name: '', email: '', status: false,
   is(){ return !!this.id; },
   take(p){
     this.id = p.id || '';
     this.name = p.name || '';
     this.email = p.email || '';
+    /* Theirs, and it travels: signing in at a screen somebody has never used
+       brings their own answer with them. */
+    this.status = !!p.status;
     /* Their own settings win over whatever this browser had. That is the
        whole point of an account: the machine's copy is a local habit, theirs
        is the thing that follows them. */
     if (p.settings) Prefs.adopt(p.settings);
+    /* Signing in can turn it on, and signing out has to be able to turn it
+       off again — so this runs on every take rather than only where it is
+       true. */
+    if (typeof syncStatusLine === 'function') syncStatusLine();
     paintGate();
     /* THE TRANSCRIPT, RELABELLED. Signing in is the one moment the answer to
        "who is speaking" changes without a setting being touched, and the
@@ -1203,6 +1216,9 @@ if (PERSON_ARRIVED === 'setup') GATE = 'setup';
    which is a better first five minutes than a screen that looks broken. */
 const Display = {
   id: '', name: DISPLAY_NAME, named: DISPLAY_NAME, approved: false, known: false,
+  /* This SCREEN's half of the diagnostic strip. The person signed in at it
+     carries the other half, and either is enough — see syncStatusLine. */
+  status: false,
   /* What the server last said about this device. `state` is one of none,
      requested, approved, expired, denied — and the page is built from it
      rather than from three booleans that can disagree with each other. */
@@ -1255,6 +1271,7 @@ const Display = {
      same shape and none of them should be assembling it differently. */
   take(d){
     this.id = d.id || '';
+    this.status = !!d.status;
     this.name = d.name || DISPLAY_NAME;
     /* A NAME OR NOTHING — see display_named. `name` above carries the list's
        placeholder for a row nobody has named, which is right in a note about
@@ -1275,6 +1292,7 @@ const Display = {
        itself into more access than it was given. Zero means it never runs
        out, which is every display an admin issued a code for. */
     this.expiresIn = d.expires_in || 0;
+    if (typeof syncStatusLine === 'function') syncStatusLine();
     /* What this place looks like, as opposed to what it may do. It arrives on
        the same answer because it belongs to the same row, and it is applied
        whatever the state is: a tablet waiting to be approved is already on a
@@ -3081,16 +3099,42 @@ const Saver = {
     if (this.forced) this.on = true;
     else if (!this.armed) this.on = false;
     else if (!this.on){
-      /* A screen in the middle of answering somebody is not an idle screen,
-         whatever the wake gate happens to be doing. Read off Drive rather
-         than off the wake word, because a display with no wake word at all
-         still thinks and still speaks — and that path never touches Wake. */
-      const busy = Drive.phase !== 'idle'
-                || (typeof Wake !== 'undefined' && Wake.armed() && Wake.awake);
-      /* `awake` as well as the phase, now that opening the mic no longer
-         claims to be speaking. Between two sentences of a conversation the
-         phase is genuinely idle for a few seconds, and a screen somebody is
-         standing in front of talking to must not start dimming at them. */
+      /* A CONVERSATION THAT IS HAPPENING, asked of the things that are doing
+         it rather than of a flag that says so.
+
+         It read `Drive.phase !== 'idle'`, and that is a DISPLAY flag: it says
+         what the figure should be drawing, it is set from six places, and any
+         one of them that returns early leaves it set. A screen whose phase was
+         left on `speaking` never reached its screensaver again — no
+         conversation, nothing on screen to show it, and no way to tell from
+         looking. That is the shape of the fault reported on 2026-08-20 with
+         the microphone open, and it is why this no longer asks a flag.
+
+         WHAT IT ASKS INSTEAD is the two things that actually speak, and the
+         count of questions outstanding. A display with no wake word at all
+         still thinks and still speaks, and all three of these are true on that
+         path — which is the property the Drive test was chosen for and keeps.
+
+         `Listen.busy` IS DELIBERATELY NOT HERE, and it is the trap this walked
+         into once already: a listening screen transcribes every noise in the
+         room, so it flickers true all day for utterances nobody addressed to
+         anything — and one frame of it resets the whole clock. A microphone
+         hearing a room is the definition of the case that must still reach
+         the screensaver.
+
+         The wake window is checked as well as the flag, so a screen left
+         `awake` by anything that failed to clear it ages out on the window
+         instead of holding the saver open for ever — the same failure one
+         level up. */
+      const talking = (typeof Speech !== 'undefined' && Speech.active)
+                   || (typeof Play !== 'undefined' && Play.playing);
+      const asked = typeof Wake !== 'undefined' && Wake.pending > 0;
+      const engaged = typeof Wake !== 'undefined' && Wake.armed() && Wake.awake
+                   && wallNow() < Wake.until;
+      /* Between two sentences of a conversation nothing is speaking for a few
+         seconds, and a screen somebody is standing in front of talking to must
+         not start dimming at them — which is what the wake window is for. */
+      const busy = talking || asked || engaged;
       if (!busy) this.idle += dt; else this.idle = 0;
       if (this.idle >= this.delay) this.on = true;
     }
@@ -5542,6 +5586,19 @@ const Settings = {
   }
 };
 
+/* EITHER SIDE BEING ON IS ENOUGH, which is the same rule the server applies in
+   status_for. A screen and a person can each carry the switch; making one of
+   them win would mean turning yours on, seeing nothing, and having to work out
+   which of two rows in two registers was holding it down.
+
+   An attribute rather than a style, so the stylesheet decides what "off" looks
+   like and this decides only whether it is. */
+function syncStatusLine(){
+  document.body.toggleAttribute('data-status',
+    (typeof Display !== 'undefined' && Display.status)
+    || (typeof Person !== 'undefined' && Person.status));
+}
+
 /* Relabel what is already on screen. The admin is tuning this against a live
    transcript, and a name that only applied to the next line would look like
    it had not taken. Its own function because the route document can change
@@ -5904,12 +5961,29 @@ const Watch = {
     this.down = false; this.said = false; this.fails = 0;
     this.offline(false);
     if (j.reload) this.want = this.want || 'asked by an admin';
-    /* A stamp that moved: something a screen renders from was edited. Not
-       while this one is still waiting to be approved, though — the approval
-       itself moves the stamp, and Display.watch() is already handling that
-       case in place, with the words for it. Reloading here would replace those
-       words with a page that came back silently approved. */
-    else if (this.gen && j.gen !== this.gen && Display.state === 'approved')
+    /* A stamp that moved: something a screen renders from was edited.
+       TWO STATES ARE EXEMPT, and only two.
+
+       `requested` is a screen waiting on a decision. The approval itself moves
+       the stamp, Display.watch() is already handling that case in place with
+       the words for it, and reloading here would replace those words with a
+       page that came back silently approved.
+
+       `setup` is a screen approved into an account and about to send somebody
+       to choose a password. Reloading that one out from under itself is worse
+       than anything the stamp could be telling it.
+
+       IT USED TO READ `state === 'approved'`, which exempted everything else
+       as well — and an unapproved screen is a legitimate working state, not a
+       transient one. A tablet somebody opened the page on would sit there for
+       days ignoring every configuration change, including one that took away
+       what it was allowed to do: it went on using the permissions it fetched
+       at load and found out only when it next asked an endpoint for something,
+       which answered with a refusal in the status line rather than a sign-in
+       page. Reported on 2026-08-20, on an endpoint changed to sign-in-required
+       underneath a tablet that was already on it. */
+    else if (this.gen && j.gen !== this.gen
+             && Display.state !== 'requested' && Display.state !== 'setup')
       this.want = 'settings changed';
     this.gen = j.gen || this.gen;
     if (!this.boot) this.boot = j.now || 0;

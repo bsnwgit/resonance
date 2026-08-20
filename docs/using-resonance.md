@@ -179,6 +179,11 @@ that has never seen you before.
 Nobody but you ever knows the password. An administrator cannot see it or set
 it; if you forget it they send a new link and you choose another.
 
+**A sign-in can lapse from quiet.** Where an administrator has set a limit, it
+is measured as the gap *between conversations* — so a session you are using
+never runs out, and one nobody has spoken into for long enough asks again.
+Different assistants can be set differently, or not at all.
+
 Under the sign-in box are two links for the two people who are not signing in:
 **Use Code Instead**, for somebody hanging a screen, and **Request Access**, for
 somebody asking to be let in. Each one swaps the box for the thing it names, and

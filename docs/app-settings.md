@@ -45,22 +45,34 @@ The **admin panel** always asks for a password. It holds the assistant's API
 key, every credential the server stores, and the power to grant anybody access
 to anything — a switch that opened it would be a switch somebody leaves on.
 
-The **displays** ask per endpoint, under ACCESS ▸ AI, on **MUST SIGN
-IN**. "Must there be a person" is a property of the thing being reached rather
-than of the server: three assistants on one box can want three different
-answers — a house one anybody in the room may talk to, a hosted model worth
-money per question, one reading from a system that should know who asked — and
-a single switch covering all three could only ever be set to the strictest.
+The **displays** ask per endpoint, through the **permission** each one names —
+its authenticate half, under PROFILES ▸ PERMISSIONS. "Must the caller be
+known" is a property of the thing being reached rather than of the server:
+three assistants on one box can want three different answers — a house one
+anybody in the room may talk to, a hosted model worth money per question, one
+reading from a system that should know who asked — and a single switch covering
+all three could only ever be set to the strictest.
 
-**Two settings on an endpoint can each produce a sign-in box** — MUST SIGN IN,
-and an allow-list that does not cover this caller. The display shows one
-whenever it cannot use what is on the port, and does not distinguish the
-reason. *Assistants* → *Sign in* has the table.
+**Either half of a permission can produce a sign-in box** — an authenticate
+profile demanding one, or an authorize profile whose allow-list does not cover
+this caller. The display shows one whenever it cannot use what is on the port,
+and does not distinguish the reason. *Assistants* → *Permission* has the
+table.
 
-MUST SIGN IN refuses a **device** outright, approved or not. A wall screen has
-no person on it, so an endpoint set that way is one your kiosks stop answering
-on. That is what makes it the control that limits what a model costs, where an
-allow-list of screens only limits which rooms it is heard in.
+**A sign-in requirement asks for a KNOWN caller, not for a person.** Two kinds
+satisfy it: somebody signed in, and a screen you enrolled with a code — minting
+that code and carrying it to the device is an admin deciding that screen should
+be here. A screen that merely opened the display page and asked is neither, and
+is refused.
+
+It refused every device outright until 2026-08-20, which turned away the
+population it is most often wanted for: a hallway screen an admin had
+deliberately hung.
+
+**What it costs you to know:** a wall screen satisfying it has no person
+attached, so whoever walks up uses that model unattributed. It limits the model
+to callers you vetted; it does not put a name on the bill. Where you need the
+name, the caller has to be a person.
 
 ### This machine only
 
@@ -97,10 +109,10 @@ but it **warns at every startup and in the admin panel**, because a laptop
 configured this way that later joins an office network will not have changed
 on the day that matters.
 
-**The warning is on the endpoint**, under ACCESS ▸ AI ▸ *Sign in*, because
-that is the control that causes it — one line saying what being open costs,
-shown only where that endpoint asks nobody to sign in and this machine can be
-reached. This page keeps the count and a pointer, since being reachable is what
+**The warning is on the endpoint**, under ACCESS ▸ AI ▸ *Permission*, because
+that is the endpoint anybody can reach — one line saying what being open costs,
+shown only where that endpoint's permission asks nobody to sign in and this
+machine can be reached. This page keeps the count and a pointer, since being reachable is what
 makes it matter rather than what decides it.
 
 **It can be answered, two ways.** *Not now* lasts as long as the tab. *I know*
@@ -340,7 +352,7 @@ impractical quickly without ever locking a legitimate user out permanently.
 | File | Holds | Mode |
 |---|---|---|
 | `settings.json` | shared interface settings | world-readable by design |
-| `routes.json` | every AI endpoint, and which model, speech and network profile it names | 600 |
+| `routes.json` | every AI endpoint, and the connection, layout and permission it names | 600 |
 | `displays.json` | every display and every profile — including the model profiles' API keys | 600 |
 | `backend.json` | the single assistant this server had before endpoints. Read once at the migration and never written again | ordinary |
 | `users.json` | accounts and password hashes | 600 |

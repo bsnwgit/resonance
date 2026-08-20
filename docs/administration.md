@@ -135,22 +135,33 @@ marked by colour and a rule underneath rather than by a box of their own.
 beneath it: the line runs above the label, turns down at the end of it and
 carries on along the top of the row, so what is inside the turn is one subject.
 Everything in it is a list of profiles, and the controls for one appear inside
-it when you open it. Two groups, at opposite ends of the row:
+it when you open it. Three groups across the row, each labelled in its own top
+edge:
 
 - **LAYOUTS** — **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER / LAYOUT**.
   What a screen is. LAYOUT reads last because it is the one that *names* the
-  four before it rather than describing anything itself.
-- **CONNECTIONS**, at the right edge — **MODELS / NETWORK**. The two halves of
-  an endpoint that are not the endpoint: what it speaks to, and what it answers
-  on. They sat among the five until 2026-08-20, which made the row a list of
-  seven unrelated things.
+  four before it rather than describing anything itself, and it carries the
+  wake word: the face, the voice and the word it answers to are one answer to
+  "what is this assistant".
+- **PERMISSIONS** — **AUTHENTICATE / AUTHORIZE / PERMISSION**. Who may use an
+  endpoint. AUTHENTICATE is whether a caller must be known and how long being
+  known lasts; AUTHORIZE is which callers are allowed; PERMISSION is one of
+  each under a name, and that name is what an endpoint points at.
+- **CONNECTIONS**, at the right edge — **MODELS / NETWORK / CONNECTION**. What
+  an endpoint speaks to and what it answers on, and the pairing of the two
+  under a name. MODELS carries the limits and the system prompt as well, since
+  those describe the service rather than the assistant in front of it.
+
+Each of the three groups reads the same way: the last tab in it is the one that
+*names* the others, and an endpoint names only those. Three pointers on an
+endpoint instead of a dozen fields, and a rule written once rather than copied
+onto every endpoint that shares it.
 
 **ACCESS**, at the foot — who and what may reach this server, as opposed to
 what you administer about it. It was called CONNECTIONS until the word was
 needed for the pair above:
 
-- **AI** — the endpoints, each naming a speech profile, a model profile and a
-  network profile.
+- **AI** — the endpoints, each naming a connection, a layout and a permission.
 - **NODES** — everything currently connected, in one register. Each row is
   badged for the door it came through — **ASKED** for a device whose user
   filled in the request form, **INVITED** for one you issued a code to — which
@@ -252,6 +263,7 @@ Each of these writes a different document, so each has its own button:
 | SAVE, inside an AI endpoint's box | that endpoint alone | immediately, next question |
 | SAVE, on SECURITY | who has to be approved, what a grant is worth, how long a code lasts | immediately |
 | SAVE, inside Sign in | how you get in | only after a restart |
+| SAVE, inside an authenticate, authorize or permission row | that profile alone, and every endpoint naming it | immediately, next question |
 | SAVE, inside Sessions | how long an admin session lasts | only after a restart |
 | SAVE, on ADMIN | the admin port, binding, maintenance | only after a restart, except maintenance |
 
@@ -325,7 +337,9 @@ There is no self-registration here and nothing that verifies an address, so
 anybody who could create their own account could create somebody else's.
 
 **Tick their assistants while you are there.** The **AI** ticks on that box are
-the grant, and the same grant each endpoint's own *Who may use it* list makes.
+the grant, and they are written into the *authorize* profile of each endpoint
+ticked — the same list you would edit under PROFILES ▸ PERMISSIONS, reached
+from the other end. A profile named by several endpoints grants all of them.
 Tick none and they reach whatever is open to everyone; an endpoint that is open
 to everyone is reachable already, so ticking it grants nothing. The same ticks
 are on the person's own row afterwards, so a grant made here can be changed
@@ -446,31 +460,35 @@ them was put.
 ### Setting a fleet in one place
 
 Eight screens on one assistant are eight rows to set by hand, and they are
-usually all the same kind of place. So an endpoint carries a **display
-profile** — ACCESS ▸ AI ▸ *Display* — and every screen opened on that
-endpoint's **port** takes it.
+usually all the same kind of place. So an endpoint names a **layout** — ACCESS
+▸ AI ▸ *Layout* — and every screen opened on that endpoint's **port** takes
+it.
 
 **The port is the association.** A browser on the Demo port is a Demo screen
 because that is the address it was opened at. Nothing to tick and no list to
 keep in step: a page is loaded from exactly one address, and a port carries one
 endpoint, so there is never more than one answer.
 
-**A screen's own choice always wins.** Nothing an endpoint says moves a row
-somebody decided about. This is read only where the row's picker is left on
-INHERIT.
+**A screen has no choice of its own any more.** It had one, and it beat the
+endpoint's — which is one question with two answers, and the second was only
+ever a way for the two to disagree. A port carries one endpoint, an endpoint
+names one layout, and a page is loaded from exactly one address, so there is
+never more than one right answer. Set it on the endpoint and every screen on
+that port takes it.
 
-**Which screens an endpoint permits is a separate question**, on *Who may use
-it*. It is about permission and has nothing to do with how a screen looks. An
-earlier version of this setting keyed off that grant instead, and it was wrong
-twice over: a profile set on an endpoint applied to nothing until every screen
-had also been ticked, and a screen granted two endpoints could have two parents
-naming different profiles with no correct way to choose between them.
+**Which screens an endpoint permits is a separate question**, on its
+*Permission*. It is about who gets in and has nothing to do with how a screen
+looks. An earlier version of this setting keyed off that grant instead, and it
+was wrong twice over: a layout set on an endpoint applied to nothing until
+every screen had also been ticked, and a screen granted two endpoints could
+have two parents naming different layouts with no correct way to choose between
+them.
 
 **An endpoint with no port reaches nothing**, this included.
 
-The row's own picker therefore does not claim to know what it will inherit —
-the same device loaded from two addresses inherits differently at each. It
-reads *INHERIT — whatever the endpoint on its port says*.
+There is nothing on the row to read it against, which is the point: the same
+device loaded from two addresses would have inherited differently at each, so a
+per-row answer was one the register could never honestly print.
 
 **One register became four lists, and every row is in exactly one.** Which one
 is two questions: is this thing working, and is it a person or a machine.
@@ -496,8 +514,11 @@ knew it was coming.
 if you already know them, set the two things you would otherwise come back and
 fill in on the row afterwards:
 
-- **Kiosk mode**, and which layout profile it is — what the screen will look
-  like and behave as, chosen before it has ever been switched on
+- **Kiosk mode** — whether the screen runs as a kiosk, chosen before it has
+  ever been switched on. **Which layout it wears is not here**, and is not on
+  the row either: that comes from the endpoint the screen is opened at. A page
+  is loaded from exactly one address and a port carries one endpoint, so there
+  is one answer and nothing to disagree about.
 - **Network** — which profile it answers on, which also decides the address and
   port in the code you are about to be given. A building with several ports has
   several right answers to *what do I type into this screen*, and the right one
@@ -557,6 +578,14 @@ it.
 device may use in the same gesture. The reason to approve anybody at all is to
 give them a particular assistant, so the decision and the grant are one thing —
 an approval that grants nothing is a row that changed colour.
+
+**Where the tick lands.** It is written into the **authorize** profile of each
+endpoint you ticked, which is what the server reads — so it grants every
+endpoint sharing that profile, and unticking takes it from all of them. A rule
+named once is a rule shared on purpose; the row redraws with the endpoints that
+actually resulted rather than the ones you clicked, so the reach is visible at
+the moment you make it. Where a rule really is one endpoint's alone, give it a
+permission of its own.
 
 **Refusing takes two messages and a choice.** One is shown on their screen, so
 they know what happened. One is a note that never leaves this panel, for
@@ -772,6 +801,43 @@ Up to eight profiles, each a name and three numbers:
 | **Dark from / until** | the hours a dim runs regardless of anybody being there. Set them the same for no dark window; a start later than an end wraps midnight, so **22:00** to **07:00** is what you mean |
 | **Dark by %** | how much light comes off it during those hours |
 
+### The status line
+
+The strip above the composer — what the microphone is doing, what the voice is
+doing. **It is a troubleshooting tool and it is off**, on every screen and every
+person, until somebody turns it on. Before 2026-08-20 it was always drawn and
+only suppressed by a heuristic guessing whether anybody was mid-conversation,
+which is the wrong shape for a diagnostic: what you want while debugging is a
+switch, and what a wall wants the rest of the time is silence.
+
+**Two switches, and either one is enough.** A **device** carries one — that
+screen, wherever it hangs — and a **person** carries one, which follows them to
+whatever they sign in at. On/off, off/on and on/on all show it; only off/off
+hides it. Making one of them win would mean turning yours on, seeing nothing,
+and having to work out which of two rows in two registers was holding it down.
+
+**Per row**, the button is in the row's own bottom bar on both registers, and it
+says the state it is in rather than the state it would move to. **In bulk**, tick
+the rows and use *Status line* — the bar above the device register on ACCESS, and
+the one above the people on IDENTITY ▸ USER. A screen takes the change at its
+next check-in; a person's applies the next time they sign in.
+
+**A LISTENING SCREEN IS AN IDLE SCREEN.** This is the part that surprises
+people, and it was wrong until 2026-08-20. The microphone being open is not a
+conversation: a wall display transcribes every noise in the room, because that
+is the only way a wake word is ever caught, and none of it is anybody talking to
+that screen. So the idle clock does not stop for it.
+
+What does stop it is a conversation that is actually happening — the assistant
+speaking aloud, a clip playing, a question outstanding, or the wake window still
+open after somebody woke it. Between two sentences nothing is speaking for a few
+seconds, and the wake window is what keeps a screen somebody is standing in
+front of from dimming at them mid-thought.
+
+It used to ask the figure's own state instead, which is a flag set from six
+places — and any one of them returning early left it set, after which that
+screen never reached its screensaver again, with nothing on screen to say why.
+
 Four things worth knowing about the behaviour:
 
 - **It scales down, then drifts** — slowly and continuously rather than bouncing
@@ -819,12 +885,16 @@ it waits until they have finished. RELOAD on a row under ACCESS asks one
 directly.
 
 
-### Layout assignment — changing several at once
+### Changing several at once
 
-The bar above the two lists on **ACCESS**. Tick the rows you want, choose
-a layout profile, and APPLY TO SELECTED gives all of them that profile in one
-gesture — which is what a building of identical hallway screens wants after a
-profile is renamed or a new one is made.
+The bar above the two lists on **ACCESS**. Tick the rows you want and the
+controls under it apply to all of them at once.
+
+**Layout is no longer one of them.** It was — pick a profile, press APPLY TO
+SELECTED — and it went with the per-screen override in 2026-08-20: what a
+building of identical hallway screens wants is one change on the endpoint their
+port carries, which reaches all of them without a selection at all. What the
+selection is for now is the **status line**.
 
 **ALL means all of this screen**, which is the two lists the bar sits under —
 People and Devices. It does not reach the rows still arriving under
@@ -894,9 +964,10 @@ token, which nobody approved — and turns up in this list as a row you were not
 expecting. That is the early warning; it is also, in the ordinary case, simply
 the next device you meant to add.
 
-**Restricting an endpoint to named displays** is on the endpoint, under AI →
-*who may use it*. `ANY DISPLAY` is the default and is what every endpoint did
-before displays existed. `ONLY THESE` names them. Two reasons to want it: an
+**Restricting an endpoint to named displays** is done on an **authorize**
+profile, under PROFILES ▸ PERMISSIONS, and the endpoint reaches it through the
+permission it names. `ANY DISPLAY` is what every endpoint did before displays
+existed. `ONLY THESE` names them. Two reasons to want it: an
 endpoint that *acts* — a house, a light switch — where every microphone in
 earshot should not be able to trigger it, and an endpoint that *costs*, where a
 hosted model is worth giving to some devices and not to all of them.
@@ -952,6 +1023,46 @@ That one check-in pays for four things: it keeps **Last seen** honest in the
 device list, it gives RELOAD somewhere to be answered, it carries the settings
 on this page out to every screen, and it is how a screen notices on its own
 that the server has returned.
+
+### How a change reaches a screen, and when it does not
+
+Two different things travel on that check-in, and knowing which is which is the
+difference between a screen that fixes itself and one that looks stuck.
+
+**A stamp.** The server sends a value built from the endpoints document, the
+shared settings and the app settings — anything a screen renders from. A screen
+keeps the value it booted with, and reloads itself when it moves. It cannot say
+*what* changed and does not need to: the answer to all of them is the same
+reload.
+
+**A request.** RELOAD on a device's row asks one named screen to reload, and the
+check-in is where it hears about it. A request older than the screen's own boot
+has already been carried out, so it fires once rather than for ever.
+
+**Two states ignore the stamp, and only two.** A screen **waiting on a
+decision** does — the approval itself moves the stamp, and reloading at that
+moment would replace the words explaining what just happened with a page that
+came back silently approved. So does a screen that has just been **approved into
+an account** and is about to send somebody to choose a password: reloading that
+one out from under itself is worse than anything the stamp could be telling it.
+
+Every other screen acts on it, approved or not. Until 2026-08-20 only an
+approved one did, and an unapproved screen is a legitimate working state rather
+than a transient one — so a tablet somebody had opened the page on would sit for
+days ignoring every configuration change, including one that took away what it
+was allowed to do. Turn sign-in on for an endpoint underneath such a screen and
+it carried on with the permissions it had fetched at load, finding out only when
+it next asked that endpoint for something — which answered with a refusal in the
+status line rather than a sign-in page.
+
+**A RELOAD request is not gated at all** and reaches any screen with a row,
+whatever its state. That is the way to bring one up to date by hand, and the way
+to reach a screen still running a page from before a deploy.
+
+**Neither ever interrupts a conversation.** A reload waits while the screen is
+speaking, while a question is outstanding, and while somebody is typing into the
+composer — a reload landing between a question and its answer is indistinguish-
+able from a crash to the person who asked.
 
 **Check in every (seconds)** — 20 by default, 2 to 300. Faster than a couple of
 seconds is a denial of service somebody configured by accident; slower than five
@@ -1088,8 +1199,8 @@ cover it.
 A name for a set of them, so a grant is made once instead of ticked twelve
 times and re-ticked every time somebody gets a new phone. Groups are made on
 **SECURITY**, under the settings that decide who has to be approved at all, and
-named wherever access is granted — today that is an endpoint's *who may use
-it*, and anything added later that grants something can name them the same way.
+named wherever access is granted — today that is an **authorize** profile, and
+anything added later that grants something can name them the same way.
 
 **Everything that starts working is filed with its own population** without
 anybody doing it: a code redeemed puts a screen with the devices, an approved
@@ -1165,13 +1276,13 @@ They are standing at that screen waiting, so **their page takes them straight
 to the choose-a-password box** the moment you approve. The link also appears in
 the panel, once, for the case where they walked away.
 
-**Either setting on an endpoint can put a sign-in box in front of somebody.**
-*Sign in* asks whether there must be a person at all; *Who may use it* asks
-whether this particular caller is allowed. A NO from either one leaves the
-browser unable to use the endpoint, and a sign-in box is what the display
-offers when that happens — so an endpoint left at NOT REQUIRED still shows one
-to a browser its allow-list does not cover. See *Assistants* → *Sign in* for
-the full table.
+**Either half of an endpoint's permission can put a sign-in box in front of
+somebody.** The *authenticate* half asks whether there must be a known caller
+at all; the *authorize* half asks whether this particular one is allowed. A NO
+from either leaves the browser unable to use the endpoint, and a sign-in box is
+what the display offers when that happens — so an endpoint whose sign-in says
+NOT REQUIRED still shows one to a browser its allow-list does not cover. See
+*Assistants* → *Permission* for the full table.
 
 **A person has no equivalent test.** An account exists only because you made
 it, so creating one *is* the approval and there is no way to turn up asking to
@@ -1227,12 +1338,12 @@ what the server will answer, not in what the page carries.
 | File | Holds | Visible to |
 |---|---|---|
 | `settings.json` | the shared interface settings | everyone — the display is built from it |
-| `routes.json` | every AI endpoint, and which model profile it names | admin only, mode 600 |
+| `routes.json` | every AI endpoint, and the connection, layout and permission it names | admin only, mode 600 |
 | `users.json` | accounts and password hashes | nobody over HTTP |
 | `app.json` | ports, binding and session lifetime | admin only |
 | `backend.json` | the single assistant this server had before endpoints | read once, at the migration, then never again |
 | `embeds.json` | embed keys, hashed, and what each one grants | admin only, mode 600 |
-| `displays.json` | every display, its token hashed, whether it is approved, and the profiles — including the model profiles' API keys | admin only, mode 600 |
+| `displays.json` | every display, its token hashed, whether it is approved, and every profile — layouts, connections, permissions and the rest, including the model profiles' API keys and the allow-lists a grant is written into | admin only, mode 600 |
 
 **Two things live outside this directory.** Piper voices are in `voices/`, and
 the transcription models are cached by faster-whisper under

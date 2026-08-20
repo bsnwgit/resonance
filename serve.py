@@ -287,7 +287,7 @@ def exposed(cfg):
        and str(cfg.get("enrol_address") or "").strip() != LOOPBACK:
         return True
     doc = read_routes()
-    live = {str(r.get("network") or "") for r in doc["routes"].values()
+    live = {route_network(r) for r in doc["routes"].values()
             if r.get("enabled", True)}
     for n in display_settings()["networks"]:
         if n["id"] not in live:
@@ -945,15 +945,25 @@ ROUTE_DEFAULTS.update({
     # Which speech profile answers for this route. Blank is the deployment's
     # default, the same rule a device follows.
     "speech": "",
-    # Which network profile — that is, which port of its own — this endpoint
-    # answers on. Blank is the shared display port, which is where they all
-    # were before this existed.
+    # WHICH CONNECTION — that is, which model and which port, as one named
+    # pair. It was those two fields side by side, and picking them separately
+    # was picking the same combination again on every endpoint that wanted it.
+    #
+    # It has to be a default rather than an incidental key: read_routes
+    # rebuilds each record from this map, so a field missing here is a field
+    # silently dropped on the next read — and an endpoint that forgot its
+    # connection is an endpoint answering as DEMO on no port, without saying
+    # why.
+    "connection": "",
+    # WHO MAY USE IT, as one named pair — an authenticate profile and an
+    # authorize one. It was five fields here: needs_signin, restricted and
+    # three allow-lists. They are below, retired, so an existing document
+    # round-trips and migrate_permissions can read them once.
+    "permission": "",
+    # RETIRED, and kept only so an existing document round-trips rather than
+    # losing keys on its first save. migrate_connections reads them once to
+    # make the pairs that already exist, and nothing reads them after that.
     "network": "",
-    # …and which model profile it speaks to. Same rule again, and it has to be
-    # a default rather than an incidental key: read_routes rebuilds each record
-    # from this map, so a field missing here is a field silently dropped on the
-    # next read — and an endpoint that forgot which model it uses is an
-    # endpoint that answers as DEMO without saying why.
     "model_profile": "",
     "wakeword": "resonance",
     "aliases": [],
@@ -1127,7 +1137,17 @@ def route_order(doc):
 #: What a model profile carries. `fallthrough` is deliberately NOT here: it
 #: names another endpoint, so it belongs to the endpoint rather than to a
 #: connection several of them might share.
-MODEL_KEYS = ("provider", "base_url", "model", "api_key", "agent_id")
+#: What a model profile holds. The first five are the connection itself; the
+#: six after them are HOW YOU TALK TO IT — the limits and the instructions —
+#: and they were on the endpoint until 2026-08-20.
+#:
+#: They belong here because they are properties of the model, not of the
+#: assistant in front of it: a context window and a token ceiling are facts
+#: about what is being spoken to, and two endpoints on one model wanting two
+#: different ceilings is not a case anybody has. Set once, where the model is.
+MODEL_KEYS = ("provider", "base_url", "model", "api_key", "agent_id",
+              "system", "max_tokens", "temperature", "timeout",
+              "keep_alive", "history_turns")
 
 
 def _model_pool():
@@ -1141,8 +1161,10 @@ def with_model(rec):
     """A route's connection, resolved from the model profile it names.
 
     Overlaid rather than replacing the record, so everything that is still the
-    ROUTE's — its system prompt, its limits, where it falls through to — is
-    untouched. A route naming no profile — or naming one that has been
+    ROUTE's — where it falls through to, what it is called — is untouched. The
+    limits and the prompt came the other way in 2026-08-20: they are the
+    model's now, and a route's stored copies are read only where the profile
+    says nothing. A route naming no profile — or naming one that has been
     deleted — resolves to nothing and stays on `demo`, rather than being
     quietly connected to a model somebody picked for a different endpoint. It
     used to fall back to a nominated default, which is how an endpoint could be
@@ -1150,7 +1172,7 @@ def with_model(rec):
     pool = _model_pool()
     if not pool:
         return rec
-    prof = find_look(str(rec.get("model_profile") or ""), pool)
+    prof = find_look(route_model(rec), pool)
     if not prof:
         return rec
     out = dict(rec)
@@ -1197,7 +1219,7 @@ def public_routes(doc, disp=None, ident=None):
         # the page's own voice. It used to fall back to a nominated default,
         # which meant an endpoint could be speaking in a voice nobody had
         # chosen for it and the panel showed an empty box either way.
-        prof = find_look(str(rec.get("speech") or ""), _speech_pool()) or {}
+        prof = find_look(route_speech(rec), _speech_pool()) or {}
         for k in ROUTE_SPEECH_KEYS:
             if k in prof:
                 row[k] = prof[k]
@@ -1220,11 +1242,21 @@ def public_routes(doc, disp=None, ident=None):
             # what wakes it, what else to accept for it, and how close a match
             # has to be. A route keeps its stored copy only so that unpicking
             # this later does not lose what somebody typed.
-            if "wakeword" in prof:
-                row["wakeword"] = str(prof.get("wakeword") or "")
-            if "wakealiases" in prof:
+            # …AND THE WORDS COME FROM THE LAYOUT, which is what an endpoint
+            # IS: a port carries one endpoint, an endpoint names one layout, so
+            # a layout is one assistant's face — how it looks, how it sounds,
+            # and what it is called. They were on the speech profile, which
+            # meant a profile that could not be shared between two endpoints
+            # for a reason nothing on it explained.
+            #
+            # A route keeps its stored copy only so that unpicking this later
+            # does not lose what somebody typed.
+            lay = route_layout(rec)
+            if lay.get("wakeword"):
+                row["wakeword"] = str(lay["wakeword"])
+            if lay.get("wakealiases"):
                 row["aliases"] = [a.strip() for a
-                                  in str(prof.get("wakealiases") or "").splitlines()
+                                  in str(lay["wakealiases"]).splitlines()
                                   if a.strip()]
             if "wakestrict" in prof:
                 row["strict"] = bool(prof.get("wakestrict"))
@@ -1287,8 +1319,9 @@ def net_members(doc, nid):
     endpoints that named nothing."""
     if not nid:
         return list(route_order(doc))
+    _cfg = display_settings()
     return [r for r in route_order(doc)
-            if doc["routes"][r].get("network") == nid]
+            if route_network(doc["routes"][r], _cfg) == nid]
 
 
 def route_dest(cfg):
@@ -1334,30 +1367,30 @@ def validate_route(obj, current, doc, rid=None):
             rec[k] = str(obj[k] or "").strip()[:200]
     if "kiosk_profile" in obj:
         pid = str(obj["kiosk_profile"] or "")[:16]
+        # ONE ENDPOINT PER LAYOUT, and this is the rule the speech profile used
+        # to carry. A layout holds the WAKE WORD now, so two endpoints naming
+        # the same one answer to the same name and cannot be told apart — the
+        # utterance would reach whichever matched first. Refused here rather
+        # than left to be discovered by talking to it.
+        if pid:
+            taken = [k for k, r in doc["routes"].items()
+                     if k != rid and str(r.get("kiosk_profile") or "") == pid]
+            if taken:
+                other = doc["routes"][taken[0]].get("name") or "another endpoint"
+                return None, ("%s already uses that layout — a layout carries "
+                              "the wake word, so two endpoints sharing one "
+                              "would answer to the same name" % other)
         if pid and not any(k["id"] == pid
                            for k in display_settings()["kiosks"]):
             return None, ("that layout profile no longer exists — reload the "
                           "panel to see the current list")
         rec["kiosk_profile"] = pid
     if "speech" in obj:
-        pid = str(obj["speech"] or "")[:16]
-        if pid and not any(p["id"] == pid
-                           for p in display_settings()["speeches"]):
-            return None, ("that speech profile no longer exists — reload the "
-                          "panel to see the current list")
-        # One endpoint per profile. A speech profile carries the WAKE WORD, so
-        # two endpoints naming the same one answer to the same name and cannot
-        # be told apart — the utterance would reach whichever matched first.
-        # Refused here rather than left to be discovered by talking to it.
-        if pid:
-            taken = [k for k, r in doc["routes"].items()
-                     if k != rid and r.get("speech") == pid]
-            if taken:
-                other = doc["routes"][taken[0]].get("name") or "another endpoint"
-                return None, ("%s already uses that speech profile — a profile "
-                              "carries the wake word, so two endpoints sharing "
-                              "one would answer to the same name" % other)
-        rec["speech"] = pid
+        # RETIRED. Which speech profile answers for an endpoint is the
+        # LAYOUT's to say — the layout is what the endpoint is, and a voice
+        # belongs with the face rather than beside it. Still accepted and
+        # still stored so an existing document round-trips; nothing reads it.
+        rec["speech"] = str(obj["speech"] or "")[:16]
     if "network" in obj:
         nid = str(obj["network"] or "")[:16]
         pool = display_settings()["networks"]
@@ -1388,22 +1421,34 @@ def validate_route(obj, current, doc, rid=None):
     # rule could not see. Naming no profile now attaches an endpoint to
     # nothing, so blanks cannot collide with each other and there is nothing
     # here to compare them against.
-    target = str(rec.get("network") or "")
+    # THE PORT IS THE CONNECTION'S NOW, so this asks the connection. The rule
+    # is unchanged and still worth having: a port carries one endpoint, so two
+    # endpoints whose connections name the same port is the collision that
+    # cannot be discovered by looking at either one of them.
+    _cfg = display_settings()
+    target = route_network(rec, _cfg)
     if target:
         other = [k for k, r in doc["routes"].items()
-                 if k != rid and str(r.get("network") or "") == target]
+                 if k != rid and route_network(r, _cfg) == target]
         if other:
             who = doc["routes"][other[0]].get("name") or "another endpoint"
             return None, ("%s already answers on that port, and a port carries "
                           "one endpoint — give this one a port of its own "
                           "under PROFILES \u25b8 NETWORK" % who)
-    if "model_profile" in obj:
-        mid = str(obj["model_profile"] or "")[:16]
-        if mid and not any(p["id"] == mid
-                           for p in display_settings()["models"]):
-            return None, ("that model profile no longer exists — reload the "
+    if "permission" in obj:
+        pid = str(obj["permission"] or "")[:16]
+        if pid and not any(p["id"] == pid
+                           for p in display_settings()["permissions"]):
+            return None, ("that permission no longer exists — reload the "
                           "panel to see the current list")
-        rec["model_profile"] = mid
+        rec["permission"] = pid
+    if "connection" in obj:
+        cid = str(obj["connection"] or "")[:16]
+        if cid and not any(c["id"] == cid
+                           for c in display_settings()["connections"]):
+            return None, ("that connection no longer exists — reload the "
+                          "panel to see the current list")
+        rec["connection"] = cid
         # Sharing one is fine and expected — several endpoints can speak to the
         # same model. What is NOT kept is the route's own copy of the
         # connection: a stale key sitting in routes.json reads as live, and
@@ -1773,10 +1818,13 @@ DISPLAY_DEFAULTS = {
     # hung on a wall and never configured still behaves like the other screens
     # in the building rather than like nothing.
     #
-    # An ID rather than the settings themselves. That is the whole point of a
-    # profile: change what a hallway screen does once, and every hallway screen
-    # changes with it, instead of twelve rows drifting out of step with no way
-    # to see which had.
+    # RETIRED 2026-08-20. Which layout a screen wears comes from the endpoint
+    # it is loaded from and from nowhere else — a port carries one endpoint, an
+    # endpoint names one layout, and a page is loaded from exactly one address,
+    # so a second place to state it could only ever be a way for the two to
+    # disagree. Kept so an existing document round-trips rather than losing a
+    # key on its first save; nothing reads it and nothing writes it, the same
+    # retirement `kind` above had.
     "kiosk_profile": "",
     # HOW THIS ROW GOT HERE: "code" for one an admin named and minted a code
     # for, "page" for one that arrived because somebody opened the display
@@ -1801,6 +1849,18 @@ DISPLAY_DEFAULTS = {
     # the request clears itself by being satisfied — no acknowledgement to
     # store, and nothing left set to fire a second time on the next boot.
     "reload_req": 0,
+    # THE STATUS LINE — what the microphone and the voice are doing, in the
+    # strip above the composer. A TROUBLESHOOTING TOOL and nothing else, so it
+    # is OFF and every screen is quiet until somebody turns it on to watch
+    # something. It was always drawn and only ever suppressed by a heuristic
+    # guessing whether anybody was in a conversation, which is the wrong shape
+    # for a diagnostic: what you want while debugging is a switch, and what a
+    # wall wants the rest of the time is silence.
+    #
+    # A PERSON CARRIES ONE TOO, and either being on is enough — see
+    # status_for. Turning it on for yourself and finding a screen still silent
+    # because the row disagreed is the failure that makes a diagnostic useless.
+    "status": False,
 }
 
 #: How many screensaver profiles may exist. A deployment has a handful of
@@ -1942,6 +2002,30 @@ DISPLAY_SETTINGS = {
     # port, which is where every endpoint was before this existed. A default
     # would silently move one onto a port of its own.
     "networks": [],
+    # A MODEL AND A PORT, UNDER ONE NAME. The two halves of an endpoint that
+    # are not the endpoint — what it speaks to, and what it answers on — named
+    # together so the pair can be picked once instead of twice.
+    #
+    # It holds ids, not copies. That is the whole point of a profile: change
+    # which model a connection speaks to and every endpoint using that
+    # connection changes with it, rather than a set of endpoints drifting apart
+    # with nothing on screen saying which had.
+    "connections": [],
+    # ---- WHO MAY USE AN ENDPOINT, in three lists for the same reason the
+    # appearance, geometry and speech of a screen are three: a deployment
+    # wants the pieces separately and the combination named.
+    #
+    # AUTHENTICATE — must there be a person at all, and how long a sign-in
+    # survives. The session limit is here and nowhere else: it was a field on
+    # every identity with no control anywhere that could set it, which is a
+    # setting nobody could see and nobody could change.
+    "authns": [],
+    # AUTHORIZE — and given a caller, is it one of the ones allowed. The
+    # allow-lists themselves, which is what makes this the half that is worth
+    # sharing: a department's screens are one list, named once.
+    "authzs": [],
+    # …and the pair of them under a name, which is what an endpoint points at.
+    "permissions": [],
     "kiosks": [],
     # NO NOMINATED DEFAULT, in any of these lists, and that is the rule rather
     # than an omission. A row naming nothing is not quietly handed a profile
@@ -2263,7 +2347,21 @@ KIOSK_OFF = {"voice_only": True, "look": "", "motion": "", "speech": "",
              # word is renamed. Typed text is for the deployment where the
              # generated line is not the point: a shop floor that would rather
              # say "ask me about opening hours".
-             "prompt_text": ""}
+             "prompt_text": "",
+             # WHAT THIS ASSISTANT IS CALLED, and what ends a conversation
+             # with it. They were in two other places: the wake word in the
+             # SPEECH profile, and the sleep word in the shared settings —
+             # deployment-wide, so every assistant on the server said goodbye
+             # to the same word.
+             #
+             # They are here because this profile is what an endpoint IS: a
+             # port carries one endpoint, an endpoint names one layout, so a
+             # layout is one assistant's face — how it looks, how it sounds,
+             # and what you call it. Splitting the name off from the face left
+             # a speech profile that could not be shared for a reason nothing
+             # on it explained.
+             "wakeword": "", "wakealiases": "",
+             "sleepword": "", "sleepaliases": ""}
 
 #: One dim line at the foot of a screen, read in passing. Anything longer is a
 #: paragraph nobody standing up will finish.
@@ -2297,6 +2395,10 @@ def clean_kiosks(raw):
                     "keep_awake": bool(k.get("keep_awake", KIOSK_OFF["keep_awake"])),
                     "listen": bool(k.get("listen", KIOSK_OFF["listen"])),
                     "prompt": bool(k.get("prompt", KIOSK_OFF["prompt"])),
+                    "wakeword": str(k.get("wakeword") or "").strip()[:40],
+                    "wakealiases": str(k.get("wakealiases") or "")[:200],
+                    "sleepword": str(k.get("sleepword") or "").strip()[:40],
+                    "sleepaliases": str(k.get("sleepaliases") or "")[:200],
                     "prompt_text": str(k.get("prompt_text") or "")
                                    .strip()[:MAX_PROMPT_TEXT]})
     return out
@@ -2696,6 +2798,133 @@ def validate_display_settings(obj, current):
             r["values"]["port"] = pv
             r["values"]["redirect"] = rv
         cfg["networks"] = rows
+    if "authns" in obj:
+        if not isinstance(obj["authns"], (list, tuple)):
+            return None, "the authenticate profiles must be a list"
+        if len(obj["authns"]) > MAX_LOOKS:
+            return None, "there is room for %d authenticate profiles" % MAX_LOOKS
+        for a in obj["authns"]:
+            if not isinstance(a, dict) or not str(a.get("name") or "").strip():
+                return None, "every authenticate profile needs a name"
+        rows = clean_profiles(obj["authns"], "a", MAX_LOOKS)
+        for r in rows:
+            v = r["values"]
+            v["needs_signin"] = bool(v.get("needs_signin"))
+            # MINUTES OF QUIET, not a lifetime. The clock is the gap between
+            # conversations: a session that is being used does not run out.
+            # Zero is no limit, which is a real answer for a wall nobody signs
+            # in at and the wrong one for anything else.
+            try:
+                m = int(v.get("session_idle") or 0)
+            except (TypeError, ValueError):
+                return None, "%s: the session limit is a whole number of minutes" % r["name"]
+            if m and not (SESSION_MIN <= m <= SESSION_MAX):
+                return None, ("%s: the session limit is %d to %d minutes, or 0 "
+                              "for no limit" % (r["name"], SESSION_MIN, SESSION_MAX))
+            v["session_idle"] = m
+            r["values"] = {k: v[k] for k in ("needs_signin", "session_idle")}
+        cfg["authns"] = rows
+    if "authzs" in obj:
+        if not isinstance(obj["authzs"], (list, tuple)):
+            return None, "the authorize profiles must be a list"
+        if len(obj["authzs"]) > MAX_LOOKS:
+            return None, "there is room for %d authorize profiles" % MAX_LOOKS
+        for a in obj["authzs"]:
+            if not isinstance(a, dict) or not str(a.get("name") or "").strip():
+                return None, "every authorize profile needs a name"
+        rows = []
+        for a in obj["authzs"]:
+            pid = str(a.get("id") or "")[:16] or ("z" + secrets.token_hex(4))
+            rows.append({"id": pid, "name": str(a["name"]).strip()[:40],
+                         "values": {
+                             "restricted": bool(a.get("restricted")),
+                             # The three allow-lists, cleaned the same way a
+                             # route's were: ids only, capped, order kept.
+                             "displays": [str(x)[:32] for x in
+                                          (a.get("displays") or [])][:MAX_ALLOW],
+                             "identities": [str(x)[:32] for x in
+                                            (a.get("identities") or [])][:MAX_ALLOW],
+                             "groups": [str(x)[:32] for x in
+                                        (a.get("groups") or [])][:MAX_ALLOW]}})
+        cfg["authzs"] = rows
+    if "connections" in obj:
+        if not isinstance(obj["connections"], (list, tuple)):
+            return None, "the connections must be a list"
+        if len(obj["connections"]) > MAX_LOOKS:
+            return None, "there is room for %d connections" % MAX_LOOKS
+        for c in obj["connections"]:
+            if not isinstance(c, dict):
+                return None, "a connection must be a set of fields"
+            if not str(c.get("name") or "").strip():
+                return None, ("every connection needs a name — it is what "
+                              "gets picked")
+        rows = clean_profiles(obj["connections"], "c", MAX_LOOKS)
+        # THE TWO ENDS, CHECKED AGAINST THE DOCUMENT AS IT WILL STAND — which
+        # is why this block sits AFTER both of theirs rather than before. `cfg`
+        # carries whatever models and networks arrived in this same save by the
+        # time it runs, so a connection naming a profile created in the same
+        # press is accepted, and one naming a profile deleted in the same press
+        # is refused. Written above them first, it would have validated against
+        # the stored networks and let a connection through that pointed at a
+        # port the same save had just removed.
+        for r in rows:
+            for key, pool, what in (("model", cfg["models"], "model profile"),
+                                    ("network", cfg["networks"], "network profile")):
+                pid = str(r["values"].get(key) or "")
+                if not pid:
+                    return None, ("%s: pick a %s — a connection is the pair, "
+                                  "and half of one is not a connection"
+                                  % (r["name"], what))
+                if not any(p["id"] == pid for p in pool):
+                    return None, ("%s: that %s no longer exists — reload the "
+                                  "panel to see the list" % (r["name"], what))
+                r["values"][key] = pid
+            # Nothing else belongs on it. A connection is two ids and a name;
+            # anything else typed here would be a third place to state
+            # something one of the two already says.
+            r["values"] = {k: r["values"][k] for k in ("model", "network")}
+        cfg["connections"] = rows
+    if "permissions" in obj:
+        if not isinstance(obj["permissions"], (list, tuple)):
+            return None, "the permissions must be a list"
+        if len(obj["permissions"]) > MAX_LOOKS:
+            return None, "there is room for %d permissions" % MAX_LOOKS
+        for p in obj["permissions"]:
+            if not isinstance(p, dict) or not str(p.get("name") or "").strip():
+                return None, "every permission needs a name"
+        rows = clean_profiles(obj["permissions"], "x", MAX_LOOKS)
+        # BOTH ENDS, against the document as it will stand — the same reason
+        # the connection block runs after the two it pairs. A permission naming
+        # a profile made in this same save is accepted; one naming a profile
+        # this same save deleted is refused.
+        for r in rows:
+            for key, pool, what in (("authn", cfg["authns"], "authenticate profile"),
+                                    ("authz", cfg["authzs"], "authorize profile")):
+                pid = str(r["values"].get(key) or "")
+                if not pid:
+                    return None, ("%s: pick an %s — a permission is the pair, "
+                                  "and half of one decides nothing"
+                                  % (r["name"], what))
+                if not any(x["id"] == pid for x in pool):
+                    return None, ("%s: that %s no longer exists — reload the "
+                                  "panel to see the list" % (r["name"], what))
+                r["values"][key] = pid
+            r["values"] = {k: r["values"][k] for k in ("authn", "authz")}
+        cfg["permissions"] = rows
+    # THE SAME CHECK, ON WHATEVER THIS SAVE TOUCHED. The block above only runs
+    # when the permissions themselves are being written, and the way to strand
+    # one is to save the OTHER list: delete an authorize profile on its own and
+    # every permission naming it is left pointing at nothing. Run against the
+    # document as it will stand, so it catches the save that breaks a pointer
+    # as well as the save that writes a broken one.
+    for p in cfg.get("permissions") or []:
+        pv = p.get("values") or {}
+        for key, pool, what in (("authn", cfg.get("authns") or [], "authenticate"),
+                                ("authz", cfg.get("authzs") or [], "authorize")):
+            if not any(x["id"] == str(pv.get(key) or "") for x in pool):
+                return None, ("the permission %s uses that %s profile — "
+                              "point it somewhere else first"
+                              % (p.get("name") or "?", what))
     for key, prefix in (("motions", "m"), ("speeches", "p")):
         if key not in obj:
             continue
@@ -2801,6 +3030,325 @@ def write_displays(displays):
     doc = read_displays_doc()
     doc["displays"] = displays
     _write_displays_doc(doc)
+
+
+#: The six that moved from the endpoint onto the model profile.
+MODEL_TALK_KEYS = ("system", "max_tokens", "temperature", "timeout",
+                   "keep_alive", "history_turns")
+
+
+def migrate_permissions():
+    """Give every endpoint a permission built from what it already carries.
+
+    An endpoint held five fields — must there be a person, is it restricted,
+    and three allow-lists. It names a PERMISSION now, and without this every
+    endpoint on the server would be refused outright at the next question:
+    route_perm treats a missing pointer as the strict answer, which is right
+    for a half-built deployment and catastrophic for one that was working.
+
+    DEDUPLICATED BY VALUE at every level, because that is what makes the lists
+    worth having. Three endpoints that all ask for a sign-in share one
+    authenticate profile; two with the same allow-list share one authorize;
+    and a pair already made is reused rather than made again.
+
+    NAMED AFTER WHAT THEY SAY, not after the first endpoint that used them —
+    "Signed in" and "Anyone" describe a rule, and a rule named after one of its
+    users reads as belonging to that one. An authorize list is the exception:
+    a set of ticks has nothing to describe itself with, so it takes the
+    endpoint's name.
+
+    THE SESSION LIMIT IS MADE AS NO LIMIT, because there was none. A sign-in
+    lasted twelve hours whatever happened in them; the gap between
+    conversations ended nothing. Inventing a timer here would start closing
+    people's sessions in a way the code being replaced never did, so every
+    profile is made with zero and a limit is somebody deciding, on a profile
+    they can see."""
+    doc = read_routes()
+    routes = doc.get("routes") or {}
+    if not routes:
+        return
+    ddoc = read_displays_doc()
+    cfg = ddoc.get("settings")
+    cfg = dict(cfg) if isinstance(cfg, dict) else {}
+    authns = clean_profiles(cfg.get("authns"), "a", MAX_LOOKS)
+    authzs = [r for r in (cfg.get("authzs") or []) if isinstance(r, dict)]
+    perms = clean_profiles(cfg.get("permissions"), "x", MAX_LOOKS)
+    n_by = {(bool((a.get("values") or {}).get("needs_signin")),
+             int((a.get("values") or {}).get("session_idle") or 0)): a["id"]
+            for a in authns}
+    def zkey(v):
+        return (bool(v.get("restricted")),
+                tuple(sorted(v.get("displays") or [])),
+                tuple(sorted(v.get("identities") or [])),
+                tuple(sorted(v.get("groups") or [])))
+    z_by = {zkey(a.get("values") or {}): a["id"] for a in authzs}
+    p_by = {(str((p.get("values") or {}).get("authn") or ""),
+             str((p.get("values") or {}).get("authz") or "")): p["id"]
+            for p in perms}
+    made = 0
+    for rid in route_order(doc):
+        rec = routes[rid]
+        if rec.get("permission"):
+            continue
+        # NO IDLE LIMIT, because there was none. A session ran for twelve
+        # hours whatever happened in them, and a migration that invented a gap
+        # timer would start ending people's sessions in a way the code being
+        # replaced never did. Zero is the faithful answer; a limit is somebody
+        # deciding, on a profile they can see.
+        want_n = (bool(rec.get("needs_signin")), 0)
+        if want_n not in n_by:
+            if len(authns) >= MAX_LOOKS:
+                continue
+            a = {"id": "a" + secrets.token_hex(4),
+                 "name": "Signed in" if want_n[0] else "Anyone",
+                 "values": {"needs_signin": want_n[0],
+                            "session_idle": want_n[1]}}
+            authns.append(a); n_by[want_n] = a["id"]
+        zv = {"restricted": bool(rec.get("restricted")),
+              "displays": list(rec.get("displays") or []),
+              "identities": list(rec.get("identities") or []),
+              "groups": list(rec.get("groups") or [])}
+        zk = zkey(zv)
+        if zk not in z_by:
+            if len(authzs) >= MAX_LOOKS:
+                continue
+            z = {"id": "z" + secrets.token_hex(4),
+                 "name": ("Any display" if not zv["restricted"]
+                          else (rec.get("name") or rid)),
+                 "values": zv}
+            authzs.append(z); z_by[zk] = z["id"]
+        pk = (n_by[want_n], z_by[zk])
+        if pk not in p_by:
+            if len(perms) >= MAX_LOOKS:
+                continue
+            nm = next((a["name"] for a in authns if a["id"] == pk[0]), "?")
+            zn = next((a["name"] for a in authzs if a["id"] == pk[1]), "?")
+            p = {"id": "x" + secrets.token_hex(4),
+                 "name": (nm + " · " + zn)[:40],
+                 "values": {"authn": pk[0], "authz": pk[1]}}
+            perms.append(p); p_by[pk] = p["id"]
+        rec["permission"] = p_by[pk]
+        made += 1
+    if not made:
+        return
+    cfg["authns"], cfg["authzs"], cfg["permissions"] = authns, authzs, perms
+    ddoc["settings"] = cfg
+    _write_displays_doc(ddoc)
+    write_routes(doc)
+    print("permissions: %d endpoint(s) onto %d permission(s) "
+          "(%d authenticate, %d authorize)"
+          % (made, len(perms), len(authns), len(authzs)), flush=True)
+
+
+def migrate_model_limits():
+    """Copy each endpoint's limits and system prompt onto the model profile it
+    speaks to.
+
+    They were the endpoint's, and they are the model's — a context window and a
+    token ceiling are facts about what is being spoken to. Without this every
+    profile comes up at the shipped defaults and every carefully-set ceiling and
+    every system prompt on the server is silently replaced by one.
+
+    THE FIRST ENDPOINT USING A PROFILE WINS, and where two disagree the second
+    is said out loud rather than dropped quietly — that is a real setting
+    somebody made, and the only warning they will get that it is not being
+    carried across.
+
+    WHERE THE PROFILE ALREADY SAYS SOMETHING IT IS LEFT ALONE. This fills
+    blanks; it does not overwrite an answer somebody gave."""
+    doc = read_routes()
+    routes = doc.get("routes") or {}
+    if not routes:
+        return
+    ddoc = read_displays_doc()
+    cfg = ddoc.get("settings")
+    cfg = dict(cfg) if isinstance(cfg, dict) else {}
+    models = clean_profiles(cfg.get("models"), "n", MAX_LOOKS)
+    if not models:
+        return
+    by_id = {m["id"]: m for m in models}
+    claimed, moved, clashed = {}, 0, []
+    for rid in route_order(doc):
+        rec = routes[rid]
+        prof = by_id.get(route_model(rec, cfg) or str(rec.get("model_profile") or ""))
+        if not prof:
+            continue
+        vals = prof.setdefault("values", {})
+        if any(k in vals for k in MODEL_TALK_KEYS):
+            continue                        # already carries them
+        if claimed.get(prof["id"]):
+            same = all(rec.get(k) == routes[claimed[prof["id"]]].get(k)
+                       for k in MODEL_TALK_KEYS)
+            if not same:
+                clashed.append(rec.get("name") or rid)
+            continue
+        for k in MODEL_TALK_KEYS:
+            if k in rec:
+                vals[k] = rec[k]
+        claimed[prof["id"]] = rid
+        moved += 1
+    if not moved:
+        return
+    cfg["models"] = models
+    ddoc["settings"] = cfg
+    _write_displays_doc(ddoc)
+    print("limits: moved onto %d model profile(s)%s" % (
+        moved,
+        (" — %s had different ones and kept the first endpoint's: %s"
+         % (len(clashed), ", ".join(clashed))) if clashed else ""), flush=True)
+
+
+def migrate_wake_words():
+    """Move each endpoint's wake word onto the layout it names, and the shared
+    sleep word onto every layout that has none.
+
+    The words were in two other places — the wake word on the SPEECH profile
+    an endpoint named, the sleep word in the settings document, one for the
+    whole server. Without this, every assistant loses its name on upgrade and
+    answers to nothing, which is the loudest possible failure.
+
+    WHERE THE LAYOUT ALREADY SAYS SOMETHING, IT WINS and nothing is touched.
+    This fills blanks; it does not overwrite an answer somebody gave.
+
+    An endpoint naming no layout has nowhere to put its word and keeps it on
+    its own record, where public_route still falls back to it."""
+    doc = read_routes()
+    routes = doc.get("routes") or {}
+    if not routes:
+        return
+    ddoc = read_displays_doc()
+    cfg = ddoc.get("settings")
+    cfg = dict(cfg) if isinstance(cfg, dict) else {}
+    kiosks = clean_kiosks(cfg.get("kiosks"))
+    if not kiosks:
+        return
+    speeches = clean_profiles(cfg.get("speeches"), "p", MAX_LOOKS)
+    by_id = {k["id"]: k for k in kiosks}
+    # WHICH LAYOUT IS SPOKEN FOR. Two endpoints sharing one was legal until the
+    # words moved onto it, and it is the ordinary case: a pair of assistants
+    # dressed the same. Moving a word onto a shared layout would give both of
+    # them the FIRST one's name and silently take the second's away, so a
+    # sharer gets a copy of its own instead — same look, its own name.
+    claimed = {}
+    # The one word the whole server used to say goodbye with.
+    shared_sleep = str(cfg.get("sleepword") or "").strip()
+    shared_alias = str(cfg.get("sleepaliases") or "")
+    moved, split = 0, []
+    for rid in route_order(doc):
+        rec = routes[rid]
+        kid = str(rec.get("kiosk_profile") or "")
+        lay = by_id.get(kid)
+        if not lay:
+            continue
+        if claimed.get(kid) and claimed[kid] != rid:
+            if len(kiosks) >= MAX_KIOSKS:
+                print("wake words: no room to give %s a layout of its own — "
+                      "it shares one and will answer to the other's name"
+                      % (rec.get("name") or rid), flush=True)
+                continue
+            copy = dict(lay)
+            copy["id"] = "k" + secrets.token_hex(4)
+            copy["name"] = (rec.get("name") or "endpoint")[:40]
+            copy["wakeword"] = ""
+            copy["wakealiases"] = ""
+            kiosks.append(copy)
+            by_id[copy["id"]] = copy
+            rec["kiosk_profile"] = copy["id"]
+            kid, lay = copy["id"], copy
+            split.append(copy["name"])
+        claimed[kid] = rid
+        if not lay.get("wakeword"):
+            # The speech profile's word first — that is where it was being read
+            # from — and the route's own only if that says nothing.
+            sp = find_look(str(rec.get("speech") or ""), speeches) or {}
+            word = str(sp.get("wakeword") or rec.get("wakeword") or "").strip()
+            if word:
+                lay["wakeword"] = word
+                lay["wakealiases"] = str(sp.get("wakealiases") or "") \
+                    or "\n".join(rec.get("aliases") or [])
+                moved += 1
+        if not lay.get("sleepword") and shared_sleep:
+            lay["sleepword"] = shared_sleep
+            lay["sleepaliases"] = shared_alias
+    if not (moved or split or shared_sleep):
+        return
+    cfg["kiosks"] = kiosks
+    ddoc["settings"] = cfg
+    _write_displays_doc(ddoc)
+    if split:
+        write_routes(doc)
+    print("wake words: %d moved onto layouts%s, sleep word %s"
+          % (moved,
+             (" — %d given a layout of its own so they keep their names: %s"
+              % (len(split), ", ".join(split))) if split else "",
+             ("copied onto every layout" if shared_sleep else "not set")),
+          flush=True)
+
+
+def migrate_connections():
+    """Give every endpoint that still names a model and a port a connection.
+
+    An endpoint named a model profile and a network profile side by side. It
+    names the PAIR now, so this makes the pairs that already exist — otherwise
+    a field rename is every endpoint quietly pointing at nothing.
+
+    IT FILLS GAPS RATHER THAN RUNNING ONCE. The first draft returned as soon as
+    the list had anything in it, which is wrong the moment somebody makes one
+    connection by hand before upgrading: the endpoint they made it for would be
+    fine and every other one would be left empty. So it looks at each endpoint
+    on its own, and an endpoint that already names a connection is left alone.
+
+    DEDUPLICATED AGAINST WHAT IS THERE, including hand-made rows. A pair that
+    already exists is reused rather than made a second time under a different
+    name, which is the whole reason the list is a list.
+
+    A PAIR IS ONLY MADE WHERE BOTH HALVES ARE THERE. An endpoint with a model
+    and no port answered nowhere and still does; inventing half a connection
+    for it would turn a visible gap into a row that looks configured."""
+    doc = read_routes()
+    routes = doc.get("routes") or {}
+    if not routes:
+        return
+    ddoc = read_displays_doc()
+    cfg = ddoc.get("settings")
+    cfg = dict(cfg) if isinstance(cfg, dict) else {}
+    have = clean_profiles(cfg.get("connections"), "c", MAX_LOOKS)
+    index = {(str((c.get("values") or {}).get("model") or ""),
+              str((c.get("values") or {}).get("network") or "")): c["id"]
+             for c in have}
+    made = 0
+    for rid in route_order(doc):
+        rec = routes[rid]
+        if rec.get("connection"):
+            continue
+        key = (str(rec.get("model_profile") or ""), str(rec.get("network") or ""))
+        if not (key[0] and key[1]):
+            continue
+        if key not in index:
+            if len(have) >= MAX_LOOKS:
+                # Nowhere to put it. Said rather than dropped silently: the
+                # endpoint keeps working on its own two fields until somebody
+                # makes room, and this is the only warning there will be.
+                print("connection migration: no room for %s — there are "
+                      "already %d connections" % (rec.get("name") or rid,
+                                                  MAX_LOOKS), flush=True)
+                continue
+            prof = {"id": "c" + secrets.token_hex(4),
+                    "name": rec.get("name") or "connection",
+                    "values": {"model": key[0], "network": key[1]}}
+            have.append(prof)
+            index[key] = prof["id"]
+            made += 1
+        rec["connection"] = index[key]
+    if not any(r.get("connection") for r in routes.values()):
+        return
+    changed = [rid for rid in routes if routes[rid].get("connection")]
+    cfg["connections"] = have
+    ddoc["settings"] = cfg
+    _write_displays_doc(ddoc)
+    write_routes(doc)
+    print("connections: %d endpoint(s) on %d connection(s), %d made now"
+          % (len(changed), len(have), made), flush=True)
 
 
 def migrate_models():
@@ -2968,6 +3516,20 @@ def display_named(rec):
     return ""
 
 
+def status_for(disp=None, ident=None):
+    """Does the status line show for this caller?
+
+    EITHER SIDE BEING ON IS ENOUGH. A screen and a person can both carry the
+    switch, and the alternative — one of them winning — is somebody turning
+    theirs on, seeing nothing, and having to work out which of two rows in two
+    different registers is holding it down. A diagnostic that has to be
+    debugged is not one.
+
+    Off is the default on both, so a deployment nobody has touched shows
+    nothing anywhere, which is the point of it."""
+    return bool((disp or {}).get("status")) or bool((ident or {}).get("status"))
+
+
 def display_label(rec):
     """What to call it in a list, which is never nothing.
 
@@ -2977,7 +3539,10 @@ def display_label(rec):
     return display_named(rec) or "unnamed display"
 
 
-KIOSK_FIELDS = ("kiosk", "kiosk_profile")
+#: What a screen still carries about being a kiosk. `kiosk_profile` went in
+#: 2026-08-20 — which layout a screen wears is the endpoint's to say, and a
+#: field only one of the two could win was a disagreement waiting to be had.
+KIOSK_FIELDS = ("kiosk",)
 
 
 def kiosk_of(rec, savers=None, looks=None, kiosks=None,
@@ -3008,9 +3573,18 @@ def kiosk_of(rec, savers=None, looks=None, kiosks=None,
     # The row's own choice first, and only then the port it came in on. A
     # screen that names a profile is a screen somebody decided about, and
     # nothing the endpoint says may move it.
-    want = str(rec.get("kiosk_profile") or "")
-    if not want:
-        want, _ = kiosk_from_port(nid, kiosks=kiosks)
+    # THE PORT, AND ONLY THE PORT. A screen carried its own profile and it beat
+    # whatever the endpoint said, on the reasoning that a row somebody decided
+    # about should not be moved by an endpoint. That is one question with two
+    # answers, which is the shape this panel keeps removing: a port carries one
+    # endpoint, an endpoint names one layout, and a page is loaded from exactly
+    # one address — so there is never more than one right answer, and a second
+    # place to state it is only a way for the two to disagree.
+    #
+    # The row's `kiosk_profile` is left on the record so an existing document
+    # round-trips rather than losing a key on its first save. Nothing reads it
+    # and nothing writes it — the same retirement `kind` had.
+    want, _ = kiosk_from_port(nid, kiosks=kiosks)
     prof = find_kiosk(want, kiosks) or {}
     # The three snapshots are merged into ONE map of settings before it leaves
     # here. The display already knows how to take a map of settings and apply
@@ -3029,6 +3603,14 @@ def kiosk_of(rec, savers=None, looks=None, kiosks=None,
         got = find_look(str(prof.get(key) or ""), pools[key] or [])
         if got:
             merged.update(got)
+    # …AND THE SLEEP WORD, which is the layout's own rather than one of the
+    # three it names. It was a shared setting, so every assistant on the server
+    # said goodbye to the same word — and a hallway that answers to one name
+    # ought to stop answering to its own. Overlaid after the merge because it
+    # belongs to this profile and nothing under it can contradict it.
+    for k in ("sleepword", "sleepaliases"):
+        if prof.get(k):
+            merged[k] = prof[k]
     return {"kiosk": True,
             "voice_only": bool(prof.get("voice_only", KIOSK_OFF["voice_only"])),
             "look": merged or None,
@@ -3045,7 +3627,7 @@ def kiosk_of(rec, savers=None, looks=None, kiosks=None,
 
 
 def validate_kiosk(obj, rec, kiosks):
-    """Returns (the two fields, error). Separate from
+    """Returns (the fields, error). Separate from
     validate_display_settings for the same reason the panel has a SAVE per
     block: these belong to one screen, those to the deployment, and one commit
     writing both would publish an edit somebody was halfway through.
@@ -3062,12 +3644,11 @@ def validate_kiosk(obj, rec, kiosks):
     # person pressing save must be told, or a panel left open while somebody
     # else deleted a profile silently sets a device to something it did not
     # choose.
-    if "kiosk_profile" in obj:
-        pid = str(obj["kiosk_profile"] or "")[:16]
-        if pid and not any(p["id"] == pid for p in kiosks):
-            return None, ("that kiosk profile no longer exists — reload the "
-                          "panel to see the current list")
-        out["kiosk_profile"] = pid
+    # THERE IS NO "kiosk_profile" HERE either, and for the same kind of reason
+    # the network went: a screen does not choose its layout any more than it
+    # chooses its port. Both come from the endpoint it is loaded from. A caller
+    # still sending one is simply ignored rather than refused — it is a stale
+    # panel, not a mistake anybody made.
     # There is no "network" here. A screen does not choose a port: it is
     # loaded from the port its endpoints answer on, which display_network
     # reads back off the grant.
@@ -3121,9 +3702,9 @@ def _displays_stamp(did=None):
     if isinstance(rows, dict):
         rows = [dict(r, id=k) for k, r in rows.items()]
     facts = sorted(
-        "%s|%s|%s|%s|%s|%s" % (r.get("id"), bool(r.get("approved")),
-                               bool(r.get("denied")), bool(r.get("kiosk")),
-                               r.get("kiosk_profile") or "", r.get("name") or "")
+        "%s|%s|%s|%s|%s" % (r.get("id"), bool(r.get("approved")),
+                            bool(r.get("denied")), bool(r.get("kiosk")),
+                            r.get("name") or "")
         for r in rows
         if isinstance(r, dict) and (did is None or r.get("id") == did))
     facts.append(json.dumps(raw.get("settings") or {}, sort_keys=True))
@@ -3241,7 +3822,7 @@ def display_network(did, doc=None):
     is a screen that cannot be loaded from a single address and is refused
     where it is made rather than discovered later."""
     doc = doc or read_routes()
-    nids = {str(r.get("network") or "")
+    nids = {route_network(r)
             for r in doc["routes"].values()
             if did in (r.get("displays") or [])}
     if len(nids) > 1:
@@ -3257,7 +3838,7 @@ def display_network_clash(rids, doc=None):
     alternative is a code that works and an assistant that silently never
     answers, which is the failure this whole setting was renamed away from."""
     doc = doc or read_routes()
-    seen = {str((doc["routes"].get(rid) or {}).get("network") or "")
+    seen = {route_network(doc["routes"].get(rid) or {})
             for rid in rids or []}
     if len(seen) < 2:
         return ""
@@ -3307,7 +3888,7 @@ def identity_places(rec, pid, host):
         r = doc["routes"][rid]
         if not r.get("enabled", True) or not subject_may(r, ident=who):
             continue
-        url = net_base_for(str(r.get("network") or ""), "/", host)
+        url = net_base_for(route_network(r), "/", host)
         if url:
             out.append({"name": r.get("name") or rid, "url": url})
     return out
@@ -3352,7 +3933,6 @@ def invite_display(name, by, setup=None):
     # rather than found and filled in afterwards on a row among fifty.
     if isinstance(setup, dict):
         rec["kiosk"] = bool(setup.get("kiosk"))
-        rec["kiosk_profile"] = str(setup.get("kiosk_profile") or "")[:16]
         # `network` is NOT set here any more. Where a screen is loaded from is
         # derived from the endpoints it is granted — see display_network.
     displays[did] = rec
@@ -3511,51 +4091,24 @@ def request_access(did, answers):
 
 
 def set_identity_endpoints(pid, rids):
-    """Which endpoints this PERSON may use. The identity half of
-    set_display_endpoints, and deliberately its twin: added where it is named,
-    removed everywhere else, allow-lists only.
+    """Which endpoints this PERSON may use, from their own row.
 
-    It exists because approving a request now creates a person rather than a
-    device, and the ticks beside APPROVE have to land somewhere. Sending them
-    to the display half would have written the browser's id into a list that
-    is read for people — a grant that looks made and reaches nobody."""
-    doc = read_routes()
-    want = set(rids or [])
-    changed = False
-    for rid, rec in doc["routes"].items():
-        has = pid in (rec.get("identities") or [])
-        if rid in want and not has:
-            rec["identities"] = list(rec.get("identities") or []) + [pid]
-            changed = True
-        elif rid not in want and has:
-            rec["identities"] = [p for p in rec["identities"] if p != pid]
-            changed = True
-    if changed:
-        write_routes(doc)
+    The identity half of set_display_endpoints, and deliberately its twin. It
+    exists because approving a request creates a person rather than a device,
+    and the ticks beside APPROVE have to land somewhere.
+
+    IT WROTE A LIST ON THE ENDPOINT until 2026-08-20, which stopped being
+    consulted the day an endpoint began naming a permission — the grant was
+    made, stored and read back, and reached nobody. It writes the authorize
+    profile now, which is where the answer is."""
+    return set_member_endpoints("identities", pid, rids)
 
 
 def set_display_endpoints(did, rids):
     """Which endpoints this display may use, as one gesture: added where it is
     named, removed everywhere else. The ticks are the whole truth rather than
-    an addition to something invisible.
-
-    Only ever the allow-lists. Naming an endpoint that is open to any display
-    does not restrict it — that would lock everybody else out as a side effect
-    of granting one person access, which is the opposite of what was asked."""
-    doc = read_routes()
-    want = set(rids or [])
-    changed = False
-    for rid, rec in doc["routes"].items():
-        has = did in (rec.get("displays") or [])
-        if rid in want and not has:
-            rec["displays"] = list(rec.get("displays") or []) + [did]
-            changed = True
-        elif rid not in want and has:
-            rec["displays"] = [d for d in rec["displays"] if d != did]
-            changed = True
-    if changed:
-        write_routes(doc)
-    return changed
+    an addition to something invisible."""
+    return set_member_endpoints("displays", did, rids)
 
 
 def open_default(doc):
@@ -3589,6 +4142,234 @@ def guest_path_broken(doc):
     return not display_settings()["guest_requests"] and not open_default(doc)
 
 
+def route_perm(rec, cfg=None):
+    """WHO MAY USE THIS ENDPOINT, resolved to the five fields that decide it.
+
+    An endpoint carried them: whether a person must be signed in, whether it is
+    restricted, and three allow-lists. It names a PERMISSION now — a named pair
+    of an authenticate profile and an authorize one — and this flattens that
+    pair back into the shape subject_may has always read, so the one function
+    every request goes through did not have to learn a new one.
+
+    NAMING NOTHING IS THE STRICT ANSWER, deliberately. An endpoint with no
+    permission is refused rather than open: the old default was `restricted`
+    False, which is safe only because it was the shape a route was BORN in — a
+    field somebody had to go and set. A missing pointer is not that; it is a
+    deployment mid-edit, and mid-edit is not a state to be permissive in."""
+    cfg = cfg or display_settings()
+    pid = str((rec or {}).get("permission") or "")
+    if not pid:
+        return None
+    perm = next((p for p in cfg.get("permissions") or [] if p["id"] == pid), None)
+    if not perm:
+        return None
+    vals = perm.get("values") or {}
+    authn = next((a for a in cfg.get("authns") or []
+                  if a["id"] == str(vals.get("authn") or "")), None)
+    authz = next((a for a in cfg.get("authzs") or []
+                  if a["id"] == str(vals.get("authz") or "")), None)
+    # HALF A PERMISSION IS NOT A PERMISSIVE ONE. A missing half used to read as
+    # an empty one, and an empty authorize profile means UNRESTRICTED — so
+    # deleting a profile two endpoints named would have opened both of them to
+    # anybody. Saving is guarded against leaving one dangling; this is the same
+    # answer given at the point of use, because a document can also arrive from
+    # a backup, a hand edit or a half-finished restore.
+    if authn is None or authz is None:
+        return None
+    av, zv = (authn.get("values") or {}), (authz.get("values") or {})
+    return {"needs_signin": bool(av.get("needs_signin")),
+            "session_idle": int(av.get("session_idle") or 0),
+            "restricted": bool(zv.get("restricted")),
+            "displays": list(zv.get("displays") or []),
+            "identities": list(zv.get("identities") or []),
+            "groups": list(zv.get("groups") or [])}
+
+
+#: The two allow-lists a row can be named in, and the two names the panel uses
+#: for them. `groups` is the third, and is never set from a row's own page.
+GRANT_KEYS = ("displays", "identities", "groups")
+
+
+def route_authz_id(rec, cfg):
+    """Which AUTHORIZE profile decides who may use this endpoint, or "".
+
+    One step short of route_perm on purpose: granting is a write, and a write
+    has to know the profile's identity rather than the flattened answer."""
+    pid = str((rec or {}).get("permission") or "")
+    perm = next((p for p in cfg.get("permissions") or [] if p["id"] == pid), None)
+    if not perm:
+        return ""
+    return str((perm.get("values") or {}).get("authz") or "")
+
+
+def granted_map(key, cfg=None, doc=None):
+    """member id -> the endpoints it may use, read through the permissions.
+
+    The panel draws a person's and a device's ticks from this. It used to read
+    a list on the endpoint itself, which stopped being consulted the day an
+    endpoint started naming a permission — so every one of those ticks was
+    still being drawn from a field nothing decided anything with."""
+    cfg = cfg or display_settings()
+    doc = doc or read_routes()
+    out = {}
+    for rid in route_order(doc):
+        perm = route_perm(doc["routes"][rid], cfg)
+        if not perm:
+            continue
+        for member in perm.get(key) or []:
+            out.setdefault(member, []).append(rid)
+    return out
+
+
+def set_member_endpoints(key, mid, rids):
+    """Which endpoints one row may use, written where the grant now lives.
+
+    THE PROFILE IS THE GRANT, and a profile can be named by more than one
+    endpoint — so ticking an endpoint grants every endpoint sharing its rule,
+    and unticking one takes the grant away from all of them. That is what
+    naming a rule once means, and it is the reason this returns the set that
+    actually resulted: the panel redraws from that rather than from what was
+    asked for, so an admin sees the reach of what they just did instead of a
+    tick list that disagrees with the server.
+
+    Only ever the allow-lists. A profile set to ANY DISPLAY is not restricted
+    by being named here — that would lock everybody else out as a side effect
+    of granting one person access, which is the opposite of what was asked."""
+    if key not in ("displays", "identities"):
+        raise ValueError("not a grantable list: %s" % key)
+    ddoc = read_displays_doc()
+    cfg = ddoc.get("settings")
+    if not isinstance(cfg, dict):
+        cfg = {}
+        ddoc["settings"] = cfg
+    doc = read_routes()
+    want = set(rids or [])
+    by = {}
+    for rid, rec in doc["routes"].items():
+        aid = route_authz_id(rec, cfg)
+        if aid:
+            by.setdefault(aid, []).append(rid)
+    changed = False
+    for a in cfg.get("authzs") or []:
+        here = by.get(a.get("id") or "") or []
+        if not here:
+            continue                     # a profile no endpoint uses
+        vals = a.setdefault("values", {})
+        lst = [x for x in (vals.get(key) or []) if isinstance(x, str)]
+        keep = any(r in want for r in here)
+        if keep and mid not in lst:
+            vals[key] = (lst + [mid])[:MAX_ALLOW]
+            changed = True
+        elif not keep and mid in lst:
+            vals[key] = [x for x in lst if x != mid]
+            changed = True
+    if changed:
+        _write_displays_doc(ddoc)
+    return granted_map(key, display_settings(), doc).get(mid, [])
+
+
+def drop_member_grants(mid):
+    """Every grant a deleted row held, in every authorize profile.
+
+    An allow-list holding somebody who no longer exists is a permission nobody
+    can see and nobody can withdraw — and worse than invisible now that a
+    profile is shared, because the next row to be given that id inherits it."""
+    ddoc = read_displays_doc()
+    cfg = ddoc.get("settings")
+    if not isinstance(cfg, dict):
+        return 0
+    hit = 0
+    for a in cfg.get("authzs") or []:
+        vals = a.get("values") or {}
+        for key in GRANT_KEYS:
+            lst = vals.get(key) or []
+            if mid in lst:
+                vals[key] = [x for x in lst if x != mid]
+                hit += 1
+    if hit:
+        _write_displays_doc(ddoc)
+    return hit
+
+
+def vouched(disp):
+    """Is this screen one an admin deliberately put here?
+
+    A CODE IS THE VOUCHING. An admin named the row, was handed six characters,
+    and carried them to the device — every step of that is a person deciding
+    this screen should exist. `origin` records which door a row came through
+    and it is set when the row is made, so this cannot be forged by anything
+    the device says about itself.
+
+    Approval alone is NOT enough and the distinction is the whole point:
+    `page` is a browser that opened the display page, which is anybody who can
+    reach the port. Those do not become devices any more — a browser that asks
+    is answered with an ACCOUNT, so the form is for people and a code is the
+    only way a device arrives — but old rows exist and must not be promoted by
+    a rule written after them."""
+    return bool(disp) and bool(disp.get("approved")) \
+        and str(disp.get("origin") or "") == "code"
+
+
+def route_conn(rec, cfg=None):
+    """The connection an endpoint names, as a values dict, or {}.
+
+    ONE INDIRECTION, IN ONE PLACE. An endpoint carried a model id and a network
+    id side by side; it carries the name of a pair now, and everything that
+    used to read either reads through here. Written as a lookup rather than
+    copied onto the route at save time for the reason every other profile is:
+    a copy is a second answer that stops agreeing with the first the moment
+    somebody edits the connection."""
+    cid = str((rec or {}).get("connection") or "")
+    if not cid:
+        return {}
+    pool = (cfg or display_settings()).get("connections") or []
+    for c in pool:
+        if c["id"] == cid:
+            return dict(c.get("values") or {})
+    return {}
+
+
+def route_layout(rec, cfg=None):
+    """The layout profile an endpoint hands to the screens on its port, as a
+    values dict, or {}.
+
+    It is the endpoint's face: what a screen wearing it looks like, sounds
+    like, and answers to. Read through here for the same reason route_conn is —
+    one indirection in one place."""
+    kid = str((rec or {}).get("kiosk_profile") or "")
+    if not kid:
+        return {}
+    for k in (cfg or display_settings()).get("kiosks") or []:
+        if k["id"] == kid:
+            return dict(k)
+    return {}
+
+
+def route_speech(rec, cfg=None):
+    """Which speech profile answers for this endpoint — through its layout.
+
+    It was a picker of its own on the endpoint, beside the layout picker, and
+    the two were answering one question: what this assistant sounds like. A
+    layout already names an appearance and a screensaver; the voice belongs
+    with them."""
+    return str(route_layout(rec, cfg).get("speech") or "")
+
+
+def route_network(rec, cfg=None):
+    """Which port this endpoint answers on — through its connection.
+
+    Eleven callers asked `rec.get("network")` directly: the listener loop, the
+    clash check, display_network, kiosk_from_port, net_base_for's callers and
+    the person's own base among them. They ask this instead, so the day the
+    indirection changes there is one place it changes in."""
+    return str(route_conn(rec, cfg).get("network") or "")
+
+
+def route_model(rec, cfg=None):
+    """…and which model it speaks to, by the same route."""
+    return str(route_conn(rec, cfg).get("model") or "")
+
+
 def subject_may(route, disp=None, ident=None):
     """May this caller use this endpoint?
 
@@ -3614,6 +4395,15 @@ def subject_may(route, disp=None, ident=None):
     # that reason — it has no person on it either.
     if disp and disp.get("preview"):
         return True
+    # THE FIVE FIELDS, THROUGH THE PERMISSION THIS ENDPOINT NAMES. They were on
+    # the route; everything below reads them from here instead, so this
+    # function is unchanged in what it decides and changed only in where it
+    # looks. An endpoint naming no permission is refused outright — see
+    # route_perm for why a missing pointer is not the same as an open door.
+    perm = route_perm(route)
+    if perm is None:
+        return False
+    route = perm
     # MUST THERE BE A PERSON. Above the allow-list test, because it applies to
     # an endpoint that has no allow-list at all: "open to anyone who signs in"
     # is a real and useful thing to say, and checking this after the
@@ -3621,7 +4411,20 @@ def subject_may(route, disp=None, ident=None):
     #
     # `ident` is only ever set for a browser holding a PROVED session — see
     # _identity — so a device is refused here whatever it was approved for.
-    if route.get("needs_signin") and not ident:
+    # WHO COUNTS AS KNOWN. A person who signed in, or a screen an admin
+    # enrolled with a code — see vouched. It was a person and only a person,
+    # and that made this setting refuse the one population it is most often
+    # wanted for: a hallway screen an admin hung deliberately could never use
+    # an endpoint that asked for a sign-in, because being approved is exactly
+    # what makes it a device and a device can never sign in. An admin who
+    # ticked such an endpoint onto such a screen got a grant that reached
+    # nothing, silently.
+    #
+    # WHAT IT NOW MEANS is no anonymous callers rather than a person for every
+    # question. A code-enrolled screen satisfies it, so whoever walks up to
+    # that screen uses it with no person attached — which is the trade being
+    # made deliberately: a wall is a place somebody vetted, not a stranger.
+    if route.get("needs_signin") and not ident and not vouched(disp):
         return False
     if not route.get("restricted"):
         return True
@@ -3677,7 +4480,7 @@ def kiosk_from_port(nid, doc=None, kiosks=None):
     doc = doc or read_routes()
     for rid in route_order(doc):
         rec = doc["routes"][rid]
-        if str(rec.get("network") or "") != str(nid):
+        if route_network(rec) != str(nid):
             continue
         pid = str(rec.get("kiosk_profile") or "")
         if not pid:
@@ -3696,16 +4499,13 @@ def admin_displays():
     out = []
     displays = read_displays()
     now_ = int(time.time())
-    # WHICH ENDPOINTS EACH ROW IS ON, read once for the whole list. It lives on
-    # the endpoint rather than on the display — an allow-list is a property of
-    # the thing being protected — so a panel drawing a row had to have the
-    # routes document to know, and the tabs that draw these rows never fetch
-    # it. The grant was made, stored and invisible: ticks that could only ever
-    # be empty on the one page that shows a device's settings.
-    granted = {}
-    for rid, rrec in read_routes()["routes"].items():
-        for member in (rrec.get("displays") or []):
-            granted.setdefault(member, []).append(rid)
+    # WHICH ENDPOINTS EACH ROW IS ON, read once for the whole list. It lives
+    # with the endpoint rather than on the display — an allow-list is a
+    # property of the thing being protected — so a panel drawing a row had to
+    # have the routes document to know, and the tabs that draw these rows never
+    # fetch it. The grant was made, stored and invisible: ticks that could only
+    # ever be empty on the one page that shows a device's settings.
+    granted = granted_map("displays")
     for did, rec in sorted(displays.items(), key=lambda kv: kv[1]["created"]):
         row = {k: rec.get(k) for k in
                ("name", "asked", "approved", "hint", "created", "last_seen",
@@ -3740,6 +4540,7 @@ def admin_displays():
                    # needs both: one is the control's value, the other is the
                    # answer a blank control is currently getting.
                    kind=str(rec.get("kind") or ""), arrived=enrolled_as(rec),
+                   status=bool(rec.get("status")),
                    # Three states, and the panel needs to tell them apart:
                    # INVITED is a row waiting for somebody to type its code
                    # into a screen, WAITING is a device that turned up on its
@@ -4641,7 +5442,15 @@ IDENTITY_DEFAULTS = {
     # rather than the deployment's: a password is entered at a login page, not
     # at a screen standing in a room, so there is no place carrying the risk to
     # set it from. Zero takes the deployment default.
+    # RETIRED. How long a sign-in survives is the authenticate profile's — see
+    # identity_hours. Kept so an existing document round-trips rather than
+    # losing a key on its first save; nothing reads it and nothing writes it.
     "session_hours": 0,
+    # THEIR OWN STATUS LINE, and it follows them. The device's is about one
+    # screen; this is about one person, on whatever they sign in at — which is
+    # what makes it useful for somebody debugging their own account from a
+    # laptop they have never used before. Either being on is enough.
+    "status": False,
     # NO ENDPOINT ON THE ROW. There was one, for exactly as long as the link's
     # address was derived from it — enrolment has a listener of its own now, so
     # the address is a deployment's answer rather than a property of the person
@@ -4698,8 +5507,17 @@ def write_identity_settings(pid, obj):
 
 
 def identity_hours(rec):
-    h = int(rec.get("session_hours") or 0)
-    return h if h > 0 else SESSION_HOURS_DEFAULT
+    """RETIRED as a per-person field. How long a sign-in survives is the
+    AUTHENTICATE profile's now — see route_perm — because it is a property of
+    the door somebody came through rather than of the person who came through
+    it. The field it read was on every identity with no control anywhere that
+    could set it, which is a setting nobody could see and nobody could change.
+
+    Still here, and still the deployment constant, because a session is opened
+    at the moment somebody signs in and that is before any endpoint is
+    involved: what the permission decides is when an IDLE one lapses, which
+    session_left answers."""
+    return SESSION_HOURS_DEFAULT
 
 
 def open_user_session(pid, hours):
@@ -4710,8 +5528,36 @@ def open_user_session(pid, hours):
         now_ = time.time()
         for t in [t for t, v in _user_sessions.items() if v["expires"] <= now_]:
             _user_sessions.pop(t, None)
-        _user_sessions[token] = {"pid": pid, "expires": now_ + hours * 3600}
+        # `idle` is nought until the first conversation. The limit that ends
+        # an idle session belongs to an AUTHENTICATE profile, and nothing
+        # names one yet at this moment: signing in happens at a login box,
+        # before any endpoint is involved. The first exchange sets it.
+        _user_sessions[token] = {"pid": pid, "expires": now_ + hours * 3600,
+                                 "idle": 0.0}
     return token
+
+
+def touch_user_session(token, minutes):
+    """A conversation happened; push the idle deadline out by this endpoint's
+    limit — or take the deadline away where it has none.
+
+    THE LIMIT IS THE TIME BETWEEN CONVERSATIONS, which is why this is called
+    from the ask handler and from nowhere else. A page open on a wall polls
+    this server every few seconds and none of that is somebody being present:
+    sliding on requests would mean a session that never lapsed as long as the
+    browser was switched on, which is the opposite of what the setting is for.
+
+    Read off the endpoint being spoken to rather than stored on the session,
+    because one person may use several and each may answer differently: the
+    deadline is always the one the last conversation set."""
+    tok = str(token or "")
+    if not tok:
+        return
+    with _user_lock:
+        rec = _user_sessions.get(tok)
+        if not rec:
+            return
+        rec["idle"] = (time.time() + minutes * 60) if minutes > 0 else 0.0
 
 
 def user_session_pid(token):
@@ -4721,7 +5567,12 @@ def user_session_pid(token):
     rec = _user_sessions.get(str(token or ""))
     if not rec:
         return ""
-    if rec["expires"] <= time.time():
+    now_ = time.time()
+    # EITHER DEADLINE ENDS IT. The absolute one is how long a sign-in may last
+    # at all; the idle one is how long it may sit between conversations, set by
+    # the authenticate profile of whatever was last spoken to.
+    idle = float(rec.get("idle") or 0)
+    if rec["expires"] <= now_ or (idle and idle <= now_):
         _user_sessions.pop(str(token), None)
         return ""
     return rec["pid"]
@@ -4865,9 +5716,13 @@ def wake_words_in_use(skip_pid=""):
     doc = read_routes()
     for rid in route_order(doc):
         rec = doc["routes"][rid]
-        prof = find_look(str(rec.get("speech") or ""), _speech_pool()) or {}
-        for w in [prof.get("wakeword") or rec.get("wakeword") or ""] \
-                 + list(prof.get("aliases") or rec.get("aliases") or []):
+        # THE LAYOUT, not the speech profile: that is where the words live
+        # now. A route's own copy is still the fallback, so an endpoint whose
+        # layout says nothing keeps whatever it was called.
+        lay = route_layout(rec)
+        alias = [a.strip() for a in str(lay.get("wakealiases") or "").splitlines()
+                 if a.strip()] or list(rec.get("aliases") or [])
+        for w in [lay.get("wakeword") or rec.get("wakeword") or ""] + alias:
             if w:
                 out.append((w, rec.get("name") or rid))
     for pid, rec in read_identities().items():
@@ -5064,15 +5919,12 @@ def admin_identities():
     # up itself would print an id on that tab and a name on the other one for
     # the same row. Read once for the whole list.
     doc = read_routes()
-    # WHAT EACH OF THEM IS ACTUALLY GRANTED, read off the allow-lists rather
-    # than stored on the row — the endpoint owns the grant and this is the
-    # same set its own `Who may use it` list shows. `granted` and not
-    # `endpoints`, because that is the key grantList reads for a display and
-    # the ticks on a person are meant to be the same control.
-    held = {}
-    for rid in route_order(doc):
-        for p in (doc["routes"][rid].get("identities") or []):
-            held.setdefault(p, []).append(rid)
+    # WHAT EACH OF THEM IS ACTUALLY GRANTED, read through each endpoint's
+    # permission rather than off a list on the endpoint — the authorize profile
+    # owns the grant, and this is the same set that profile's own list shows.
+    # `granted` and not `endpoints`, because that is the key grantList reads
+    # for a display and the ticks on a person are meant to be the same control.
+    held = granted_map("identities", doc=doc)
     # WHETHER, never what. That they have set a password is the fact the panel
     # is built on: it is what moves a row from the enrolment queue to the
     # register, and it is the one thing an admin cannot do for them.
@@ -5081,6 +5933,7 @@ def admin_identities():
                    "pw_set_at")},
                  id=pid, label=identity_label(rec),
                  granted=held.get(pid, []),
+                 status=bool(rec.get("status")),
                  wakeword=rec.get("wakeword") or "",
                  ready=identity_ready(rec))
             for pid, rec in sorted(rows.items(), key=lambda kv: kv[1]["created"])]
@@ -6598,6 +7451,7 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/displays", "/displays/approve", "/displays/rename",
                      "/displays/delete", "/displays/new", "/displays/reissue",
                      "/displays/decide", "/displays/settings", "/displays/kiosk",
+                     "/displays/status", "/identities/status",
                      "/groups", "/groups/save", "/groups/delete", "/groups/sets",
                      "/log", "/alerts", "/alerts/ack",
                      "/events", "/events/clear",
@@ -6928,6 +7782,19 @@ class Handler(SimpleHTTPRequestHandler):
         m = jar.get(USER_COOKIE)
         return user_session_pid(m.value) if m else ""
 
+    def _user_token(self):
+        """The token itself rather than who it belongs to. Only the idle timer
+        wants this: it has a session to push out, not a person to identify."""
+        raw = self.headers.get("Cookie")
+        if not raw or self.admin_port:
+            return ""
+        try:
+            jar = http.cookies.SimpleCookie(raw)
+        except http.cookies.CookieError:
+            return ""
+        m = jar.get(USER_COOKIE)
+        return m.value if m else ""
+
     def _set_user_cookie(self, token, hours):
         bits = ["%s=%s" % (USER_COOKIE, token), "Path=/", "HttpOnly",
                 "SameSite=Strict", "Max-Age=%d" % int(hours * 3600)]
@@ -7001,6 +7868,11 @@ class Handler(SimpleHTTPRequestHandler):
                # the socket was bound, so a screen is answered about the
                # address it is actually being viewed at rather than about the
                # one its row was created under.
+               # THE DIAGNOSTIC STRIP, for this screen. Sent whatever the
+               # state is, like the kiosk block beside it: a tablet nobody has
+               # approved is exactly the one somebody is standing in front of
+               # wondering why it does nothing, which is when it is wanted.
+               "status": bool(rec.get("status")),
                "kiosk": kiosk_of(rec, nid=self.pinned_net)}
         if may_ask:
             out["form"] = cfg["form"]
@@ -7412,6 +8284,14 @@ class Handler(SimpleHTTPRequestHandler):
                                     # explain why the switch will not move.
                                     "endpoints": [{"id": r, "name": doc["routes"][r]["name"],
                                                    "restricted": doc["routes"][r].get("restricted"),
+                                                   # WHETHER A DEVICE CAN USE IT
+                                                   # AT ALL. Sign-in required
+                                                   # refuses a screen outright,
+                                                   # whatever it was ticked for,
+                                                   # so a tick list that does not
+                                                   # know this offers grants that
+                                                   # reach nothing.
+                                                   "needs_signin": doc["routes"][r].get("needs_signin"),
                                                    "is_default": r == doc["default"]}
                                                   for r in route_order(doc)],
                                     "open_default": open_default(doc),
@@ -7584,6 +8464,7 @@ class Handler(SimpleHTTPRequestHandler):
                                     "endpoints": [
                                         {"id": r, "name": _doc["routes"][r]["name"],
                                          "restricted": _doc["routes"][r].get("restricted"),
+                                         "needs_signin": _doc["routes"][r].get("needs_signin"),
                                          "is_default": r == _doc["default"]}
                                         for r in route_order(_doc)],
                                     "max": MAX_IDENTITIES,
@@ -7926,9 +8807,9 @@ class Handler(SimpleHTTPRequestHandler):
                 unack_open(rid)
             # The wake word and the adapter kind, and never the key or the
             # URL it points at: a log is read by more people than the panel.
-            print("route %s (%s) saved by %s: wake=%s model=%s"
+            print("route %s (%s) saved by %s: wake=%s connection=%s"
                   % (rid, rec["name"], s["user"], rec["wakeword"],
-                     rec.get("model_profile") or "(default)"), flush=True)
+                     rec.get("connection") or "(none)"), flush=True)
             return self._json(200, {"ok": True, "id": rid,
                                     "routes": admin_routes(doc),
                                     "default": doc["default"]})
@@ -8251,6 +9132,10 @@ class Handler(SimpleHTTPRequestHandler):
                     # so "signed in" and "not" is the whole of it.
                     out = {"id": who["id"], "name": who["name"] or "",
                            "email": who.get("email") or "",
+                           # Theirs, which travels with them — the display's
+                           # own is on the other branch of this answer, and
+                           # either being on is enough. See status_for.
+                           "status": bool(who.get("status")),
                            "settings": identity_settings(who["id"])}
                     return self._json(200, {"person": out})
             if disp:
@@ -8906,14 +9791,7 @@ class Handler(SimpleHTTPRequestHandler):
             # An allow-list holding somebody who no longer exists is a
             # permission nobody can see and nobody can withdraw. Cleared here,
             # exactly as a deleted display's is.
-            doc = read_routes()
-            touched = [r for r, o in doc["routes"].items()
-                       if pid in (o.get("identities") or [])]
-            for r in touched:
-                doc["routes"][r]["identities"] = [
-                    p for p in doc["routes"][r]["identities"] if p != pid]
-            if touched:
-                write_routes(doc)
+            touched = [None] * drop_member_grants(pid)
             print("identity %s (%s) deleted by %s%s%s"
                   % (pid, name, s["user"],
                      " — removed from %d endpoint(s)" % len(touched)
@@ -8990,14 +9868,7 @@ class Handler(SimpleHTTPRequestHandler):
             # nobody can see and nobody can withdraw — the same reasoning that
             # clears a deleted display from an allow-list, and a deleted
             # endpoint from a fallthrough.
-            doc = read_routes()
-            touched = [r for r, o in doc["routes"].items()
-                       if gid in (o.get("groups") or [])]
-            for r in touched:
-                doc["routes"][r]["groups"] = [g for g in doc["routes"][r]["groups"]
-                                              if g != gid]
-            if touched:
-                write_routes(doc)
+            touched = [None] * drop_member_grants(gid)
             print("group %s (%s) deleted by %s%s"
                   % (gid, name, s["user"],
                      " — removed from %d endpoint(s)" % len(touched)
@@ -9199,13 +10070,12 @@ class Handler(SimpleHTTPRequestHandler):
             # Validated here rather than trusted: a profile id that does not
             # exist would leave a screen naming nothing, which reads on the row
             # as a setting somebody chose.
+            #
+            # NO LAYOUT HERE ANY MORE. A screen named one when it was created
+            # and that beat the endpoint's; layout comes from the endpoint now,
+            # so there is nothing to name and nothing to validate.
             cfg = display_settings()
-            kp = str(obj.get("kiosk_profile") or "")[:16]
             nw = str(obj.get("network") or "")[:16]
-            if kp and not any(k["id"] == kp for k in cfg["kiosks"]):
-                return self._json(400, {"error": "that layout profile no "
-                                                 "longer exists — reload the "
-                                                 "panel to see the list"})
             if nw and not any(n["id"] == nw for n in cfg["networks"]):
                 return self._json(400, {"error": "that network profile no "
                                                  "longer exists — reload the "
@@ -9232,7 +10102,7 @@ class Handler(SimpleHTTPRequestHandler):
             rec, err = invite_display(str(obj.get("name") or "").strip()[:40],
                                       s["user"],
                                       {"kiosk": obj.get("kiosk"),
-                                       "kiosk_profile": kp, "network": nw})
+                                       "network": nw})
             if err:
                 return self._json(400, {"error": err})
             # Granted through the same call the row's own ticks use, so there
@@ -9325,6 +10195,62 @@ class Handler(SimpleHTTPRequestHandler):
                      "approved" if on else "approval withdrawn", s["user"]),
                   flush=True)
             return self._json(200, {"ok": True, "displays": admin_displays()})
+
+        if parsed.path == "/displays/status":
+            # THE DIAGNOSTIC STRIP, on one row or on many. Its own endpoint
+            # because it is switched on to watch something and off again a
+            # minute later, which is nothing like the gestures that name a
+            # screen or dress it — and because the register wants to do it to
+            # a selection in one press.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            want = obj.get("on") is not False
+            ids = obj.get("ids")
+            if ids is None:
+                ids = [obj.get("id")]
+            ids = [str(i) for i in ids if i]
+            displays = read_displays()
+            missing = [i for i in ids if i not in displays]
+            if not ids or missing:
+                return self._json(404, {"error": "no such display"})
+            for did in ids:
+                displays[did]["status"] = want
+            write_displays(displays)
+            print("status line %s for %d display(s) by %s"
+                  % ("on" if want else "off", len(ids), s["user"]), flush=True)
+            return self._json(200, {"ok": True, "on": want, "count": len(ids),
+                                    "displays": admin_displays()})
+
+        if parsed.path == "/identities/status":
+            # The same switch, one population over. A person's follows them to
+            # whatever they sign in at, which is the whole reason it is not
+            # simply a property of the screen.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            want = obj.get("on") is not False
+            ids = obj.get("ids")
+            if ids is None:
+                ids = [obj.get("id")]
+            ids = [str(i) for i in ids if i]
+            rows = read_identities()
+            missing = [i for i in ids if i not in rows]
+            if not ids or missing:
+                return self._json(404, {"error": "no such identity"})
+            for pid in ids:
+                rows[pid]["status"] = want
+            write_identities(rows)
+            print("status line %s for %d identity(s) by %s"
+                  % ("on" if want else "off", len(ids), s["user"]), flush=True)
+            return self._json(200, {"ok": True, "on": want, "count": len(ids),
+                                    "identities": admin_identities()})
 
         if parsed.path == "/displays/kiosk":
             # What this screen looks like where it hangs. Its own endpoint
@@ -9437,14 +10363,7 @@ class Handler(SimpleHTTPRequestHandler):
             # An allow-list holding the id of a display that no longer exists
             # is a permission nobody can see and nobody can withdraw. Cleared
             # here, for the same reason a deleted endpoint's fallthrough is.
-            doc = read_routes()
-            touched = [r for r, o in doc["routes"].items()
-                       if did in (o.get("displays") or [])]
-            for r in touched:
-                doc["routes"][r]["displays"] = [d for d in doc["routes"][r]["displays"]
-                                                if d != did]
-            if touched:
-                write_routes(doc)
+            touched = [None] * drop_member_grants(did)
             print("display %s (%s) deleted by %s%s%s"
                   % (did, name, s["user"],
                      " — removed from %d endpoint(s)" % len(touched)
@@ -9531,6 +10450,15 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(403, dict(about, refused="display",
                                             error="this display may not use "
                                                   "that endpoint"))
+
+            # THE IDLE CLOCK, RESET. Past the gate is a conversation starting,
+            # which is the event the authenticate profile's limit measures the
+            # gap between — not a request, of which a display makes hundreds
+            # while nobody is in the room.
+            if ident:
+                touch_user_session(
+                    self._user_token(),
+                    int((route_perm(cfg) or {}).get("session_idle") or 0))
             if cfg["provider"] == "demo":
                 # The display owns the demo replies; say so plainly rather
                 # than inventing a second set that drifts from the first.
@@ -9795,6 +10723,16 @@ def main():
     migrate_kiosks()
     migrate_models()
     migrate_networks()
+    # AFTER the two it pairs, because it reads the ids they produce. A fresh
+    # install running all three in one startup has its models and its ports
+    # before anything tries to name a pair of them.
+    migrate_connections()
+    # After the layouts exist and before anything reads a wake word.
+    migrate_wake_words()
+    # After the connections, because it resolves a route's model through one.
+    migrate_model_limits()
+    # Last of them, and it reads five fields the others do not touch.
+    migrate_permissions()
     # The two groups that always exist. Made at startup rather than on first
     # need, so they are there before anything can enrol into them and there is
     # no moment where a population has nowhere to land.
@@ -9884,7 +10822,7 @@ def main():
     for _rid, _r in _doc["routes"].items():
         if not _r.get("enabled", True):
             continue
-        _on = str(_r.get("network") or "")
+        _on = route_network(_r)
         if not _on:
             # NO PORT, SO NOWHERE. Named rather than counted: an assistant
             # nobody can reach is a fault, and the only thing worse than the
