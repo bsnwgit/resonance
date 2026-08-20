@@ -2317,7 +2317,7 @@ had a nominated DEFAULT, and every figure on the wall was a variation on the
 same figure. Both were things the deployment decided on an admin's behalf.
 
 - **The five nominated defaults are gone** — appearance, geometry, speech,
-  models and interface profiles. A row naming nothing is not quietly handed
+  models and layout profiles. A row naming nothing is not quietly handed
   somebody else's profile: an endpoint with no model profile is on `demo` and
   says so, a route with no speech profile speaks in the page's own voice, a
   screen with no appearance profile shows what the page ships with. What made
@@ -2362,11 +2362,11 @@ same figure. Both were things the deployment decided on an admin's behalf.
   it hears: the first attempt put it at the top of `Mic.step` as an early
   return, which took the voice-activity detector and the recorder with it and
   stopped the display hearing its own name.
-- **A interface profile can say *listen from the moment it loads*.** A wall
+- **A layout profile can say *listen from the moment it loads*.** A wall
   screen has nobody to press TALK, and every reload left it deaf. It is a
   request rather than a guarantee — the browser decides — so a refusal falls
   back to the first touch, which is the same touch that asks for full screen.
-- **An endpoint can hand a interface profile to the screens it names**, and a
+- **An endpoint can hand a layout profile to the screens it names**, and a
   screen's own choice always wins. Only endpoints that NAME it, and only when
   the answer is unambiguous: a screen can be granted several endpoints, so it
   can have several parents, and two that disagree resolve to nothing rather

@@ -991,7 +991,7 @@ ROUTE_DEFAULTS.update({
     # only limits which rooms it is answered in.
     "needs_signin": False,
     "displays": [],
-    # The interface profile every screen opened on THIS ENDPOINT'S PORT gets.
+    # The layout profile every screen opened on THIS ENDPOINT'S PORT gets.
     # Read only where the screen's own row names none — see kiosk_from_port,
     # which is where the rule actually lives.
     "kiosk_profile": "",
@@ -1336,7 +1336,7 @@ def validate_route(obj, current, doc, rid=None):
         pid = str(obj["kiosk_profile"] or "")[:16]
         if pid and not any(k["id"] == pid
                            for k in display_settings()["kiosks"]):
-            return None, ("that interface profile no longer exists — reload the "
+            return None, ("that layout profile no longer exists — reload the "
                           "panel to see the current list")
         rec["kiosk_profile"] = pid
     if "speech" in obj:
@@ -2996,7 +2996,7 @@ def kiosk_of(rec, savers=None, looks=None, kiosks=None,
     see the note below and the picker on the register."""
     # NO "NOT A KIOSK" BRANCH ANY MORE, and the field it read is on its way
     # out with it. It made sense while a shared settings document dressed every
-    # screen whether or not it was in interface mode; that document is gone, so a
+    # screen whether or not it was in layout mode; that document is gone, so a
     # row in that state had nothing dressing it and came out looking broken
     # rather than plain. Every display row is a display. Rows stored `False`
     # before this are read as True rather than migrated on disk — the same
@@ -3651,7 +3651,7 @@ def subject_may(route, disp=None, ident=None):
 
 
 def kiosk_from_port(nid, doc=None, kiosks=None):
-    """The interface profile a screen gets from THE PORT IT WAS OPENED ON.
+    """The layout profile a screen gets from THE PORT IT WAS OPENED ON.
 
     Returns (profile id, endpoint name). Empty id means the port carries no
     endpoint, or the one it carries names no profile.
@@ -9203,7 +9203,7 @@ class Handler(SimpleHTTPRequestHandler):
             kp = str(obj.get("kiosk_profile") or "")[:16]
             nw = str(obj.get("network") or "")[:16]
             if kp and not any(k["id"] == kp for k in cfg["kiosks"]):
-                return self._json(400, {"error": "that interface profile no "
+                return self._json(400, {"error": "that layout profile no "
                                                  "longer exists — reload the "
                                                  "panel to see the list"})
             if nw and not any(n["id"] == nw for n in cfg["networks"]):
