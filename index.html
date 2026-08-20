@@ -639,10 +639,12 @@
      into the canvas for the duration, because an outage lasts hours and a
      stationary line held that long on a screen whose whole purpose at that
      moment is that nothing stays still is the one thing left to burn in. */
-  /* NOT WHILE IT DRIFTS. A line that never moves is the exact thing the
-     screensaver exists to drift away from, so the clock goes with the rest of
-     the overlays rather than being the one that burns in. Same rule, same
-     shape, as the lost-server line below it. */
+  /* NOT WHILE IT DRIFTS — as a BAR. The time itself does not go: it is
+     painted into the canvas for the duration, where it travels with the figure
+     instead of holding still. A line that never moves is the exact thing the
+     screensaver exists to drift away from, and a wall clock that disappears
+     the moment the hallway goes quiet is a wall clock nobody can use. See
+     render(). */
   body[data-clock]:not([data-saver]) #clockline{display:flex}
   body[data-offline]:not([data-saver]) #offline{display:flex}
 </style>
@@ -1458,12 +1460,19 @@ const Clock = {
                           + '-' + this.two(d.getDate());
     return d.toLocaleDateString();
   },
+  /* THE LAST STRINGS, kept. The screensaver paints this into the canvas and
+     that runs every frame — formatting a date sixty times a second to draw
+     the same two words is work a wall screen does for a year. They change
+     once a minute and are read from here in between. */
+  tstr: '', dstr: '',
   paint(){
+    const now = new Date();
+    this.tstr = this.time(now);
+    this.dstr = this.date(now);
     const t = $('cktime'), dl = $('ckdate');
     if (!t || !dl) return;
-    const now = new Date();
-    t.textContent = this.time(now);
-    dl.textContent = this.date(now);
+    t.textContent = this.tstr;
+    dl.textContent = this.dstr;
   },
 };
 
@@ -3071,6 +3080,38 @@ function render(){
              + getComputedStyle(document.body).fontFamily;
     ctx.fillStyle = '#e0716b';
     ctx.fillText(OFFLINE, cx, cy - short * 0.22 * Saver.scale);
+    ctx.restore();
+  }
+
+  /* --- and the clock, which is the one thing here worth reading while it
+         drifts ---
+     The DOM bar is hidden for the duration like every other overlay, and this
+     is what replaces it: the same two lines, travelling with the figure and
+     easing with it, so a hallway can be glanced at at two in the morning
+     without the time being the one shape burnt into the panel.
+
+     ABOVE the figure and further out than the outage line, so the two never
+     land on each other; the invitation is below. The time carries the size —
+     it is what somebody crossing a room is reading — and the date sits under
+     it at the scale the rest of this frame uses. */
+  if (typeof Kiosk !== 'undefined' && Kiosk.clock
+      && Clock.tstr && Saver.amount > 0.01){
+    const short = Math.min(W, H);
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgb(' + pal.glass + ')';
+    ctx.globalAlpha = 0.52 * Saver.amount;
+    ctx.font = Math.round(Math.max(14*DPR, short*0.050*Saver.scale)) + 'px '
+             + getComputedStyle(document.body).fontFamily;
+    ctx.fillText(Clock.tstr, cx, cy - short * 0.33 * Saver.scale);
+    if (Clock.dstr){
+      ctx.globalAlpha = 0.34 * Saver.amount;
+      ctx.font = Math.round(Math.max(10*DPR, short*0.022*Saver.scale)) + 'px '
+               + getComputedStyle(document.body).fontFamily;
+      ctx.fillText(Clock.dstr, cx, cy - short * 0.275 * Saver.scale);
+    }
     ctx.restore();
   }
 
