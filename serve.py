@@ -1132,7 +1132,17 @@ def route_order(doc):
 #: What a model profile carries. `fallthrough` is deliberately NOT here: it
 #: names another endpoint, so it belongs to the endpoint rather than to a
 #: connection several of them might share.
-MODEL_KEYS = ("provider", "base_url", "model", "api_key", "agent_id")
+#: What a model profile holds. The first five are the connection itself; the
+#: six after them are HOW YOU TALK TO IT — the limits and the instructions —
+#: and they were on the endpoint until 2026-08-20.
+#:
+#: They belong here because they are properties of the model, not of the
+#: assistant in front of it: a context window and a token ceiling are facts
+#: about what is being spoken to, and two endpoints on one model wanting two
+#: different ceilings is not a case anybody has. Set once, where the model is.
+MODEL_KEYS = ("provider", "base_url", "model", "api_key", "agent_id",
+              "system", "max_tokens", "temperature", "timeout",
+              "keep_alive", "history_turns")
 
 
 def _model_pool():
@@ -1146,8 +1156,10 @@ def with_model(rec):
     """A route's connection, resolved from the model profile it names.
 
     Overlaid rather than replacing the record, so everything that is still the
-    ROUTE's — its system prompt, its limits, where it falls through to — is
-    untouched. A route naming no profile — or naming one that has been
+    ROUTE's — where it falls through to, what it is called — is untouched. The
+    limits and the prompt came the other way in 2026-08-20: they are the
+    model's now, and a route's stored copies are read only where the profile
+    says nothing. A route naming no profile — or naming one that has been
     deleted — resolves to nothing and stays on `demo`, rather than being
     quietly connected to a model somebody picked for a different endpoint. It
     used to fall back to a nominated default, which is how an endpoint could be
@@ -2901,6 +2913,69 @@ def write_displays(displays):
     doc = read_displays_doc()
     doc["displays"] = displays
     _write_displays_doc(doc)
+
+
+#: The six that moved from the endpoint onto the model profile.
+MODEL_TALK_KEYS = ("system", "max_tokens", "temperature", "timeout",
+                   "keep_alive", "history_turns")
+
+
+def migrate_model_limits():
+    """Copy each endpoint's limits and system prompt onto the model profile it
+    speaks to.
+
+    They were the endpoint's, and they are the model's — a context window and a
+    token ceiling are facts about what is being spoken to. Without this every
+    profile comes up at the shipped defaults and every carefully-set ceiling and
+    every system prompt on the server is silently replaced by one.
+
+    THE FIRST ENDPOINT USING A PROFILE WINS, and where two disagree the second
+    is said out loud rather than dropped quietly — that is a real setting
+    somebody made, and the only warning they will get that it is not being
+    carried across.
+
+    WHERE THE PROFILE ALREADY SAYS SOMETHING IT IS LEFT ALONE. This fills
+    blanks; it does not overwrite an answer somebody gave."""
+    doc = read_routes()
+    routes = doc.get("routes") or {}
+    if not routes:
+        return
+    ddoc = read_displays_doc()
+    cfg = ddoc.get("settings")
+    cfg = dict(cfg) if isinstance(cfg, dict) else {}
+    models = clean_profiles(cfg.get("models"), "n", MAX_LOOKS)
+    if not models:
+        return
+    by_id = {m["id"]: m for m in models}
+    claimed, moved, clashed = {}, 0, []
+    for rid in route_order(doc):
+        rec = routes[rid]
+        prof = by_id.get(route_model(rec, cfg) or str(rec.get("model_profile") or ""))
+        if not prof:
+            continue
+        vals = prof.setdefault("values", {})
+        if any(k in vals for k in MODEL_TALK_KEYS):
+            continue                        # already carries them
+        if claimed.get(prof["id"]):
+            same = all(rec.get(k) == routes[claimed[prof["id"]]].get(k)
+                       for k in MODEL_TALK_KEYS)
+            if not same:
+                clashed.append(rec.get("name") or rid)
+            continue
+        for k in MODEL_TALK_KEYS:
+            if k in rec:
+                vals[k] = rec[k]
+        claimed[prof["id"]] = rid
+        moved += 1
+    if not moved:
+        return
+    cfg["models"] = models
+    ddoc["settings"] = cfg
+    _write_displays_doc(ddoc)
+    print("limits: moved onto %d model profile(s)%s" % (
+        moved,
+        (" — %s had different ones and kept the first endpoint's: %s"
+         % (len(clashed), ", ".join(clashed))) if clashed else ""), flush=True)
 
 
 def migrate_wake_words():
@@ -10263,6 +10338,8 @@ def main():
     migrate_connections()
     # After the layouts exist and before anything reads a wake word.
     migrate_wake_words()
+    # After the connections, because it resolves a route's model through one.
+    migrate_model_limits()
     # The two groups that always exist. Made at startup rather than on first
     # need, so they are there before anything can enrol into them and there is
     # no moment where a population has nowhere to land.

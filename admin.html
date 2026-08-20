@@ -5577,8 +5577,10 @@ $('b_appsave').addEventListener('click', async ()=>{
    a stale copy beside the pair, and reading controls that no longer exist sent
    every endpoint back as DEMO on no port — the same failure the provider
    fields had when they moved onto the model profile. */
-const RT_FIELDS = ['name','connection','system',
-                   'kiosk_profile','keep_alive'];
+/* `system` and `keep_alive` are gone with the limits: they are the model
+   profile's, and sending them from a block that no longer has the controls
+   would publish an empty string over what the profile holds. */
+const RT_FIELDS = ['name','connection','kiosk_profile'];
 const RT_SLIDERS = {max_tokens:  v=> v,
                     temperature: v=> (+v).toFixed(2),
                     history_turns: v=> v == 0 ? 'none' : v,
@@ -5807,62 +5809,12 @@ nothing for one of those.</div>
   <!-- THE NETWORK SUBGROUP WENT WITH THE MODEL PICKER. Which port an
        endpoint answers on is half of its connection, chosen with the other
        half under one name, rather than a second question asked here. -->
-<div class="subgrp" data-g="limits">
-    <h5>Limits<span class="subsum"></span></h5>
-    <div class="subbody">
-  <div class="sl" data-r="maxrow"><label>Reply limit (tokens)</label><output data-o="max_tokens"></output><input data-s="max_tokens" type="range" min="16" max="2000" step="16"></div>
-  <div class="sl" data-r="temprow"><label>Temperature</label><output data-o="temperature"></output><input data-s="temperature" type="range" min="0" max="1.5" step=".05"></div>
-  <div class="sl" data-r="ctxrow"><label>Turns of context</label><output data-o="history_turns"></output><input data-s="history_turns" type="range" min="0" max="24" step="1"></div>
-  <div class="sl"><label>Timeout</label><output data-o="timeout"></output><input data-s="timeout" type="range" min="5" max="600" step="5"></div>
-  <div data-r="keepaliverow">
-  <label class="bklab">Keep model loaded</label>
-  <input data-f="keep_alive" type="text" spellcheck="false" autocomplete="off"
-         placeholder="30m">
-  </div>
-  <div class="note" data-r="anthnote" style="display:none">Temperature and
-keep-alive are not sent to Anthropic.</div>
-  <!-- One line, because it is STATE: which of these apply to what this
-       endpoint is currently pointed at. The reasoning behind it moved under
-       the ? with the rest of the prose. -->
-  <div class="note" data-r="hanote" style="display:none">Only the timeout
-applies to Home Assistant.</div>
-  <div class="note help">A cold model can take half a minute to load before it
-says anything, so keep the timeout generous — one tuned to a warm model looks
-like a dead server every morning. <b>turns of context</b> is how much of the
-conversation goes back with each question: at zero, "and the other one?" means
-nothing. <b>keep model loaded</b> is an Ollama extension that holds it in
-memory so the next question isn't the slow one.
-
-<b>Home Assistant holds the conversation itself</b>, and what the agent is told
-is configured over there — so the reply limit, the temperature, the context
-length and the whole System prompt section are not shown when it is pointed at
-one: nothing would read them. Any wording already typed is kept, and comes back
-if this endpoint is pointed at a model again.
-
-Set the timeout to the <b>agent</b>, not to "Home Assistant": the built-in
-intent engine answers in about a tenth of a second, while an LLM-backed one is
-two model passes with your exposed entities in the prompt each time. On modest
-hardware that is tens of seconds, and a timeout chosen for the first cuts off
-the second just before it succeeds.
-
-<b>Anthropic</b> is not sent the temperature or the keep-alive — steer it with
-the system prompt.</div>
-    </div>
-  </div>
-
-  <div class="subgrp" data-g="prompt">
-    <h5>System prompt<span class="subsum"></span></h5>
-    <div class="subbody">
-  <textarea data-f="system" rows="7" spellcheck="false"></textarea>
-  <div class="seg actrow">
-    <button data-a="resetprompt" class="act-undo" title="back to the wording this ships with">RESET</button>
-  </div>
-  <div class="note help">Sent ahead of every question this endpoint is asked.
-Each has its own — a house controller and a general assistant want different
-instructions, and one wording covering both suits neither. The reply is read
-out loud, so ask for plain prose.</div>
-    </div>
-  </div>
+<!-- LIMITS AND THE SYSTEM PROMPT MOVED ONTO THE MODEL PROFILE. A context
+       window, a token ceiling and the instructions sent ahead of every question
+       are facts about what is being spoken to, not about the assistant in
+       front of it — and two endpoints on one model wanting two different
+       ceilings is not a case anybody has. They are set once, under
+       PROFILES ▸ MODELS, where the model is. -->
 
   </div><!-- /subwrap -->
 
@@ -6086,13 +6038,6 @@ function blockPaint(blk, r){
                                              ? ' ' + n.values.port : '')
                                  : 'no port');
     })(),
-    limits: routeProvider(r) === 'homeassistant' ? r.timeout + 's'
-          : r.max_tokens + ' tokens · '
-          + (r.history_turns ? r.history_turns + ' turns' : 'no context') + ' · '
-          + r.timeout + 's',
-    prompt: routeProvider(r) === 'demo' ? 'not used in demo'
-          : routeProvider(r) === 'homeassistant' ? 'set in Home Assistant'
-          : ((r.system || '').trim().split(/\s+/).filter(Boolean).length + ' words'),
   };
   Object.keys(sums).forEach(g=>{
     const h = blk.querySelector('[data-g="' + g + '"] .subsum');
@@ -6585,6 +6530,8 @@ async function blockAction(blk, act, btn){
   const rid = blk.dataset.rid;
   const rec = blk._rec || {};
   if (act === 'resetprompt'){
+    /* The button is on the model profile now; this stays only so an older
+       page in somebody's tab does not throw. */
     const t = F(blk, 'system');
     t.value = SHIPPED_PROMPT; t.dataset.touched = '1';
     return blockNote(blk, 'back to the shipped wording — not saved yet');
@@ -8265,6 +8212,13 @@ let DPMODELS = [], OPENMD = -1;
 const PROVIDERS = [['demo','DEMO'], ['openai','OPENAI-COMPATIBLE'],
                    ['anthropic','ANTHROPIC'], ['homeassistant','HOME ASSISTANT']];
 
+/* The shipped values, for a slider on a profile that has never been given one.
+   Same numbers ROUTE_DEFAULTS carries on the server — a slider that opened at
+   its own minimum would read as a setting somebody chose. */
+const RT_DEFAULTS = {max_tokens: 400, temperature: 0.7, history_turns: 8,
+                     timeout: 120};
+
+function paintModelsRows(list){ return list; }
 function paintModels(list){
   DPMODELS = (list || []).map(m=> ({id: m.id || '', _new: !!m._new,
                                     name: m.name || '', has_key: !!m.has_key,
@@ -8347,6 +8301,71 @@ function paintModels(list){
                                                      : '', 'password');
       k.value = '';
       k.oninput = ()=>{ v.api_key = k.value; };
+    }
+
+    /* HOW YOU TALK TO IT, which came off the endpoint. A context window and a
+       token ceiling are facts about what is being spoken to rather than about
+       the assistant in front of it, and two endpoints on one model wanting two
+       different ceilings is not a case anybody has. Set once, where the model
+       is.
+
+       Only what this provider actually reads, the same rule the fields above
+       follow: DEMO answers from the display and reads none of it; Home
+       Assistant holds the conversation and the instructions itself, so only
+       the timeout survives; Anthropic is sent neither the temperature nor the
+       keep-alive. */
+    const slider = (label, key, lo, hi, step, fmt)=>{
+      const w = document.createElement('div'); w.className = 'sl';
+      const b = document.createElement('label'); b.textContent = label;
+      const out = document.createElement('output');
+      const inp = document.createElement('input');
+      inp.type = 'range'; inp.min = lo; inp.max = hi; inp.step = step;
+      inp.value = (v[key] !== undefined && v[key] !== '') ? v[key]
+                : (RT_DEFAULTS[key] !== undefined ? RT_DEFAULTS[key] : lo);
+      const show = ()=>{ out.textContent = fmt ? fmt(inp.value) : inp.value; };
+      show();
+      inp.oninput = ()=>{ v[key] = parseFloat(inp.value); show(); };
+      w.appendChild(b); w.appendChild(out); w.appendChild(inp);
+      row.appendChild(w);
+    };
+    const ha = v.provider === 'homeassistant', demo = v.provider === 'demo',
+          anth = v.provider === 'anthropic';
+    if (!demo){
+      if (!ha){
+        slider('Reply limit (tokens)', 'max_tokens', 16, 2000, 16);
+        if (!anth) slider('Temperature', 'temperature', 0, 1.5, .05,
+                          x=> (+x).toFixed(2));
+        slider('Turns of context', 'history_turns', 0, 24, 1,
+               x=> x == 0 ? 'none' : x);
+      }
+      slider('Timeout', 'timeout', 5, 600, 5, x=> x + 's');
+      if (!ha && !anth) text('Keep model loaded', 'keep_alive', '30m');
+      if (!ha){
+        const b = document.createElement('b');
+        b.textContent = 'System prompt';
+        const ta = document.createElement('textarea');
+        ta.rows = 7; ta.spellcheck = false;
+        ta.value = v.system || '';
+        ta.oninput = ()=>{ v.system = ta.value; };
+        const w = document.createElement('div'); w.className = 'namerow';
+        w.appendChild(b); row.appendChild(w); row.appendChild(ta);
+      }
+      const n = document.createElement('div');
+      n.className = 'note';
+      n.textContent = ha
+        ? 'Home Assistant holds the conversation and instructs its own agent, '
+          + 'so only the timeout reaches it. Set it to the AGENT: an '
+          + 'LLM-backed one is two model passes with your entities in the '
+          + 'prompt, which a timeout chosen for the built-in engine cuts off '
+          + 'just before it succeeds.'
+        : anth
+          ? 'Anthropic is sent neither the temperature nor the keep-alive — '
+            + 'steer it with the system prompt.'
+          : 'A cold model can take half a minute to load before it says '
+            + 'anything, so keep the timeout generous. Turns of context is how '
+            + 'much of the conversation goes back with each question: at zero, '
+            + '\u201cand the other one?\u201d means nothing.';
+      row.appendChild(n);
     }
 
     const acts = document.createElement('div'); acts.className = 'acts';
