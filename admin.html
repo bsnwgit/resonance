@@ -6118,15 +6118,14 @@ function blockPaint(blk, r){
     /* NONE is a real answer and reads as one: no connection is an endpoint
        that speaks to nothing and answers nowhere, which is exactly what a
        half-built one is. */
+    /* THE NAME AND NOTHING ELSE. A select is as wide as its longest option, so
+       spelling the pair out here set the width of the control from the longest
+       model name on the server — and what the pair holds is one tab away,
+       stated once, rather than restated on every endpoint that uses it. The
+       shut row's own line still says both halves, which is where you read it
+       without opening anything. */
     const opts = [['', 'NONE — demo replies, no port']]
-      .concat(pool.map(c=> {
-        const m = ((DPCFG && DPCFG.models) || [])
-                    .filter(x=> x.id === (c.values || {}).model)[0];
-        const n = ((DPCFG && DPCFG.networks) || [])
-                    .filter(x=> x.id === (c.values || {}).network)[0];
-        return [c.id, c.name + ' · ' + (m ? m.name : 'no model')
-                             + ' · ' + (n ? n.name : 'no port')];
-      }));
+      .concat(pool.map(c=> [c.id, c.name]));
     if (want && !all.some(c=> c.id === want))
       opts.push([want, 'a connection that no longer exists']);
     opts.forEach(([v, label])=>{
