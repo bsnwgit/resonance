@@ -287,7 +287,7 @@ def exposed(cfg):
        and str(cfg.get("enrol_address") or "").strip() != LOOPBACK:
         return True
     doc = read_routes()
-    live = {str(r.get("network") or "") for r in doc["routes"].values()
+    live = {route_network(r) for r in doc["routes"].values()
             if r.get("enabled", True)}
     for n in display_settings()["networks"]:
         if n["id"] not in live:
@@ -945,15 +945,20 @@ ROUTE_DEFAULTS.update({
     # Which speech profile answers for this route. Blank is the deployment's
     # default, the same rule a device follows.
     "speech": "",
-    # Which network profile — that is, which port of its own — this endpoint
-    # answers on. Blank is the shared display port, which is where they all
-    # were before this existed.
+    # WHICH CONNECTION — that is, which model and which port, as one named
+    # pair. It was those two fields side by side, and picking them separately
+    # was picking the same combination again on every endpoint that wanted it.
+    #
+    # It has to be a default rather than an incidental key: read_routes
+    # rebuilds each record from this map, so a field missing here is a field
+    # silently dropped on the next read — and an endpoint that forgot its
+    # connection is an endpoint answering as DEMO on no port, without saying
+    # why.
+    "connection": "",
+    # RETIRED, and kept only so an existing document round-trips rather than
+    # losing keys on its first save. migrate_connections reads them once to
+    # make the pairs that already exist, and nothing reads them after that.
     "network": "",
-    # …and which model profile it speaks to. Same rule again, and it has to be
-    # a default rather than an incidental key: read_routes rebuilds each record
-    # from this map, so a field missing here is a field silently dropped on the
-    # next read — and an endpoint that forgot which model it uses is an
-    # endpoint that answers as DEMO without saying why.
     "model_profile": "",
     "wakeword": "resonance",
     "aliases": [],
@@ -1150,7 +1155,7 @@ def with_model(rec):
     pool = _model_pool()
     if not pool:
         return rec
-    prof = find_look(str(rec.get("model_profile") or ""), pool)
+    prof = find_look(route_model(rec), pool)
     if not prof:
         return rec
     out = dict(rec)
@@ -1287,8 +1292,9 @@ def net_members(doc, nid):
     endpoints that named nothing."""
     if not nid:
         return list(route_order(doc))
+    _cfg = display_settings()
     return [r for r in route_order(doc)
-            if doc["routes"][r].get("network") == nid]
+            if route_network(doc["routes"][r], _cfg) == nid]
 
 
 def route_dest(cfg):
@@ -1388,22 +1394,27 @@ def validate_route(obj, current, doc, rid=None):
     # rule could not see. Naming no profile now attaches an endpoint to
     # nothing, so blanks cannot collide with each other and there is nothing
     # here to compare them against.
-    target = str(rec.get("network") or "")
+    # THE PORT IS THE CONNECTION'S NOW, so this asks the connection. The rule
+    # is unchanged and still worth having: a port carries one endpoint, so two
+    # endpoints whose connections name the same port is the collision that
+    # cannot be discovered by looking at either one of them.
+    _cfg = display_settings()
+    target = route_network(rec, _cfg)
     if target:
         other = [k for k, r in doc["routes"].items()
-                 if k != rid and str(r.get("network") or "") == target]
+                 if k != rid and route_network(r, _cfg) == target]
         if other:
             who = doc["routes"][other[0]].get("name") or "another endpoint"
             return None, ("%s already answers on that port, and a port carries "
                           "one endpoint — give this one a port of its own "
                           "under PROFILES \u25b8 NETWORK" % who)
-    if "model_profile" in obj:
-        mid = str(obj["model_profile"] or "")[:16]
-        if mid and not any(p["id"] == mid
-                           for p in display_settings()["models"]):
-            return None, ("that model profile no longer exists — reload the "
+    if "connection" in obj:
+        cid = str(obj["connection"] or "")[:16]
+        if cid and not any(c["id"] == cid
+                           for c in display_settings()["connections"]):
+            return None, ("that connection no longer exists — reload the "
                           "panel to see the current list")
-        rec["model_profile"] = mid
+        rec["connection"] = cid
         # Sharing one is fine and expected — several endpoints can speak to the
         # same model. What is NOT kept is the route's own copy of the
         # connection: a stale key sitting in routes.json reads as live, and
@@ -2864,6 +2875,72 @@ def write_displays(displays):
     _write_displays_doc(doc)
 
 
+def migrate_connections():
+    """Give every endpoint that still names a model and a port a connection.
+
+    An endpoint named a model profile and a network profile side by side. It
+    names the PAIR now, so this makes the pairs that already exist — otherwise
+    a field rename is every endpoint quietly pointing at nothing.
+
+    IT FILLS GAPS RATHER THAN RUNNING ONCE. The first draft returned as soon as
+    the list had anything in it, which is wrong the moment somebody makes one
+    connection by hand before upgrading: the endpoint they made it for would be
+    fine and every other one would be left empty. So it looks at each endpoint
+    on its own, and an endpoint that already names a connection is left alone.
+
+    DEDUPLICATED AGAINST WHAT IS THERE, including hand-made rows. A pair that
+    already exists is reused rather than made a second time under a different
+    name, which is the whole reason the list is a list.
+
+    A PAIR IS ONLY MADE WHERE BOTH HALVES ARE THERE. An endpoint with a model
+    and no port answered nowhere and still does; inventing half a connection
+    for it would turn a visible gap into a row that looks configured."""
+    doc = read_routes()
+    routes = doc.get("routes") or {}
+    if not routes:
+        return
+    ddoc = read_displays_doc()
+    cfg = ddoc.get("settings")
+    cfg = dict(cfg) if isinstance(cfg, dict) else {}
+    have = clean_profiles(cfg.get("connections"), "c", MAX_LOOKS)
+    index = {(str((c.get("values") or {}).get("model") or ""),
+              str((c.get("values") or {}).get("network") or "")): c["id"]
+             for c in have}
+    made = 0
+    for rid in route_order(doc):
+        rec = routes[rid]
+        if rec.get("connection"):
+            continue
+        key = (str(rec.get("model_profile") or ""), str(rec.get("network") or ""))
+        if not (key[0] and key[1]):
+            continue
+        if key not in index:
+            if len(have) >= MAX_LOOKS:
+                # Nowhere to put it. Said rather than dropped silently: the
+                # endpoint keeps working on its own two fields until somebody
+                # makes room, and this is the only warning there will be.
+                print("connection migration: no room for %s — there are "
+                      "already %d connections" % (rec.get("name") or rid,
+                                                  MAX_LOOKS), flush=True)
+                continue
+            prof = {"id": "c" + secrets.token_hex(4),
+                    "name": rec.get("name") or "connection",
+                    "values": {"model": key[0], "network": key[1]}}
+            have.append(prof)
+            index[key] = prof["id"]
+            made += 1
+        rec["connection"] = index[key]
+    if not any(r.get("connection") for r in routes.values()):
+        return
+    changed = [rid for rid in routes if routes[rid].get("connection")]
+    cfg["connections"] = have
+    ddoc["settings"] = cfg
+    _write_displays_doc(ddoc)
+    write_routes(doc)
+    print("connections: %d endpoint(s) on %d connection(s), %d made now"
+          % (len(changed), len(have), made), flush=True)
+
+
 def migrate_models():
     """One-time: lift each endpoint's connection into a model profile.
 
@@ -3327,7 +3404,7 @@ def display_network(did, doc=None):
     is a screen that cannot be loaded from a single address and is refused
     where it is made rather than discovered later."""
     doc = doc or read_routes()
-    nids = {str(r.get("network") or "")
+    nids = {route_network(r)
             for r in doc["routes"].values()
             if did in (r.get("displays") or [])}
     if len(nids) > 1:
@@ -3343,7 +3420,7 @@ def display_network_clash(rids, doc=None):
     alternative is a code that works and an assistant that silently never
     answers, which is the failure this whole setting was renamed away from."""
     doc = doc or read_routes()
-    seen = {str((doc["routes"].get(rid) or {}).get("network") or "")
+    seen = {route_network(doc["routes"].get(rid) or {})
             for rid in rids or []}
     if len(seen) < 2:
         return ""
@@ -3393,7 +3470,7 @@ def identity_places(rec, pid, host):
         r = doc["routes"][rid]
         if not r.get("enabled", True) or not subject_may(r, ident=who):
             continue
-        url = net_base_for(str(r.get("network") or ""), "/", host)
+        url = net_base_for(route_network(r), "/", host)
         if url:
             out.append({"name": r.get("name") or rid, "url": url})
     return out
@@ -3693,6 +3770,40 @@ def vouched(disp):
         and str(disp.get("origin") or "") == "code"
 
 
+def route_conn(rec, cfg=None):
+    """The connection an endpoint names, as a values dict, or {}.
+
+    ONE INDIRECTION, IN ONE PLACE. An endpoint carried a model id and a network
+    id side by side; it carries the name of a pair now, and everything that
+    used to read either reads through here. Written as a lookup rather than
+    copied onto the route at save time for the reason every other profile is:
+    a copy is a second answer that stops agreeing with the first the moment
+    somebody edits the connection."""
+    cid = str((rec or {}).get("connection") or "")
+    if not cid:
+        return {}
+    pool = (cfg or display_settings()).get("connections") or []
+    for c in pool:
+        if c["id"] == cid:
+            return dict(c.get("values") or {})
+    return {}
+
+
+def route_network(rec, cfg=None):
+    """Which port this endpoint answers on — through its connection.
+
+    Eleven callers asked `rec.get("network")` directly: the listener loop, the
+    clash check, display_network, kiosk_from_port, net_base_for's callers and
+    the person's own base among them. They ask this instead, so the day the
+    indirection changes there is one place it changes in."""
+    return str(route_conn(rec, cfg).get("network") or "")
+
+
+def route_model(rec, cfg=None):
+    """…and which model it speaks to, by the same route."""
+    return str(route_conn(rec, cfg).get("model") or "")
+
+
 def subject_may(route, disp=None, ident=None):
     """May this caller use this endpoint?
 
@@ -3794,7 +3905,7 @@ def kiosk_from_port(nid, doc=None, kiosks=None):
     doc = doc or read_routes()
     for rid in route_order(doc):
         rec = doc["routes"][rid]
-        if str(rec.get("network") or "") != str(nid):
+        if route_network(rec) != str(nid):
             continue
         pid = str(rec.get("kiosk_profile") or "")
         if not pid:
@@ -8065,9 +8176,9 @@ class Handler(SimpleHTTPRequestHandler):
                 unack_open(rid)
             # The wake word and the adapter kind, and never the key or the
             # URL it points at: a log is read by more people than the panel.
-            print("route %s (%s) saved by %s: wake=%s model=%s"
+            print("route %s (%s) saved by %s: wake=%s connection=%s"
                   % (rid, rec["name"], s["user"], rec["wakeword"],
-                     rec.get("model_profile") or "(default)"), flush=True)
+                     rec.get("connection") or "(none)"), flush=True)
             return self._json(200, {"ok": True, "id": rid,
                                     "routes": admin_routes(doc),
                                     "default": doc["default"]})
@@ -9993,6 +10104,10 @@ def main():
     migrate_kiosks()
     migrate_models()
     migrate_networks()
+    # AFTER the two it pairs, because it reads the ids they produce. A fresh
+    # install running all three in one startup has its models and its ports
+    # before anything tries to name a pair of them.
+    migrate_connections()
     # The two groups that always exist. Made at startup rather than on first
     # need, so they are there before anything can enrol into them and there is
     # no moment where a population has nowhere to land.
@@ -10082,7 +10197,7 @@ def main():
     for _rid, _r in _doc["routes"].items():
         if not _r.get("enabled", True):
             continue
-        _on = str(_r.get("network") or "")
+        _on = route_network(_r)
         if not _on:
             # NO PORT, SO NOWHERE. Named rather than counted: an assistant
             # nobody can reach is a fault, and the only thing worse than the

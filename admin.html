@@ -3790,11 +3790,7 @@ to all of them is one tick.</div>
        screen on its port at once — which is what this bar was for, done in one
        place instead of a selection at a time. The selection itself stays: the
        status line below uses it. -->
-  <div class="bulkbar" id="bulkbar" hidden>
-    <span class="bulktitle">Selection</span>
-    <label><input type="checkbox" id="bulkall"> ALL</label>
-    <span id="bulkcount">nothing selected</span>
-  </div>
+
   <!-- THE SECOND THING A SELECTION IS FOR. Its own row rather than a third
        control on the one above, because that one is a picker with one APPLY
        and this is two presses with no picker — sharing a row would put a
@@ -3802,6 +3798,8 @@ to all of them is one tick.</div>
        either way: what is ticked is ticked. -->
   <div class="bulkbar" id="bulkstatusbar" hidden>
     <span class="bulktitle">Status line</span>
+    <label><input type="checkbox" id="bulkall"> ALL</label>
+    <span id="bulkcount">nothing selected</span>
     <span class="spacer"></span>
     <button id="b_bulkstaton" class="act-save">SHOW ON SELECTED</button>
     <button id="b_bulkstatoff" class="act-undo">HIDE ON SELECTED</button>
@@ -5574,7 +5572,12 @@ $('b_appsave').addEventListener('click', async ()=>{
    the speech profile carries them, and an endpoint names a profile. */
 /* The connection went the way of the greeting and the wake word: a model
    profile carries it, and an endpoint names one. */
-const RT_FIELDS = ['name','speech','model_profile','network','system',
+/* `model_profile` and `network` are gone from here: an endpoint names a
+   CONNECTION, which is the pair of them. Sending the retired two would publish
+   a stale copy beside the pair, and reading controls that no longer exist sent
+   every endpoint back as DEMO on no port — the same failure the provider
+   fields had when they moved onto the model profile. */
+const RT_FIELDS = ['name','speech','connection','system',
                    'kiosk_profile','keep_alive'];
 const RT_SLIDERS = {max_tokens:  v=> v,
                     temperature: v=> (+v).toFixed(2),
@@ -5785,16 +5788,23 @@ looking at the screen — which is all a kiosk offers.</div>
   </div>
 
   <div class="subgrp" data-g="conn">
-    <h5>Model<span class="subsum"></span></h5>
+    <h5>Connection<span class="subsum"></span></h5>
     <div class="subbody">
-  <select data-f="model_profile" class="ppick"></select>
-  <div class="note help">Which <b>model profile</b> answers for this endpoint —
-the provider, the base URL, the model and the key. Built once under MODELS and
-named here, so two endpoints on the same model are one connection rather than
-the same credential typed twice. Blank is the deployment's default.
+  <select data-f="connection" class="ppick"></select>
+  <div class="note help">Which <b>connection</b> this endpoint uses — a model
+and a port, under one name, built under PROFILES ▸ CONNECTION.
+
+It was two pickers here: a model profile and a network profile, chosen
+separately on every endpoint that wanted the same combination. They are one
+choice now, because they are one thing — an assistant is something to speak to
+and somewhere to reach it, and either without the other is not an assistant.
 
 <b>DEMO</b> answers from built-in text and reaches nothing, which is how you
-tell a fault in the interface from a fault in whatever it is pointed at.</div>
+tell a fault in the interface from a fault in whatever it is pointed at.
+
+<b>A port carries one endpoint</b>, so two endpoints cannot use connections
+that name the same port — saving the second is refused, with the first one
+named.</div>
 
   <div data-r="harows">
   <label class="bklab">When it recognises nothing, ask</label>
@@ -5808,30 +5818,9 @@ nothing for one of those.</div>
   </div>
     </div>
   </div>
-  <div class="subgrp" data-g="net">
-    <h5>Network<span class="subsum"></span></h5>
-    <div class="subbody">
-  <select data-f="network" class="ppick"></select>
-  <div class="note help">A <b>port of this server's own</b> that reaches this
-endpoint and nothing else — built under PROFILES ▸ NETWORK and named here.
-Leave it at the display port and this endpoint is the one reached there.
-
-<b>A port carries one endpoint.</b> Ports were shareable once, several
-assistants told apart by wake word; that went when signing in became a
-property of the port, because a door with two assistants behind it can only
-have one lock and would have to answer for the looser of them. Choosing a port
-another endpoint already answers on is refused, and such a port is not offered
-in the list above.
-
-A browser opening that port gets the ordinary interface built from this
-endpoint's settings, with no other endpoint offered and nothing to address by
-name. One port reaches one endpoint, so a profile another endpoint already
-answers on is not offered here.
-
-<b>The port is bound when the server starts</b>, so choosing one here takes a
-restart to come into effect — the same as the ports on ADMIN.</div>
-    </div>
-  </div>
+  <!-- THE NETWORK SUBGROUP WENT WITH THE MODEL PICKER. Which port an
+       endpoint answers on is half of its connection, chosen with the other
+       half under one name, rather than a second question asked here. -->
 <div class="subgrp" data-g="limits">
     <h5>Limits<span class="subsum"></span></h5>
     <div class="subbody">
@@ -5923,11 +5912,27 @@ function blockNote(blk, m, bad){
    stale credential cannot sit in routes.json looking live, which means
    reading r.provider gives 'demo' for every endpoint on the server. Anything
    that used to branch on it has to resolve the profile instead. */
+/* THE CONNECTION AN ENDPOINT NAMES, and the two halves through it. One
+   indirection in one place, the same shape route_conn has on the server: the
+   endpoint holds the name of a pair, and everything that used to read a model
+   id or a network id reads it out of that pair. */
+function routeConn(r){
+  const pool = (DPCFG && DPCFG.connections) || [];
+  return pool.filter(c=> c.id === ((r && r.connection) || ''))[0] || null;
+}
 function routeModel(r){
+  const c = routeConn(r);
   const pool = (DPCFG && DPCFG.models) || [];
-  // What it NAMES. An endpoint naming nothing has no model and reads as demo,
-  // which is the truth about it — it used to inherit a nominated default.
-  return pool.filter(x=> x.id === ((r && r.model_profile) || ''))[0] || null;
+  // What it NAMES, through its connection. An endpoint naming none has no
+  // model and reads as demo, which is the truth about it.
+  return pool.filter(x=> x.id === ((c && c.values && c.values.model) || ''))[0]
+         || null;
+}
+function routeNet(r){
+  const c = routeConn(r);
+  const pool = (DPCFG && DPCFG.networks) || [];
+  return pool.filter(x=> x.id === ((c && c.values && c.values.network) || ''))[0]
+         || null;
 }
 function routeProvider(r){
   const m = routeModel(r);
@@ -5939,8 +5944,8 @@ function blockSyncProvider(blk){
      provider is the profile's now. Reading a control that no longer exists
      made every endpoint look like DEMO, which hid its limits and its system
      prompt. */
-  const sel = blk.querySelector('[data-f="model_profile"]');
-  const v = routeProvider({model_profile: sel ? sel.value : ''});
+  const sel = blk.querySelector('[data-f="connection"]');
+  const v = routeProvider({connection: sel ? sel.value : ''});
   const connected = v !== 'demo', anth = v === 'anthropic',
         ha = v === 'homeassistant';
   const show = (name, yes)=>{ const el = R(blk, name); if (el) el.style.display = yes ? '' : 'none'; };
@@ -6047,154 +6052,62 @@ function blockPaint(blk, r){
   /* The model picker, by profile name. A profile that has been deleted is
      still offered on the endpoint naming it, marked, rather than silently
      reading as the default. */
-  /* The ports, less the ones another endpoint already answers on — a port
-     reaches one endpoint, so offering a taken one would be offering a save
-     the server is going to refuse. Its own stays offered, obviously. */
-  const nw = F(blk, 'network');
-  if (nw){
-    const want = r.network || '';
-    /* A SHARED port is always on offer — carrying several endpoints is what it
-       is for. An exclusive one another endpoint already answers on is not:
-       offering it would be offering a save the server is going to refuse. */
-    const taken = {};
-    (RT.routes || []).forEach(x=>{ if (x.id !== r.id && x.network)
-                                     taken[x.network] = x.name; });
-    const all = (DPCFG && DPCFG.networks) || [];
-    /* A port already answering for another endpoint is not offered: one
-       port, one endpoint, so choosing it would be choosing a refusal. */
-    const pool = all.filter(x=> !taken[x.id]);
-    nw.innerHTML = '';
-    /* NO PORT MEANS NO PORT. It used to fall back to a nominated default,
-       which is what quietly put two assistants on one port: two endpoints
-       that had simply never been given one both landed there, chosen by
-       nobody. An endpoint naming no profile is now attached to nothing and
-       answers nowhere — said here, on the row, rather than discovered. */
-    /* EVERY free profile, the nominated one included. That filter excluded it
-       because the blank option USED to represent it — pick "default" and you
-       got that port. The blank option means "no port" now, so excluding the
-       profile as well left it in the list on the NETWORK page and impossible
-       to choose here: a port nothing was using that nothing could be put on. */
-    const opts = [['', 'NOT ATTACHED TO A PORT — answers nowhere']]
-                   .concat(pool.map(x=> [x.id,
-                     x.name + ((x.values || {}).port ? ' · ' + x.values.port : '')]));
-    if (want && !pool.some(x=> x.id === want))
-      opts.push([want, 'a profile that no longer exists']);
+  /* THE CONNECTIONS, less the ones whose PORT another endpoint already
+     answers on. A port reaches one endpoint, so offering a connection that
+     would collide is offering a save the server is going to refuse — and the
+     collision is a property of the pair now, not of a picker beside it. Its
+     own stays offered, obviously. */
+  const cn = F(blk, 'connection');
+  if (cn){
+    const want = r.connection || '';
+    const all = (DPCFG && DPCFG.connections) || [];
+    /* Which PORT each other endpoint is on, by way of its connection. */
+    const byId = {};
+    all.forEach(c=> { byId[c.id] = (c.values || {}).network || ''; });
+    const takenPort = {};
+    (RT.routes || []).forEach(x=>{
+      if (x.id === r.id || !x.connection) return;
+      const p = byId[x.connection];
+      if (p) takenPort[p] = x.name;
+    });
+    const pool = all.filter(c=> c.id === want
+                                || !takenPort[(c.values || {}).network || '']);
+    cn.innerHTML = '';
+    /* NONE is a real answer and reads as one: no connection is an endpoint
+       that speaks to nothing and answers nowhere, which is exactly what a
+       half-built one is. */
+    const opts = [['', 'NONE — demo replies, no port']]
+      .concat(pool.map(c=> {
+        const m = ((DPCFG && DPCFG.models) || [])
+                    .filter(x=> x.id === (c.values || {}).model)[0];
+        const n = ((DPCFG && DPCFG.networks) || [])
+                    .filter(x=> x.id === (c.values || {}).network)[0];
+        return [c.id, c.name + ' · ' + (m ? m.name : 'no model')
+                             + ' · ' + (n ? n.name : 'no port')];
+      }));
+    if (want && !all.some(c=> c.id === want))
+      opts.push([want, 'a connection that no longer exists']);
     opts.forEach(([v, label])=>{
       const o = document.createElement('option');
-      o.value = v; o.textContent = label; nw.appendChild(o);
+      o.value = v; o.textContent = label;
+      cn.appendChild(o);
     });
-    nw.value = want;
+    cn.value = want;
+    /* Said where it is true rather than left to a refusal on save: an endpoint
+       whose port is spoken for has nothing to pick, and the reason is not on
+       this tab. */
+    const note = R(blk, 'connnote');
+    if (note){
+      const lost = all.length - pool.length;
+      note.textContent = !all.length
+        ? 'No connections yet — make one under PROFILES ▸ CONNECTION.'
+        : lost ? lost + ' not offered: another endpoint already answers on '
+                 + (lost === 1 ? 'that port' : 'those ports') + '.'
+             : '';
+      note.className = 'note';
+    }
   }
 
-  const mp = F(blk, 'model_profile');
-  if (mp){
-    const want = r.model_profile || '';
-    const pool = (DPCFG && DPCFG.models) || [];
-    mp.innerHTML = '';
-    const opts = [['', 'NONE — demo replies']].concat(pool.map(x=> [x.id, x.name]));
-    if (want && !pool.some(x=> x.id === want))
-      opts.push([want, 'a profile that no longer exists']);
-    opts.forEach(([v, label])=>{
-      const o = document.createElement('option');
-      o.value = v; o.textContent = label; mp.appendChild(o);
-    });
-    mp.value = want;
-  }
-
-  /* Every OTHER endpoint, because falling through to yourself is a loop and
-     falling through to a house is asking the thing that just declined. Built
-     from what is on the server rather than from what is on screen: a draft
-     nobody has saved has no id to point at. */
-  const ft = F(blk, 'fallthrough');
-  if (ft && ft.dataset.touched !== '1'){
-    const want = r.fallthrough || '';
-    ft.innerHTML = '';
-    /* DEMO is left out because it answers from the display's own text: the
-       server would find nothing to say and the question would die there.
-       Another house is offered — two of them in one building is a real
-       arrangement, and one may know a room the other does not. */
-    const opts = [['', 'nothing — it answers for itself']].concat(
-      (RT.routes || []).filter(x=> x.id !== r.id && routeProvider(x) !== 'demo')
-                       .map(x=> [x.id, x.name]));
-    if (want && !opts.some(([v])=> v === want)) opts.push([want, 'an endpoint that is gone']);
-    opts.forEach(([v, label])=>{
-      const o = document.createElement('option');
-      o.value = v; o.textContent = label; ft.appendChild(o);
-    });
-    ft.value = want;
-  }
-
-  /* What each closed box holds, so the whole endpoint reads off the headings
-     and opening one is for changing it rather than for finding out. */
-  const words = (r.aliases || []).length;
-  const sums = {
-    display: (()=>{
-      const p = ((DPCFG && DPCFG.kiosks) || [])
-                  .filter(x=> x.id === (r.kiosk_profile || ''))[0];
-      /* Named, and told apart from "set to something that is gone". The third
-         state is the one worth saying out loud: a profile chosen here does
-         nothing at all while the endpoint is open to every display. */
-      return !r.kiosk_profile ? 'none chosen'
-           : !p ? 'a profile that no longer exists'
-           : p.name + (r.restricted ? '' : ' · not applied — open to all');
-    })(),
-    wake: (r.wakeword ? '“' + r.wakeword + '”' : 'not set')
-        + (words ? ' +' + words + ' more' : '')
-        + (r.strict ? ' · exact' : ''),
-    who: !r.restricted ? 'any display'
-       : ((r.groups || []).length + (r.displays || []).length
-          + (r.identities || []).length)
-         ? [(r.groups || []).length
-              ? (r.groups || []).length + ' group' + ((r.groups || []).length === 1 ? '' : 's')
-              : '',
-            (r.displays || []).length
-              ? (r.displays || []).length + ' named' : '',
-            (r.identities || []).length
-              ? (r.identities || []).length
-                + ((r.identities || []).length === 1 ? ' person' : ' people')
-              : ''].filter(Boolean).join(' + ')
-         : 'nobody',
-    signin: r.needs_signin ? 'required' : 'not required',
-    /* WHERE IT ANSWERS, on the collapsed heading. An endpoint with no port
-       answers nowhere, and that is exactly the state that used to be hidden
-       behind a silent fallback — so it is the one thing this line has to be
-       unmissable about. */
-    net: (()=>{
-      const prof = ((DPCFG && DPCFG.networks) || [])
-                     .filter(n=> n.id === (r.network || ''))[0];
-      if (!prof) return 'no port — answers nowhere';
-      return prof.name + ((prof.values || {}).port ? ' · ' + prof.values.port : '');
-    })(),
-    voice: (r.greeting ? '“' + r.greeting.slice(0, 28)
-                       + (r.greeting.length > 28 ? '…' : '') + '” · ' : 'shared greeting · ')
-         + (r.voice || 'shared voice'),
-    conn: (()=>{
-      const pool = (DPCFG && DPCFG.models) || [];
-      const p = pool.filter(x=> x.id === (r.model_profile || ''))[0];
-      return p ? p.name : 'no model profile';
-    })(),
-    limits: routeProvider(r) === 'homeassistant' ? r.timeout + 's'
-          : r.max_tokens + ' tokens · '
-          + (r.history_turns ? r.history_turns + ' turns' : 'no context') + ' · '
-          + r.timeout + 's',
-    prompt: routeProvider(r) === 'demo' ? 'not used in demo'
-          : routeProvider(r) === 'homeassistant' ? 'set in Home Assistant'
-          : ((r.system || '').trim().split(/\s+/).filter(Boolean).length + ' words'),
-  };
-  Object.keys(sums).forEach(g=>{
-    const h = blk.querySelector('[data-g="' + g + '"] .subsum');
-    if (h) h.textContent = sums[g];
-  });
-  /* The speech profiles, by name. A profile that has been deleted is still
-     offered on the row that names it, marked, rather than disappearing out of
-     a select the admin never touched. NONE is a real answer here and not a
-     missing setting: the endpoint speaks in whatever voice the page ships
-     with. */
-  /* The layout profile this endpoint hands to the screens it names. Eight
-     screens on one assistant are eight rows to set otherwise, and they are
-     all the same kind of place. A screen's own row still wins — this is only
-     read where that row names none, and only where the answer is unambiguous;
-     the rule is on the server, in inherited_kiosk, so there is one of it. */
   const kp = F(blk, 'kiosk_profile');
   if (kp){
     const want = r.kiosk_profile || '';
@@ -6411,7 +6324,11 @@ function blockSyncSignin(blk){
   const on = blk.querySelector('[data-f="needs_signin"] button.on');
   const needsIn = !!on && on.dataset.v === '1';
   const rec = blk._rec || {};
-  const net = (F(blk, 'network') || {}).value || rec.network || '';
+  /* THROUGH THE CONNECTION. The picker beside this one names a pair now, so
+     the port is read out of it rather than off a control of its own. */
+  const cid = (F(blk, 'connection') || {}).value || rec.connection || '';
+  const cc = ((DPCFG && DPCFG.connections) || []).filter(c=> c.id === cid)[0];
+  const net = (cc && (cc.values || {}).network) || '';
   const bits = [];
   if (net){
     const prof = ((DPCFG && DPCFG.networks) || []).filter(n=> n.id === net)[0];
@@ -6575,11 +6492,11 @@ function wireBlock(blk){
     /* Which limits and which notes apply is the PROFILE's provider, so
        choosing a different profile rearranges the block the same way choosing
        a different provider used to. */
-    if (e.target.closest('[data-f="model_profile"]')) blockSyncProvider(blk);
+    if (e.target.closest('[data-f="connection"]')) blockSyncProvider(blk);
     /* The sign-in note is about this endpoint's PORT and its neighbours on it,
        so moving the endpoint to another network profile changes what it says.
        Without this it would keep describing the port it used to be on. */
-    if (e.target.closest('[data-f="network"]')) blockSyncSignin(blk);
+    if (e.target.closest('[data-f="connection"]')) blockSyncSignin(blk);
   });
   blk.addEventListener('input', e=>{
     const f = e.target.closest('[data-f]');
@@ -9835,7 +9752,7 @@ const dispState = (d)=> !d.enrolled ? (d.code ? 'code' : 'stale')
 const PICKED = new Set();
 
 function paintBulk(){
-  const bar = $('bulkbar');
+  const bar = $('bulkstatusbar');
   if (!bar) return;
   const here = onThisScreen();
   /* Pruned against what is ON THIS SCREEN, not against every row: a selection
@@ -9844,8 +9761,6 @@ function paintBulk(){
   [...PICKED].forEach(id=>{ if (!here.some(d=> d.id === id)) PICKED.delete(id); });
   const n = PICKED.size;
   bar.hidden = !here.length;
-  const sbar = $('bulkstatusbar');
-  if (sbar) sbar.hidden = !here.length;
   const cnt = $('bulkcount');
   if (cnt) cnt.textContent = n ? n + (n === 1 ? ' selected' : ' selected')
                                : 'nothing selected';
