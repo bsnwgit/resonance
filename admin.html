@@ -563,15 +563,16 @@
      belongs to something else rather than as the third of three.
 
      Scoped to this row on purpose: the same trims everywhere would take the
-     air out of rows that have it to spare. And NOTHING here is type size —
-     what gives is the space around the words, the gap either side of each
-     divider, and the padding inside the three borders. It buys about 180px,
-     which is a group and a half. */
-  .profrow{gap:8px}
-  .profrow .tabbox{padding:2px 6px 4px}
-  .profrow .tabbox > legend{padding:0 6px}
-  .profrow .tabbox > legend .tablabel{padding:3px 7px;letter-spacing:.16em}
-  .profrow .tabs button{padding:2px 9px;letter-spacing:.14em}
+     air out of rows that have it to spare.
+
+     AND THE TRACKING IS LEFT ALONE. Closing the letters up was the first
+     attempt and it was the wrong space to take: padding is air around the
+     words, tracking is the words themselves, and tightening it changed how
+     the row reads rather than how much room it needs. Only the padding gives
+     — about 110px, which is enough for the third group and no more. */
+  .profrow{gap:10px}
+  .profrow .tabbox{padding:2px 7px 4px}
+  .profrow .tabs button{padding:2px 10px}
   .profhead{margin:2px 0 10px}
   /* THE BOX IS AS WIDE AS WHAT IS IN IT, like the two at the head of the
      panel — a border drawn out to the width its side happens to have is a box
