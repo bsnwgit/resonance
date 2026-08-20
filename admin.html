@@ -2408,6 +2408,18 @@
         <button data-tab="devprof">LAYOUT</button>
       </div>
     </fieldset>
+    <!-- BETWEEN THE TWO, because it is the third thing an endpoint is made
+         of: what it looks like, who may use it, and what it is wired to. -->
+    <fieldset class="tabbox">
+      <legend><span class="tablabel">PERMISSIONS</span></legend>
+      <!-- The two halves and then the pair, the order they are built in —
+           the same shape LAYOUTS and CONNECTIONS have. -->
+      <div class="tabs">
+        <button data-tab="authn">AUTHENTICATE</button>
+        <button data-tab="authz">AUTHORIZE</button>
+        <button data-tab="perm">PERMISSION</button>
+      </div>
+    </fieldset>
     <fieldset class="tabbox">
       <legend><span class="tablabel">CONNECTIONS</span></legend>
       <!-- The two halves of an endpoint that are not the endpoint — what it
@@ -3426,6 +3438,81 @@ pointed at.</div>
        instead of twice. It holds their IDS and not copies of them: change
        which model a connection speaks to and everything using that connection
        changes with it, which is the whole point of a profile. -->
+  <!-- MUST THERE BE A PERSON AT ALL, and how long a sign-in survives. The
+       first half of a permission. -->
+  <section class="grp bare proflist" data-tab="authn">
+    <div class="barehead"><span class="listtitle">Authenticate</span></div>
+    <div class="grpbody">
+  <div id="dp_authns"></div>
+  <div class="note" id="authnnote"></div>
+  <div class="seg addrow">
+    <button id="b_addauthn" class="act-add">ADD A PROFILE</button>
+  </div>
+  <div class="note help">Whether a caller has to be <b>known</b>, and how long
+being known lasts.
+
+<b>REQUIRED means no anonymous caller</b> — somebody signed in, or a screen you
+enrolled with a code, because minting that code and carrying it to the device is
+the same act of vouching a password is. A browser that merely opened the display
+page is neither.
+
+<b>The session limit is the gap between conversations</b>, not a lifetime. A
+session being used does not run out; one nobody has spoken to for that long
+does. <b>0 is no limit</b>, which is a real answer for a wall nobody signs in at
+and the wrong one for anything else.
+
+This is where the limit lives and the only place it does. It used to be a field
+on every person with nothing anywhere that could set it.</div>
+    </div>
+  </section>
+
+  <!-- …AND GIVEN A CALLER, IS IT ONE OF THE ONES ALLOWED. The other half. -->
+  <section class="grp bare proflist" data-tab="authz">
+    <div class="barehead"><span class="listtitle">Authorize</span></div>
+    <div class="grpbody">
+  <div id="dp_authzs"></div>
+  <div class="note" id="authznote"></div>
+  <div class="seg addrow">
+    <button id="b_addauthz" class="act-add">ADD A PROFILE</button>
+  </div>
+  <div class="note help">Which callers may use whatever names this — screens,
+people, and groups of either.
+
+<b>ANY DISPLAY</b> and the list is not consulted: anything that gets past
+Authenticate is through. <b>ONLY THESE</b> and a caller has to be named, either
+directly or by a group it is in. Grants add up; nothing here takes anything
+away.
+
+<b>A LIST IS SHARED.</b> That is the point of it being a profile — a
+department's screens named once rather than ticked on every endpoint — and it
+is the thing to know before ticking: what you tick here reaches every
+permission using this profile, and every endpoint using those.</div>
+    </div>
+  </section>
+
+  <!-- …and the pair of them under a name, which is what an endpoint points
+       at. The same shape a connection has, one subject over. -->
+  <section class="grp bare proflist" data-tab="perm">
+    <div class="barehead"><span class="listtitle">Permissions</span></div>
+    <div class="grpbody">
+  <div id="dp_perms"></div>
+  <div class="note" id="permnote"></div>
+  <div class="seg addrow">
+    <button id="b_addperm" class="act-add">ADD A PERMISSION</button>
+  </div>
+  <div class="note help">An <b>authenticate</b> profile and an <b>authorize</b>
+one, under a name. Those are the two questions the server asks of every caller
+before it answers anything: must there be a person, and is this one allowed.
+
+<b>Both are required.</b> Half a permission decides nothing.
+
+An endpoint names one of these instead of carrying the answers itself. An
+endpoint naming <b>none</b> is refused outright — not opened — because a
+missing pointer is a deployment mid-edit, and mid-edit is not a state to be
+permissive in.</div>
+    </div>
+  </section>
+
   <section class="grp bare proflist" data-tab="connection">
     <div class="barehead"><span class="listtitle">Connections</span></div>
     <div class="grpbody">
@@ -3686,8 +3773,8 @@ browser and is the same person in all three.
 link.</b> The address is what they will sign in with; the link is what lets
 them choose a password, and it buys exactly that one thing.
 
-<b>The ticks are the grant</b>, and the same grant each endpoint's own
-<i>Who may use it</i> list makes. Tick none and they reach whatever is open to
+<b>The ticks are the grant</b>, and the same grant an <i>authorize</i> profile
+makes under PROFILES ▸ PERMISSIONS. Tick none and they reach whatever is open to
 everyone; an endpoint that is open to everyone is reachable already, so ticking
 it grants nothing. They can be changed afterwards on the person's own row, or
 from the endpoint.
@@ -5665,7 +5752,7 @@ $('b_appsave').addEventListener('click', async ()=>{
 /* `system` and `keep_alive` are gone with the limits: they are the model
    profile's, and sending them from a block that no longer has the controls
    would publish an empty string over what the profile holds. */
-const RT_FIELDS = ['name','connection','kiosk_profile'];
+const RT_FIELDS = ['name','connection','permission','kiosk_profile'];
 const RT_SLIDERS = {max_tokens:  v=> v,
                     temperature: v=> (+v).toFixed(2),
                     history_turns: v=> v == 0 ? 'none' : v,
@@ -5738,21 +5825,24 @@ never spoken and never matched against.</div>
        belongs to. An endpoint is a port and a model and a bill; three of them
        on one machine legitimately want three different answers, and a single
        deployment-wide switch could only ever be set to the strictest. -->
-  <div class="subgrp" data-g="signin">
-    <h5>Sign in<span class="subsum"></span></h5>
-    <div class="subbody">
-  <div class="seg" data-f="needs_signin">
-    <button data-v="0" class="on">NOT REQUIRED</button>
-    <button data-v="1">REQUIRED</button>
-  </div>
-  <!-- WHAT NOT REQUIRED COSTS, said on the endpoint it is true of. It used to
-       be one long block on ADMIN ▸ IP Address, which is a page nobody opens
-       twice — so the warning was furthest from the control that causes it and
-       nearest to the setting that merely makes it matter.
+  <!-- ONE PICKER WHERE SIGN IN AND WHO MAY USE IT WERE. Those are the two
+       questions the server asks of every caller, and they are a named pair
+       now — an authenticate profile and an authorize one — built under
+       PROFILES ▸ PERMISSIONS and pointed at from here.
 
-       Dismissable, because a warning that cannot be is one people learn to
-       read past. Two answers: not now, which lasts as long as this tab, and
-       one recorded against this admin account. -->
+       They were five fields on this block: needs_signin, restricted and three
+       allow-lists. A department's screens were ticked again on every endpoint
+       that served them, and a change of rule was a change in as many places as
+       there were endpoints. -->
+  <div class="subgrp" data-g="perm">
+    <h5>Permission<span class="subsum"></span></h5>
+    <div class="subbody">
+  <select data-f="permission" class="ppick"></select>
+  <!-- THE POSTURE WARNING, still on the endpoint it is about. It followed
+       needs_signin off this block and onto the permission, so it is driven by
+       the resolved answer now rather than by a control sitting beside it —
+       but it is shown here, where the endpoint is, because that is the thing
+       anyone can reach. -->
   <div class="openwarn" data-r="openwarn" hidden>
     <div data-r="openwarntext"></div>
     <div class="seg">
@@ -5760,106 +5850,26 @@ never spoken and never matched against.</div>
       <button type="button" data-r="openackever">I KNOW — STOP TELLING ME</button>
     </div>
   </div>
+  <div class="note" data-r="permnote"></div>
   <div class="note" data-r="signinnote"></div>
-  <div class="note help">Whether somebody must be <b>signed in as a person</b>
-to use this endpoint at all. Nothing here is about which people — that is
-<i>Who may use it</i>, below, and the two are independent: an endpoint can be
-open to everybody and still insist they sign in.
+  <div class="note help">Which <b>permission</b> decides who may use this
+endpoint — an authenticate profile and an authorize one, under one name.
 
-<b>REQUIRED means no anonymous caller</b>, not that there must be a person.
-Two kinds of caller satisfy it: somebody <b>signed in</b>, and a screen you
-<b>enrolled with a code</b> — because minting that code and carrying it to the
-device is itself an admin deciding that screen should be here. A browser that
-merely opened this page is neither, and is refused.
+<b>Authenticate</b> is whether a caller has to be known at all, and how long
+being known lasts. <b>Authorize</b> is which callers are allowed given that. A
+sign-in box appears on a display when the answer to either is no.
 
-It refused a device outright until 2026-08-20, which was this setting turning
-away the population it is most often wanted for: a hallway screen an admin hung
-deliberately could not use an endpoint that asked for a sign-in, because being
-approved is exactly what made it a device. Ticking such an endpoint onto such a
-screen produced a grant that reached nothing, and said so nowhere.
+<b>An endpoint naming none is refused outright</b>, not opened. A missing
+pointer is a deployment mid-edit, and mid-edit is not a state to be permissive
+in — the old default was open, and that was only safe because it was the shape
+an endpoint was born in rather than one it could fall into.
 
-<b>What it costs you to know:</b> a wall screen satisfying this has no person
-attached, so whoever walks up to it uses that model unattributed. This limits
-the model to callers you vetted; it does not attribute the bill to a name.
-
-They sign in at the display itself, with the email address and password they
-set from their enrolment link. The admin panel is not affected by this and
-never was: that always asks for a password, whatever is set here.</div>
+<b>A permission is shared on purpose.</b> Change the rule once and every
+endpoint using it changes — which is also the thing to know before editing one:
+what you change there reaches all of them.</div>
     </div>
   </div>
 
-  <div class="subgrp" data-g="who">
-    <h5>Who may use it<span class="subsum"></span></h5>
-    <div class="subbody">
-  <div class="seg" data-f="restricted">
-    <button data-v="0" class="on">ANY DISPLAY</button>
-    <button data-v="1">ONLY THESE</button>
-  </div>
-  <label class="bklab" data-r="grouplab">Groups</label>
-  <div class="cks" data-r="groups"></div>
-  <!-- People, in a box of their own. A person's grant is theirs and travels
-       with them to whatever machine they open their URL on, where a group or a
-       display is a grant to a machine — different populations, so a list that
-       could hold either would be one nobody could audit. -->
-  <label class="bklab" data-r="peoplelab">People</label>
-  <div class="cks" data-r="identities"></div>
-  <div class="note" data-r="whonote"></div>
-  <div class="note help">Two reasons to restrict one. <b>A room with several
-microphones in it</b> — one person addresses the wall screen and every other
-device in earshot hears it too. And <b>what an endpoint costs</b> — a hosted
-model worth giving to some people and not to everyone.
-
-Either way the rule is enforced <b>here</b> rather than in anybody's browser
-settings, because push-to-talk on a phone is the right setting and is not a
-control: nothing makes anybody set it.
-
-ANY DISPLAY is what every endpoint was before this existed. ONLY THESE names
-the devices — a wall screen, a TV, a laptop, a phone — that may reach it.
-
-A display that hears a name it may not use <b>drops the utterance</b> — it
-does not answer, does not pass it to whatever it was already talking to, and
-says nothing out loud. The person was addressing another device.
-
-Devices enrol themselves and are approved under ACCESS.</div>
-    </div>
-  </div>
-
-  <!-- Its own section rather than a control inside "Who may use it". A
-       layout profile is what a screen LOOKS LIKE, and that group is about
-       permission; somebody going looking for what a screen looks like opens
-       the section called Layout. Subsections are collapsed until opened, so a
-       control in the wrong one is a control that does not exist. -->
-  <div class="subgrp" data-g="display">
-    <h5>Layout<span class="subsum"></span></h5>
-    <div class="subbody">
-  <select data-f="kiosk_profile" class="ppick"></select>
-  <div class="note help">The <b>layout profile</b> every screen opened on this
-endpoint's <b>port</b> gets. A browser on the Demo port is a Demo screen
-because that is the address it was opened at — nothing to tick, and no list to
-keep in step.
-
-<b>A screen's own choice always wins.</b> A row that names a profile is a
-screen somebody decided about, and nothing set here moves it — this is read
-only where that row's picker is left on INHERIT.
-
-<b>The port, not the grant.</b> Which screens an endpoint <i>permits</i> is a
-separate question, on the section above. A page is loaded from exactly one
-address and a port carries one endpoint, so there is never more than one answer
-here and never anything to disambiguate.
-
-<b>Every option here is a real profile.</b> There is no "none": an endpoint
-that has never been given one reads <i>choose a layout profile</i> until it
-is.
-
-<b>An endpoint with no port reaches nothing</b>, this included — it is attached
-to nothing and answers nowhere, which the Network section says.</div>
-    </div>
-  </div>
-
-  <!-- THE SPEECH PICKER WENT ONTO THE LAYOUT. What an endpoint sounds like
-       is part of what it IS, and the layout already said what it looks like —
-       two pickers side by side answering one question. Set it under
-       PROFILES ▸ LAYOUT, on the profile this endpoint hands out. -->
   <div class="subgrp" data-g="conn">
     <h5>Connection<span class="subsum"></span></h5>
     <div class="subbody">
@@ -5957,6 +5967,29 @@ function routeNet(r){
   return pool.filter(x=> x.id === ((c && c.values && c.values.network) || ''))[0]
          || null;
 }
+/* THE SAME ONE INDIRECTION THE SERVER DOES, so the panel says what the server
+   will do rather than what this block used to hold. Null where none is named,
+   which is refused rather than open — see route_perm in serve.py. */
+function routePerm(r){
+  const pool = (DPCFG && DPCFG.permissions) || [];
+  const p = pool.filter(x=> x.id === ((r && r.permission) || ''))[0];
+  if (!p) return null;
+  const v = p.values || {};
+  const an = ((DPCFG && DPCFG.authns) || []).filter(x=> x.id === (v.authn || ''))[0];
+  const az = ((DPCFG && DPCFG.authzs) || []).filter(x=> x.id === (v.authz || ''))[0];
+  /* HALF A PAIR IS NULL TOO, exactly as the server has it. An empty authorize
+     profile means UNRESTRICTED, so reading a missing one as empty would draw a
+     panel saying ANY DISPLAY over a server refusing everybody — and of the two
+     ways to be wrong about that, the panel promising access is the worse. */
+  if (!an || !az) return null;
+  const a = an.values || {}, b = az.values || {};
+  return {perm: p, authn: an, authz: az,
+          needs_signin: !!a.needs_signin,
+          session_idle: a.session_idle,
+          restricted: !!b.restricted,
+          displays: b.displays || [], groups: b.groups || [],
+          identities: b.identities || []};
+}
 function routeProvider(r){
   const m = routeModel(r);
   return (m && m.values && m.values.provider) || 'demo';
@@ -6041,10 +6074,8 @@ function blockPaint(blk, r){
   });
   blk.querySelectorAll('[data-f="strict"] button').forEach(b=>
     b.classList.toggle('on', (b.dataset.v === '1') === !!r.strict));
-  blk.querySelectorAll('[data-f="restricted"] button').forEach(b=>
-    b.classList.toggle('on', (b.dataset.v === '1') === !!r.restricted));
-  blk.querySelectorAll('[data-f="needs_signin"] button').forEach(b=>
-    b.classList.toggle('on', (b.dataset.v === '1') === !!r.needs_signin));
+  /* NOTHING TO FILL for who may use it or whether they must sign in: both
+     are the permission's, and this block only names one. */
   /* The two answers. NOT NOW is this page's alone; the other is recorded
      against the account, so it follows this admin to the next machine and
      leaves a colleague still being told. */
@@ -6067,7 +6098,7 @@ function blockPaint(blk, r){
     }
     blockSyncOpen(blk);
   };
-  blockFillWho(blk, r);
+  blockSyncPerm(blk);
   blockSyncSignin(blk);
   /* Painted with the rest of the block, so a row opened fresh already carries
      the answer rather than waiting for somebody to touch the control. */
@@ -6096,20 +6127,19 @@ function blockPaint(blk, r){
            : p.name + ' · ' + (p.wakeword ? 'wakes to \u201c' + p.wakeword + '\u201d'
                                           : 'no wake word');
     })(),
-    who: !r.restricted ? 'any display'
-       : ((r.groups || []).length + (r.displays || []).length
-          + (r.identities || []).length)
-         ? [(r.groups || []).length
-              ? (r.groups || []).length + ' group' + ((r.groups || []).length === 1 ? '' : 's')
-              : '',
-            (r.displays || []).length
-              ? (r.displays || []).length + ' named' : '',
-            (r.identities || []).length
-              ? (r.identities || []).length
-                + ((r.identities || []).length === 1 ? ' person' : ' people')
-              : ''].filter(Boolean).join(' + ')
-         : 'nobody',
-    signin: r.needs_signin ? 'required' : 'not required',
+    /* ONE LINE FOR BOTH QUESTIONS, because they are one pointer now. The
+       count is read through the permission rather than off the record, whose
+       own copy of the lists stopped being consulted. */
+    perm: (()=>{
+      const p = routePerm(r);
+      if (!p) return (r.permission ? 'a permission that is gone or half gone'
+                                   : 'no permission') + ' — refused to everybody';
+      const n = (p.groups || []).length + (p.displays || []).length
+              + (p.identities || []).length;
+      return (p.perm.name || 'unnamed') + ' · '
+           + (p.needs_signin ? 'sign in' : 'no sign-in') + ' · '
+           + (!p.restricted ? 'any display' : n ? n + ' named' : 'nobody');
+    })(),
     /* THE PAIR, AND BOTH HALVES OF IT. An endpoint with no connection speaks
        to nothing and answers nowhere, which is exactly the state a silent
        fallback used to hide — so it is the one thing this line is unmissable
@@ -6128,6 +6158,29 @@ function blockPaint(blk, r){
     const h = blk.querySelector('[data-g="' + g + '"] .subsum');
     if (h) h.textContent = sums[g];
   });
+
+  /* THE PERMISSIONS, by name. Unlike a connection none is deliberately shared
+     between endpoints, so nothing is filtered out of this list: two endpoints
+     answering to the same rule is the point of naming it once. */
+  const pm = F(blk, 'permission');
+  if (pm){
+    const want = r.permission || '';
+    const all = (DPCFG && DPCFG.permissions) || [];
+    /* NONE reads as the refusal it is. It was the shape of a half-built
+       endpoint before and it meant OPEN then; saying so at the control is the
+       cheapest place to correct that expectation. */
+    const opts = [['', 'NONE — refused to everybody']]
+      .concat(all.map(p=> [p.id, p.name]));
+    if (want && !all.some(p=> p.id === want))
+      opts.push([want, 'a permission that no longer exists']);
+    pm.innerHTML = '';
+    opts.forEach(([v, label])=>{
+      const o = document.createElement('option');
+      o.value = v; o.textContent = label;
+      pm.appendChild(o);
+    });
+    pm.value = want;
+  }
 
   const cn = F(blk, 'connection');
   if (cn){
@@ -6351,13 +6404,70 @@ function blockFillWho(blk, r){
 
    Read from the CONTROL rather than the record, so it appears and disappears
    as the segmented control is pressed rather than after a save. */
+/* WHAT THE CHOSEN PERMISSION ACTUALLY DOES, in this endpoint's terms. The two
+   answers used to be controls on this block, so they were self-evident; named
+   somewhere else they are not, and the pointer alone tells nobody whether a
+   caller gets in. */
+function blockSyncPerm(blk){
+  const note = R(blk, 'permnote');
+  if (!note) return;
+  const rec = blkRoute(blk);
+  const p = routePerm(rec);
+  /* Which of the two nulls this is: nothing named, or something named that
+     has since been half deleted. They read the same to the server and want
+     different things done about them. */
+  const named = ((DPCFG && DPCFG.permissions) || [])
+                  .filter(x=> x.id === (rec.permission || ''))[0];
+  let msg = '', bad = false;
+  if (!p && !named){
+    msg = (rec.permission ? 'That permission no longer exists'
+                          : 'No permission')
+        + ' — this endpoint is refused to everybody until one is chosen. '
+        + 'It is not open.';
+    bad = true;
+  }else if (!p){
+    msg = '“' + (named.name || 'it') + '” is missing a half — an authenticate '
+        + 'or authorize profile it names has gone. The endpoint is refused to '
+        + 'everybody until that is put right.';
+    bad = true;
+  }else{
+    const n = (p.groups || []).length + (p.displays || []).length
+            + (p.identities || []).length;
+    const who = !p.restricted ? 'any display'
+              : n ? n + (n === 1 ? ' named caller' : ' named callers')
+                  : 'nobody — nothing is ticked on it';
+    msg = (p.needs_signin ? 'must sign in' : 'no sign-in')
+        + ' · ' + who
+        + (p.authn ? ' · ' + p.authn.name : ' · authenticate profile missing')
+        + (p.authz ? ' · ' + p.authz.name : ' · authorize profile missing');
+    bad = !p.authn || !p.authz || (p.restricted && !n);
+  }
+  note.textContent = msg;
+  note.className = 'note' + (bad ? ' bad' : '');
+}
+
+/* The record as it stands IN THE PANEL — the picker's value rather than the
+   saved one, so every note answers to what somebody has just chosen instead of
+   to what was last written. */
+function blkRoute(blk){
+  const rec = Object.assign({}, blk._rec || {});
+  const sel = F(blk, 'permission');
+  if (sel) rec.permission = sel.value;
+  const cn = F(blk, 'connection');
+  if (cn) rec.connection = cn.value;
+  return rec;
+}
+
 function blockSyncOpen(blk){
   const box = blk.querySelector('[data-r="openwarn"]');
   if (!box) return;
   const rec = blk._rec || {};
   const rid = rec.id || '';
-  const on = blk.querySelector('[data-f="needs_signin"] button.on');
-  const needsIn = !!on && on.dataset.v === '1';
+  /* THROUGH THE PERMISSION now. An endpoint naming none is refused rather than
+     open, so there is nothing to warn about — the note under the picker says
+     that, and says it as a fault. */
+  const p = routePerm(blkRoute(blk));
+  const needsIn = !p || p.needs_signin;
   const enabled = rec.enabled !== false;
   const acked = OPENACK_NOW.has(rid) || (RT.acked || []).indexOf(rid) >= 0;
   const show = !needsIn && enabled && RT.exposed && !acked;
@@ -6377,9 +6487,9 @@ function blockSyncOpen(blk){
 function blockSyncSignin(blk){
   const note = blk.querySelector('[data-r="signinnote"]');
   if (!note) return;
-  const on = blk.querySelector('[data-f="needs_signin"] button.on');
-  const needsIn = !!on && on.dataset.v === '1';
   const rec = blk._rec || {};
+  const perm = routePerm(blkRoute(blk));
+  const needsIn = !!perm && perm.needs_signin;
   /* THROUGH THE CONNECTION. The picker beside this one names a pair now, so
      the port is read out of it rather than off a control of its own. */
   const cid = (F(blk, 'connection') || {}).value || rec.connection || '';
@@ -6395,7 +6505,12 @@ function blockSyncSignin(blk){
       bits.push('this port is marked OPEN, and reaching it is normally the '
               + 'whole grant — that does not cover this endpoint, because no '
               + 'port can prove who is at it');
-    const loose = sharing.filter(r=> !r.needs_signin);
+    /* Each neighbour read through ITS permission, not off a field this block
+       no longer keeps — the copy on the record is stale by design. */
+    const loose = sharing.filter(r=>{
+      const q = routePerm(r);
+      return q && !q.needs_signin;
+    });
     if (needsIn && loose.length)
       bits.push(loose.length + ' other endpoint(s) on this same port do not '
               + 'require it — “' + loose.map(r=> r.name || r.id).join('”, “')
@@ -6406,8 +6521,12 @@ function blockSyncSignin(blk){
 }
 
 function blockSyncWho(blk){
+  /* THE ENDPOINT'S CONTROLS ARE GONE; the block this runs on is an AUTHORIZE
+     profile, whose segmented control carries no data-f. Read the record it was
+     drawn from, and fall back to the control where one exists. */
   const on = blk.querySelector('[data-f="restricted"] button.on');
-  const restricted = !!on && on.dataset.v === '1';
+  const restricted = on ? on.dataset.v === '1'
+                        : !!(blk._who && blk._who.restricted);
   const sIn = blk.querySelector('[data-f="needs_signin"] button.on');
   const needsIn = !!sIn && sIn.dataset.v === '1';
   ['groups', 'grouplab', 'identities', 'peoplelab'].forEach(n=>{
@@ -6460,14 +6579,9 @@ function blockSyncWho(blk){
     if (restricted && blk._rec && blk._rec.is_default)
       msg += ' · this is the default endpoint, so typed questions from any '
            + 'other display are refused too';
-    /* Said HERE because this is where somebody is reasoning about who gets in,
-       and because the two combine in a way worth spelling out: a list of
-       screens plus MUST SIGN IN is a list that can never match, since a screen
-       is not a person. */
-    if (needsIn)
-      msg += (msg ? ' · ' : '')
-           + 'and SIGN IN is set to required above, so no device reaches this '
-           + 'at all, approved or not';
+    /* The screens-plus-sign-in combination moved to the PERMISSION row, which
+       is the only place both halves are visible at once. Reading it here would
+       mean reading a control this block no longer has. */
     note.className = 'note' + (bad ? ' bad' : '');
     note.textContent = msg;
   }
@@ -6490,10 +6604,14 @@ function blockCollect(blk){
      control that is gone sent every endpoint back as DEMO. */
   const strict = blk.querySelector('[data-f="strict"] button.on');
   body.strict = !!strict && strict.dataset.v === '1';
+  /* Guarded like the lists below, and for the same reason: the endpoint block
+     has neither control any more, and answering for a control that is gone
+     would send FALSE for both — quietly rewriting the retired copy on the
+     record and making a rolled-back deployment read as wide open. */
   const who = blk.querySelector('[data-f="restricted"] button.on');
-  body.restricted = !!who && who.dataset.v === '1';
+  if (who) body.restricted = who.dataset.v === '1';
   const signin = blk.querySelector('[data-f="needs_signin"] button.on');
-  body.needs_signin = !!signin && signin.dataset.v === '1';
+  if (signin) body.needs_signin = signin.dataset.v === '1';
   /* Sent whether or not the switch is on, so turning it off and on again
      brings back the displays that were ticked rather than an empty list
      somebody has to fill in twice. */
@@ -6503,8 +6621,9 @@ function blockCollect(blk){
   const dbox = blk.querySelector('[data-r="displays"]');
   if (dbox)
     body.displays = [...dbox.querySelectorAll('input:checked')].map(cb=> cb.dataset.d);
-  body.groups = [...blk.querySelectorAll('[data-r="groups"] input:checked')]
-                  .map(cb=> cb.dataset.g);
+  const gbox = blk.querySelector('[data-r="groups"]');
+  if (gbox)
+    body.groups = [...gbox.querySelectorAll('input:checked')].map(cb=> cb.dataset.g);
   /* Guarded the same way the displays box is: sending an empty list from a
      panel that does not have the box would wipe every grant a route already
      carries, where omitting the field leaves the server's copy alone. */
@@ -6553,6 +6672,12 @@ function wireBlock(blk){
        so moving the endpoint to another network profile changes what it says.
        Without this it would keep describing the port it used to be on. */
     if (e.target.closest('[data-f="connection"]')) blockSyncSignin(blk);
+    /* All three of these are the permission's answers, so choosing another one
+       has to redraw them at once — the warning especially, which is about
+       whether anybody at all has to sign in. */
+    if (e.target.closest('[data-f="permission"]')){
+      blockSyncPerm(blk); blockSyncSignin(blk); blockSyncOpen(blk);
+    }
   });
   blk.addEventListener('input', e=>{
     const f = e.target.closest('[data-f]');
@@ -6595,15 +6720,9 @@ function wireBlock(blk){
     const seg = b.closest('.seg[data-f]');
     if (seg){
       seg.querySelectorAll('button').forEach(x=> x.classList.toggle('on', x === b));
-      if (seg.dataset.f === 'restricted'
-          || seg.dataset.f === 'needs_signin') blockSyncWho(blk);
-      if (seg.dataset.f === 'needs_signin'){
-        blockSyncSignin(blk);
-        /* Pressing REQUIRED takes the warning away at once rather than at the
-           next save: the control is the thing being warned about, so what it
-           says now is what the message has to answer to. */
-        blockSyncOpen(blk);
-      }
+      /* WHO MAY USE IT and SIGN IN are not segs on this block any more; the
+         permission picker above stands for both, and is wired as a change
+         rather than a click. */
       return;
     }
     const act = b.dataset.a;
@@ -8116,6 +8235,9 @@ function paintDpSettings(){
   paintModels(DPCFG.models || []);
   paintNetworks(DPCFG.networks || []);
   paintConns(DPCFG.connections || []);
+  paintAuthns(DPCFG.authns || []);
+  paintAuthzs(DPCFG.authzs || []);
+  paintPerms(DPCFG.permissions || []);
   paintNewSetup();
 }
 
@@ -8499,6 +8621,320 @@ function paintModels(list){
    has to look like something; an endpoint naming no network profile is not
    missing a setting, it is on the display port. */
 let DPNETS = [], OPENNW = -1;
+
+/* ------------------------------------------------- authenticate / authorize
+   The two halves of a permission, and the pair. Built like every other profile
+   list here — a local array the rows are drawn from, one row open at a time,
+   SAVE sending the whole list — so there is one shape to learn rather than
+   three. */
+let DPAUTHNS = [], OPENAN = -1;
+let DPAUTHZS = [], OPENAZ = -1;
+let DPPERMS  = [], OPENPM = -1;
+
+/* The shell every one of these rows is: a name, a badge that says what it
+   holds, and a foot with SAVE and REMOVE. Written once because the three
+   differ only in what goes between the name and the foot. */
+function profShell(box, arr, i, rec, openIdx, setOpen, summary, repaint){
+  const row = document.createElement('div');
+  row.className = 'erow';
+  if (openIdx !== i) row.classList.add('shut');
+  const top = document.createElement('div'); top.className = 'top';
+  const nmt = document.createElement('span'); nmt.className = 'nm';
+  const sum = document.createElement('span'); sum.className = 'badge';
+  const retitle = ()=>{
+    nmt.textContent = (rec.name || '').trim() || 'unnamed profile';
+    sum.textContent = summary();
+  };
+  top.appendChild(nmt); top.appendChild(sum);
+  top.onclick = (e)=>{
+    if (e.target.closest('input, button, select, textarea')) return;
+    setOpen(openIdx === i ? -1 : i); repaint();
+  };
+  row.appendChild(top);
+  const namerow = document.createElement('div'); namerow.className = 'namerow';
+  const nlab = document.createElement('b'); nlab.textContent = 'Name';
+  namerow.appendChild(nlab);
+  const nm = document.createElement('input');
+  nm.type = 'text'; nm.className = 'nmedit'; nm.value = rec.name || '';
+  nm.spellcheck = false;
+  nm.oninput = ()=>{ rec.name = nm.value; retitle(); };
+  namerow.appendChild(nm);
+  row.appendChild(namerow);
+  retitle();
+  box.appendChild(row);
+  return {row: row, retitle: retitle};
+}
+
+function profFoot(row, arr, i, rec, setOpen, repaint, save, canRemove){
+  const acts = document.createElement('div'); acts.className = 'acts';
+  const gap = document.createElement('span'); gap.className = 'spacer';
+  acts.appendChild(gap);
+  const b = document.createElement('button');
+  b.textContent = 'SAVE'; b.className = 'act-save';
+  b.onclick = ()=>{ rec._new = false; setOpen(-1); save(); };
+  acts.appendChild(b);
+  const del = document.createElement('button');
+  del.textContent = 'REMOVE'; del.className = 'act-danger';
+  const why = canRemove ? '' : canRemove;
+  del.onclick = ()=>{ setOpen(-1); arr.splice(i, 1); repaint(); };
+  acts.appendChild(del);
+  row.appendChild(acts);
+}
+
+function paintAuthns(list){
+  DPAUTHNS = (list || []).map(a=> ({id: a.id || '', _new: !!a._new,
+                                    name: a.name || '',
+                                    values: Object.assign({}, a.values || {})}));
+  const box = $('dp_authns');
+  if (!box) return;
+  box.innerHTML = '';
+  DPAUTHNS.forEach((a, i)=>{
+    const v = a.values;
+    const sh = profShell(box, DPAUTHNS, i, a, OPENAN, x=>{OPENAN=x;},
+      ()=> (v.needs_signin ? 'known callers only' : 'anyone')
+         + ' · ' + (v.session_idle ? v.session_idle + ' min idle' : 'no limit'),
+      ()=> paintAuthns(DPAUTHNS));
+    /* A SWITCH, not a tick: the two answers are opposites and both are real,
+       which is what a segmented pair says and a checkbox does not. */
+    const r1 = document.createElement('div'); r1.className = 'namerow';
+    const b1 = document.createElement('b'); b1.textContent = 'Sign in';
+    r1.appendChild(b1);
+    const seg = document.createElement('div'); seg.className = 'seg';
+    [['0','NOT REQUIRED'],['1','REQUIRED']].forEach(([val, label])=>{
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.textContent = label;
+      btn.classList.toggle('on', (val === '1') === !!v.needs_signin);
+      btn.onclick = ()=>{ v.needs_signin = val === '1'; paintAuthns(DPAUTHNS); };
+      seg.appendChild(btn);
+    });
+    r1.appendChild(seg); sh.row.appendChild(r1);
+
+    const r2 = document.createElement('div'); r2.className = 'namerow';
+    const b2 = document.createElement('b'); b2.textContent = 'Session limit';
+    r2.appendChild(b2);
+    const inp = document.createElement('input');
+    inp.type = 'number'; inp.className = 'num'; inp.min = 0; inp.max = 480;
+    inp.value = v.session_idle === undefined ? 0 : v.session_idle;
+    inp.oninput = ()=>{ v.session_idle = parseInt(inp.value, 10) || 0;
+                        sh.retitle(); };
+    r2.appendChild(inp); sh.row.appendChild(r2);
+    const n = document.createElement('div'); n.className = 'note';
+    n.textContent = 'Minutes of quiet before a sign-in lapses — the gap '
+                  + 'BETWEEN conversations, not a lifetime, so a session in '
+                  + 'use never runs out. 5 to 480, or 0 for no limit. A screen '
+                  + 'polling this server is not a conversation and does not '
+                  + 'hold one open.';
+    sh.row.appendChild(n);
+
+    profFoot(sh.row, DPAUTHNS, i, a, x=>{OPENAN=x;},
+             ()=> paintAuthns(DPAUTHNS),
+             ()=> saveDp({authns: DPAUTHNS.filter(x=> (x.name||'').trim())
+                    .map(x=> ({id:x.id, name:x.name, values:x.values}))},
+                    'authnnote'), true);
+  });
+  const btn = $('b_addauthn');
+  if (btn){
+    const busy = OPENAN >= 0 || DPAUTHNS.some(x=> x._new);
+    btn.hidden = busy; btn.disabled = busy || DPAUTHNS.length >= 8;
+  }
+}
+
+const bAddAuthn = $('b_addauthn');
+if (bAddAuthn) bAddAuthn.addEventListener('click', ()=>{
+  if (DPAUTHNS.length >= 8) return;
+  DPAUTHNS.push({id: profileId('a'), _new: true, name: '',
+                 values: {needs_signin: true, session_idle: 60}});
+  OPENAN = DPAUTHNS.length - 1;
+  paintAuthns(DPAUTHNS);
+});
+
+function paintAuthzs(list){
+  DPAUTHZS = (list || []).map(a=> ({id: a.id || '', _new: !!a._new,
+                                    name: a.name || '',
+                                    values: Object.assign({restricted:false,
+                                      displays:[], identities:[], groups:[]},
+                                      a.values || {})}));
+  const box = $('dp_authzs');
+  if (!box) return;
+  box.innerHTML = '';
+  DPAUTHZS.forEach((a, i)=>{
+    const v = a.values;
+    const count = ()=> (v.groups||[]).length + (v.displays||[]).length
+                     + (v.identities||[]).length;
+    const sh = profShell(box, DPAUTHZS, i, a, OPENAZ, x=>{OPENAZ=x;},
+      ()=> !v.restricted ? 'any display'
+         : (count() ? count() + ' named' : 'nobody'),
+      ()=> paintAuthzs(DPAUTHZS));
+
+    const r1 = document.createElement('div'); r1.className = 'namerow';
+    const b1 = document.createElement('b'); b1.textContent = 'Who may use it';
+    r1.appendChild(b1);
+    const seg = document.createElement('div'); seg.className = 'seg';
+    [['0','ANY DISPLAY'],['1','ONLY THESE']].forEach(([val, label])=>{
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.textContent = label;
+      btn.classList.toggle('on', (val === '1') === !!v.restricted);
+      btn.onclick = ()=>{ v.restricted = val === '1'; paintAuthzs(DPAUTHZS); };
+      seg.appendChild(btn);
+    });
+    r1.appendChild(seg); sh.row.appendChild(r1);
+
+    /* THE THREE LISTS, only where they decide anything. ANY DISPLAY does not
+       consult them, and a set of ticks that changes nothing is a set of ticks
+       somebody will believe they made. */
+    if (v.restricted){
+      const mk = (label, key, tag)=>{
+        const lab = document.createElement('label');
+        lab.className = 'bklab'; lab.textContent = label;
+        const cks = document.createElement('div');
+        cks.className = 'cks'; cks.dataset.r = tag;
+        sh.row.appendChild(lab); sh.row.appendChild(cks);
+      };
+      mk('Groups', 'groups', 'groups');
+      mk('Screens', 'displays', 'displays');
+      mk('People', 'identities', 'identities');
+      /* The same line the endpoint used to carry under its list — how many are
+         ticked, and which of them are not approved yet and so refused. It is
+         about this list, so it belongs where the list is now. */
+      const wn = document.createElement('div');
+      wn.className = 'note'; wn.dataset.r = 'whonote';
+      sh.row.appendChild(wn);
+      sh.row._who = v;
+      /* Filled by the same function the endpoint block used, because it is the
+         same three lists in the same three boxes — one place that knows how a
+         grant is drawn rather than two that have to agree. */
+      blockFillWho(sh.row, v);
+      /* …and read back out on every tick, so the local record is what SAVE
+         sends rather than the DOM being asked at the last moment. */
+      sh.row.querySelectorAll('[data-r] input').forEach(cb=>{
+        cb.addEventListener('change', ()=>{
+          ['groups','displays','identities'].forEach(k=>{
+            const b = sh.row.querySelector('[data-r="' + k + '"]');
+            /* The keys blockFillWho actually writes — d, g and p. Reading a
+               dataset.id it never set collected a list of undefineds, which
+               saved as a grant to nobody. */
+            if (b) v[k] = [...b.querySelectorAll('input:checked')]
+                            .map(x=> x.dataset.d || x.dataset.g || x.dataset.p);
+          });
+          blockSyncWho(sh.row);
+          sh.retitle();
+        });
+      });
+    }
+    profFoot(sh.row, DPAUTHZS, i, a, x=>{OPENAZ=x;},
+             ()=> paintAuthzs(DPAUTHZS),
+             ()=> saveDp({authzs: DPAUTHZS.filter(x=> (x.name||'').trim())
+                    .map(x=> ({id:x.id, name:x.name,
+                               restricted:x.values.restricted,
+                               displays:x.values.displays,
+                               identities:x.values.identities,
+                               groups:x.values.groups}))}, 'authznote'), true);
+  });
+  const btn = $('b_addauthz');
+  if (btn){
+    const busy = OPENAZ >= 0 || DPAUTHZS.some(x=> x._new);
+    btn.hidden = busy; btn.disabled = busy || DPAUTHZS.length >= 8;
+  }
+}
+
+const bAddAuthz = $('b_addauthz');
+if (bAddAuthz) bAddAuthz.addEventListener('click', ()=>{
+  if (DPAUTHZS.length >= 8) return;
+  DPAUTHZS.push({id: profileId('z'), _new: true, name: '',
+                 values: {restricted:false, displays:[], identities:[], groups:[]}});
+  OPENAZ = DPAUTHZS.length - 1;
+  paintAuthzs(DPAUTHZS);
+});
+
+function paintPerms(list){
+  DPPERMS = (list || []).map(p=> ({id: p.id || '', _new: !!p._new,
+                                   name: p.name || '',
+                                   values: Object.assign({}, p.values || {})}));
+  const box = $('dp_perms');
+  if (!box) return;
+  box.innerHTML = '';
+  const an = (DPCFG && DPCFG.authns) || [], az = (DPCFG && DPCFG.authzs) || [];
+  if (!an.length || !az.length){
+    box.className = 'note';
+    box.textContent = 'Nothing to pair yet — a permission is an authenticate '
+      + 'profile and an authorize one, and there '
+      + (!an.length && !az.length ? 'are none of either.'
+         : !an.length ? 'are no authenticate profiles.'
+                      : 'are no authorize profiles.');
+    const ab = $('b_addperm'); if (ab) ab.hidden = true;
+    return;
+  }
+  box.className = '';
+  DPPERMS.forEach((p, i)=>{
+    const v = p.values;
+    const nm = id=> (an.filter(x=> x.id === id)[0] || {}).name;
+    const zm = id=> (az.filter(x=> x.id === id)[0] || {}).name;
+    const sh = profShell(box, DPPERMS, i, p, OPENPM, x=>{OPENPM=x;},
+      ()=> (nm(v.authn) || 'no authenticate') + ' · ' + (zm(v.authz) || 'no authorize'),
+      ()=> paintPerms(DPPERMS));
+    const pick = (label, key, pool)=>{
+      const r = document.createElement('div'); r.className = 'namerow';
+      const b = document.createElement('b'); b.textContent = label;
+      r.appendChild(b);
+      const sel = document.createElement('select'); sel.className = 'ppick';
+      const none = document.createElement('option');
+      none.value = ''; none.textContent = 'PICK ONE'; sel.appendChild(none);
+      pool.forEach(x=>{
+        const o = document.createElement('option');
+        o.value = x.id; o.textContent = x.name; sel.appendChild(o);
+      });
+      sel.value = v[key] || '';
+      sel.onchange = ()=>{ v[key] = sel.value; paintPerms(DPPERMS); };
+      r.appendChild(sel); sh.row.appendChild(r);
+    };
+    pick('Authenticate', 'authn', an);
+    pick('Authorize', 'authz', az);
+    /* SAID WHERE THE PAIR IS MADE. It used to be a line under the endpoint's
+       own list, because that was where both halves sat; the halves are here
+       now, and this is the only screen that sees them together. */
+    const bits = [];
+    const A = (an.filter(x=> x.id === v.authn)[0] || {}).values || {};
+    const Z = (az.filter(x=> x.id === v.authz)[0] || {}).values || {};
+    if (v.authz && Z.restricted
+        && !(Z.groups || []).length && !(Z.displays || []).length
+        && !(Z.identities || []).length)
+      bits.push('the authorize profile has nothing ticked, so this permission '
+              + 'admits nobody at all');
+    else if (v.authn && v.authz && A.needs_signin && Z.restricted
+             && !(Z.identities || []).length)
+      bits.push('sign-in is required and only screens are named — a screen is '
+              + 'not a person, so no caller can satisfy both');
+    if (bits.length){
+      const w = document.createElement('div');
+      w.className = 'note bad'; w.textContent = bits.join(' · ');
+      sh.row.appendChild(w);
+    }
+    profFoot(sh.row, DPPERMS, i, p, x=>{OPENPM=x;},
+             ()=> paintPerms(DPPERMS),
+             ()=>{
+               if (!v.authn || !v.authz)
+                 return dpNote('pick both — half a permission decides nothing',
+                               true, 'permnote');
+               saveDp({permissions: DPPERMS.filter(x=> (x.name||'').trim()
+                                       && x.values.authn && x.values.authz)
+                 .map(x=> ({id:x.id, name:x.name, values:x.values}))}, 'permnote');
+             }, true);
+  });
+  const btn = $('b_addperm');
+  if (btn){
+    const busy = OPENPM >= 0 || DPPERMS.some(x=> x._new);
+    btn.hidden = busy; btn.disabled = busy || DPPERMS.length >= 8;
+  }
+}
+
+const bAddPerm = $('b_addperm');
+if (bAddPerm) bAddPerm.addEventListener('click', ()=>{
+  if (DPPERMS.length >= 8) return;
+  DPPERMS.push({id: profileId('x'), _new: true, name: '',
+                values: {authn: '', authz: ''}});
+  OPENPM = DPPERMS.length - 1;
+  paintPerms(DPPERMS);
+});
 
 /* ------------------------------------------------------- connections
    A model and a port under one name. Built like every other profile list on
@@ -11865,7 +12301,12 @@ function panelNav(){
        meant they were blank. */
     if (tab === 'savers' || tab === 'devprof' || tab === 'models'
         || tab === 'network' || tab === 'connection'
+        || tab === 'authn' || tab === 'authz' || tab === 'perm'
         || PROF_OF[tab]) refreshProfiles();
+    /* AUTHORIZE ticks displays, people and groups, and those are three
+       documents this tab has never fetched. Without them every box is drawn
+       empty and a grant somebody made reads as nothing ticked. */
+    if (tab === 'authz'){ refreshDisplays(); refreshIdentities(); refreshGroups(); }
     /* NETWORK says which endpoint answers on each port, and that is read off
        the endpoints — which this tab has never fetched. Repainted once they
        arrive rather than left saying "no endpoint" about every port. */

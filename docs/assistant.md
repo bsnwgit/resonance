@@ -23,18 +23,24 @@ follow-up needs no second address, which is the only tolerable behaviour for
 speech. Say a *different* name mid-conversation and you switch to that one
 instead.
 
-Each names **a model profile** — the service, address, model and key, kept as
-a named set under PROFILES ▸ MODELS — and adds its own instructions. Its
-greeting and its voice come from the speech profile it names rather than from
-fields of its own, so a room with more than one can still hear which replied. Two endpoints may name the same profile: one connection, two
-names to say, two sets of instructions.
+**An endpoint names three things and holds almost nothing itself.** Each is a
+named profile, built once on its own tab and pointed at from here:
 
-**One row per endpoint**, and the row is the whole of it: the speech profile
-that carries the word reaching it, the model profile it speaks to, and the
-instructions it speaks under, saved together by the SAVE inside it. **ADD
-INSTANCE** at the foot of the tab makes another and opens it; each row carries
-its own TEST, MAKE DEFAULT, SWITCH OFF and DELETE. The key is not here — it
-belongs to the profile, and is edited once for every endpoint using it.
+| It names | Which carries | Built under |
+|---|---|---|
+| a **connection** | the model it speaks to and the port it answers on | PROFILES ▸ CONNECTION |
+| a **layout** | the face, the voice, the greeting, the wake word and the name it answers to | PROFILES ▸ LAYOUT |
+| a **permission** | whether a caller must be known, and which callers are allowed | PROFILES ▸ PERMISSIONS |
+
+That is the whole of the row, and each of the three may be named by more than
+one endpoint — which is the point of them. A key typed once serves every
+endpoint reaching that service; a rule written once governs every endpoint
+under it. The service, address, model, key, limits and system prompt are the
+*connection's*, not the endpoint's, and are edited once for all of them.
+
+**One row per endpoint**, saved together by the SAVE inside it. **ADD INSTANCE**
+at the foot of the tab makes another and opens it; each row carries its own
+TEST, MAKE DEFAULT, SWITCH OFF and DELETE.
 
 Every block's heading says what you say to reach it and what it is wired to —
 `say "house" -> house-agent` — so you can find the right one without opening
@@ -66,18 +72,40 @@ allowed to use. That is what lets it stay quiet when somebody addresses
 another device: it has to recognise the house's name in order to ignore a
 command meant for the house rather than passing it into its own conversation.
 
-### Sign in
+### Permission
 
-Its own section on the endpoint, and the first one: whether somebody must be
-**signed in as a person** to use it at all. Nothing here is about *which*
-people — that is *Who may use it*, below — and the two are independent, so
-"open to everybody, but they must sign in" is a thing you can say.
+One picker on the endpoint, and it answers both of the questions the server
+asks of every caller: **must somebody be known at all**, and **is this
+particular caller allowed**. They were two sections here — *Sign in* and *Who
+may use it* — with five fields between them, repeated on every endpoint that
+wanted the same rule. They are a named pair now, built under **PROFILES ▸
+PERMISSIONS** and pointed at from here.
 
-It is set per endpoint because that is where the answer differs. Three
-assistants on one server can want three: a house one anybody in the room may
-talk to, a hosted model worth money per question, one reading from a system
-that should know who asked. A single deployment-wide switch could only ever be
-set to the strictest of them, which is why there is no longer one.
+- an **authenticate** profile — whether a caller must be known, and how long
+  being known lasts
+- an **authorize** profile — which callers are allowed, given that
+- a **permission** — one of each, under a name, which is what an endpoint names
+
+**An endpoint naming no permission is refused outright**, not opened. The old
+default was open, and that was only safe because it was the shape an endpoint
+was *born* in — a field somebody had to go and set. A missing pointer is not
+that; it is a deployment mid-edit, and mid-edit is not a state to be permissive
+in. The same goes for a permission whose authenticate or authorize profile has
+since been deleted: half a permission is not a permissive one. Saving is
+guarded against leaving one dangling, and the server refuses at the point of
+use as well, because a document can also arrive from a backup or a hand edit.
+
+**A permission is shared on purpose.** Change the rule once and every endpoint
+using it changes — which is also the thing to know before editing one: what you
+change there reaches all of them. Where a rule really is this endpoint's alone,
+make it a permission of its own and name it after the endpoint.
+
+#### Authenticate
+
+**Sign in** — whether somebody must be **signed in as a person** to use the
+endpoint at all. Nothing here is about *which* people; that is the authorize
+half, and the two are independent, so "open to everybody, but they must sign
+in" is a thing you can say.
 
 **REQUIRED means no anonymous caller**, not that there must be a person. Two
 kinds satisfy it:
@@ -103,74 +131,31 @@ to callers you vetted; it does not attribute the bill to a name. Where you need
 the name, the caller has to be a person — which means a personal browser, not a
 screen on a wall.
 
-People sign in at the display with the email address and password they set
-from their enrolment link. The admin panel is not affected and never was: it
-always asks, whatever is set here.
+**Session limit** — minutes of quiet before a sign-in lapses, and the clock is
+**the gap between conversations**, not a lifetime. A session in use never runs
+out; one nobody has spoken into for the limit does. Zero is no limit, which is
+the right answer for a wall nobody signs in at and the wrong one for anything
+else. 5 to 480.
 
-#### What actually puts a sign-in box on a screen
+The gap is measured between *conversations* deliberately. A page open on a wall
+polls this server every few seconds, and none of that is somebody being
+present: a timer that slid on requests would never lapse as long as the browser
+was switched on, which is the opposite of what the setting is for.
 
-**Two different settings can produce it, and this is worth reading once.** The
-display does not show a sign-in box because *Sign in* is set to REQUIRED. It
-shows one because **this browser cannot use anything on this port** — and
-there is more than one way to be in that position.
+It lives here because it is a property of the door somebody came through rather
+than of the person who came through it. Before this it was a field on every
+identity, with no control anywhere that could set it and a twelve-hour constant
+behind it — a setting nobody could see and nobody could change. Existing
+deployments migrate to **no limit**, because that is what they had.
 
-The server answers one question per endpoint, for the caller in front of it:
-*may this caller use it?* A NO is a NO, whichever setting produced it, and the
-page reacts the same way to all of them — by offering the ways past. So an
-endpoint you deliberately left open can still meet somebody with a sign-in
-box, if they are not on its allow-list.
+People sign in at the display with the email address and password they set from
+their enrolment link. The admin panel is not affected and never was: it always
+asks, whatever is set here, and its own idle timeout is a separate setting under
+SETTINGS ▸ SECURITY ▸ Sessions.
 
-| *Sign in* | *Who may use it* | What somebody who is not signed in sees |
-|---|---|---|
-| NOT REQUIRED | ANY DISPLAY | **the assistant** — nothing is in the way |
-| NOT REQUIRED | ONLY THESE, and they are not on it | **a sign-in box** — not because signing in is required, but because this browser may not use it, and signing in as somebody who *is* listed is one of the ways past |
-| REQUIRED | ANY DISPLAY | **a sign-in box** — sign in as anybody and it works. Not on a screen enrolled with a code: that is already a known caller, and it sees the assistant |
-| REQUIRED | ONLY THESE | **a sign-in box** — and signing in is not enough on its own; it has to be as somebody the list names. A code-enrolled screen the list names sees the assistant |
+#### Authorize
 
-The one that surprises people is the second row: *Sign in* says NOT REQUIRED
-and a sign-in box appears anyway. Nothing is wrong. **ONLY THESE is itself a
-statement that some callers may not use this**, and a browser that is not one
-of them has to become one — which means signing in as a person the list
-allows. The setting above it only decides whether that is demanded of
-*everybody* or just of the ones the list does not already cover.
-
-**When the change reaches a screen.** Both of these are read by the server on
-every question, so a screen cannot use something it has stopped being allowed to
-use, whatever it thinks. What it *shows* is a different matter: the page draws
-the sign-in box from the permissions it fetched when it loaded, so changing
-either setting under a screen that is already on it takes effect at that
-screen's next check-in, when it notices the configuration moved and reloads
-itself. Until then it looks unchanged, and a question typed into it comes back
-refused in the status line rather than as a box. **RELOAD** on the device's row
-does it immediately.
-
-**A device's tick list says when a grant is worth nothing.** Under DEVICE
-enrolment and on a device's own row, an endpoint set to REQUIRED reads *needs a
-person signed in, so a screen cannot use it* — because ticking it grants that
-screen nothing at all. On a PERSON's list the same endpoint reads *open to
-anyone signed in anyway*, since signing in is the whole of what it asks of them.
-
-Read the pair as one sentence and it stops being surprising:
-
-- *Sign in* — **must there be a person at all?**
-- *Who may use it* — **and given a caller, is it one of the ones allowed?**
-
-A sign-in box is what the display offers when the answer to either is no.
-
-#### And when there is no box at all
-
-Two states look like a fault and are not:
-
-- **"Nothing is set up on this port"** — no endpoint has been given this
-  network profile. There is nothing here to sign in to; giving an endpoint
-  this port under *Network* is the fix.
-- **A wall screen that stops answering** — an approved device on an endpoint
-  set to REQUIRED. It has no person on it and cannot acquire one, so it is
-  refused. That is the setting working, not failing.
-
-### Who may use it
-
-Two reasons to restrict an endpoint.
+**Who may use it.** Two reasons to restrict an endpoint.
 
 **A room with several microphones in it.** Two people, one of them addressing
 the wall screen, and every other device in earshot hearing it too. Push-to-talk
@@ -180,19 +165,91 @@ anybody set it — so the rule lives on the endpoint instead.
 **What an endpoint costs.** A hosted model is worth giving to some devices and
 not to every one that can reach the port, and this is where that is decided.
 
-**ANY DISPLAY** is the default, and is what every endpoint did before displays
-existed.
+**ANY DISPLAY** is what every endpoint did before displays existed.
 
-**ONLY THESE** names the devices that may reach it — a wall screen, a TV, a
-laptop, a phone. Anything else that hears its wake word drops the utterance: no
-answer, nothing passed to whatever it was already talking to, nothing said out
-loud, no matter how that browser is configured.
+**ONLY THESE** names the devices, groups and people that may reach it — a wall
+screen, a TV, a laptop, a phone. Anything else that hears its wake word drops
+the utterance: no answer, nothing passed to whatever it was already talking to,
+nothing said out loud, no matter how that browser is configured.
 
-Devices enrol themselves by loading the page and are approved under ACCESS;
-one that has not been approved yet can be ticked here, and is refused until it
-is. Restricting the **default** endpoint is worth a moment's thought: anything
-typed into the composer with no name in front of it goes there, so displays
-outside the list get nothing back when somebody types.
+Devices enrol themselves by loading the page and are approved under ACCESS; one
+that has not been approved yet can be ticked here, and is refused until it is.
+Restricting the endpoint that is **default** is worth a moment's thought:
+anything typed into the composer with no name in front of it goes there, so
+displays outside the list get nothing back when somebody types.
+
+**ONLY THESE with nothing ticked admits nobody.** That is allowed rather than
+refused — restricting an endpoint before the tablet that will use it has been
+hung is a legitimate order to do things in — and the profile says so in red
+while it is true.
+
+#### What actually puts a sign-in box on a screen
+
+**Two different settings can produce it, and this is worth reading once.** The
+display does not show a sign-in box because *Sign in* is REQUIRED. It shows one
+because **this browser cannot use anything on this port** — and there is more
+than one way to be in that position.
+
+The server answers one question per endpoint, for the caller in front of it:
+*may this caller use it?* A NO is a NO, whichever half produced it, and the page
+reacts the same way to all of them — by offering the ways past. So an endpoint
+you deliberately left open can still meet somebody with a sign-in box, if they
+are not on its allow-list.
+
+| Authenticate | Authorize | What somebody who is not signed in sees |
+|---|---|---|
+| NOT REQUIRED | ANY DISPLAY | **the assistant** — nothing is in the way |
+| NOT REQUIRED | ONLY THESE, and they are not on it | **a sign-in box** — not because signing in is required, but because this browser may not use it, and signing in as somebody who *is* listed is one of the ways past |
+| REQUIRED | ANY DISPLAY | **a sign-in box** — sign in as anybody and it works. Not on a screen enrolled with a code: that is already a known caller, and it sees the assistant |
+| REQUIRED | ONLY THESE | **a sign-in box** — and signing in is not enough on its own; it has to be as somebody the list names. A code-enrolled screen the list names sees the assistant |
+| *no permission at all* | | **a sign-in box that never opens it** — the endpoint is refused to everybody, and no caller can become one it accepts |
+
+The one that surprises people is the second row: sign-in says NOT REQUIRED and a
+sign-in box appears anyway. Nothing is wrong. **ONLY THESE is itself a statement
+that some callers may not use this**, and a browser that is not one of them has
+to become one — which means signing in as a person the list allows. The
+authenticate half only decides whether that is demanded of *everybody* or just
+of the ones the list does not already cover.
+
+**A permission is refused if it is missing a half.** Deleting an authorize
+profile two endpoints named would otherwise have opened both of them to
+everybody, because an empty allow-list means *unrestricted* — which is why
+deleting a profile a permission uses is refused while it is still named.
+
+**When the change reaches a screen.** Both halves are read by the server on
+every question, so a screen cannot use something it has stopped being allowed
+to use, whatever it thinks. What it *shows* is a different matter: the page
+draws the sign-in box from the permissions it fetched when it loaded, so
+changing either half under a screen that is already on it takes effect at that
+screen's next check-in, when it notices the configuration moved and reloads
+itself. Until then it looks unchanged, and a question typed into it comes back
+refused in the status line rather than as a box. **RELOAD** on the device's row
+does it immediately.
+
+**A device's tick list says when a grant is worth nothing.** Under DEVICE
+enrolment and on a device's own row, an endpoint whose permission requires a
+sign-in reads *needs a person signed in, so a screen cannot use it* — because
+ticking it grants that screen nothing at all. On a PERSON's list the same
+endpoint reads *open to anyone signed in anyway*, since signing in is the whole
+of what it asks of them.
+
+Read the pair as one sentence and it stops being surprising:
+
+- **authenticate** — must the caller be known at all?
+- **authorize** — and given a caller, is it one of the ones allowed?
+
+A sign-in box is what the display offers when the answer to either is no.
+
+#### And when there is no box at all
+
+Two states look like a fault and are not:
+
+- **"Nothing is set up on this port"** — no endpoint has been given a
+  connection carrying this port. There is nothing here to sign in to; giving an
+  endpoint that connection is the fix.
+- **A wall screen that stops answering** — an approved device on an endpoint
+  whose permission requires a sign-in. It has no person on it and cannot
+  acquire one, so it is refused. That is the setting working, not failing.
 
 ### The instance name and the wake word are two different things
 
@@ -201,10 +258,11 @@ The **instance name** labels the endpoint in the panel, in the log and in
 is what somebody actually says. An endpoint called *Kitchen Lights* is a
 perfectly good label and a terrible thing to say out loud.
 
-**The word is not on this tab.** It lives in the speech profile the endpoint
-names, on SPEECH ▸ WAKE WORD, along with the spellings it will also accept and
-whether matching is forgiving. One endpoint per speech profile is enforced, so
-each endpoint still has a word of its own.
+**The word is not on this tab.** It lives in the **layout** the endpoint names,
+on PROFILES ▸ LAYOUT, along with the spellings it will also accept, the sleep
+word and whether matching is forgiving — beside the face, the voice and the
+name the assistant answers to, because those are one answer to "what is this
+assistant" rather than four.
 
 ### FUZZY and EXACT
 
@@ -228,16 +286,16 @@ apart do not. Worth settling before a household learns them, because changing
 one afterwards is its own small misery.
 
 Two assistants sharing a word is a display that cannot tell them apart, and it
-is **no longer refused at the point of saving** — the words moved to speech
-profiles, and the check compared the vestigial copy every endpoint still
-carries, which refused every save. What prevents the clash instead is that one
-speech profile may be named by only one endpoint. Two *profiles* given the
-same word are not caught. Words that merely *sound* close are not checked
-either.
+is **not refused at the point of saving**: the word is a layout's, and two
+layouts given the same word are not caught. Two endpoints naming the *same*
+layout are the case that used to bite, and the upgrade splits those — each
+endpoint keeps a layout of its own with its own name — but nothing stops
+somebody typing one word into two layouts afterwards. Words that merely *sound*
+close are not checked either.
 
 **LEARN HOW I SAY IT** captures what the transcriber actually returns when you
 say the word, three times, and adds those forms to *Also accept*. It is on the
-SPEECH tab beside the word it teaches, not in an endpoint's block. The
+LAYOUT tab beside the word it teaches, not in an endpoint's block. The
 captured words land in the field unsaved — save the profile to keep them.
 
 ### TEST
@@ -264,9 +322,21 @@ names where the same question would have gone in use.
 
 ## Model profiles
 
-A profile is one connection under a name: **PROFILES ▸ MODELS**, one row each,
-the same caret and the same one-open-at-a-time as every other list. **ADD A
+A profile is one service under a name: **PROFILES ▸ MODELS**, one row each, the
+same caret and the same one-open-at-a-time as every other list. **ADD A
 PROFILE** makes one and SAVE commits the row.
+
+**The limits and the system prompt are here**, not on the endpoint. A context
+window, a token ceiling, a timeout and the instructions sent ahead of every
+question are facts about *what is being spoken to* — and two endpoints on one
+model wanting two different ceilings is not a case anybody has. They are set
+once, where the model is.
+
+**An endpoint does not name a model directly.** It names a *connection*, which
+pairs a model with a network profile: PROFILES ▸ CONNECTION. One name answers
+both "what does it speak to" and "where does it answer", because in practice
+they are chosen together and a half-configured endpoint is one that speaks to
+nothing or answers nowhere.
 
 There is no MAKE DEFAULT here, and nothing is nominated behind it — the same
 rule the network profiles have. An endpoint naming no model profile is not
@@ -378,8 +448,10 @@ display ports became a profile on upgrade and are treated exactly like one you
 made yourself. A profile no endpoint has been given is not bound at all, and
 the server says so at startup.
 
-**Whether a caller has to sign in is on the endpoint**, under ACCESS ▸ AI
-▸ Sign in — not here. See *Who may use it*.
+**Whether a caller has to sign in is not here.** It is an authenticate
+profile's, reached through the permission the endpoint names — see *Permission*
+above. A port is a door, not a lock: nothing about reaching one says who is at
+it.
 
 TLS is the same certificate the display port uses — the microphone needs a
 secure context, and a second certificate for the same machine would be one
@@ -535,6 +607,8 @@ a hosted provider and is never sent to Anthropic.
 
 ## The other settings
 
+On the **model profile**, beside the system prompt — not on the endpoint.
+
 | Control | What it does |
 |---|---|
 | reply limit (tokens) | ceiling on the length of an answer |
@@ -583,10 +657,13 @@ Sent ahead of every question, and it matters more here than in a chat box: the
 reply is **read aloud**. Markdown, bullets, headings and emoji are all noise
 when spoken, and a bulleted answer read out is unusable.
 
-Each assistant has its own. A local model and a hosted one want different
-instructions, and one wording covering both suits neither. A Home Assistant
-endpoint has none at all — its agent is instructed in Home Assistant — so the
-box is closed on those.
+**Each model profile has its own**, on PROFILES ▸ MODELS beside the limits. A
+local model and a hosted one want different instructions, and one wording
+covering both suits neither — but two endpoints on the same model wanting two
+different promptings is a case that never came up, and asking for it once per
+endpoint meant every endpoint carried a copy to drift out of step. A Home
+Assistant profile has none at all — its agent is instructed in Home Assistant —
+so the box is closed on those.
 
 The shipped prompt asks for one or two sentences of plain prose. **RESET**
 returns to it. That single instruction is the largest difference between a
@@ -645,7 +722,7 @@ earshot what the box is wired to.
 | the house says it does not understand | that is a pass for the built-in agent on a test sentence; on a real command, the device is not exposed to Assist or is named something else |
 | the house heard a command and did nothing audible | it did not fail silently — an action with nothing to say is spoken as "Done." If you hear nothing at all, look at the note on screen |
 | still on DEMO | that one is set to DEMO — nothing was asked of a model |
-| the wrong one answered | a near-miss; set the other speech profile to EXACT, or move the words further apart |
+| the wrong one answered | a near-miss; set the other layout to EXACT, or move the words further apart |
 | nothing woke at all | the word belongs to none of them, or the gate is off — SPEECH tab |
 | a confidently wrong answer | the model, not the plumbing — see above |
 

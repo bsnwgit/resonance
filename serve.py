@@ -955,6 +955,11 @@ ROUTE_DEFAULTS.update({
     # connection is an endpoint answering as DEMO on no port, without saying
     # why.
     "connection": "",
+    # WHO MAY USE IT, as one named pair — an authenticate profile and an
+    # authorize one. It was five fields here: needs_signin, restricted and
+    # three allow-lists. They are below, retired, so an existing document
+    # round-trips and migrate_permissions can read them once.
+    "permission": "",
     # RETIRED, and kept only so an existing document round-trips rather than
     # losing keys on its first save. migrate_connections reads them once to
     # make the pairs that already exist, and nothing reads them after that.
@@ -1430,6 +1435,13 @@ def validate_route(obj, current, doc, rid=None):
             return None, ("%s already answers on that port, and a port carries "
                           "one endpoint — give this one a port of its own "
                           "under PROFILES \u25b8 NETWORK" % who)
+    if "permission" in obj:
+        pid = str(obj["permission"] or "")[:16]
+        if pid and not any(p["id"] == pid
+                           for p in display_settings()["permissions"]):
+            return None, ("that permission no longer exists — reload the "
+                          "panel to see the current list")
+        rec["permission"] = pid
     if "connection" in obj:
         cid = str(obj["connection"] or "")[:16]
         if cid and not any(c["id"] == cid
@@ -1999,6 +2011,21 @@ DISPLAY_SETTINGS = {
     # connection changes with it, rather than a set of endpoints drifting apart
     # with nothing on screen saying which had.
     "connections": [],
+    # ---- WHO MAY USE AN ENDPOINT, in three lists for the same reason the
+    # appearance, geometry and speech of a screen are three: a deployment
+    # wants the pieces separately and the combination named.
+    #
+    # AUTHENTICATE — must there be a person at all, and how long a sign-in
+    # survives. The session limit is here and nowhere else: it was a field on
+    # every identity with no control anywhere that could set it, which is a
+    # setting nobody could see and nobody could change.
+    "authns": [],
+    # AUTHORIZE — and given a caller, is it one of the ones allowed. The
+    # allow-lists themselves, which is what makes this the half that is worth
+    # sharing: a department's screens are one list, named once.
+    "authzs": [],
+    # …and the pair of them under a name, which is what an endpoint points at.
+    "permissions": [],
     "kiosks": [],
     # NO NOMINATED DEFAULT, in any of these lists, and that is the rule rather
     # than an omission. A row naming nothing is not quietly handed a profile
@@ -2771,6 +2798,55 @@ def validate_display_settings(obj, current):
             r["values"]["port"] = pv
             r["values"]["redirect"] = rv
         cfg["networks"] = rows
+    if "authns" in obj:
+        if not isinstance(obj["authns"], (list, tuple)):
+            return None, "the authenticate profiles must be a list"
+        if len(obj["authns"]) > MAX_LOOKS:
+            return None, "there is room for %d authenticate profiles" % MAX_LOOKS
+        for a in obj["authns"]:
+            if not isinstance(a, dict) or not str(a.get("name") or "").strip():
+                return None, "every authenticate profile needs a name"
+        rows = clean_profiles(obj["authns"], "a", MAX_LOOKS)
+        for r in rows:
+            v = r["values"]
+            v["needs_signin"] = bool(v.get("needs_signin"))
+            # MINUTES OF QUIET, not a lifetime. The clock is the gap between
+            # conversations: a session that is being used does not run out.
+            # Zero is no limit, which is a real answer for a wall nobody signs
+            # in at and the wrong one for anything else.
+            try:
+                m = int(v.get("session_idle") or 0)
+            except (TypeError, ValueError):
+                return None, "%s: the session limit is a whole number of minutes" % r["name"]
+            if m and not (SESSION_MIN <= m <= SESSION_MAX):
+                return None, ("%s: the session limit is %d to %d minutes, or 0 "
+                              "for no limit" % (r["name"], SESSION_MIN, SESSION_MAX))
+            v["session_idle"] = m
+            r["values"] = {k: v[k] for k in ("needs_signin", "session_idle")}
+        cfg["authns"] = rows
+    if "authzs" in obj:
+        if not isinstance(obj["authzs"], (list, tuple)):
+            return None, "the authorize profiles must be a list"
+        if len(obj["authzs"]) > MAX_LOOKS:
+            return None, "there is room for %d authorize profiles" % MAX_LOOKS
+        for a in obj["authzs"]:
+            if not isinstance(a, dict) or not str(a.get("name") or "").strip():
+                return None, "every authorize profile needs a name"
+        rows = []
+        for a in obj["authzs"]:
+            pid = str(a.get("id") or "")[:16] or ("z" + secrets.token_hex(4))
+            rows.append({"id": pid, "name": str(a["name"]).strip()[:40],
+                         "values": {
+                             "restricted": bool(a.get("restricted")),
+                             # The three allow-lists, cleaned the same way a
+                             # route's were: ids only, capped, order kept.
+                             "displays": [str(x)[:32] for x in
+                                          (a.get("displays") or [])][:MAX_ALLOW],
+                             "identities": [str(x)[:32] for x in
+                                            (a.get("identities") or [])][:MAX_ALLOW],
+                             "groups": [str(x)[:32] for x in
+                                        (a.get("groups") or [])][:MAX_ALLOW]}})
+        cfg["authzs"] = rows
     if "connections" in obj:
         if not isinstance(obj["connections"], (list, tuple)):
             return None, "the connections must be a list"
@@ -2808,6 +2884,47 @@ def validate_display_settings(obj, current):
             # something one of the two already says.
             r["values"] = {k: r["values"][k] for k in ("model", "network")}
         cfg["connections"] = rows
+    if "permissions" in obj:
+        if not isinstance(obj["permissions"], (list, tuple)):
+            return None, "the permissions must be a list"
+        if len(obj["permissions"]) > MAX_LOOKS:
+            return None, "there is room for %d permissions" % MAX_LOOKS
+        for p in obj["permissions"]:
+            if not isinstance(p, dict) or not str(p.get("name") or "").strip():
+                return None, "every permission needs a name"
+        rows = clean_profiles(obj["permissions"], "x", MAX_LOOKS)
+        # BOTH ENDS, against the document as it will stand — the same reason
+        # the connection block runs after the two it pairs. A permission naming
+        # a profile made in this same save is accepted; one naming a profile
+        # this same save deleted is refused.
+        for r in rows:
+            for key, pool, what in (("authn", cfg["authns"], "authenticate profile"),
+                                    ("authz", cfg["authzs"], "authorize profile")):
+                pid = str(r["values"].get(key) or "")
+                if not pid:
+                    return None, ("%s: pick an %s — a permission is the pair, "
+                                  "and half of one decides nothing"
+                                  % (r["name"], what))
+                if not any(x["id"] == pid for x in pool):
+                    return None, ("%s: that %s no longer exists — reload the "
+                                  "panel to see the list" % (r["name"], what))
+                r["values"][key] = pid
+            r["values"] = {k: r["values"][k] for k in ("authn", "authz")}
+        cfg["permissions"] = rows
+    # THE SAME CHECK, ON WHATEVER THIS SAVE TOUCHED. The block above only runs
+    # when the permissions themselves are being written, and the way to strand
+    # one is to save the OTHER list: delete an authorize profile on its own and
+    # every permission naming it is left pointing at nothing. Run against the
+    # document as it will stand, so it catches the save that breaks a pointer
+    # as well as the save that writes a broken one.
+    for p in cfg.get("permissions") or []:
+        pv = p.get("values") or {}
+        for key, pool, what in (("authn", cfg.get("authns") or [], "authenticate"),
+                                ("authz", cfg.get("authzs") or [], "authorize")):
+            if not any(x["id"] == str(pv.get(key) or "") for x in pool):
+                return None, ("the permission %s uses that %s profile — "
+                              "point it somewhere else first"
+                              % (p.get("name") or "?", what))
     for key, prefix in (("motions", "m"), ("speeches", "p")):
         if key not in obj:
             continue
@@ -2918,6 +3035,109 @@ def write_displays(displays):
 #: The six that moved from the endpoint onto the model profile.
 MODEL_TALK_KEYS = ("system", "max_tokens", "temperature", "timeout",
                    "keep_alive", "history_turns")
+
+
+def migrate_permissions():
+    """Give every endpoint a permission built from what it already carries.
+
+    An endpoint held five fields — must there be a person, is it restricted,
+    and three allow-lists. It names a PERMISSION now, and without this every
+    endpoint on the server would be refused outright at the next question:
+    route_perm treats a missing pointer as the strict answer, which is right
+    for a half-built deployment and catastrophic for one that was working.
+
+    DEDUPLICATED BY VALUE at every level, because that is what makes the lists
+    worth having. Three endpoints that all ask for a sign-in share one
+    authenticate profile; two with the same allow-list share one authorize;
+    and a pair already made is reused rather than made again.
+
+    NAMED AFTER WHAT THEY SAY, not after the first endpoint that used them —
+    "Signed in" and "Anyone" describe a rule, and a rule named after one of its
+    users reads as belonging to that one. An authorize list is the exception:
+    a set of ticks has nothing to describe itself with, so it takes the
+    endpoint's name.
+
+    THE SESSION LIMIT IS MADE AS NO LIMIT, because there was none. A sign-in
+    lasted twelve hours whatever happened in them; the gap between
+    conversations ended nothing. Inventing a timer here would start closing
+    people's sessions in a way the code being replaced never did, so every
+    profile is made with zero and a limit is somebody deciding, on a profile
+    they can see."""
+    doc = read_routes()
+    routes = doc.get("routes") or {}
+    if not routes:
+        return
+    ddoc = read_displays_doc()
+    cfg = ddoc.get("settings")
+    cfg = dict(cfg) if isinstance(cfg, dict) else {}
+    authns = clean_profiles(cfg.get("authns"), "a", MAX_LOOKS)
+    authzs = [r for r in (cfg.get("authzs") or []) if isinstance(r, dict)]
+    perms = clean_profiles(cfg.get("permissions"), "x", MAX_LOOKS)
+    n_by = {(bool((a.get("values") or {}).get("needs_signin")),
+             int((a.get("values") or {}).get("session_idle") or 0)): a["id"]
+            for a in authns}
+    def zkey(v):
+        return (bool(v.get("restricted")),
+                tuple(sorted(v.get("displays") or [])),
+                tuple(sorted(v.get("identities") or [])),
+                tuple(sorted(v.get("groups") or [])))
+    z_by = {zkey(a.get("values") or {}): a["id"] for a in authzs}
+    p_by = {(str((p.get("values") or {}).get("authn") or ""),
+             str((p.get("values") or {}).get("authz") or "")): p["id"]
+            for p in perms}
+    made = 0
+    for rid in route_order(doc):
+        rec = routes[rid]
+        if rec.get("permission"):
+            continue
+        # NO IDLE LIMIT, because there was none. A session ran for twelve
+        # hours whatever happened in them, and a migration that invented a gap
+        # timer would start ending people's sessions in a way the code being
+        # replaced never did. Zero is the faithful answer; a limit is somebody
+        # deciding, on a profile they can see.
+        want_n = (bool(rec.get("needs_signin")), 0)
+        if want_n not in n_by:
+            if len(authns) >= MAX_LOOKS:
+                continue
+            a = {"id": "a" + secrets.token_hex(4),
+                 "name": "Signed in" if want_n[0] else "Anyone",
+                 "values": {"needs_signin": want_n[0],
+                            "session_idle": want_n[1]}}
+            authns.append(a); n_by[want_n] = a["id"]
+        zv = {"restricted": bool(rec.get("restricted")),
+              "displays": list(rec.get("displays") or []),
+              "identities": list(rec.get("identities") or []),
+              "groups": list(rec.get("groups") or [])}
+        zk = zkey(zv)
+        if zk not in z_by:
+            if len(authzs) >= MAX_LOOKS:
+                continue
+            z = {"id": "z" + secrets.token_hex(4),
+                 "name": ("Any display" if not zv["restricted"]
+                          else (rec.get("name") or rid)),
+                 "values": zv}
+            authzs.append(z); z_by[zk] = z["id"]
+        pk = (n_by[want_n], z_by[zk])
+        if pk not in p_by:
+            if len(perms) >= MAX_LOOKS:
+                continue
+            nm = next((a["name"] for a in authns if a["id"] == pk[0]), "?")
+            zn = next((a["name"] for a in authzs if a["id"] == pk[1]), "?")
+            p = {"id": "x" + secrets.token_hex(4),
+                 "name": (nm + " · " + zn)[:40],
+                 "values": {"authn": pk[0], "authz": pk[1]}}
+            perms.append(p); p_by[pk] = p["id"]
+        rec["permission"] = p_by[pk]
+        made += 1
+    if not made:
+        return
+    cfg["authns"], cfg["authzs"], cfg["permissions"] = authns, authzs, perms
+    ddoc["settings"] = cfg
+    _write_displays_doc(ddoc)
+    write_routes(doc)
+    print("permissions: %d endpoint(s) onto %d permission(s) "
+          "(%d authenticate, %d authorize)"
+          % (made, len(perms), len(authns), len(authzs)), flush=True)
 
 
 def migrate_model_limits():
@@ -3949,6 +4169,49 @@ def guest_path_broken(doc):
     return not display_settings()["guest_requests"] and not open_default(doc)
 
 
+def route_perm(rec, cfg=None):
+    """WHO MAY USE THIS ENDPOINT, resolved to the five fields that decide it.
+
+    An endpoint carried them: whether a person must be signed in, whether it is
+    restricted, and three allow-lists. It names a PERMISSION now — a named pair
+    of an authenticate profile and an authorize one — and this flattens that
+    pair back into the shape subject_may has always read, so the one function
+    every request goes through did not have to learn a new one.
+
+    NAMING NOTHING IS THE STRICT ANSWER, deliberately. An endpoint with no
+    permission is refused rather than open: the old default was `restricted`
+    False, which is safe only because it was the shape a route was BORN in — a
+    field somebody had to go and set. A missing pointer is not that; it is a
+    deployment mid-edit, and mid-edit is not a state to be permissive in."""
+    cfg = cfg or display_settings()
+    pid = str((rec or {}).get("permission") or "")
+    if not pid:
+        return None
+    perm = next((p for p in cfg.get("permissions") or [] if p["id"] == pid), None)
+    if not perm:
+        return None
+    vals = perm.get("values") or {}
+    authn = next((a for a in cfg.get("authns") or []
+                  if a["id"] == str(vals.get("authn") or "")), None)
+    authz = next((a for a in cfg.get("authzs") or []
+                  if a["id"] == str(vals.get("authz") or "")), None)
+    # HALF A PERMISSION IS NOT A PERMISSIVE ONE. A missing half used to read as
+    # an empty one, and an empty authorize profile means UNRESTRICTED — so
+    # deleting a profile two endpoints named would have opened both of them to
+    # anybody. Saving is guarded against leaving one dangling; this is the same
+    # answer given at the point of use, because a document can also arrive from
+    # a backup, a hand edit or a half-finished restore.
+    if authn is None or authz is None:
+        return None
+    av, zv = (authn.get("values") or {}), (authz.get("values") or {})
+    return {"needs_signin": bool(av.get("needs_signin")),
+            "session_idle": int(av.get("session_idle") or 0),
+            "restricted": bool(zv.get("restricted")),
+            "displays": list(zv.get("displays") or []),
+            "identities": list(zv.get("identities") or []),
+            "groups": list(zv.get("groups") or [])}
+
+
 def vouched(disp):
     """Is this screen one an admin deliberately put here?
 
@@ -4053,6 +4316,15 @@ def subject_may(route, disp=None, ident=None):
     # that reason — it has no person on it either.
     if disp and disp.get("preview"):
         return True
+    # THE FIVE FIELDS, THROUGH THE PERMISSION THIS ENDPOINT NAMES. They were on
+    # the route; everything below reads them from here instead, so this
+    # function is unchanged in what it decides and changed only in where it
+    # looks. An endpoint naming no permission is refused outright — see
+    # route_perm for why a missing pointer is not the same as an open door.
+    perm = route_perm(route)
+    if perm is None:
+        return False
+    route = perm
     # MUST THERE BE A PERSON. Above the allow-list test, because it applies to
     # an endpoint that has no allow-list at all: "open to anyone who signs in"
     # is a real and useful thing to say, and checking this after the
@@ -5094,6 +5366,9 @@ IDENTITY_DEFAULTS = {
     # rather than the deployment's: a password is entered at a login page, not
     # at a screen standing in a room, so there is no place carrying the risk to
     # set it from. Zero takes the deployment default.
+    # RETIRED. How long a sign-in survives is the authenticate profile's — see
+    # identity_hours. Kept so an existing document round-trips rather than
+    # losing a key on its first save; nothing reads it and nothing writes it.
     "session_hours": 0,
     # THEIR OWN STATUS LINE, and it follows them. The device's is about one
     # screen; this is about one person, on whatever they sign in at — which is
@@ -5156,8 +5431,17 @@ def write_identity_settings(pid, obj):
 
 
 def identity_hours(rec):
-    h = int(rec.get("session_hours") or 0)
-    return h if h > 0 else SESSION_HOURS_DEFAULT
+    """RETIRED as a per-person field. How long a sign-in survives is the
+    AUTHENTICATE profile's now — see route_perm — because it is a property of
+    the door somebody came through rather than of the person who came through
+    it. The field it read was on every identity with no control anywhere that
+    could set it, which is a setting nobody could see and nobody could change.
+
+    Still here, and still the deployment constant, because a session is opened
+    at the moment somebody signs in and that is before any endpoint is
+    involved: what the permission decides is when an IDLE one lapses, which
+    session_left answers."""
+    return SESSION_HOURS_DEFAULT
 
 
 def open_user_session(pid, hours):
@@ -5168,8 +5452,36 @@ def open_user_session(pid, hours):
         now_ = time.time()
         for t in [t for t, v in _user_sessions.items() if v["expires"] <= now_]:
             _user_sessions.pop(t, None)
-        _user_sessions[token] = {"pid": pid, "expires": now_ + hours * 3600}
+        # `idle` is nought until the first conversation. The limit that ends
+        # an idle session belongs to an AUTHENTICATE profile, and nothing
+        # names one yet at this moment: signing in happens at a login box,
+        # before any endpoint is involved. The first exchange sets it.
+        _user_sessions[token] = {"pid": pid, "expires": now_ + hours * 3600,
+                                 "idle": 0.0}
     return token
+
+
+def touch_user_session(token, minutes):
+    """A conversation happened; push the idle deadline out by this endpoint's
+    limit — or take the deadline away where it has none.
+
+    THE LIMIT IS THE TIME BETWEEN CONVERSATIONS, which is why this is called
+    from the ask handler and from nowhere else. A page open on a wall polls
+    this server every few seconds and none of that is somebody being present:
+    sliding on requests would mean a session that never lapsed as long as the
+    browser was switched on, which is the opposite of what the setting is for.
+
+    Read off the endpoint being spoken to rather than stored on the session,
+    because one person may use several and each may answer differently: the
+    deadline is always the one the last conversation set."""
+    tok = str(token or "")
+    if not tok:
+        return
+    with _user_lock:
+        rec = _user_sessions.get(tok)
+        if not rec:
+            return
+        rec["idle"] = (time.time() + minutes * 60) if minutes > 0 else 0.0
 
 
 def user_session_pid(token):
@@ -5179,7 +5491,12 @@ def user_session_pid(token):
     rec = _user_sessions.get(str(token or ""))
     if not rec:
         return ""
-    if rec["expires"] <= time.time():
+    now_ = time.time()
+    # EITHER DEADLINE ENDS IT. The absolute one is how long a sign-in may last
+    # at all; the idle one is how long it may sit between conversations, set by
+    # the authenticate profile of whatever was last spoken to.
+    idle = float(rec.get("idle") or 0)
+    if rec["expires"] <= now_ or (idle and idle <= now_):
         _user_sessions.pop(str(token), None)
         return ""
     return rec["pid"]
@@ -7391,6 +7708,19 @@ class Handler(SimpleHTTPRequestHandler):
             return ""
         m = jar.get(USER_COOKIE)
         return user_session_pid(m.value) if m else ""
+
+    def _user_token(self):
+        """The token itself rather than who it belongs to. Only the idle timer
+        wants this: it has a session to push out, not a person to identify."""
+        raw = self.headers.get("Cookie")
+        if not raw or self.admin_port:
+            return ""
+        try:
+            jar = http.cookies.SimpleCookie(raw)
+        except http.cookies.CookieError:
+            return ""
+        m = jar.get(USER_COOKIE)
+        return m.value if m else ""
 
     def _set_user_cookie(self, token, hours):
         bits = ["%s=%s" % (USER_COOKIE, token), "Path=/", "HttpOnly",
@@ -10068,6 +10398,15 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(403, dict(about, refused="display",
                                             error="this display may not use "
                                                   "that endpoint"))
+
+            # THE IDLE CLOCK, RESET. Past the gate is a conversation starting,
+            # which is the event the authenticate profile's limit measures the
+            # gap between — not a request, of which a display makes hundreds
+            # while nobody is in the room.
+            if ident:
+                touch_user_session(
+                    self._user_token(),
+                    int((route_perm(cfg) or {}).get("session_idle") or 0))
             if cfg["provider"] == "demo":
                 # The display owns the demo replies; say so plainly rather
                 # than inventing a second set that drifts from the first.
@@ -10340,6 +10679,8 @@ def main():
     migrate_wake_words()
     # After the connections, because it resolves a route's model through one.
     migrate_model_limits()
+    # Last of them, and it reads five fields the others do not touch.
+    migrate_permissions()
     # The two groups that always exist. Made at startup rather than on first
     # need, so they are there before anything can enrol into them and there is
     # no moment where a population has nowhere to land.

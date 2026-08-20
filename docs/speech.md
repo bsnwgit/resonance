@@ -19,16 +19,22 @@ Without a wake word, an AUTO display responds to any speech near it —
 including two people talking to each other. The wake word is what makes it
 usable in an occupied room.
 
-**The words themselves are here**, in the speech profile — the word, the
-spellings it will also accept, LEARN, whether matching is forgiving, how long
-it stays awake, and the greeting. An endpoint names a profile and takes all of
-it, and one profile may be named by only one endpoint, so with several
-assistants each still has a word of its own.
+**The words themselves are on the LAYOUT profile**, not here — the wake word,
+the spellings it will also accept, LEARN, whether matching is forgiving, and
+the sleep word with its spellings. They sit beside the face, the voice and the
+greeting because those are one answer to *what is this assistant* rather than
+four: a port carries one endpoint, an endpoint names one layout, so a layout is
+one assistant's whole identity.
 
-**A new profile starts with the word empty.** Everything else it inherits from
-the tab as you have it set up, which is the point of capturing a profile
-there — but a second profile carrying the first one's word is a clash by
-construction, since the word is what tells two assistants apart.
+This tab is what a display **hears and says** — the transcriber, the voice, how
+long it stays awake — which is a property of the room and the machine rather
+than of any one assistant, and is why a speech profile can be shared where a
+word cannot.
+
+**Two layouts given the same word are not caught.** The word is what tells two
+assistants apart, so it is worth settling before a household learns them.
+Endpoints that shared a layout before the word moved onto it were split on
+upgrade, each keeping a layout of its own under its own name.
 
 **It is stored as you type it, capitals and all**, so a display can say
 *Resonance* rather than *resonance*. What it answers to is unaffected: the

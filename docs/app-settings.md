@@ -52,10 +52,11 @@ answers — a house one anybody in the room may talk to, a hosted model worth
 money per question, one reading from a system that should know who asked — and
 a single switch covering all three could only ever be set to the strictest.
 
-**Two settings on an endpoint can each produce a sign-in box** — MUST SIGN IN,
-and an allow-list that does not cover this caller. The display shows one
-whenever it cannot use what is on the port, and does not distinguish the
-reason. *Assistants* → *Sign in* has the table.
+**Either half of a permission can produce a sign-in box** — an authenticate
+profile demanding one, or an authorize profile whose allow-list does not cover
+this caller. The display shows one whenever it cannot use what is on the port,
+and does not distinguish the reason. *Assistants* → *Permission* has the
+table.
 
 MUST SIGN IN refuses a **device** outright, approved or not. A wall screen has
 no person on it, so an endpoint set that way is one your kiosks stop answering
@@ -97,10 +98,10 @@ but it **warns at every startup and in the admin panel**, because a laptop
 configured this way that later joins an office network will not have changed
 on the day that matters.
 
-**The warning is on the endpoint**, under ACCESS ▸ AI ▸ *Sign in*, because
-that is the control that causes it — one line saying what being open costs,
-shown only where that endpoint asks nobody to sign in and this machine can be
-reached. This page keeps the count and a pointer, since being reachable is what
+**The warning is on the endpoint**, under ACCESS ▸ AI ▸ *Permission*, because
+that is the endpoint anybody can reach — one line saying what being open costs,
+shown only where that endpoint's permission asks nobody to sign in and this
+machine can be reached. This page keeps the count and a pointer, since being reachable is what
 makes it matter rather than what decides it.
 
 **It can be answered, two ways.** *Not now* lasts as long as the tab. *I know*

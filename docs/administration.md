@@ -135,22 +135,33 @@ marked by colour and a rule underneath rather than by a box of their own.
 beneath it: the line runs above the label, turns down at the end of it and
 carries on along the top of the row, so what is inside the turn is one subject.
 Everything in it is a list of profiles, and the controls for one appear inside
-it when you open it. Two groups, at opposite ends of the row:
+it when you open it. Three groups across the row, each labelled in its own top
+edge:
 
 - **LAYOUTS** — **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER / LAYOUT**.
   What a screen is. LAYOUT reads last because it is the one that *names* the
-  four before it rather than describing anything itself.
-- **CONNECTIONS**, at the right edge — **MODELS / NETWORK**. The two halves of
-  an endpoint that are not the endpoint: what it speaks to, and what it answers
-  on. They sat among the five until 2026-08-20, which made the row a list of
-  seven unrelated things.
+  four before it rather than describing anything itself, and it carries the
+  wake word: the face, the voice and the word it answers to are one answer to
+  "what is this assistant".
+- **PERMISSIONS** — **AUTHENTICATE / AUTHORIZE / PERMISSION**. Who may use an
+  endpoint. AUTHENTICATE is whether a caller must be known and how long being
+  known lasts; AUTHORIZE is which callers are allowed; PERMISSION is one of
+  each under a name, and that name is what an endpoint points at.
+- **CONNECTIONS**, at the right edge — **MODELS / NETWORK / CONNECTION**. What
+  an endpoint speaks to and what it answers on, and the pairing of the two
+  under a name. MODELS carries the limits and the system prompt as well, since
+  those describe the service rather than the assistant in front of it.
+
+Each of the three groups reads the same way: the last tab in it is the one that
+*names* the others, and an endpoint names only those. Three pointers on an
+endpoint instead of a dozen fields, and a rule written once rather than copied
+onto every endpoint that shares it.
 
 **ACCESS**, at the foot — who and what may reach this server, as opposed to
 what you administer about it. It was called CONNECTIONS until the word was
 needed for the pair above:
 
-- **AI** — the endpoints, each naming a speech profile, a model profile and a
-  network profile.
+- **AI** — the endpoints, each naming a connection, a layout and a permission.
 - **NODES** — everything currently connected, in one register. Each row is
   badged for the door it came through — **ASKED** for a device whose user
   filled in the request form, **INVITED** for one you issued a code to — which
@@ -252,6 +263,7 @@ Each of these writes a different document, so each has its own button:
 | SAVE, inside an AI endpoint's box | that endpoint alone | immediately, next question |
 | SAVE, on SECURITY | who has to be approved, what a grant is worth, how long a code lasts | immediately |
 | SAVE, inside Sign in | how you get in | only after a restart |
+| SAVE, inside an authenticate, authorize or permission row | that profile alone, and every endpoint naming it | immediately, next question |
 | SAVE, inside Sessions | how long an admin session lasts | only after a restart |
 | SAVE, on ADMIN | the admin port, binding, maintenance | only after a restart, except maintenance |
 
@@ -325,7 +337,8 @@ There is no self-registration here and nothing that verifies an address, so
 anybody who could create their own account could create somebody else's.
 
 **Tick their assistants while you are there.** The **AI** ticks on that box are
-the grant, and the same grant each endpoint's own *Who may use it* list makes.
+the grant, and the same grant an *authorize* profile makes under PROFILES ▸
+PERMISSIONS.
 Tick none and they reach whatever is open to everyone; an endpoint that is open
 to everyone is reachable already, so ticking it grants nothing. The same ticks
 are on the person's own row afterwards, so a grant made here can be changed
@@ -1249,13 +1262,13 @@ They are standing at that screen waiting, so **their page takes them straight
 to the choose-a-password box** the moment you approve. The link also appears in
 the panel, once, for the case where they walked away.
 
-**Either setting on an endpoint can put a sign-in box in front of somebody.**
-*Sign in* asks whether there must be a person at all; *Who may use it* asks
-whether this particular caller is allowed. A NO from either one leaves the
-browser unable to use the endpoint, and a sign-in box is what the display
-offers when that happens — so an endpoint left at NOT REQUIRED still shows one
-to a browser its allow-list does not cover. See *Assistants* → *Sign in* for
-the full table.
+**Either half of an endpoint's permission can put a sign-in box in front of
+somebody.** The *authenticate* half asks whether there must be a known caller
+at all; the *authorize* half asks whether this particular one is allowed. A NO
+from either leaves the browser unable to use the endpoint, and a sign-in box is
+what the display offers when that happens — so an endpoint whose sign-in says
+NOT REQUIRED still shows one to a browser its allow-list does not cover. See
+*Assistants* → *Permission* for the full table.
 
 **A person has no equivalent test.** An account exists only because you made
 it, so creating one *is* the approval and there is no way to turn up asking to
