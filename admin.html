@@ -699,6 +699,12 @@
     font-size:calc(9px * var(--fs));letter-spacing:.06em;line-height:1.6;
     color:#f0cf94;display:flex;flex-direction:column;gap:8px;
   }
+  /* AND IT HAS TO SAY THIS. `hidden` gets its display:none from the browser's
+     own stylesheet, which any author rule outranks — so the display:flex
+     above quietly cancelled it and the box stayed on screen with no text in
+     it and its two buttons intact, on endpoints that had nothing to warn
+     about. `.pending` never hit this because it sets no display at all. */
+  .openwarn[hidden]{display:none}
   .openwarn .seg{margin:0}
   /* `#portgrid` is gone with the section that had it: the app's ports are
      network profiles now, so the one row left was a grid built for a column
