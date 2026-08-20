@@ -3833,39 +3833,6 @@ chose their password.</div>
     </div>
   </section>
 
-  <!-- Everything that is simply working. Its own topic, because the list
-       above is a queue — read when something needs deciding — and this one is
-       a register, read when somebody asks what is out there. Three rows that
-       need attention buried among fifty that do not is how a request sits
-       unanswered for a week. -->
-  <!-- BARE: the tab is already called DEVICES, and a section titled Devices
-       inside it says the same word twice. A bare section has no heading, never
-       collapses — there is nothing to collapse it behind — and gets its ? on a
-       thin row of its own. -->
-  <!-- Only people, and only those who have not been decided about — a bare
-       list like every other, under the topic that decides what it asks them.
-       A QUEUE: read when something needs doing, empty when nothing does. -->
-  <section class="grp bare proflist" data-tab="displays">
-    <div class="barehead"><span class="listtitle">Waiting for approval</span></div>
-    <div class="grpbody">
-  <div id="asklist"></div>
-  <div class="note" id="asknote"></div>
-  <div class="note help">Somebody opened the display page on their own device
-and filled in the form above. Nothing they said is proof of anything — it is
-what they told you — but a request that arrives saying <b>Sarah, building 4
-laptop</b> is one you can act on, where an anonymous row is one you can only
-guess at.
-
-<b>APPROVE</b> grants access and, in the same gesture, whichever endpoints you
-tick. <b>REFUSE</b> gives them a message and you a note for whoever comes back
-to this row in six months, and says whether they may ask again.
-
-They leave this list the moment you decide and appear under ACCESS ▸
-NODES, in the one register with every other device, badged ASKED for the door
-they came through.</div>
-    </div>
-  </section>
-
   <!-- The same shape as APPEARANCE and every other list in this panel: a bare
        section with the list's name across the top, the rows, and the thing
        that makes a new one along the foot. It was two headed topics you had to
@@ -10729,7 +10696,7 @@ async function refreshDisplays(){
          two could never be looked at together anyway, and a row left open on a
          tab you walked away from is a row you come back to already scrolled
          past. */
-      document.querySelectorAll('#asklist .erow, #enrollist .erow, '
+      document.querySelectorAll('#enrollist .erow, '
                                 + '#conndevices .erow')
               .forEach(x=> x.classList.add('shut'));
       row.classList.toggle('shut', !opening);
@@ -11426,7 +11393,7 @@ function decide(d, name, row){
    element happens to live on — which, since GET A CODE moved to its own tab,
    is not the tab anybody pressing APPROVE is looking at. */
 function dispNoteEl(){
-  return $({displays: 'asknote', enrol: 'dispnote',
+  return $({enrol: 'dispnote',
             devices: 'connnote'}[CURRENT_TAB] || 'dispnote') || $('dispnote');
 }
 
