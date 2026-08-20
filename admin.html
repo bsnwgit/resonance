@@ -557,6 +557,21 @@
      past reading. */
   .profrow{flex-wrap:wrap;align-items:flex-start}
   .profrow .tabbox:last-child{margin-left:auto}
+  /* TIGHTENED SO THE THIRD GROUP STAYS ON THE LINE. Eleven buttons across
+     three boxes is the widest row on the panel, and at the width this opens at
+     CONNECTIONS was wrapping onto a second line — which reads as a group that
+     belongs to something else rather than as the third of three.
+
+     Scoped to this row on purpose: the same trims everywhere would take the
+     air out of rows that have it to spare. And NOTHING here is type size —
+     what gives is the space around the words, the gap either side of each
+     divider, and the padding inside the three borders. It buys about 180px,
+     which is a group and a half. */
+  .profrow{gap:8px}
+  .profrow .tabbox{padding:2px 6px 4px}
+  .profrow .tabbox > legend{padding:0 6px}
+  .profrow .tabbox > legend .tablabel{padding:3px 7px;letter-spacing:.16em}
+  .profrow .tabs button{padding:2px 9px;letter-spacing:.14em}
   .profhead{margin:2px 0 10px}
   /* THE BOX IS AS WIDE AS WHAT IS IN IT, like the two at the head of the
      panel — a border drawn out to the width its side happens to have is a box
