@@ -491,6 +491,11 @@
      Brighter than the hairline between topics, so they group rather than
      merge into the section rules. */
   .rule{height:1px;margin:9px 0 2px;background:rgba(var(--glass),.55)}
+  /* Tighter than the one that closes the row. It sits between a label and the
+     thing the label names, which is a shorter distance than between one
+     subject and the next — the rule below has a whole row above it and the
+     topics below, and it needs the air. */
+  .headrule{margin:5px 0 8px}
   /* Between the groups the server keeps and the ones an admin made. More air
      than the rule above the topics gets, because it is separating two halves
      of one list rather than capping a column — rows sit tight against each
@@ -2179,6 +2184,10 @@
        third group rather than as the name of the row. Everything under it is a
        profile; the two labels below say which KIND. -->
   <div class="tabhead"><span class="tablabel">PROFILES</span></div>
+  <!-- …and a line under it, so it caps the row rather than floating above it.
+       The same hairline that closes the row at the bottom: what is between the
+       two is one subject. -->
+  <div class="rule headrule"></div>
   <div class="tabs">
     <!-- WHAT A SCREEN IS, in five parts. The four that describe it and the one
          that names them: a layout profile points at an appearance and a
