@@ -1957,6 +1957,15 @@ DISPLAY_SETTINGS = {
     # port, which is where every endpoint was before this existed. A default
     # would silently move one onto a port of its own.
     "networks": [],
+    # A MODEL AND A PORT, UNDER ONE NAME. The two halves of an endpoint that
+    # are not the endpoint — what it speaks to, and what it answers on — named
+    # together so the pair can be picked once instead of twice.
+    #
+    # It holds ids, not copies. That is the whole point of a profile: change
+    # which model a connection speaks to and every endpoint using that
+    # connection changes with it, rather than a set of endpoints drifting apart
+    # with nothing on screen saying which had.
+    "connections": [],
     "kiosks": [],
     # NO NOMINATED DEFAULT, in any of these lists, and that is the rule rather
     # than an omission. A row naming nothing is not quietly handed a profile
@@ -2711,6 +2720,43 @@ def validate_display_settings(obj, current):
             r["values"]["port"] = pv
             r["values"]["redirect"] = rv
         cfg["networks"] = rows
+    if "connections" in obj:
+        if not isinstance(obj["connections"], (list, tuple)):
+            return None, "the connections must be a list"
+        if len(obj["connections"]) > MAX_LOOKS:
+            return None, "there is room for %d connections" % MAX_LOOKS
+        for c in obj["connections"]:
+            if not isinstance(c, dict):
+                return None, "a connection must be a set of fields"
+            if not str(c.get("name") or "").strip():
+                return None, ("every connection needs a name — it is what "
+                              "gets picked")
+        rows = clean_profiles(obj["connections"], "c", MAX_LOOKS)
+        # THE TWO ENDS, CHECKED AGAINST THE DOCUMENT AS IT WILL STAND — which
+        # is why this block sits AFTER both of theirs rather than before. `cfg`
+        # carries whatever models and networks arrived in this same save by the
+        # time it runs, so a connection naming a profile created in the same
+        # press is accepted, and one naming a profile deleted in the same press
+        # is refused. Written above them first, it would have validated against
+        # the stored networks and let a connection through that pointed at a
+        # port the same save had just removed.
+        for r in rows:
+            for key, pool, what in (("model", cfg["models"], "model profile"),
+                                    ("network", cfg["networks"], "network profile")):
+                pid = str(r["values"].get(key) or "")
+                if not pid:
+                    return None, ("%s: pick a %s — a connection is the pair, "
+                                  "and half of one is not a connection"
+                                  % (r["name"], what))
+                if not any(p["id"] == pid for p in pool):
+                    return None, ("%s: that %s no longer exists — reload the "
+                                  "panel to see the list" % (r["name"], what))
+                r["values"][key] = pid
+            # Nothing else belongs on it. A connection is two ids and a name;
+            # anything else typed here would be a third place to state
+            # something one of the two already says.
+            r["values"] = {k: r["values"][k] for k in ("model", "network")}
+        cfg["connections"] = rows
     for key, prefix in (("motions", "m"), ("speeches", "p")):
         if key not in obj:
             continue

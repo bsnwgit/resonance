@@ -2339,6 +2339,10 @@
     <span class="tablabel">CONNECTIONS</span>
     <button data-tab="models">MODELS</button>
     <button data-tab="network">NETWORK</button>
+    <!-- AFTER THE TWO IT IS MADE OF, because that is the order it is built in:
+         a model to speak to, a port to answer on, and then the pair of them
+         under one name. -->
+    <button data-tab="connection">CONNECTION</button>
   </div>
   </div><!-- /profbox — its foot is the rule that used to sit here -->
   </div><!-- /panelhead -->
@@ -3342,6 +3346,38 @@ pointed at.</div>
   <!-- A port, under a name. The ports on ADMIN are the admin
        portal's own; what the app answers on is here, with the rest of what an
        endpoint is made of. -->
+  <!-- A MODEL AND A PORT UNDER ONE NAME. The two halves of an endpoint that
+       are not the endpoint, named together so the pair can be picked once
+       instead of twice. It holds their IDS and not copies of them: change
+       which model a connection speaks to and everything using that connection
+       changes with it, which is the whole point of a profile. -->
+  <section class="grp bare proflist" data-tab="connection">
+    <div class="barehead"><span class="listtitle">Connections</span></div>
+    <div class="grpbody">
+  <div id="dp_conns"></div>
+  <div class="note" id="connnote"></div>
+  <div class="seg addrow">
+    <button id="b_addconn" class="act-add">ADD A CONNECTION</button>
+  </div>
+  <div class="note help">A <b>model</b> and a <b>network profile</b>, under one
+name. Those are the two halves of an endpoint that are not the endpoint: what
+it speaks to, and what it answers on.
+
+<b>Both are required.</b> Half a connection is not a connection — there is
+nothing useful to do with a model that answers nowhere, or a port with nothing
+behind it.
+
+<b>It names them rather than copying them.</b> Change which model a connection
+speaks to and everything using that connection changes with it, instead of a
+set of endpoints drifting apart with nothing on screen saying which had. A
+profile something names cannot be deleted out from under it: point the
+connection elsewhere first.
+
+Nothing references a connection yet — this is the list, built before the thing
+that will pick from it.</div>
+    </div>
+  </section>
+
   <section class="grp bare proflist" data-tab="network">
     <div class="barehead"><span class="listtitle">Network profiles</span></div>
     <div class="grpbody">
@@ -8104,6 +8140,7 @@ function paintDpSettings(){
   paintKiosks(DPCFG.kiosks || []);
   paintModels(DPCFG.models || []);
   paintNetworks(DPCFG.networks || []);
+  paintConns(DPCFG.connections || []);
   paintNewSetup();
 }
 
@@ -8415,6 +8452,149 @@ function paintModels(list){
    has to look like something; an endpoint naming no network profile is not
    missing a setting, it is on the display port. */
 let DPNETS = [], OPENNW = -1;
+
+/* ------------------------------------------------------- connections
+   A model and a port under one name. Built like every other profile list on
+   this panel — a local array the rows are drawn from, one row open at a time,
+   and SAVE sending the whole list rather than a row — so the three read alike
+   and there is one shape to learn rather than three. */
+let DPCONNS = [], OPENCN = -1;
+
+function paintConns(list){
+  DPCONNS = (list || []).map(c=> ({id: c.id || '', _new: !!c._new,
+                                   name: c.name || '',
+                                   values: Object.assign({}, c.values || {})}));
+  const box = $('dp_conns');
+  if (!box) return;
+  box.innerHTML = '';
+  const models = (DPCFG && DPCFG.models) || [];
+  const nets   = (DPCFG && DPCFG.networks) || [];
+  /* SAID ONCE, not per row. Neither list can be picked from until it has
+     something in it, and a row of two empty pickers explains nothing about
+     why. */
+  if (!models.length || !nets.length){
+    box.className = 'note';
+    box.textContent = !models.length && !nets.length
+      ? 'Nothing to connect yet — a connection is a model and a port, and '
+        + 'there are none of either. Make one of each under MODELS and NETWORK.'
+      : !models.length
+        ? 'No models yet — a connection needs something to speak to. MODELS.'
+        : 'No network profiles yet — a connection needs a port to answer on. '
+          + 'NETWORK.';
+    const ab = $('b_addconn');
+    if (ab) ab.hidden = true;
+    return;
+  }
+  box.className = '';
+  DPCONNS.forEach((c, i)=>{
+    const v = c.values;
+    const row = document.createElement('div');
+    row.className = 'erow';
+    if (OPENCN !== i) row.classList.add('shut');
+
+    const top = document.createElement('div'); top.className = 'top';
+    const nmt = document.createElement('span'); nmt.className = 'nm';
+    nmt.textContent = (c.name || '').trim() || 'unnamed connection';
+    top.appendChild(nmt);
+    /* WHAT IT TIES, on the shut row. It is the whole of what a connection is,
+       so a row that made you open it to find out would be a row that says
+       nothing. */
+    const sum = document.createElement('span'); sum.className = 'badge';
+    const mn = models.filter(m=> m.id === v.model)[0];
+    const wn = nets.filter(n=> n.id === v.network)[0];
+    sum.textContent = (mn ? mn.name : 'no model') + ' · '
+                    + (wn ? wn.name : 'no port');
+    top.appendChild(sum);
+    top.onclick = (e)=>{
+      if (e.target.closest('input, button, select, textarea')) return;
+      OPENCN = (OPENCN === i) ? -1 : i;
+      paintConns(DPCONNS);
+    };
+    row.appendChild(top);
+
+    const namerow = document.createElement('div');
+    namerow.className = 'namerow';
+    const nlab = document.createElement('b'); nlab.textContent = 'Name';
+    namerow.appendChild(nlab);
+    const nm = document.createElement('input');
+    nm.type = 'text'; nm.className = 'nmedit'; nm.value = c.name || '';
+    nm.spellcheck = false;
+    nm.oninput = ()=>{ c.name = nm.value; nmt.textContent =
+                       (nm.value || '').trim() || 'unnamed connection'; };
+    namerow.appendChild(nm);
+    row.appendChild(namerow);
+
+    /* THE TWO ENDS, in the order a connection is built: what it speaks to,
+       then what it answers on. */
+    const pick = (label, key, pool, blank)=>{
+      const r = document.createElement('div');
+      r.className = 'namerow';
+      const b = document.createElement('b'); b.textContent = label;
+      r.appendChild(b);
+      const sel = document.createElement('select');
+      sel.className = 'ppick';
+      const none = document.createElement('option');
+      none.value = ''; none.textContent = blank;
+      sel.appendChild(none);
+      pool.forEach(p=>{
+        const o = document.createElement('option');
+        o.value = p.id; o.textContent = p.name;
+        sel.appendChild(o);
+      });
+      sel.value = v[key] || '';
+      sel.onchange = ()=>{ v[key] = sel.value; paintConns(DPCONNS); };
+      r.appendChild(sel);
+      row.appendChild(r);
+    };
+    pick('Model', 'model', models, 'PICK ONE');
+    pick('Answers on', 'network', nets, 'PICK ONE');
+
+    const acts = document.createElement('div'); acts.className = 'acts';
+    const gap = document.createElement('span'); gap.className = 'spacer';
+    acts.appendChild(gap);
+    const save = document.createElement('button');
+    save.textContent = 'SAVE'; save.className = 'act-save';
+    save.onclick = ()=>{
+      /* Said here rather than by the server, because the server answers about
+         the whole list and this is about the row in front of somebody. */
+      if (!(c.name || '').trim())
+        return dpNote('a connection needs a name before it can be saved',
+                      true, 'connnote');
+      if (!v.model || !v.network)
+        return dpNote('pick both a model and a port — half a connection is '
+                      + 'not a connection', true, 'connnote');
+      c._new = false; OPENCN = -1;
+      saveDp({connections: DPCONNS.filter(x=> (x.name || '').trim()
+                                              && x.values.model
+                                              && x.values.network)
+                .map(x=> ({id: x.id, name: x.name,
+                           values: {model: x.values.model,
+                                    network: x.values.network}}))}, 'connnote');
+    };
+    acts.appendChild(save);
+    const del = document.createElement('button');
+    del.textContent = 'REMOVE'; del.className = 'act-danger';
+    del.onclick = ()=>{ OPENCN = -1; DPCONNS.splice(i, 1); paintConns(DPCONNS); };
+    acts.appendChild(del);
+    row.appendChild(acts);
+    box.appendChild(row);
+  });
+  const btn = $('b_addconn');
+  if (btn){
+    const busy = OPENCN >= 0 || DPCONNS.some(x=> x._new);
+    btn.hidden = busy;
+    btn.disabled = busy || DPCONNS.length >= 8;
+  }
+}
+
+const bAddConn = $('b_addconn');
+if (bAddConn) bAddConn.addEventListener('click', ()=>{
+  if (DPCONNS.length >= 8) return;
+  DPCONNS.push({id: profileId('c'), _new: true, name: '',
+                values: {model: '', network: ''}});
+  OPENCN = DPCONNS.length - 1;
+  paintConns(DPCONNS);
+});
 
 function paintNetworks(list){
   DPNETS = (list || []).map(n=> ({id: n.id || '', _new: !!n._new,
@@ -11599,7 +11779,8 @@ function panelNav(){
        to visit PROFILES first, which on a panel that opens on APPEARANCE
        meant they were blank. */
     if (tab === 'savers' || tab === 'devprof' || tab === 'models'
-        || tab === 'network' || PROF_OF[tab]) refreshProfiles();
+        || tab === 'network' || tab === 'connection'
+        || PROF_OF[tab]) refreshProfiles();
     /* NETWORK says which endpoint answers on each port, and that is read off
        the endpoints — which this tab has never fetched. Repainted once they
        arrive rather than left saying "no endpoint" about every port. */
