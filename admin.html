@@ -2937,10 +2937,7 @@ be answered.
 
 If you do not ask for a name, rows arrive labelled by their id and you approve
 them on whatever you did ask for. Ask for nothing at all and a request carries
-nothing but that id.
-
-The requests themselves are under <b>ENROLLMENTS ▸ USER</b>, in
-<i>Waiting for approval</i>.</div>
+nothing but that id.</div>
 
   <div class="seg actrow">
     <button id="b_formsave" class="act-save">SAVE THE FORM</button>
@@ -10486,10 +10483,17 @@ function paintBulk(){
    routes, with different buttons, and neither wants to read the other's queue
    while doing it.
 
-   So: WAITING FOR APPROVAL and GET A CODE are the two arrivals halls, one per
-   population, and CONNECTIONS is where both end up — still told apart,
-   because "which of my screens is on the wall" and "who has been let in" are
-   different questions asked by the same admin on different days. */
+   So: GET A CODE is the arrivals hall a screen comes through, and CONNECTIONS
+   is where everything ends up — still told apart, because "which of my
+   screens is on the wall" and "who has been let in" are different questions
+   asked by the same admin on different days.
+
+   THE `waiting` BUCKET HAS NO ELEMENT ANY MORE. WAITING FOR APPROVAL was the
+   other arrivals hall and it was taken off the USER tab; the bucket is kept
+   because the rows still exist and are still bucketed, and the loop below
+   drops a bucket whose box is not in the document — the same tolerance a tab
+   that is not rendered relies on. Nothing in the panel shows a request until
+   one of these is given a home again. */
 const DISP_BUCKETS = ['waiting', 'enrol', 'devices'];
 function dispBucket(d){
   /* Two doors, not two populations — and the register does not split on the

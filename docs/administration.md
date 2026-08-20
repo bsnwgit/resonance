@@ -312,18 +312,16 @@ through.** A person opens the display page and asks; a device is named here
 and takes a code to the screen. They have almost nothing in common except
 that both end up connected, so neither has to read the other's queue.
 
-**PERSON** (under ENROLLMENTS) — people, and only people:
+**PERSON** (under ENROLLMENTS) — people, and only people. One list:
+**People**, under a PENDING divider, holding the ones you have minted a link
+for who have not used it yet.
 
-| | |
-|---|---|
-| **People** | the ones you have minted a link for who have not used it yet |
-| **Waiting for approval** | everybody who has asked and not been decided about |
+**Requests are not listed there.** Somebody asking from a display still
+reaches the server and is still recorded, but the queue that decided them —
+*Waiting for approval* — is no longer on that tab, so there is nowhere in the
+panel to approve or refuse one.
 
-What a request *asks* is **SETTINGS ▸ ADMIN ▸ Enrollment Request Form**. It
-sat here, above the queue it feeds, which reads well and put a thing written
-once in your own words on the page you open to decide about the people who
-have already answered it. Those are different jobs at different moments: one
-is configuration, the other is work.
+What a request *asks* is still **SETTINGS ▸ ADMIN ▸ Enrollment Request Form**.
 
 ### A person, as against a device
 
