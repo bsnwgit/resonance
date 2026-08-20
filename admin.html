@@ -575,9 +575,22 @@
      words, tracking is the words themselves, and tightening it changed how
      the row reads rather than how much room it needs. Only the padding gives
      — about 110px, which is enough for the third group and no more. */
-  .profrow{gap:14px}
-  .profrow .tabbox{padding:2px 9px 4px}
-  .profrow .tabs button{padding:2px 13px}
+  /* THE PADDING GIVES WAY AS THE TYPE GROWS, which is the only version of
+     this that survives. The panel adopts the display's typography — applyType
+     reads `fs` and `face` out of the settings document when the preview says
+     ready — so the row is laid out twice: once at 1.0 on the default face,
+     and again a moment later at whatever the deployment set. Tuned in fixed
+     pixels it fitted on the first paint and wrapped on the second, which is
+     exactly what it looked like.
+     
+     So the space around the words shrinks by roughly what the words grow: at
+     1.0 these are the panel's own values to the pixel, and each step up the
+     scale spends a little of them. `max` keeps it sane at the top of the
+     range, where there is nothing left to give and wrapping is the honest
+     answer. Tracking is not in here — that was the wrong space to take. */
+  .profrow{gap:max(6px, calc(14px - (var(--fs) - 1) * 12px))}
+  .profrow .tabbox{padding:2px max(5px, calc(10px - (var(--fs) - 1) * 12px)) 4px}
+  .profrow .tabs button{padding:2px max(6px, calc(14px - (var(--fs) - 1) * 25px))}
   .profhead{margin:2px 0 10px}
   /* THE BOX IS AS WIDE AS WHAT IS IN IT, like the two at the head of the
      panel — a border drawn out to the width its side happens to have is a box
