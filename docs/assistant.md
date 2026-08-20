@@ -116,6 +116,22 @@ of them has to become one — which means signing in as a person the list
 allows. The setting above it only decides whether that is demanded of
 *everybody* or just of the ones the list does not already cover.
 
+**When the change reaches a screen.** Both of these are read by the server on
+every question, so a screen cannot use something it has stopped being allowed to
+use, whatever it thinks. What it *shows* is a different matter: the page draws
+the sign-in box from the permissions it fetched when it loaded, so changing
+either setting under a screen that is already on it takes effect at that
+screen's next check-in, when it notices the configuration moved and reloads
+itself. Until then it looks unchanged, and a question typed into it comes back
+refused in the status line rather than as a box. **RELOAD** on the device's row
+does it immediately.
+
+**A device's tick list says when a grant is worth nothing.** Under DEVICE
+enrolment and on a device's own row, an endpoint set to REQUIRED reads *needs a
+person signed in, so a screen cannot use it* — because ticking it grants that
+screen nothing at all. On a PERSON's list the same endpoint reads *open to
+anyone signed in anyway*, since signing in is the whole of what it asks of them.
+
 Read the pair as one sentence and it stops being surprising:
 
 - *Sign in* — **must there be a person at all?**

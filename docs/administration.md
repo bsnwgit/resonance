@@ -772,6 +772,22 @@ Up to eight profiles, each a name and three numbers:
 | **Dark from / until** | the hours a dim runs regardless of anybody being there. Set them the same for no dark window; a start later than an end wraps midnight, so **22:00** to **07:00** is what you mean |
 | **Dark by %** | how much light comes off it during those hours |
 
+**A LISTENING SCREEN IS AN IDLE SCREEN.** This is the part that surprises
+people, and it was wrong until 2026-08-20. The microphone being open is not a
+conversation: a wall display transcribes every noise in the room, because that
+is the only way a wake word is ever caught, and none of it is anybody talking to
+that screen. So the idle clock does not stop for it.
+
+What does stop it is a conversation that is actually happening — the assistant
+speaking aloud, a clip playing, a question outstanding, or the wake window still
+open after somebody woke it. Between two sentences nothing is speaking for a few
+seconds, and the wake window is what keeps a screen somebody is standing in
+front of from dimming at them mid-thought.
+
+It used to ask the figure's own state instead, which is a flag set from six
+places — and any one of them returning early left it set, after which that
+screen never reached its screensaver again, with nothing on screen to say why.
+
 Four things worth knowing about the behaviour:
 
 - **It scales down, then drifts** — slowly and continuously rather than bouncing

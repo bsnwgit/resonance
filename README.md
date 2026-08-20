@@ -1658,6 +1658,17 @@ it. Each entry below carries its own panel scope.
   it. Slow continuous drift rather than a bouncing path — it covers more of
   the panel over a night and is calmer to share a room with.
 
+  **An open microphone is not a conversation**, and the idle clock does not
+  stop for one. A wall display transcribes every noise in the room — it has to,
+  or the wake word is never caught — and none of that is somebody talking to
+  it. What holds the clock is the assistant speaking, a clip playing, a
+  question outstanding, or the wake window still open; between two sentences
+  nothing is speaking for a few seconds, and the window is what stops a screen
+  dimming at somebody mid-thought. It asked the FIGURE's own state until
+  2026-08-20, which is a flag set from six places — any one of them returning
+  early left it set, and that screen never reached its screensaver again with
+  nothing on screen to say why.
+
   **A dim level beside it**, as its own number. Reducing brightness does more
   against burn-in than movement does, and it is independently what a hallway
   screen should do at two in the morning.
