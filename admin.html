@@ -1277,6 +1277,12 @@
   .erow .namerow{display:flex;align-items:center;gap:8px;margin:7px 0 2px}
   /* …and anything destructive on that line sits at the far end of it. */
   .erow .namerow > button.act-danger{margin-left:auto}
+  /* WHERE A SECOND BUTTON JOINS IT THERE, the two travel as a pair: the auto
+     margin belongs to the FIRST of them, because flex hands each auto margin
+     a share of the free space and two of them would leave the pair at
+     opposite ends of the line rather than side by side. */
+  .erow .namerow > button.pairfar{margin-left:auto}
+  .erow .namerow > button.pairfar + button.act-danger{margin-left:0}
   .erow .namerow > b{
     font-weight:400;letter-spacing:.1em;font-size:calc(8px * var(--fs));
     color:rgba(var(--paper),.5);white-space:nowrap;
@@ -7332,9 +7338,36 @@ async function refreshIdentities(){
       if (j){ idNote(''); refreshIdentities(); }
     };
     namerow.appendChild(nm);
+    /* THE WHOLE OF ACCOUNT RECOVERY, and deliberately one button. A forgotten
+       password and a leaked link want the same answer — a new link, and a
+       password only its holder ever chooses. There is no CLEAR THE PASSWORD
+       beside it because a cleared password with a spent link is an account
+       nobody can reach, which is the dead end that looked like a fix. */
+    const re = document.createElement('button');
+    re.className = 'act-undo pairfar';
+    re.textContent = p.ready ? 'REISSUE THE LINK' : 'NEW LINK';
+    re.onclick = async ()=>{
+      if (!confirm('Mint a new link for "' + (p.label || p.id) + '"?'
+                   + (p.ready ? ' Their password is cleared and every browser '
+                              + 'they are signed in on is signed out. They '
+                              + 'choose a new password from the new link.'
+                              : ' The one they have stops working the moment '
+                              + 'you press this.'))) return;
+      const j = await idAction('/identities/reissue', {id: p.id});
+      if (!j || !j.token) return;
+      /* On screen before anything repaints: the old one is already dead, so a
+         new one nobody caught is somebody locked out. */
+      showPersonUrl(p.label || p.id, j.token, j.mailed, j.base, p.id);
+      idNote('the previous link stopped working just now');
+      refreshIdentities();
+    };
+    namerow.appendChild(re);
     /* On the name's own line, hard right, the same as a group's — deleting is
        the one thing here that cannot be undone and belongs beside the thing it
-       names rather than among the ticks. */
+       names rather than among the ticks. The link that recovers the account
+       sits immediately to its left: they are the two things done TO a person
+       rather than to what a person may reach, and the pair reads as one end
+       of the row instead of one button orphaned in the action bar. */
     const del = document.createElement('button');
     del.textContent = 'DELETE';
     del.className = 'act-danger';
@@ -7452,6 +7485,16 @@ async function refreshIdentities(){
     gnote.className = 'note';
     row.appendChild(gnote);
 
+    /* Theirs follows them to whatever they sign in at, which is why it is on
+       the person and not only on the screen — and on a line of its own,
+       between the link at the top of the row and SAVE at the foot of it,
+       because it is neither of those: it takes effect as it is pressed, so it
+       has nothing to save, and it is not part of recovering an account. */
+    const strow = document.createElement('div');
+    strow.className = 'seg actrow';
+    strow.appendChild(statusButton(p, '/identities/status', refreshIdentities));
+    row.appendChild(strow);
+
     const acts = document.createElement('div');
     acts.className = 'seg actrow';
     /* SAVE and REVERT in the row's own bottom bar with everything else,
@@ -7489,33 +7532,6 @@ async function refreshIdentities(){
       gnote.textContent = 'back to what is saved';
     };
     acts.appendChild(gundo);
-    /* Theirs follows them to whatever they sign in at, which is why it is on
-       the person and not only on the screen. */
-    acts.appendChild(statusButton(p, '/identities/status', refreshIdentities));
-    /* THE WHOLE OF ACCOUNT RECOVERY, and deliberately one button. A forgotten
-       password and a leaked link want the same answer — a new link, and a
-       password only its holder ever chooses. There is no CLEAR THE PASSWORD
-       beside it because a cleared password with a spent link is an account
-       nobody can reach, which is the dead end that looked like a fix. */
-    const re = document.createElement('button');
-    re.className = 'act-undo';
-    re.textContent = p.ready ? 'REISSUE THE LINK' : 'NEW LINK';
-    re.onclick = async ()=>{
-      if (!confirm('Mint a new link for "' + (p.label || p.id) + '"?'
-                   + (p.ready ? ' Their password is cleared and every browser '
-                              + 'they are signed in on is signed out. They '
-                              + 'choose a new password from the new link.'
-                              : ' The one they have stops working the moment '
-                              + 'you press this.'))) return;
-      const j = await idAction('/identities/reissue', {id: p.id});
-      if (!j || !j.token) return;
-      /* On screen before anything repaints: the old one is already dead, so a
-         new one nobody caught is somebody locked out. */
-      showPersonUrl(p.label || p.id, j.token, j.mailed, j.base, p.id);
-      idNote('the previous link stopped working just now');
-      refreshIdentities();
-    };
-    acts.appendChild(re);
     row.appendChild(acts);
 
     const meta = document.createElement('div');

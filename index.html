@@ -990,16 +990,21 @@ function paintGate(){
   if (pass) pass.placeholder = setup ? 'choose a password' : 'password';
 
   if (head){
+    /* A REFUSED LINK IS ASKED ABOUT FIRST. It used to be asked about last,
+       and `invite` is set for everything that is not a spent link — so a
+       refusal painted "open the link you were sent" at somebody who had just
+       opened the link they were sent, and the two messages written for the
+       two failures could never appear. */
     head.textContent =
         done    ? 'You are set up'
+      : failed && PERSON_ARRIVED === 'isdevice'
+                           ? 'This screen belongs to the building'
+      : failed             ? 'That link did not work'
       : invite  ? 'Invitations are accepted here'
       : spent   ? 'That link has been used'
       : setup   ? 'Choose a password'
       : GATE === 'code'    ? 'Setting this screen up?'
       : GATE === 'request' ? 'Ask to be let in'
-      : failed && PERSON_ARRIVED === 'isdevice'
-                           ? 'This screen belongs to the building'
-      : failed             ? 'That link did not work'
       : 'Sign in';
   }
   /* Only where nothing else has written a reason into it. A failed sign-in
@@ -1011,6 +1016,12 @@ function paintGate(){
                       + 'just chose, at whichever of these you want:'
                     : 'Nothing has been granted to this account yet — an '
                       + 'administrator has to say which assistant you may use.')
+      : failed && PERSON_ARRIVED === 'isdevice'
+                           ? 'It is set up as a display, so a personal link '
+                             + 'cannot be opened on it. Use your own device, '
+                             + 'or open the link in a private window.'
+      : failed             ? 'It may have been replaced since it was sent to '
+                             + 'you. Ask an administrator for a new one.'
       : invite  ? 'Open the link you were sent. It is the only way in from '
                   + 'this address, and it works nowhere else.'
       : spent   ? 'A password was already chosen with it. Sign in where your '
@@ -1019,12 +1030,6 @@ function paintGate(){
                   + 'works once. Choose something long.'
       : GATE === 'code'    ? ''
       : GATE === 'request' ? ''
-      : failed && PERSON_ARRIVED === 'isdevice'
-                           ? 'It is set up as a display, so a personal link '
-                             + 'cannot be opened on it. Use your own device, '
-                             + 'or ask an administrator.'
-      : failed             ? 'It may have been replaced since it was sent to '
-                             + 'you. Ask an administrator for a new one.'
       : '';
   }
 
