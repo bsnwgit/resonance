@@ -413,12 +413,12 @@ screen looks like and what it is allowed to do were never the same question:
 |---|---|
 | **Appearance profiles** | what a place looks like, for the handful of values that cannot be shared |
 | **Screensaver profiles** | what a kiosk does when nobody is there |
-| **Display profiles** | what a public screen is: voice only, full screen, the prompt line, and which of the lists above it uses |
+| **Interface profiles** | what a public screen is: voice only, full screen, the prompt line, and which of the lists above it uses |
 
 They are in that order on the tab because it is the order you build in: the two
 pieces first, then the thing that names them.
 
-**A display profile is composed, not self-contained.** It names an appearance and
+**A interface profile is composed, not self-contained.** It names an appearance and
 a screensaver rather than carrying copies of their values, so changing what a
 hallway looks like once still reaches every kiosk using it. Day and night in
 one hallway share an appearance and differ only in the dim — that case is the
@@ -487,7 +487,7 @@ knew it was coming.
 if you already know them, set the two things you would otherwise come back and
 fill in on the row afterwards:
 
-- **Kiosk mode**, and which display profile it is — what the screen will look
+- **Kiosk mode**, and which interface profile it is — what the screen will look
   like and behave as, chosen before it has ever been switched on
 - **Network** — which profile it answers on, which also decides the address and
   port in the code you are about to be given. A building with several ports has
@@ -573,7 +573,7 @@ for them.
 
 Most rows in a real deployment are not kiosks — a guest's laptop, somebody's
 phone — so it is one tick. Tick **Kiosk mode** on a device and one control
-appears: **which kiosk it is**, chosen from the DISPLAY profiles.
+appears: **which kiosk it is**, chosen from the INTERFACE profiles.
 Untick it and the screen goes back to being an ordinary page, with the choice
 kept: putting the device back up restores what you had.
 
@@ -652,7 +652,7 @@ looks like.
 
 **Every row is a display**, and there is no longer a state where it is not
 one. There was, while a shared settings document dressed every screen whether
-or not it was in display mode; that document is gone, so a row in that state
+or not it was in interface mode; that document is gone, so a row in that state
 had nothing dressing it and came out looking broken rather than plain. The only
 question a row answers now is which profile — its own, or the one it inherits.
 
@@ -813,7 +813,7 @@ directly.
 ### Kiosk assignment — changing several at once
 
 The bar above the two lists on **CONNECTIONS**. Tick the rows you want, choose
-a display profile, and APPLY TO SELECTED gives all of them that profile in one
+a interface profile, and APPLY TO SELECTED gives all of them that profile in one
 gesture — which is what a building of identical hallway screens wants after a
 profile is renamed or a new one is made.
 

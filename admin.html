@@ -2188,7 +2188,7 @@
          would rewrite every stored document for a label. What the profile
          describes is a display — a screen with a page on it — where DEVICE is
          the row under ACCESS that a display is granted through. -->
-    <button data-tab="devprof">DISPLAY</button>
+    <button data-tab="devprof">INTERFACE</button>
   </div>
 
   <div class="rule"></div>
@@ -3272,7 +3272,7 @@ Deleting a profile clears it from every device that named it, the same way
 deleting a display clears it from every endpoint. Nothing keeps drifting to
 numbers that are no longer here.
 
-<b>On a device</b>, in DEVICES, tick <b>Display mode</b> and pick which of these
+<b>On a device</b>, in DEVICES, tick <b>Interface mode</b> and pick which of these
 profiles it is. Untick it and the screen goes back to being an ordinary page;
 what you chose is kept, so putting it back up restores it.
 
@@ -3316,9 +3316,9 @@ DEVICES asks one directly.</div>
     </div>
   </section>
   <!-- What a public screen IS, and the only one of the three a device names.
-       The other lists are things a display profile points at. -->
+       The other lists are things a interface profile points at. -->
   <section class="grp bare proflist" data-tab="devprof">
-    <div class="barehead"><span class="listtitle">Display profiles</span></div>
+    <div class="barehead"><span class="listtitle">Interface profiles</span></div>
     <div class="grpbody">
   <div id="dp_kiosks"></div>
   <div class="note" id="kiosknote"></div>
@@ -3515,7 +3515,7 @@ they came through.</div>
          a screen is granted is the endpoint, which carries the model, the
          voice and the wake word together.
 
-         Display mode is a picker alone, where it was a tick with a picker
+         Interface mode is a picker alone, where it was a tick with a picker
          that appeared when it was ticked. Two controls for one choice, and
          the second one hidden until the first was found: NONE is the top of
          the list and the default, and choosing anything else IS switching it
@@ -3529,7 +3529,7 @@ they came through.</div>
          asked for twice. -->
     <div class="setuprow">
       <span class="setpair">
-        <label class="bklab" for="dp_newprofile">Display mode</label>
+        <label class="bklab" for="dp_newprofile">Interface mode</label>
         <select id="dp_newprofile" class="ppick"></select>
       </span>
     </div>
@@ -3588,7 +3588,7 @@ to all of them is one tick.</div>
   <!-- Named for what it does. It was a row of controls with no title, so the
        only way to find out what APPLY TO SELECTED applied was to press it. -->
   <div class="bulkbar" id="bulkbar" hidden>
-    <span class="bulktitle">Display mode assignment</span>
+    <span class="bulktitle">Interface mode assignment</span>
     <label><input type="checkbox" id="bulkall"> ALL</label>
     <span id="bulkcount">nothing selected</span>
     <span class="spacer"></span>
@@ -5510,15 +5510,15 @@ Devices enrol themselves and are approved under ACCESS.</div>
   </div>
 
   <!-- Its own section rather than a control inside "Who may use it". A
-       display profile is what a screen LOOKS LIKE, and that group is about
+       interface profile is what a screen LOOKS LIKE, and that group is about
        permission; somebody going looking for a display setting opens the
        section called Display. Subsections are collapsed until opened, so a
        control in the wrong one is a control that does not exist. -->
   <div class="subgrp" data-g="display">
-    <h5>Display<span class="subsum"></span></h5>
+    <h5>Interface<span class="subsum"></span></h5>
     <div class="subbody">
   <select data-f="kiosk_profile" class="ppick"></select>
-  <div class="note help">The <b>display profile</b> every screen opened on this
+  <div class="note help">The <b>interface profile</b> every screen opened on this
 endpoint's <b>port</b> gets. A browser on the Demo port is a Demo screen
 because that is the address it was opened at — nothing to tick, and no list to
 keep in step.
@@ -5533,7 +5533,7 @@ address and a port carries one endpoint, so there is never more than one answer
 here and never anything to disambiguate.
 
 <b>Every option here is a real profile.</b> There is no "none": an endpoint
-that has never been given one reads <i>choose a display profile</i> until it
+that has never been given one reads <i>choose a interface profile</i> until it
 is.
 
 <b>An endpoint with no port reaches nothing</b>, this included — it is attached
@@ -5965,7 +5965,7 @@ function blockPaint(blk, r){
      a select the admin never touched. NONE is a real answer here and not a
      missing setting: the endpoint speaks in whatever voice the page ships
      with. */
-  /* The display profile this endpoint hands to the screens it names. Eight
+  /* The interface profile this endpoint hands to the screens it names. Eight
      screens on one assistant are eight rows to set otherwise, and they are
      all the same kind of place. A screen's own row still wins — this is only
      read where that row names none, and only where the answer is unambiguous;
@@ -5975,7 +5975,7 @@ function blockPaint(blk, r){
     const want = r.kiosk_profile || '';
     const pool = (DPCFG && DPCFG.kiosks) || [];
     kp.innerHTML = '';
-    /* NO "NONE" OPTION. Every entry in this list is a real display profile,
+    /* NO "NONE" OPTION. Every entry in this list is a real interface profile,
        because "none" here is not a thing an endpoint can usefully say — a
        screen that inherits nothing already has an answer of its own, and
        offering the absence as a choice made it look like a decision somebody
@@ -5988,9 +5988,9 @@ function blockPaint(blk, r){
        before this setting did starts there. */
     const opts = [];
     if (!pool.length)
-      opts.push(['', 'no display profiles yet — make one under DISPLAYS']);
+      opts.push(['', 'no interface profiles yet — make one under PROFILES ▸ INTERFACE']);
     else if (!want || !pool.some(x=> x.id === want))
-      opts.push(['', 'choose a display profile']);
+      opts.push(['', 'choose a interface profile']);
     pool.forEach(x=> opts.push([x.id, x.name]));
     if (want && !pool.some(x=> x.id === want))
       opts.push([want, 'a profile that no longer exists']);
@@ -8892,7 +8892,7 @@ function paintSavers(list){
     btn.disabled = busy || DPSAVERS.length >= 8;
   }
 }
-/* ---- the display profiles ----
+/* ---- the interface profiles ----
    The one list a device names. Same row, same caret, same one-open-at-a-time
    as everything else in this panel, because they are the same kind of thing.
 
@@ -9252,7 +9252,7 @@ function kioskBlock(d){
   syncGroups();
 
   /* THE SAME THINGS THE ROW WAS CREATED WITH, in the same order and the same
-     shape as GET A CODE: display mode, and the AI it may use. The register
+     shape as GET A CODE: interface mode, and the AI it may use. The register
      showed only the first, so what a screen was granted could be chosen when
      it was made and never seen again.
 
@@ -9260,7 +9260,7 @@ function kioskBlock(d){
      port its AI answers on, and asking for it twice is what let a row claim
      one port while its endpoints answered on another.
 
-     The tick that used to switch display mode on is gone here as well: NONE at
+     The tick that used to switch interface mode on is gone here as well: NONE at
      the top of the picker is the whole of saying no, which is one control for
      one choice rather than two that can disagree. */
   const line = document.createElement('div');
@@ -9284,12 +9284,12 @@ function kioskBlock(d){
      a display-mode screen at all, one that is but names no profile, and one
      that names its own. The middle one used to read DEFAULT and follow
      whichever profile was nominated; nothing is nominated any more, so it says
-     what it now does — the screen is in display mode and shows the settings
+     what it now does — the screen is in interface mode and shows the settings
      the page itself ships with. Rows already sitting on it keep working and
      keep the same stored value. */
   /* THERE IS NO "NOT A DISPLAY" ANY MORE. It was a real state once, when a
      shared settings document dressed every screen whether or not it was in
-     display mode. That document is gone — a screen now shows the profiles it
+     interface mode. That document is gone — a screen now shows the profiles it
      names and nothing else — so a row in that state has nothing dressing it at
      all, and an ordinary browser tab pointed at this server came out looking
      broken rather than plain. A state whose only outcome is a page that looks
@@ -9325,7 +9325,7 @@ function kioskBlock(d){
     sel.appendChild(o);
   });
   sel.value = d.kiosk_profile || '';
-  line.appendChild(pair('Display mode', sel));
+  line.appendChild(pair('Interface mode', sel));
   box.appendChild(line);
 
   /* Which assistants it may use, ticked here as well as at the moment a code
@@ -9415,7 +9415,7 @@ function kioskBlock(d){
      which — that is decided by the port it is opened at, not by anything
      stored here. */
   const ownProf = kiosks.filter(k=> k.id === (d.kiosk_profile || ''))[0] || null;
-  const label = 'DISPLAY MODE · '
+  const label = 'INTERFACE MODE · '
               + (ownProf ? ownProf.name : 'inherits from its port');
   return {box: box, save: save, undo: undo, said: said, label: label};
 }
@@ -9462,7 +9462,7 @@ function paintBulk(){
     sel.innerHTML = '';
     ((DPCFG && DPCFG.kiosks) || []).forEach(k=>{
       const o = document.createElement('option');
-      o.value = k.id; o.textContent = 'Display mode · ' + k.name;
+      o.value = k.id; o.textContent = 'Interface mode · ' + k.name;
       sel.appendChild(o);
     });
     sel.value = want || sel.value;
