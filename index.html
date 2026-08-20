@@ -3081,16 +3081,42 @@ const Saver = {
     if (this.forced) this.on = true;
     else if (!this.armed) this.on = false;
     else if (!this.on){
-      /* A screen in the middle of answering somebody is not an idle screen,
-         whatever the wake gate happens to be doing. Read off Drive rather
-         than off the wake word, because a display with no wake word at all
-         still thinks and still speaks — and that path never touches Wake. */
-      const busy = Drive.phase !== 'idle'
-                || (typeof Wake !== 'undefined' && Wake.armed() && Wake.awake);
-      /* `awake` as well as the phase, now that opening the mic no longer
-         claims to be speaking. Between two sentences of a conversation the
-         phase is genuinely idle for a few seconds, and a screen somebody is
-         standing in front of talking to must not start dimming at them. */
+      /* A CONVERSATION THAT IS HAPPENING, asked of the things that are doing
+         it rather than of a flag that says so.
+
+         It read `Drive.phase !== 'idle'`, and that is a DISPLAY flag: it says
+         what the figure should be drawing, it is set from six places, and any
+         one of them that returns early leaves it set. A screen whose phase was
+         left on `speaking` never reached its screensaver again — no
+         conversation, nothing on screen to show it, and no way to tell from
+         looking. That is the shape of the fault reported on 2026-08-20 with
+         the microphone open, and it is why this no longer asks a flag.
+
+         WHAT IT ASKS INSTEAD is the two things that actually speak, and the
+         count of questions outstanding. A display with no wake word at all
+         still thinks and still speaks, and all three of these are true on that
+         path — which is the property the Drive test was chosen for and keeps.
+
+         `Listen.busy` IS DELIBERATELY NOT HERE, and it is the trap this walked
+         into once already: a listening screen transcribes every noise in the
+         room, so it flickers true all day for utterances nobody addressed to
+         anything — and one frame of it resets the whole clock. A microphone
+         hearing a room is the definition of the case that must still reach
+         the screensaver.
+
+         The wake window is checked as well as the flag, so a screen left
+         `awake` by anything that failed to clear it ages out on the window
+         instead of holding the saver open for ever — the same failure one
+         level up. */
+      const talking = (typeof Speech !== 'undefined' && Speech.active)
+                   || (typeof Play !== 'undefined' && Play.playing);
+      const asked = typeof Wake !== 'undefined' && Wake.pending > 0;
+      const engaged = typeof Wake !== 'undefined' && Wake.armed() && Wake.awake
+                   && wallNow() < Wake.until;
+      /* Between two sentences of a conversation nothing is speaking for a few
+         seconds, and a screen somebody is standing in front of talking to must
+         not start dimming at them — which is what the wake window is for. */
+      const busy = talking || asked || engaged;
       if (!busy) this.idle += dt; else this.idle = 0;
       if (this.idle >= this.delay) this.on = true;
     }
