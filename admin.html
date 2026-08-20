@@ -645,6 +645,14 @@
     background:rgba(var(--glass),.035);
     padding:0 11px 10px;
   }
+  /* …and it goes when that section is the only one on the tab. See render().
+     TRANSPARENT rather than `border:0`, so the box model does not change and
+     nothing on the page moves by a pixel when a profile is expanded and the
+     edges come back. */
+  #grpbox.solo .grp:not(.shut){
+    border-color:transparent;
+    background:none;
+  }
   /* …except a section that is nothing but a title. The rule above exists to
      put an edge around a block of CONTROLS that belongs to a heading, and a
      heading with no controls under it gets an empty box instead — which reads
@@ -852,6 +860,22 @@
   .tablabel{
     border-color:rgba(var(--pal-ice),.70);
     background:rgba(var(--pal-ice),.26);
+  }
+  /* PROFILES keeps the ice it shares with the bar's own subject labels; the
+     two groups INSIDE it take milk, so a group reads as a division of the row
+     rather than as another row-level label. Milk is the palest of the five and
+     carries a little more of itself to land at the same weight — the same
+     allowance the search label already gets. */
+  .tabs .tablabel{
+    border-color:rgba(var(--pal-milk),.70);
+    background:rgba(var(--pal-milk),.30);
+  }
+  /* ACCESS is rust: it is the only one of the labels that is not a setting —
+     it names who and what may reach this server — and a colour of its own is
+     what says so before the words do. */
+  #panelfoot .connside .tablabel{
+    border-color:rgba(var(--pal-rust),.70);
+    background:rgba(var(--pal-rust),.30);
   }
   /* Milk is the palest of the five, so it carries a little more of itself to
      land at the same visual weight as the other two. */
@@ -11313,6 +11337,19 @@ function panelNav(){
             .some(h=> h.textContent.toLowerCase().includes(q))
         : g.dataset.help === '1');
     });
+    /* ONE SECTION FILLING THE BOX DOES NOT NEED A BOX OF ITS OWN. A profile
+       tab with nothing expanded is a single list, so its edge and #grpbox's
+       landed one inside the other with nothing between them — an outer box
+       whose entire contents were an inner box.
+
+       Counted rather than keyed to a tab: the profile tabs are the case you
+       see it on, but the answer is about how many topics are showing, and
+       expanding a profile brings its settings sections up as siblings. Where
+       there are several, every one keeps its edge, because there the border
+       is what tells one topic from the next. */
+    const box = $('grpbox');
+    if (box) box.classList.toggle('solo',
+                                  groups.filter(g=> !g.hidden).length === 1);
   }
   /* Two homes now: the row at the top and the pinned entry at the foot.
      Treat them as one set so exactly one is ever lit. */
