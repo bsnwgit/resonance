@@ -374,7 +374,7 @@
      of links behind a label now, and a menu bar that wraps onto three lines at
      560px is one nobody can scan. The search that used to sit above them, and
      was held to that measure, is in the foot with the other row. */
-  #panelhead > .profbox{max-width:none}
+  #panelhead > .profrow{max-width:none}
   /* …but the tab row itself runs the whole width, out to the edge of the
      preview, because it now carries two groups that have to sit apart. */
   #panelhead > .tabrow{max-width:none}
@@ -489,178 +489,33 @@
      Brighter than the hairline between topics, so they group rather than
      merge into the section rules. */
   .rule{height:1px;margin:9px 0 2px;background:rgba(var(--glass),.55)}
-  /* THE BOX, and the step is its top edge.
+  /* A GROUP OF TABS THAT NAMES ITSELF. A fieldset because a legend cuts a real
+     gap in the border — the panel's ground is translucent over the page, so a
+     label with a background laid over the line would be a slightly different
+     colour than whatever is behind it, at every width and in every theme.
 
-     WHICH BORDER LIVES WHERE MATTERS. The right side belongs to the TAB ROW
-     and not to the box, because it has to begin where the step comes down —
-     put on the box it would start at the very top and leave a stub of line
-     above the step with nothing to meet. The left side is the box's, since
-     that one does run the whole height. */
-  .profbox{
-    border-left:1px solid rgba(var(--glass),.55);
-    border-bottom:1px solid rgba(var(--glass),.55);
-    margin-bottom:2px;
-  }
-  /* `stretch` is what makes the step work: the piece filling the rest of the
-     row is as tall as the label, so its left border is the drop and its
-     bottom border comes out level with the label's own foot. */
-  .tabhead{align-items:stretch}
-  .stepnest{
-    display:flex;align-items:center;
-    /* Above the label, and clear of it on both sides: the left padding holds
-       it off the box's edge, the right holds the drop off the chip's own
-       border — touching, those two would read as one thicker edge. */
-    padding:5px 12px 0 12px;
-    border-top:1px solid rgba(var(--glass),.55);
-  }
-  .steprest{
-    flex:1 1 auto;
-    border-left:1px solid rgba(var(--glass),.55);
-    border-bottom:1px solid rgba(var(--glass),.55);
-  }
-  .profbox .tabs{
-    border-right:1px solid rgba(var(--glass),.55);
-    margin:0;padding:8px 12px;
-  }
-  /* Between the groups the server keeps and the ones an admin made. More air
-     than the rule above the topics gets, because it is separating two halves
-     of one list rather than capping a column — rows sit tight against each
-     other, so a hairline with a row's own spacing either side of it reads as
-     one more row. */
-  .grouprule{margin:14px 0 12px}
-  /* A RULE WITH A WORD IN IT, naming the rows under it. Two lines that grow to
-     fill whatever the label leaves, rather than one background with a gap cut
-     out of it — the label can be any length and the halves stay even without
-     anybody measuring. */
-  .rulehead{
-    display:flex;align-items:center;gap:10px;margin:14px 0 10px;
-    font-size:calc(8.5px * var(--fs));letter-spacing:.2em;
-    text-transform:uppercase;color:rgba(var(--paper),.62);
-  }
-  /* The first one heads the list rather than dividing anything, so it gets
-     less air above it than between two sections. */
-  .rulehead:first-child{margin-top:4px}
-  .rulehead::before,.rulehead::after{
-    content:'';flex:1 1 auto;height:1px;background:rgba(var(--glass),.55);
-  }
-
-  /* The topics are bounded, so it is obvious where the list of them starts
-     and stops rather than the column running on into the foot. Same strength
-     as the rules above it. */
-  #grpbox{
+     `min-width:0` because a fieldset refuses to shrink below its content by
+     default, which on a narrow panel pushes the row off the edge instead of
+     wrapping it. */
+  .tabbox{
     border:1px solid rgba(var(--glass),.55);
-    padding:2px 10px 12px;
-    margin-top:10px;
+    margin:0;padding:2px 10px 4px;min-width:0;
   }
-  /* The ground the panel sits on, present the whole time. Out of the flow and
-     pinned to the panel rather than to the scroll, so it stays put while the
-     topics move over it. */
-  #panelhome{
-    position:absolute;inset:0;z-index:0;
-    display:flex;align-items:center;justify-content:center;
-    /* Never in the way of anything: it is behind the page in every sense, and
-       a click that lands on the wallpaper instead of the control under the
-       cursor is the one way a watermark can be a bug. */
-    pointer-events:none;
-    /* The artwork carries an opaque near-black backing rectangle, drawn for a
-       sign-in card that needed one. Behind a working panel that would be a
-       dark BLOCK rather than a watermark — so it is screened, where near-black
-       contributes nothing and only the strokes and the wordmark come through.
-       Without support for the blend the rectangle is still all but invisible
-       at this opacity, so it degrades to slightly-too-dark rather than to
-       wrong. */
-    mix-blend-mode:screen;
-    opacity:.12;filter:grayscale(.9);
-    /* Slow enough to read as the page settling rather than as something
-       flashing on the way past. */
-    transition:opacity .55s ease, filter .55s ease;
+  .tabbox > legend{
+    padding:0 8px;
+    font-size:calc(8.5px * var(--fs));letter-spacing:.2em;
+    text-transform:uppercase;color:rgba(var(--paper),.80);
   }
-  /* Full strength on the opening state, where it is the only thing there. */
-  #panel.home #panelhome{opacity:1;filter:none}
-  /* Three quarters of the panel, which IS the space between the window's left
-     edge and the preview — so a percentage of this column is the measurement
-     without having to know what the preview is set to. */
-  #panelhome img{width:75%;height:auto;max-width:none}
-  /* Above the mark, both of them. Without a stacking order of their own they
-     share one with it and the answer is whatever the DOM happens to say. */
-  #panelbar,
-  #panelscroll{position:relative;z-index:1}
-  /* The box goes; the search does not. Searching is the one thing that makes
-     sense from a page showing nothing — it looks across every tab at once, so
-     it is how you get somewhere when you do not know which tab to press. It
-     takes the panel out of this state as soon as anything is typed, which is
-     what keeps it from being a field with nowhere to put its answers. */
-  #panel.home #grpbox{display:none}
-  /* A register is a table, not a settings column. Where the box tiles its
-     topics into 300px columns, this one takes the full width of them — rows
-     that read across need the room, and a device row has four things on it
-     before the profile picker lands. */
-  /* Out to the same edges as the tab row above: a list is not a settings
-     column, and the box's own inset left it starting short of the tabs. The
-     negatives are the box's padding plus its border, so the two line up. */
-  #grpbox .grp.bare{grid-column:1 / -1;margin-left:-11px;margin-right:-11px}
-  /* Same span without the bare treatment: a topic that keeps its heading and
-     its caret, but has no siblings to tile beside. One narrow column with the
-     rest of the row empty reads as something that failed to load. */
-  #grpbox .grp.wide{grid-column:1 / -1}
-  #grpbox .grp.bare > .barehead,
-  #grpbox .grp.bare > .grpbody{padding-left:11px;padding-right:11px}
-  /* Inside a profile the controls are part of the row, not topics in the box:
-     no frame of their own, indented under the name they belong to. */
-  .profsettings{margin:8px 0 2px;padding-left:9px;
-                border-left:2px solid rgba(var(--glass),.22)}
-  .profsettings .grp{border:0;margin:0;padding:0}
-  .profsettings .grp + .grp{margin-top:9px}
-  /* An endpoint's subsections are .subgrp rather than .grp, so they need
-     saying separately — but they are the same thing to the eye: a caret, a
-     name, and a body that opens. */
-  /* …and the embed draft is one of these too: it is a row in a list of named
-     things, made the same way an endpoint is, so it reads the same way down
-     its own row. */
-  .erow[data-rid] .subgrp,
-  #em_draft .subgrp{border:0;margin:0}
-  .erow[data-rid] .subgrp + .subgrp,
-  #em_draft .subgrp + .subgrp{margin-top:9px}
-  /* One per line, full width, the way a profile's sections stack — rather than
-     tiling into 215px columns. An endpoint reads down its own row instead of
-     across it, and the two lists look like the same kind of thing. */
-  .erow[data-rid] .subwrap,
-  #em_draft .subwrap{
-    display:block;margin:8px 0 2px;padding-left:9px;
-    border-left:2px solid rgba(var(--glass),.22);
-  }
-  /* No box of its own either: a profile's sections are separated by a hairline
-     under the name, not by a frame each. */
-  .erow[data-rid] .subgrp,
-  #em_draft .subgrp{
-    border:0;border-top:1px solid rgba(var(--glass),.10);
-    background:none;margin:0;
-  }
-  .erow[data-rid] .subgrp:first-child,
-  #em_draft .subgrp:first-child{border-top:0}
-  .erow[data-rid] .subgrp > h5,
-  #em_draft .subgrp > h5{padding-left:20px}
+  .tabbox .tabs{margin:0}
+  /* The two groups at opposite ends of the row, the same way they were inside
+     one box: what a screen IS on the left, what an assistant is wired to on
+     the right. `wrap` so a narrow panel stacks them instead of shrinking both
+     past reading. */
+  .profrow{flex-wrap:wrap;align-items:flex-start}
+  .profrow .tabbox:last-child{margin-left:auto}
+  /* The heading over them, with its rule running out to the edge. */
+  .profhead{margin:2px 0 10px}
 
-  /* the first topic's own top rule would double up with the box edge */
-  #grpbox .grp:first-of-type{border-top:0;margin-top:6px}
-
-  /* An OPEN topic gets a box of its own. Closed, a topic is one line and a
-     hairline between neighbours is enough to separate it; open, it is a
-     block of controls that belongs to a heading, and without an edge those
-     controls read as loose on the panel — particularly once the topics tile
-     and the thing below an open one is a different topic entirely rather
-     than more of the same column.
-
-     Listed after the :first-of-type exception above, which it ties with on
-     specificity: an open first topic wants its box like any other. */
-  #grpbox .grp:not(.shut){
-    border:1px solid rgba(var(--glass),.42);
-    background:rgba(var(--glass),.035);
-    padding:0 11px 10px;
-  }
-  /* The box's own foot closes the last section on a tab, so that one does not
-     draw a second line ten pixels above it. See render(). */
-  #grpbox .grp.lastvis:not(.shut){border-bottom:0}
   /* …and it goes when that section is the only one on the tab. See render().
      TRANSPARENT rather than `border:0`, so the box model does not change and
      nothing on the page moves by a pixel when a profile is expanded and the
@@ -1749,22 +1604,9 @@
      under the current one, and separated by the same hairline. */
   .tabs{display:flex;align-items:stretch;gap:0;margin-bottom:10px;flex-wrap:wrap}
   /* A label on a line of its own, naming the row under it. */
-  .tabhead{display:flex}
-  /* THE SPACE THAT DIVIDES ONE GROUP OF TABS FROM THE NEXT, and it takes
-     whatever is left over: the group after it sits against the right edge of
-     the box rather than trailing the group before it. A fixed width put the
-     two groups next to each other with the whole right half of a wide panel
-     empty behind them, which reads as one long row that happens to have a gap
-     in it rather than as two subjects at opposite ends.
-
-     It keeps a floor of 34px — the width the bar at the top uses between its
-     own subjects — so on a panel too narrow to spread them the gap is still a
-     gap and not a collision.
-
-     `button + button` draws the divider between neighbours, so a label after
-     this starts its group without one, which is what a new subject should
-     look like. */
-  .tabgap{flex:1 1 34px;min-width:34px}
+  /* `.tabgap` went with the single box it lived in. What divides the two
+     groups now is the space between two boxes, and `.profrow`'s auto margin
+     puts the second at the right edge. */
   .tabs button{
     display:flex;align-items:center;
     font:inherit;font-size:calc(9px * var(--fs));letter-spacing:.18em;
@@ -2291,60 +2133,49 @@
        are different subjects that happen to share a row. -->
   <!-- One group, the full width of the panel. What a display looks and
        sounds like: nothing else shares this row. -->
-  <!-- PROFILES ON A LINE OF ITS OWN. The row beneath carries two labelled
-       groups now, and a third label sitting inline among them would read as a
-       third group rather than as the name of the row. Everything under it is a
-       profile; the two labels below say which KIND. -->
-  <!-- ONE BOX, with a stepped top edge. The line runs above the label, turns
-       down at the end of it, and carries on along the bottom of that row for
-       the rest of the width; the left side runs the whole height, the right
-       side picks up where the step left off, and the foot closes it.
+  <!-- PROFILES NAMES THE ROW, and the two boxes under it are its parts. It
+       was one box with both groups inside and a stepped top edge; two groups
+       in one box needed a label each anyway, and a label inside a box is a box
+       inside a box — the thing this panel has been taking out everywhere else.
 
-       Six borders on four elements, and each one is on the element whose edge
-       it actually is — nothing is positioned, so a longer label or a wrapped
-       row moves the corners with it. -->
-  <div class="profbox">
-  <div class="tabhead">
-    <span class="stepnest"><span class="tablabel">PROFILES</span></span>
-    <span class="steprest"></span>
+       So the heading is a heading, and each group is a box that says its own
+       name in its own top edge. A FIELDSET rather than a label painted over a
+       border: the panel's ground is translucent, so a patch of "background"
+       laid over the line would be a slightly different colour than the thing
+       behind it. A legend cuts a real gap. -->
+  <div class="rulehead profhead">Profiles</div>
+  <div class="tabrow profrow">
+    <fieldset class="tabbox">
+      <legend>Layouts</legend>
+      <!-- WHAT A SCREEN IS, in five parts: the four that describe it and the
+           one that names them. LAYOUT reads last because it is built from the
+           four before it. -->
+      <div class="tabs">
+        <!-- APPEARANCE rather than LOOK, so the tab and the "Appearance
+             profiles" read as the same subject. data-tab stays "look": it is
+             the storage key, and renaming it would rewrite every stored
+             document for a label. -->
+        <button data-tab="look" class="on">APPEARANCE</button>
+        <!-- GEOMETRY rather than MOTION, and data-tab stays "motion" for the
+             same reason. -->
+        <button data-tab="motion">GEOMETRY</button>
+        <button data-tab="speech">SPEECH</button>
+        <button data-tab="savers">SCREENSAVER</button>
+        <button data-tab="devprof">LAYOUT</button>
+      </div>
+    </fieldset>
+    <fieldset class="tabbox">
+      <legend>Connections</legend>
+      <!-- The two halves of an endpoint that are not the endpoint — what it
+           speaks to and what it answers on — and then the pair of them under
+           one name, which is the order they are built in. -->
+      <div class="tabs">
+        <button data-tab="models">MODELS</button>
+        <button data-tab="network">NETWORK</button>
+        <button data-tab="connection">CONNECTION</button>
+      </div>
+    </fieldset>
   </div>
-  <div class="tabs">
-    <!-- WHAT A SCREEN IS, in five parts. The four that describe it and the one
-         that names them: a layout profile points at an appearance and a
-         screensaver rather than carrying copies. -->
-    <span class="tablabel">LAYOUTS</span>
-    <!-- APPEARANCE rather than LOOK, so the tab and the "Appearance
-     profiles" read as the same subject. data-tab stays "look": it is
-     the storage key, and renaming it would rewrite every stored
-     document for a label. -->
-    <button data-tab="look" class="on">APPEARANCE</button>
-    <!-- GEOMETRY rather than MOTION, and data-tab stays "motion" for the
-     same reason. -->
-    <button data-tab="motion">GEOMETRY</button>
-    <button data-tab="speech">SPEECH</button>
-    <button data-tab="savers">SCREENSAVER</button>
-    <!-- LAST of the five, where it used to be last of seven — it is the one
-         that NAMES the others, so it reads after the pieces it is built from.
-         data-tab stays "devprof" for the same reason APPEARANCE keeps "look":
-         it is the storage key, and renaming it would rewrite every stored
-         document for a label. -->
-    <button data-tab="devprof">LAYOUT</button>
-    <!-- The gap is what says these are a different subject, the same way the
-         one in the bar at the top does. Left of it is what a screen IS; right
-         of it is what an assistant is wired to. -->
-    <span class="tabgap"></span>
-    <!-- The two halves of an endpoint that are not the endpoint: what it
-         speaks to, and what it answers on. They were among the five above,
-         which made the row a list of seven unrelated things. -->
-    <span class="tablabel">CONNECTIONS</span>
-    <button data-tab="models">MODELS</button>
-    <button data-tab="network">NETWORK</button>
-    <!-- AFTER THE TWO IT IS MADE OF, because that is the order it is built in:
-         a model to speak to, a port to answer on, and then the pair of them
-         under one name. -->
-    <button data-tab="connection">CONNECTION</button>
-  </div>
-  </div><!-- /profbox — its foot is the rule that used to sit here -->
   </div><!-- /panelhead -->
 
   <div id="grpbox">
