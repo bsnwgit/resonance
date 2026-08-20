@@ -79,11 +79,29 @@ talk to, a hosted model worth money per question, one reading from a system
 that should know who asked. A single deployment-wide switch could only ever be
 set to the strictest of them, which is why there is no longer one.
 
-**REQUIRED refuses a device outright**, approved or not. A wall screen has no
-person on it and never will, so an endpoint set this way is one your kiosks
-stop answering on. That is what makes this the control that limits what a
-model costs, where an allow-list of screens only limits which rooms it is
-heard in.
+**REQUIRED means no anonymous caller**, not that there must be a person. Two
+kinds satisfy it:
+
+- somebody **signed in**, and
+- a screen you **enrolled with a code** — minting that code and carrying it to
+  the device is itself an admin deciding that screen should be here, which is
+  the same act of vouching a password is.
+
+A browser that merely opened the display page is neither, and is refused.
+
+**It refused a device outright until 2026-08-20**, and that was this setting
+turning away the population it is most often wanted for. A hallway screen an
+admin had hung deliberately could not use an endpoint that asked for a sign-in,
+because being approved was exactly what made it a device and a device could
+never sign in — so ticking such an endpoint onto such a screen produced a grant
+that reached nothing and said so nowhere. The rule now asks whether the caller
+is *known*, and a code is how a screen becomes known.
+
+**What it costs you to know:** a wall screen satisfying this has no person
+attached, so whoever walks up uses that model unattributed. It limits the model
+to callers you vetted; it does not attribute the bill to a name. Where you need
+the name, the caller has to be a person — which means a personal browser, not a
+screen on a wall.
 
 People sign in at the display with the email address and password they set
 from their enrolment link. The admin panel is not affected and never was: it
@@ -106,8 +124,8 @@ box, if they are not on its allow-list.
 |---|---|---|
 | NOT REQUIRED | ANY DISPLAY | **the assistant** — nothing is in the way |
 | NOT REQUIRED | ONLY THESE, and they are not on it | **a sign-in box** — not because signing in is required, but because this browser may not use it, and signing in as somebody who *is* listed is one of the ways past |
-| REQUIRED | ANY DISPLAY | **a sign-in box** — sign in as anybody and it works |
-| REQUIRED | ONLY THESE | **a sign-in box** — and signing in is not enough on its own; it has to be as somebody the list names |
+| REQUIRED | ANY DISPLAY | **a sign-in box** — sign in as anybody and it works. Not on a screen enrolled with a code: that is already a known caller, and it sees the assistant |
+| REQUIRED | ONLY THESE | **a sign-in box** — and signing in is not enough on its own; it has to be as somebody the list names. A code-enrolled screen the list names sees the assistant |
 
 The one that surprises people is the second row: *Sign in* says NOT REQUIRED
 and a sign-in box appears anyway. Nothing is wrong. **ONLY THESE is itself a

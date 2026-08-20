@@ -2475,9 +2475,20 @@ being reached.
 - **Sign-in became a property of the assistant.** There is no deployment-wide
   switch in either direction. Each endpoint carries its own *Sign in* section,
   because three assistants on one box can want three answers and one switch
-  covering all of them could only ever be set to the strictest. REQUIRED
-  refuses a device outright, approved or not: a wall screen has no person on
-  it, which is what makes this the control that limits what a model costs.
+  covering all of them could only ever be set to the strictest. REQUIRED means
+  **no anonymous caller** — somebody signed in, or a screen enrolled with a
+  code, because minting that code and carrying it to the device is the same act
+  of vouching a password is. A browser that merely opened the display page is
+  neither.
+
+  It refused a device outright until 2026-08-20, and that was the setting
+  turning away the population it is most often wanted for: an admin hangs a
+  hallway screen, ticks the endpoint onto it, and the grant reaches nothing —
+  because being approved is exactly what made it a device, and a device could
+  never sign in. The question is whether the caller is KNOWN; a code is how a
+  screen becomes known. The trade is that a wall satisfying it has no person
+  attached, so it limits a model to callers you vetted rather than attributing
+  the bill to a name.
 - **A port carries one endpoint, and no port means no port.** Sharing went
   with the sign-in requirement — a door with two assistants behind it can only
   have one lock and would answer for the looser of them. The nominated default

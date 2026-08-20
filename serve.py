@@ -3615,6 +3615,25 @@ def guest_path_broken(doc):
     return not display_settings()["guest_requests"] and not open_default(doc)
 
 
+def vouched(disp):
+    """Is this screen one an admin deliberately put here?
+
+    A CODE IS THE VOUCHING. An admin named the row, was handed six characters,
+    and carried them to the device — every step of that is a person deciding
+    this screen should exist. `origin` records which door a row came through
+    and it is set when the row is made, so this cannot be forged by anything
+    the device says about itself.
+
+    Approval alone is NOT enough and the distinction is the whole point:
+    `page` is a browser that opened the display page, which is anybody who can
+    reach the port. Those do not become devices any more — a browser that asks
+    is answered with an ACCOUNT, so the form is for people and a code is the
+    only way a device arrives — but old rows exist and must not be promoted by
+    a rule written after them."""
+    return bool(disp) and bool(disp.get("approved")) \
+        and str(disp.get("origin") or "") == "code"
+
+
 def subject_may(route, disp=None, ident=None):
     """May this caller use this endpoint?
 
@@ -3647,7 +3666,20 @@ def subject_may(route, disp=None, ident=None):
     #
     # `ident` is only ever set for a browser holding a PROVED session — see
     # _identity — so a device is refused here whatever it was approved for.
-    if route.get("needs_signin") and not ident:
+    # WHO COUNTS AS KNOWN. A person who signed in, or a screen an admin
+    # enrolled with a code — see vouched. It was a person and only a person,
+    # and that made this setting refuse the one population it is most often
+    # wanted for: a hallway screen an admin hung deliberately could never use
+    # an endpoint that asked for a sign-in, because being approved is exactly
+    # what makes it a device and a device can never sign in. An admin who
+    # ticked such an endpoint onto such a screen got a grant that reached
+    # nothing, silently.
+    #
+    # WHAT IT NOW MEANS is no anonymous callers rather than a person for every
+    # question. A code-enrolled screen satisfies it, so whoever walks up to
+    # that screen uses it with no person attached — which is the trade being
+    # made deliberately: a wall is a place somebody vetted, not a stranger.
+    if route.get("needs_signin") and not ident and not vouched(disp):
         return False
     if not route.get("restricted"):
         return True

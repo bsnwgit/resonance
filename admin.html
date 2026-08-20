@@ -5590,11 +5590,21 @@ to use this endpoint at all. Nothing here is about which people — that is
 <i>Who may use it</i>, below, and the two are independent: an endpoint can be
 open to everybody and still insist they sign in.
 
-<b>REQUIRED refuses a device outright</b>, approved or not. A wall screen has
-no person on it and never will, so an endpoint set this way is one your kiosks
-stop answering on. That is what makes this the control that limits what a
-model costs, where an allow-list of screens only limits which rooms it is
-heard in.
+<b>REQUIRED means no anonymous caller</b>, not that there must be a person.
+Two kinds of caller satisfy it: somebody <b>signed in</b>, and a screen you
+<b>enrolled with a code</b> — because minting that code and carrying it to the
+device is itself an admin deciding that screen should be here. A browser that
+merely opened this page is neither, and is refused.
+
+It refused a device outright until 2026-08-20, which was this setting turning
+away the population it is most often wanted for: a hallway screen an admin hung
+deliberately could not use an endpoint that asked for a sign-in, because being
+approved is exactly what made it a device. Ticking such an endpoint onto such a
+screen produced a grant that reached nothing, and said so nowhere.
+
+<b>What it costs you to know:</b> a wall screen satisfying this has no person
+attached, so whoever walks up to it uses that model unattributed. This limits
+the model to callers you vetted; it does not attribute the bill to a name.
 
 They sign in at the display itself, with the email address and password they
 set from their enrolment link. The admin panel is not affected by this and
@@ -10539,14 +10549,17 @@ $('dp_name').addEventListener('keydown', e=>{
    Read from the endpoint list on every repaint, so a change made on ACCESS ▸ AI
    is described correctly the next time either of these lists is drawn. */
 function grantNote(e, kind){
-  if (kind === 'device' && e.needs_signin)
-    return ' — needs a person signed in, so a screen cannot use it';
   if (e.restricted) return '';
   /* Unrestricted, so the tick is worth nothing either way — but to WHOM it is
-     open still differs: with sign-in required it is everybody who has, and
-     without it, everybody. */
-  return e.needs_signin ? ' — open to anyone signed in anyway'
-                        : ' — open to all anyway';
+     open still differs, and differently for each population. Sign-in required
+     means no ANONYMOUS caller: a screen an admin enrolled with a code counts,
+     and a person who signed in counts, and a browser that is neither does not.
+     It said a screen could not use one of these at all, which was true until
+     2026-08-20 and was the setting refusing the population it is most often
+     wanted for. */
+  if (!e.needs_signin) return ' — open to all anyway';
+  return kind === 'device' ? ' — open to any enrolled screen anyway'
+                           : ' — open to anyone signed in anyway';
 }
 
 function grantList(d, heading, kind){
