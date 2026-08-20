@@ -537,12 +537,19 @@
   .profrow{flex-wrap:wrap;align-items:flex-start}
   .profrow .tabbox:last-child{margin-left:auto}
   .profhead{margin:2px 0 10px}
-  /* A side is a column that the box fills, so the border reaches the width the
-     row gave it rather than shrinking to its buttons. */
-  .tabside > .tabbox{width:100%}
-  /* The foot's rows align at the bottom, so the boxes there do too — otherwise
-     the taller of the two hangs below the other's border. */
-  #panelfoot .tabbox{align-self:flex-end}
+  /* THE BOX IS AS WIDE AS WHAT IS IN IT, like the two at the head of the
+     panel — a border drawn out to the width its side happens to have is a box
+     around a row of buttons and a lot of nothing.
+
+     SEARCH is the exception and has to be: the field inside it grows to fill
+     what it is given, so a box that shrank to its content would shrink the
+     thing you type in along with it. */
+  .findside > .tabbox{width:100%}
+  /* NOTHING HERE ABOUT THE BOTTOM. There was `align-self:flex-end`, meant to
+     line the two boxes up at the foot of the row — and a side is a COLUMN, so
+     align-self on its child is the HORIZONTAL axis: it pushed the box to the
+     right of its side instead. The row already aligns its sides at the bottom
+     — see #panelfoot .tabrow — which is where that job belongs. */
 
   .profbox{
     border-left:1px solid rgba(var(--glass),.55);
