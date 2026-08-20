@@ -172,11 +172,24 @@ screen, a TV, a laptop, a phone. Anything else that hears its wake word drops
 the utterance: no answer, nothing passed to whatever it was already talking to,
 nothing said out loud, no matter how that browser is configured.
 
-Devices enrol themselves by loading the page and are approved under ACCESS; one
-that has not been approved yet can be ticked here, and is refused until it is.
+**The lists offer only what a grant can reach.** A screen appears once it is
+approved under ACCESS ▸ NODES; a person appears once they have used their link
+and chosen a password. Before that a row is refused whatever is ticked, so
+offering it was a tick that could not do anything and looked like it had. One
+already ticked stays on the list whatever state it is in — a list quietly
+dropping a grant would take it away at the next save without anybody asking.
+
 Restricting the endpoint that is **default** is worth a moment's thought:
 anything typed into the composer with no name in front of it goes there, so
 displays outside the list get nothing back when somebody types.
+
+**The same ticks are on a person's and a device's own row**, under ACCESS —
+the list of endpoints there and this list of callers here are two views of one
+grant. Ticking an endpoint on a row writes it into that endpoint's authorize
+profile, which is the thing being read: **so it grants every endpoint sharing
+that profile**, and unticking takes it from all of them. That is what naming a
+rule once means. The row redraws with what actually resulted rather than what
+was clicked, so the reach is visible immediately.
 
 **ONLY THESE with nothing ticked admits nobody.** That is allowed rather than
 refused — restricting an endpoint before the tablet that will use it has been
@@ -226,12 +239,11 @@ itself. Until then it looks unchanged, and a question typed into it comes back
 refused in the status line rather than as a box. **RELOAD** on the device's row
 does it immediately.
 
-**A device's tick list says when a grant is worth nothing.** Under DEVICE
-enrolment and on a device's own row, an endpoint whose permission requires a
-sign-in reads *needs a person signed in, so a screen cannot use it* — because
-ticking it grants that screen nothing at all. On a PERSON's list the same
-endpoint reads *open to anyone signed in anyway*, since signing in is the whole
-of what it asks of them.
+**A tick list says when a grant is worth nothing.** On a PERSON's list, an
+endpoint open to everybody reads *open to anyone signed in anyway* — ticking it
+grants nothing, because it is reachable already. A device's list says the same
+of an endpoint its screen could never satisfy: one requiring a sign-in, where
+that screen asked from the page rather than being given a code.
 
 Read the pair as one sentence and it stops being surprising:
 
@@ -583,9 +595,10 @@ thing would go away believing they had phrased it badly. The spoken failure
 names the assistant you addressed; the reason appears on the display's status
 line.
 
-Only the **timeout** applies from the Limits box, and there is no system prompt:
-Home Assistant holds the conversation itself and its agent is instructed over
-there. Those controls hide themselves rather than sit on screen doing nothing.
+Only the **timeout** applies from the limits on its model profile, and there is
+no system prompt: Home Assistant holds the conversation itself and its agent is
+instructed over there. Those controls hide themselves rather than sit on screen
+doing nothing.
 
 **Tested against a real installation.** Spoken to by name and asked to switch a
 real light on and off, over voice, end to end. Press TEST first anyway — it

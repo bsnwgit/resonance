@@ -337,8 +337,9 @@ There is no self-registration here and nothing that verifies an address, so
 anybody who could create their own account could create somebody else's.
 
 **Tick their assistants while you are there.** The **AI** ticks on that box are
-the grant, and the same grant an *authorize* profile makes under PROFILES ▸
-PERMISSIONS.
+the grant, and they are written into the *authorize* profile of each endpoint
+ticked — the same list you would edit under PROFILES ▸ PERMISSIONS, reached
+from the other end. A profile named by several endpoints grants all of them.
 Tick none and they reach whatever is open to everyone; an endpoint that is open
 to everyone is reachable already, so ticking it grants nothing. The same ticks
 are on the person's own row afterwards, so a grant made here can be changed
@@ -459,9 +460,9 @@ them was put.
 ### Setting a fleet in one place
 
 Eight screens on one assistant are eight rows to set by hand, and they are
-usually all the same kind of place. So an endpoint carries a **display
-profile** — ACCESS ▸ AI ▸ *Display* — and every screen opened on that
-endpoint's **port** takes it.
+usually all the same kind of place. So an endpoint names a **layout** — ACCESS
+▸ AI ▸ *Layout* — and every screen opened on that endpoint's **port** takes
+it.
 
 **The port is the association.** A browser on the Demo port is a Demo screen
 because that is the address it was opened at. Nothing to tick and no list to
@@ -475,12 +476,13 @@ names one layout, and a page is loaded from exactly one address, so there is
 never more than one right answer. Set it on the endpoint and every screen on
 that port takes it.
 
-**Which screens an endpoint permits is a separate question**, on *Who may use
-it*. It is about permission and has nothing to do with how a screen looks. An
-earlier version of this setting keyed off that grant instead, and it was wrong
-twice over: a profile set on an endpoint applied to nothing until every screen
-had also been ticked, and a screen granted two endpoints could have two parents
-naming different profiles with no correct way to choose between them.
+**Which screens an endpoint permits is a separate question**, on its
+*Permission*. It is about who gets in and has nothing to do with how a screen
+looks. An earlier version of this setting keyed off that grant instead, and it
+was wrong twice over: a layout set on an endpoint applied to nothing until
+every screen had also been ticked, and a screen granted two endpoints could
+have two parents naming different layouts with no correct way to choose between
+them.
 
 **An endpoint with no port reaches nothing**, this included.
 
@@ -512,8 +514,11 @@ knew it was coming.
 if you already know them, set the two things you would otherwise come back and
 fill in on the row afterwards:
 
-- **Kiosk mode**, and which layout profile it is — what the screen will look
-  like and behave as, chosen before it has ever been switched on
+- **Kiosk mode** — whether the screen runs as a kiosk, chosen before it has
+  ever been switched on. **Which layout it wears is not here**, and is not on
+  the row either: that comes from the endpoint the screen is opened at. A page
+  is loaded from exactly one address and a port carries one endpoint, so there
+  is one answer and nothing to disagree about.
 - **Network** — which profile it answers on, which also decides the address and
   port in the code you are about to be given. A building with several ports has
   several right answers to *what do I type into this screen*, and the right one
@@ -573,6 +578,14 @@ it.
 device may use in the same gesture. The reason to approve anybody at all is to
 give them a particular assistant, so the decision and the grant are one thing —
 an approval that grants nothing is a row that changed colour.
+
+**Where the tick lands.** It is written into the **authorize** profile of each
+endpoint you ticked, which is what the server reads — so it grants every
+endpoint sharing that profile, and unticking takes it from all of them. A rule
+named once is a rule shared on purpose; the row redraws with the endpoints that
+actually resulted rather than the ones you clicked, so the reach is visible at
+the moment you make it. Where a rule really is one endpoint's alone, give it a
+permission of its own.
 
 **Refusing takes two messages and a choice.** One is shown on their screen, so
 they know what happened. One is a note that never leaves this panel, for
@@ -951,9 +964,10 @@ token, which nobody approved — and turns up in this list as a row you were not
 expecting. That is the early warning; it is also, in the ordinary case, simply
 the next device you meant to add.
 
-**Restricting an endpoint to named displays** is on the endpoint, under AI →
-*who may use it*. `ANY DISPLAY` is the default and is what every endpoint did
-before displays existed. `ONLY THESE` names them. Two reasons to want it: an
+**Restricting an endpoint to named displays** is done on an **authorize**
+profile, under PROFILES ▸ PERMISSIONS, and the endpoint reaches it through the
+permission it names. `ANY DISPLAY` is what every endpoint did before displays
+existed. `ONLY THESE` names them. Two reasons to want it: an
 endpoint that *acts* — a house, a light switch — where every microphone in
 earshot should not be able to trigger it, and an endpoint that *costs*, where a
 hosted model is worth giving to some devices and not to all of them.
@@ -1185,8 +1199,8 @@ cover it.
 A name for a set of them, so a grant is made once instead of ticked twelve
 times and re-ticked every time somebody gets a new phone. Groups are made on
 **SECURITY**, under the settings that decide who has to be approved at all, and
-named wherever access is granted — today that is an endpoint's *who may use
-it*, and anything added later that grants something can name them the same way.
+named wherever access is granted — today that is an **authorize** profile, and
+anything added later that grants something can name them the same way.
 
 **Everything that starts working is filed with its own population** without
 anybody doing it: a code redeemed puts a screen with the devices, an approved
@@ -1324,12 +1338,12 @@ what the server will answer, not in what the page carries.
 | File | Holds | Visible to |
 |---|---|---|
 | `settings.json` | the shared interface settings | everyone — the display is built from it |
-| `routes.json` | every AI endpoint, and which model profile it names | admin only, mode 600 |
+| `routes.json` | every AI endpoint, and the connection, layout and permission it names | admin only, mode 600 |
 | `users.json` | accounts and password hashes | nobody over HTTP |
 | `app.json` | ports, binding and session lifetime | admin only |
 | `backend.json` | the single assistant this server had before endpoints | read once, at the migration, then never again |
 | `embeds.json` | embed keys, hashed, and what each one grants | admin only, mode 600 |
-| `displays.json` | every display, its token hashed, whether it is approved, and the profiles — including the model profiles' API keys | admin only, mode 600 |
+| `displays.json` | every display, its token hashed, whether it is approved, and every profile — layouts, connections, permissions and the rest, including the model profiles' API keys and the allow-lists a grant is written into | admin only, mode 600 |
 
 **Two things live outside this directory.** Piper voices are in `voices/`, and
 the transcription models are cached by faster-whisper under
