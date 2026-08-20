@@ -398,6 +398,12 @@
      The figure stays: it is the product's face, and this is still the product.
      Same shape as the screensaver's rules below, and for a similar reason —
      what is left is what belongs on screen. */
+  /* THE DIAGNOSTIC STRIP, off unless somebody asked for it. It is what the
+     microphone and the voice are doing, and on a screen nobody is debugging it
+     is a line that twitches at conversations in the room and says nothing
+     anybody wanted. Off is the default on both the device and the person, so
+     the ordinary state of every screen is silent — see status_for. */
+  body:not([data-status]) #status{display:none}
   body[data-enrolonly] #log,
   body[data-enrolonly] #bar,
   body[data-enrolonly] #status,
@@ -908,16 +914,23 @@ if (PERSON_ARRIVED && window.history && history.replaceState)
   history.replaceState(null, '', location.pathname);
 
 const Person = {
-  id: '', name: '', email: '',
+  id: '', name: '', email: '', status: false,
   is(){ return !!this.id; },
   take(p){
     this.id = p.id || '';
     this.name = p.name || '';
     this.email = p.email || '';
+    /* Theirs, and it travels: signing in at a screen somebody has never used
+       brings their own answer with them. */
+    this.status = !!p.status;
     /* Their own settings win over whatever this browser had. That is the
        whole point of an account: the machine's copy is a local habit, theirs
        is the thing that follows them. */
     if (p.settings) Prefs.adopt(p.settings);
+    /* Signing in can turn it on, and signing out has to be able to turn it
+       off again — so this runs on every take rather than only where it is
+       true. */
+    if (typeof syncStatusLine === 'function') syncStatusLine();
     paintGate();
     /* THE TRANSCRIPT, RELABELLED. Signing in is the one moment the answer to
        "who is speaking" changes without a setting being touched, and the
@@ -1203,6 +1216,9 @@ if (PERSON_ARRIVED === 'setup') GATE = 'setup';
    which is a better first five minutes than a screen that looks broken. */
 const Display = {
   id: '', name: DISPLAY_NAME, named: DISPLAY_NAME, approved: false, known: false,
+  /* This SCREEN's half of the diagnostic strip. The person signed in at it
+     carries the other half, and either is enough — see syncStatusLine. */
+  status: false,
   /* What the server last said about this device. `state` is one of none,
      requested, approved, expired, denied — and the page is built from it
      rather than from three booleans that can disagree with each other. */
@@ -1255,6 +1271,7 @@ const Display = {
      same shape and none of them should be assembling it differently. */
   take(d){
     this.id = d.id || '';
+    this.status = !!d.status;
     this.name = d.name || DISPLAY_NAME;
     /* A NAME OR NOTHING — see display_named. `name` above carries the list's
        placeholder for a row nobody has named, which is right in a note about
@@ -1275,6 +1292,7 @@ const Display = {
        itself into more access than it was given. Zero means it never runs
        out, which is every display an admin issued a code for. */
     this.expiresIn = d.expires_in || 0;
+    if (typeof syncStatusLine === 'function') syncStatusLine();
     /* What this place looks like, as opposed to what it may do. It arrives on
        the same answer because it belongs to the same row, and it is applied
        whatever the state is: a tablet waiting to be approved is already on a
@@ -5567,6 +5585,19 @@ const Settings = {
     }catch(e){ return -1; }
   }
 };
+
+/* EITHER SIDE BEING ON IS ENOUGH, which is the same rule the server applies in
+   status_for. A screen and a person can each carry the switch; making one of
+   them win would mean turning yours on, seeing nothing, and having to work out
+   which of two rows in two registers was holding it down.
+
+   An attribute rather than a style, so the stylesheet decides what "off" looks
+   like and this decides only whether it is. */
+function syncStatusLine(){
+  document.body.toggleAttribute('data-status',
+    (typeof Display !== 'undefined' && Display.status)
+    || (typeof Person !== 'undefined' && Person.status));
+}
 
 /* Relabel what is already on screen. The admin is tuning this against a live
    transcript, and a name that only applied to the next line would look like

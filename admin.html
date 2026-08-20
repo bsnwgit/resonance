@@ -1325,7 +1325,10 @@
     grid-template-columns:auto minmax(0,1.4fr) minmax(0,1fr) auto;
     align-items:center;column-gap:8px;row-gap:5px;
   }
-  .erow > .top.drow .dpick{margin:0;flex:0 0 auto;accent-color:var(--hue)}
+  /* Both registers. It was scoped to `.top.drow`, which is the device row's
+     own class — the people's rows carry the same tick and would have had the
+     browser's default sitting among styled controls. */
+  .erow > .top .dpick{margin:0;flex:0 0 auto;accent-color:var(--hue)}
   /* Wide enough and the actions sit on the same line as the name; narrow and
      they take one of their own rather than pushing the row off the edge. */
   /* The bar's own name, at the weight a section heading has: it is the only
@@ -2951,6 +2954,18 @@ above.</div>
        pressed on — the same reason the note below it is duplicated. -->
   <div id="idhereurl" class="idurl"></div>
   <div class="note" id="idherenote"></div>
+  <!-- The same bar the device register has, one population over. Only the
+       diagnostic strip so far: a person has no layout profile to be given,
+       and everything else on these rows is one person's own. -->
+  <div class="bulkbar" id="idbulkbar" hidden>
+    <span class="bulktitle">Status line</span>
+    <label><input type="checkbox" id="idbulkall"> ALL</label>
+    <span id="idbulkcount">nothing selected</span>
+    <span class="spacer"></span>
+    <button id="b_idstaton" class="act-save">SHOW ON SELECTED</button>
+    <button id="b_idstatoff" class="act-undo">HIDE ON SELECTED</button>
+  </div>
+  <div class="note" id="idbulknote"></div>
   <div id="idhere"></div>
   <div class="note help">Everybody who has finished arriving: they opened the
 link you handed them, chose a password, and sign in with their email address
@@ -3693,6 +3708,17 @@ to all of them is one tick.</div>
     <span class="spacer"></span>
     <select id="bulkprofile" class="nmedit"></select>
     <button id="b_bulkapply" class="act-save">APPLY TO SELECTED</button>
+  </div>
+  <!-- THE SECOND THING A SELECTION IS FOR. Its own row rather than a third
+       control on the one above, because that one is a picker with one APPLY
+       and this is two presses with no picker — sharing a row would put a
+       button next to a dropdown it has nothing to do with. Same selection
+       either way: what is ticked is ticked. -->
+  <div class="bulkbar" id="bulkstatusbar" hidden>
+    <span class="bulktitle">Status line</span>
+    <span class="spacer"></span>
+    <button id="b_bulkstaton" class="act-save">SHOW ON SELECTED</button>
+    <button id="b_bulkstatoff" class="act-undo">HIDE ON SELECTED</button>
   </div>
   <!-- On THIS tab. The result used to be written to the Created Access note,
        which is on ACCESS — a message nobody standing here could see. -->
@@ -6739,6 +6765,10 @@ async function loadDisplays(){
    nowhere else: there is no email and nothing to vouch for a name, so anybody
    who could mint their own could mint somebody else's. */
 let IDENTITIES = [], IDBASE = '', OPENPID = '', IDPWMIN = 10;
+/* WHO IS TICKED on the register, for the bar above it. Held here rather than
+   read off the boxes because the list is rebuilt on every refresh — a
+   selection living in the DOM would be lost every time the timer fired. */
+const IDPICKED = new Set();
 async function loadIdentities(){
   try{
     const j = await api('/identities');
@@ -6882,6 +6912,57 @@ async function idAction(path, body){
   }
 }
 
+/* The bar over the register: how many are ticked, and whether ALL is. Pruned
+   against the rows actually on screen, so a selection cannot survive somebody
+   being deleted and be applied to nothing. */
+function paintIdBulk(){
+  const bar = $('idbulkbar');
+  if (!bar) return;
+  const here = (IDENTITIES || []).filter(p=> p.ready);
+  [...IDPICKED].forEach(id=>{ if (!here.some(p=> p.id === id)) IDPICKED.delete(id); });
+  bar.hidden = !here.length;
+  const cnt = $('idbulkcount');
+  if (cnt) cnt.textContent = IDPICKED.size ? IDPICKED.size + ' selected'
+                                           : 'nothing selected';
+  const all = $('idbulkall');
+  if (all){
+    all.checked = here.length > 0 && IDPICKED.size === here.length;
+    all.onclick = ()=>{
+      IDPICKED.clear();
+      if (all.checked) here.forEach(p=> IDPICKED.add(p.id));
+      refreshIdentities();
+    };
+  }
+}
+
+/* Both buttons, one request. See bulkStatus one population over — same shape,
+   same reason. */
+function idBulkStatus(on){
+  return async ()=>{
+    const ids = [...IDPICKED];
+    if (!ids.length) return;
+    const note = $('idbulknote');
+    try{
+      const j = await api('/identities/status', {method:'POST',
+        body: JSON.stringify({ids: ids, on: on})});
+      IDENTITIES = j.identities || IDENTITIES;
+      IDPICKED.clear();
+      await refreshIdentities();
+      if (note){
+        note.className = 'note';
+        note.textContent = j.count + (j.count === 1 ? ' person ' : ' people ')
+          + (on ? 'will see the status line' : 'will not see the status line')
+          + ' wherever they sign in.';
+      }
+    }catch(e){
+      if (note){ note.className = 'note bad'; note.textContent = e.message; }
+    }
+  };
+}
+const bIdOn = $('b_idstaton'), bIdOff = $('b_idstatoff');
+if (bIdOn) bIdOn.addEventListener('click', idBulkStatus(true));
+if (bIdOff) bIdOff.addEventListener('click', idBulkStatus(false));
+
 async function refreshIdentities(){
   /* TWO LISTS, AND THE ROW DOES NOT KNOW WHICH IT IS IN. Anybody who has set a
      password is here and belongs under IDENTITY; anybody who has not is still
@@ -6907,6 +6988,7 @@ async function refreshIdentities(){
     if (!row || row.ready) clearPersonUrl();
   }
   watchPersonUrl();                     // re-arm, or stop, on what is left
+  paintIdBulk();
   live.forEach(k=>{ boxes[k].innerHTML = ''; boxes[k].className = ''; });
   const filled = {};
   IDENTITIES.forEach(p=>{
@@ -6922,6 +7004,23 @@ async function refreshIdentities(){
        ever picked the URL up — which is the one thing this list is read for,
        so it is not something you open a row to find. */
     const top = document.createElement('div'); top.className = 'top';
+    /* ONLY ON THE REGISTER. The queue on ENROLLMENTS is people who have not
+       arrived yet — there is nothing to apply to them and a tick there would
+       be a control that does nothing. */
+    if (where === 'here'){
+      const pick = document.createElement('input');
+      /* `dpick` — the class the device register's tick already uses, so the
+         two look and sit the same. Not `pick`, which is a row modifier. */
+      pick.type = 'checkbox'; pick.className = 'dpick';
+      pick.title = 'select for the status line';
+      pick.checked = IDPICKED.has(p.id);
+      pick.onclick = (e)=>{
+        e.stopPropagation();          // the row opens on a click; this is not one
+        if (pick.checked) IDPICKED.add(p.id); else IDPICKED.delete(p.id);
+        paintIdBulk();
+      };
+      top.appendChild(pick);
+    }
     const nmt = document.createElement('span');
     nmt.className = 'nm';
     nmt.textContent = p.label || 'unnamed person';
@@ -7122,6 +7221,9 @@ async function refreshIdentities(){
       gnote.textContent = 'back to what is saved';
     };
     acts.appendChild(gundo);
+    /* Theirs follows them to whatever they sign in at, which is why it is on
+       the person and not only on the screen. */
+    acts.appendChild(statusButton(p, '/identities/status', refreshIdentities));
     /* THE WHOLE OF ACCOUNT RECOVERY, and deliberately one button. A forgotten
        password and a leaked link want the same answer — a new link, and a
        password only its holder ever chooses. There is no CLEAR THE PASSWORD
@@ -9549,6 +9651,8 @@ function paintBulk(){
   [...PICKED].forEach(id=>{ if (!here.some(d=> d.id === id)) PICKED.delete(id); });
   const n = PICKED.size;
   bar.hidden = !here.length;
+  const sbar = $('bulkstatusbar');
+  if (sbar) sbar.hidden = !here.length;
   const cnt = $('bulkcount');
   if (cnt) cnt.textContent = n ? n + (n === 1 ? ' selected' : ' selected')
                                : 'nothing selected';
@@ -9983,6 +10087,7 @@ async function refreshDisplays(){
       gap.className = 'spacer';
       r.appendChild(gap);
       if (kb){ r.appendChild(kb.save); r.appendChild(kb.undo); }
+      r.appendChild(statusButton(d, '/displays/status', refreshDisplays));
       const del = document.createElement('button');
       del.textContent = 'DELETE';
       del.className = 'act-danger';
@@ -10175,6 +10280,74 @@ $('bulkall').addEventListener('click', ()=>{
   if (on) onThisScreen().forEach(d=> PICKED.add(d.id));
   refreshDisplays();
 });
+/* THE DIAGNOSTIC STRIP, on ONE row. A press and it is done — no SAVE beside
+   it, because there is nothing else on the row it would commit and a switch
+   you flip to watch something is not a form. The label says the state it is
+   in rather than the state it would move to: a button reading OFF that turns
+   it off is the ambiguity this wording avoids.
+
+   `path` is the population's route and `after` the refresh that redraws the
+   list it is in — the two things that differ between a screen and a person. */
+function statusButton(rec, path, after){
+  const b = document.createElement('button');
+  const paint = ()=>{
+    b.className = rec.status ? 'act-save' : 'act-undo';
+    b.textContent = rec.status ? 'STATUS LINE · ON' : 'STATUS LINE · OFF';
+    b.title = rec.status
+      ? 'the microphone and voice line is showing on this one — press to hide it'
+      : 'show the microphone and voice line on this one, for troubleshooting';
+  };
+  paint();
+  b.onclick = async ()=>{
+    const want = !rec.status;
+    b.disabled = true;
+    try{
+      await api(path, {method:'POST',
+                       body: JSON.stringify({id: rec.id, on: want})});
+      /* The record this row was drawn from, brought up to date, so the button
+         is right whether or not the refresh below rebuilds it. */
+      rec.status = want;
+      paint();
+      if (typeof after === 'function') after();
+    }catch(e){
+      /* Left as it was, and said out loud: a switch that reports a state it
+         did not reach is worse than one that refuses. */
+      alert(e.message || 'that did not work');
+    }
+    b.disabled = false;
+  };
+  return b;
+}
+
+/* THE DIAGNOSTIC STRIP, on a selection. One request rather than one per row —
+   unlike the profile above it, which validates a row at a time and says which
+   one it refused, this is a boolean and there is nothing to refuse. */
+function bulkStatus(on){
+  return async ()=>{
+    const ids = [...PICKED];
+    if (!ids.length) return;
+    const note = $('bulknote');
+    try{
+      const j = await api('/displays/status', {method:'POST',
+        body: JSON.stringify({ids: ids, on: on})});
+      if (j.displays) DISPLAYS = j.displays;
+      PICKED.clear();
+      await refreshDisplays();
+      if (note){
+        note.className = 'note';
+        note.textContent = j.count + ' device' + (j.count === 1 ? '' : 's')
+          + (on ? ' will show the status line' : ' will hide the status line')
+          + ' — each takes it at its next check-in.';
+      }
+    }catch(e){
+      if (note){ note.className = 'note bad'; note.textContent = e.message; }
+    }
+  };
+}
+const bso = $('b_bulkstaton'), bsf = $('b_bulkstatoff');
+if (bso) bso.addEventListener('click', bulkStatus(true));
+if (bsf) bsf.addEventListener('click', bulkStatus(false));
+
 $('b_bulkapply').addEventListener('click', async ()=>{
   const ids = [...PICKED];
   if (!ids.length) return;

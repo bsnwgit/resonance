@@ -1801,6 +1801,18 @@ DISPLAY_DEFAULTS = {
     # the request clears itself by being satisfied — no acknowledgement to
     # store, and nothing left set to fire a second time on the next boot.
     "reload_req": 0,
+    # THE STATUS LINE — what the microphone and the voice are doing, in the
+    # strip above the composer. A TROUBLESHOOTING TOOL and nothing else, so it
+    # is OFF and every screen is quiet until somebody turns it on to watch
+    # something. It was always drawn and only ever suppressed by a heuristic
+    # guessing whether anybody was in a conversation, which is the wrong shape
+    # for a diagnostic: what you want while debugging is a switch, and what a
+    # wall wants the rest of the time is silence.
+    #
+    # A PERSON CARRIES ONE TOO, and either being on is enough — see
+    # status_for. Turning it on for yourself and finding a screen still silent
+    # because the row disagreed is the failure that makes a diagnostic useless.
+    "status": False,
 }
 
 #: How many screensaver profiles may exist. A deployment has a handful of
@@ -2968,6 +2980,20 @@ def display_named(rec):
     return ""
 
 
+def status_for(disp=None, ident=None):
+    """Does the status line show for this caller?
+
+    EITHER SIDE BEING ON IS ENOUGH. A screen and a person can both carry the
+    switch, and the alternative — one of them winning — is somebody turning
+    theirs on, seeing nothing, and having to work out which of two rows in two
+    different registers is holding it down. A diagnostic that has to be
+    debugged is not one.
+
+    Off is the default on both, so a deployment nobody has touched shows
+    nothing anywhere, which is the point of it."""
+    return bool((disp or {}).get("status")) or bool((ident or {}).get("status"))
+
+
 def display_label(rec):
     """What to call it in a list, which is never nothing.
 
@@ -3740,6 +3766,7 @@ def admin_displays():
                    # needs both: one is the control's value, the other is the
                    # answer a blank control is currently getting.
                    kind=str(rec.get("kind") or ""), arrived=enrolled_as(rec),
+                   status=bool(rec.get("status")),
                    # Three states, and the panel needs to tell them apart:
                    # INVITED is a row waiting for somebody to type its code
                    # into a screen, WAITING is a device that turned up on its
@@ -4642,6 +4669,11 @@ IDENTITY_DEFAULTS = {
     # at a screen standing in a room, so there is no place carrying the risk to
     # set it from. Zero takes the deployment default.
     "session_hours": 0,
+    # THEIR OWN STATUS LINE, and it follows them. The device's is about one
+    # screen; this is about one person, on whatever they sign in at — which is
+    # what makes it useful for somebody debugging their own account from a
+    # laptop they have never used before. Either being on is enough.
+    "status": False,
     # NO ENDPOINT ON THE ROW. There was one, for exactly as long as the link's
     # address was derived from it — enrolment has a listener of its own now, so
     # the address is a deployment's answer rather than a property of the person
@@ -5081,6 +5113,7 @@ def admin_identities():
                    "pw_set_at")},
                  id=pid, label=identity_label(rec),
                  granted=held.get(pid, []),
+                 status=bool(rec.get("status")),
                  wakeword=rec.get("wakeword") or "",
                  ready=identity_ready(rec))
             for pid, rec in sorted(rows.items(), key=lambda kv: kv[1]["created"])]
@@ -6598,6 +6631,7 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/displays", "/displays/approve", "/displays/rename",
                      "/displays/delete", "/displays/new", "/displays/reissue",
                      "/displays/decide", "/displays/settings", "/displays/kiosk",
+                     "/displays/status", "/identities/status",
                      "/groups", "/groups/save", "/groups/delete", "/groups/sets",
                      "/log", "/alerts", "/alerts/ack",
                      "/events", "/events/clear",
@@ -7001,6 +7035,11 @@ class Handler(SimpleHTTPRequestHandler):
                # the socket was bound, so a screen is answered about the
                # address it is actually being viewed at rather than about the
                # one its row was created under.
+               # THE DIAGNOSTIC STRIP, for this screen. Sent whatever the
+               # state is, like the kiosk block beside it: a tablet nobody has
+               # approved is exactly the one somebody is standing in front of
+               # wondering why it does nothing, which is when it is wanted.
+               "status": bool(rec.get("status")),
                "kiosk": kiosk_of(rec, nid=self.pinned_net)}
         if may_ask:
             out["form"] = cfg["form"]
@@ -8260,6 +8299,10 @@ class Handler(SimpleHTTPRequestHandler):
                     # so "signed in" and "not" is the whole of it.
                     out = {"id": who["id"], "name": who["name"] or "",
                            "email": who.get("email") or "",
+                           # Theirs, which travels with them — the display's
+                           # own is on the other branch of this answer, and
+                           # either being on is enough. See status_for.
+                           "status": bool(who.get("status")),
                            "settings": identity_settings(who["id"])}
                     return self._json(200, {"person": out})
             if disp:
@@ -9334,6 +9377,62 @@ class Handler(SimpleHTTPRequestHandler):
                      "approved" if on else "approval withdrawn", s["user"]),
                   flush=True)
             return self._json(200, {"ok": True, "displays": admin_displays()})
+
+        if parsed.path == "/displays/status":
+            # THE DIAGNOSTIC STRIP, on one row or on many. Its own endpoint
+            # because it is switched on to watch something and off again a
+            # minute later, which is nothing like the gestures that name a
+            # screen or dress it — and because the register wants to do it to
+            # a selection in one press.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            want = obj.get("on") is not False
+            ids = obj.get("ids")
+            if ids is None:
+                ids = [obj.get("id")]
+            ids = [str(i) for i in ids if i]
+            displays = read_displays()
+            missing = [i for i in ids if i not in displays]
+            if not ids or missing:
+                return self._json(404, {"error": "no such display"})
+            for did in ids:
+                displays[did]["status"] = want
+            write_displays(displays)
+            print("status line %s for %d display(s) by %s"
+                  % ("on" if want else "off", len(ids), s["user"]), flush=True)
+            return self._json(200, {"ok": True, "on": want, "count": len(ids),
+                                    "displays": admin_displays()})
+
+        if parsed.path == "/identities/status":
+            # The same switch, one population over. A person's follows them to
+            # whatever they sign in at, which is the whole reason it is not
+            # simply a property of the screen.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            want = obj.get("on") is not False
+            ids = obj.get("ids")
+            if ids is None:
+                ids = [obj.get("id")]
+            ids = [str(i) for i in ids if i]
+            rows = read_identities()
+            missing = [i for i in ids if i not in rows]
+            if not ids or missing:
+                return self._json(404, {"error": "no such identity"})
+            for pid in ids:
+                rows[pid]["status"] = want
+            write_identities(rows)
+            print("status line %s for %d identity(s) by %s"
+                  % ("on" if want else "off", len(ids), s["user"]), flush=True)
+            return self._json(200, {"ok": True, "on": want, "count": len(ids),
+                                    "identities": admin_identities()})
 
         if parsed.path == "/displays/kiosk":
             # What this screen looks like where it hangs. Its own endpoint

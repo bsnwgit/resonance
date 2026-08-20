@@ -772,6 +772,27 @@ Up to eight profiles, each a name and three numbers:
 | **Dark from / until** | the hours a dim runs regardless of anybody being there. Set them the same for no dark window; a start later than an end wraps midnight, so **22:00** to **07:00** is what you mean |
 | **Dark by %** | how much light comes off it during those hours |
 
+### The status line
+
+The strip above the composer — what the microphone is doing, what the voice is
+doing. **It is a troubleshooting tool and it is off**, on every screen and every
+person, until somebody turns it on. Before 2026-08-20 it was always drawn and
+only suppressed by a heuristic guessing whether anybody was mid-conversation,
+which is the wrong shape for a diagnostic: what you want while debugging is a
+switch, and what a wall wants the rest of the time is silence.
+
+**Two switches, and either one is enough.** A **device** carries one — that
+screen, wherever it hangs — and a **person** carries one, which follows them to
+whatever they sign in at. On/off, off/on and on/on all show it; only off/off
+hides it. Making one of them win would mean turning yours on, seeing nothing,
+and having to work out which of two rows in two registers was holding it down.
+
+**Per row**, the button is in the row's own bottom bar on both registers, and it
+says the state it is in rather than the state it would move to. **In bulk**, tick
+the rows and use *Status line* — the bar above the device register on ACCESS, and
+the one above the people on IDENTITY ▸ USER. A screen takes the change at its
+next check-in; a person's applies the next time they sign in.
+
 **A LISTENING SCREEN IS AN IDLE SCREEN.** This is the part that surprises
 people, and it was wrong until 2026-08-20. The microphone being open is not a
 conversation: a wall display transcribes every noise in the room, because that
