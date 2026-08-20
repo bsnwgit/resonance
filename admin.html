@@ -700,26 +700,28 @@
     color:#f0cf94;display:flex;flex-direction:column;gap:8px;
   }
   .openwarn .seg{margin:0}
-  #portgrid,.numgrid{display:grid;grid-template-columns:1fr auto;gap:6px 10px;
+  /* `#portgrid` is gone with the section that had it: the app's ports are
+     network profiles now, so the one row left was a grid built for a column
+     that no longer exists. The numeric grid it shared these rules with is
+     still used three times over. */
+  .numgrid{display:grid;grid-template-columns:1fr auto;gap:6px 10px;
             align-items:center;margin-top:8px}
-  #portgrid label,.numgrid label{font-size:calc(9.5px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.9)}
+  .numgrid label{font-size:calc(9.5px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.9)}
   /* the session field is the same kind of thing as a port — a small number
      you type, not prose — so it takes the same treatment */
-  #portgrid input,#ap_session,#em_ttl,.num{
+  #ap_session,#em_ttl,.num{
     width:88px;font:inherit;font-size:calc(10px * var(--fs));padding:4px 6px;
     background:rgba(0,0,0,.6);color:var(--text);
     border:1px solid rgba(var(--glass),.16);outline:0;text-align:right;
   }
-  #portgrid input:focus,#ap_session:focus,#em_ttl:focus,.num:focus{border-color:var(--hue-dim)}
-  #ap_session,#em_ttl,#ap_enrolport{display:block;margin:4px 0}
+  #ap_session:focus,#em_ttl:focus,.num:focus{border-color:var(--hue-dim)}
+  #ap_session,#em_ttl,#ap_enrolport,#ap_admin{display:block;margin:4px 0}
   /* the spinner arrows are the operating system's, and look it */
-  #portgrid input::-webkit-outer-spin-button,
-  #portgrid input::-webkit-inner-spin-button,
   #ap_session::-webkit-outer-spin-button,
   #ap_session::-webkit-inner-spin-button,
   .num::-webkit-outer-spin-button,
   .num::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
-  #portgrid input,#ap_session,#em_ttl,.num{-moz-appearance:textfield;appearance:textfield}
+  #ap_session,#em_ttl,.num{-moz-appearance:textfield;appearance:textfield}
   #em_ttl::-webkit-outer-spin-button,
   #em_ttl::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   #pw_cur:focus,#pw_new:focus,#nu_name:focus,#nu_pw:focus,
@@ -728,9 +730,9 @@
   /* What is actually bound, under the field that sets it — in the port grid
      and out of it. The enrolment port is not in the grid, and the line saying
      what it is running on belongs with it either way. */
+  /* What is actually bound, under the field that sets it. */
   .now{font-size:calc(8.5px * var(--fs));letter-spacing:.06em;
        color:rgba(var(--paper),.7);margin:-2px 0 4px}
-  #portgrid .now{grid-column:1/-1}
   /* The panel's own bar, matching #stagebar across the window so the two
      read as one line rather than as a header on one side and a heading on
      the other. */
@@ -2530,23 +2532,39 @@ it, which is why it lives beside the microphone and the voices.</div>
   <div class="sl"><label>Crackle</label><output id="o_crackle"></output><input id="s_crackle" type="range" min="0" max="1.5" step=".01"></div></div>
   </section>
 
-  <!-- Two settings, not one mode. A single label covering both starts lying
-       the moment somebody changes half of it, so the panel shows the pair and
-       states the arrangement underneath in the words it actually means. -->
-  <!-- Where this server can be reached from. Its own topic under app
-       settings: it was sharing a section with the question of what happens
-       once somebody has reached it, and those are independent. The posture
-       line lives here with it, because what it warns about is exposure. -->
   <!-- The tab's own title, the same treatment SECURITY and the profile lists
        get: full width, no caret, nothing to collapse. -->
   <section class="grp bare titleonly" data-tab="app">
     <div class="barehead"><span class="listtitle">Admin settings</span></div>
   </section>
 
+  <!-- ONE SECTION, because it is one answer: where this page is. It was two —
+       a port under one heading and a binding under another — and the split
+       asked somebody to already know that IP ADDRESS and PORTS were halves of
+       the same sentence. They are read together and set together, so they sit
+       together, in the order they are decided.
+
+       THE BINDING IS THE WHOLE SERVER'S, not the portal's alone: a network
+       profile cannot reach further than it, which is what the help says and
+       what net_host enforces. It lives here because this is the one address
+       you can never afford to lose your way back into, so the page that sets
+       it is the page that has to state it.
+
+       Two settings, not one mode. A single label covering both starts lying
+       the moment somebody changes half of it, so the panel shows the pair and
+       states the arrangement underneath in the words it actually means. -->
   <section class="grp wide" data-tab="app">
-    <h4>IP Address</h4>
+    <h4>Admin Portal</h4>
     <div class="grpbody">
   <div class="pending" id="posturewarn" hidden></div>
+
+  <!-- Under its own label, like every other field on this tab. It was the one
+       row of a grid built for a column of ports that no longer exists — the
+       app's ports are network profiles now — which left the only thing you
+       can type hard right with nothing beside it. -->
+  <label class="bklab" for="ap_admin">Port</label>
+  <input id="ap_admin" type="number" inputmode="numeric" class="num">
+  <div class="now" id="now_admin"></div>
 
   <label class="bklab">Reachable at</label>
   <div class="seg" id="ap_bind">
@@ -2558,36 +2576,25 @@ it, which is why it lives beside the microphone and the voices.</div>
     <label class="bklab">Which address</label>
     <select id="ap_bindaddr"></select>
   </div>
-  <div class="note help">Which addresses the server answers on. Binding one
-address rather than every interface is worth doing on its own account: a
-laptop that later joins another network does not follow you onto it.
+
+  <div class="note" id="posturenow"></div>
+  <div class="note help"><b>The port is this page's, and only this page's.</b>
+What the app answers on is a <b>network profile</b> — PROFILES ▸ NETWORK —
+because a deployment can want several, and which endpoints each carries is a
+question about the app rather than about the portal. This one stays here on
+purpose: it is the way back in when what is over there is wrong.
+
+1024–65535, and not a port a network profile or enrolment is using. Below 1024
+needs root, and the server runs as an ordinary user.
+
+<b>Reachable at is the whole server's</b>, not just this page's — a network
+profile cannot reach further than what is set here, so binding one address
+rather than every interface is worth doing on its own account: a laptop that
+later joins another network does not follow you onto it.
 
 <b>This machine only</b> needs no certificate — browsers already treat
 http://localhost as a secure origin, so the microphone works unprompted and
 nothing crosses a network. Start it, open localhost, talk to it.</div>
-
-  <div class="note" id="posturenow"></div>
-    </div>
-  </section>
-
-
-  <section class="grp wide" data-tab="app">
-    <h4>Ports</h4>
-    <div class="grpbody">
-  <div class="note help">The port this page answers on, and only this one.
-What the app answers on is a <b>network profile</b> — PROFILES ▸ NETWORK —
-because a deployment can want several, and which endpoints each carries is a
-question about the app rather than about the portal.
-
-This one stays here on purpose: it is the way back in when what is over there
-is wrong.</div>
-  <div id="portgrid">
-    <label for="ap_admin">administration</label>
-    <input id="ap_admin" type="number" inputmode="numeric">
-    <div class="now" id="now_admin"></div>
-  </div>
-  <div class="note help">1024–65535, and not a port a network profile is
-using. Below 1024 needs root, and the server runs as an ordinary user.</div>
     </div>
   </section>
 
@@ -2641,6 +2648,41 @@ read when a link is minted.</div>
     </div>
   </section>
 
+
+
+  <!-- MOVED HERE FROM ENROLLMENTS ▸ USER. It sat above the queue it feeds,
+       which reads well and put a thing you write ONCE — in your own words,
+       for strangers — on the page you open to decide about the people who
+       have already answered it. Those are different jobs at different
+       moments: this is configuration, the queue is work. -->
+  <section class="grp wide" data-tab="app">
+    <h4>Enrollment Request Form</h4>
+    <div class="grpbody">
+  <div id="dp_form"></div>
+  <div class="seg" style="margin-top:6px">
+    <button id="b_addfield" class="act-add">ADD A FIELD</button>
+  </div>
+  <div class="note help">What somebody is asked when they request access from
+a display. Up to five fields, and they are yours — this server has no opinion
+about what a request should ask. Somebody running a campus wants a name and a
+department; somebody running a house wants none of it. Tick <b>message</b> on
+one field to make it a box big enough for a reason, and mark the ones that must
+be answered.
+
+If you do not ask for a name, rows arrive labelled by their id and you approve
+them on whatever you did ask for. Ask for nothing at all and a request carries
+nothing but that id.
+
+The requests themselves are under <b>ENROLLMENTS ▸ USER</b>, in
+<i>Waiting for approval</i>.</div>
+
+  <div class="seg actrow">
+    <button id="b_formsave" class="act-save">SAVE THE FORM</button>
+    <button id="b_formrevert" class="act-undo">REVERT</button>
+  </div>
+  <div class="note" id="formnote"></div>
+    </div>
+  </section>
 
   <!-- ONE CONNECTION, TWO USERS. It lived inside the alerting block and only
        appeared once you ticked "send alerts by email", which is why somebody
@@ -3396,30 +3438,6 @@ least for. The link is not spent by being refused there.</div>
     </div>
   </section>
 
-  <section class="grp wide" data-tab="displays">
-    <h4>The request form</h4>
-    <div class="grpbody">
-  <div id="dp_form"></div>
-  <div class="seg" style="margin-top:6px">
-    <button id="b_addfield" class="act-add">ADD A FIELD</button>
-  </div>
-  <div class="note help">Up to five fields, and they are yours — this server has
-no opinion about what a request should ask. Somebody running a campus wants a
-name and a department; somebody running a house wants none of it. Tick
-<b>message</b> on one field to make it a box big enough for a reason, and mark
-the ones that must be answered.
-
-If you do not ask for a name, rows arrive labelled by their id and you approve
-them on whatever you did ask for. Ask for nothing at all and a request carries
-nothing but that id.</div>
-
-  <div class="seg actrow">
-    <button id="b_formsave" class="act-save">SAVE THE FORM</button>
-    <button id="b_formrevert" class="act-undo">REVERT</button>
-  </div>
-  <div class="note" id="formnote"></div>
-    </div>
-  </section>
   <!-- Everything that is simply working. Its own topic, because the list
        above is a queue — read when something needs deciding — and this one is
        a register, read when somebody asks what is out there. Three rows that
@@ -11299,7 +11317,12 @@ function panelNav(){
     if (tab === 'network')
       Promise.resolve(loadBackend()).then(()=> paintNetworks(DPNETS));
     if (tab === 'embeds') refreshEmbeds();
-    if (tab === 'app') loadApp();
+    /* …and the displays document with it, because the request form lives on
+       this tab now and is painted from it — see paintDpSettings. Without this
+       the form is drawn at its defaults on the tab that owns it, which is the
+       failure ALERT already documents: a form that only looks loaded, saved
+       over a working one. */
+    if (tab === 'app'){ loadApp(); refreshProfiles(); }
     if (tab === 'ai'){
       /* The endpoint blocks list SPEECH PROFILES, and those live in the
          displays document — which this tab never fetched. Painted before it

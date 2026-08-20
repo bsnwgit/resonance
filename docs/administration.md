@@ -74,7 +74,7 @@ a URL and talks to the display.
 is here already, SETTINGS on its right configures the server, and this is the
 one in the middle because it is the one somebody is waiting on.
 
-- **USER** — the people you have minted a URL for, the request form, and
+- **USER** — the people you have minted a URL for, and
   everybody who has asked to be here and not yet been decided about.
 - **DEVICE** — where a screen is set up: named, given a code, and watched until
   it takes it.
@@ -296,8 +296,13 @@ that both end up connected, so neither has to read the other's queue.
 | | |
 |---|---|
 | **People** | the ones you have minted a link for who have not used it yet |
-| **The request form** | what a request asks for, under a fixed email field |
 | **Waiting for approval** | everybody who has asked and not been decided about |
+
+What a request *asks* is **SETTINGS ▸ ADMIN ▸ Enrollment Request Form**. It
+sat here, above the queue it feeds, which reads well and put a thing written
+once in your own words on the page you open to decide about the people who
+have already answered it. Those are different jobs at different moments: one
+is configuration, the other is work.
 
 ### A person, as against a device
 

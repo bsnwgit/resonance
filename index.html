@@ -404,6 +404,11 @@
   body[data-enrolonly] #enrol,
   body[data-enrolonly] #reqhead,
   body[data-enrolonly] #reqform,
+  /* REQUEST ACCESS and its row. The button is a direct child of #request
+     rather than of the form, so hiding the form left it behind — and asking
+     to be let in is a thing you do at an assistant, which this port has none
+     of. The wrapper goes with it, or the page keeps its gap. */
+  body[data-enrolonly] #request > .seg,
   body[data-enrolonly] #fps{display:none}
   body[data-enrolonly] #screen{flex:1 1 auto}
   #gatego_row{display:flex;gap:8px;flex-wrap:wrap}
@@ -6063,6 +6068,18 @@ Promise.all([Settings.load(), Display.hello().then(()=> Routes.load())]).then(()
    see the gate at the top of do_GET for what is actually reachable here. */
 function enrolOnly(){
   document.body.dataset.enrolonly = '1';
+  /* THE GATE IS THE PAGE HERE, and both of these have to be said or it is not
+     drawn at all: `#request` is display:none without the first and `#gate` is
+     without the second. They are normally set by paintRequest, off a display
+     record — and there is no display record on this listener, which is how
+     this shipped as a figure with nothing in front of it.
+
+     Set outright rather than by calling paintRequest: that function decides
+     whether somebody may ask for access and what a screen is allowed to show,
+     and every one of those answers is about a device. There is no device
+     here and never will be. */
+  document.body.toggleAttribute('data-request', true);
+  document.body.toggleAttribute('data-gate', true);
   /* Still dressed. The appearance settings are public and they arrived, so
      this looks like the rest of the product rather than like a form somebody
      forgot to style. */
