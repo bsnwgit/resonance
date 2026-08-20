@@ -165,3 +165,54 @@ Three candidates, in the order worth checking:
 
 If it turns out to be none of those, the answer is probably that a wall screen
 should hush on being a wall screen rather than on nobody talking to it.
+
+---
+
+## 5 · A real certificate on the server
+
+**Self-signed, and it is the reason for most of what looks broken.** What is on
+the box today:
+
+```
+subject / issuer  CN = <the server's IP>      (its own issuer — self-signed)
+valid             13 Aug 2026 → 13 Aug 2027
+SAN               IP:<server>, IP:127.0.0.1, DNS:localhost
+```
+
+Every browser warns before every listener, on the panel and on each assistant,
+and it has to be clicked past on each new machine and after each profile wipe.
+Worse than the noise: a warning people are trained to click past is a warning
+that stops meaning anything on the day it matters.
+
+What it also blocks, concretely:
+
+- **The FQDN under ADMIN ▸ Enrolment cannot be used honestly.** Set
+  *Address in the link* to a name and every invitation opens on a certificate
+  that does not carry it, so the first thing anybody sees when accepting is a
+  security warning about the link they were sent. That is indistinguishable
+  from phishing and it is the one page where it matters most.
+- **Tooling cannot reach it.** The in-app browser refuses the cert outright, so
+  the acceptance page and the panel cannot be driven or screenshotted for
+  verification — which is why the enrolment gate shipped with its two body
+  attributes unset and was found by hand instead.
+- **A name is barely usable at all.** `make-cert.sh` writes the SAN from the
+  one host it is given, so every name and address wanted has to be decided in
+  advance and the script re-run to change any of them.
+
+**To decide first:** where the certificate comes from, and it is a different
+job for each answer.
+
+- **An internal CA**, with its root installed on the machines that use this —
+  covers every name and address at once and is the only answer that scales past
+  a handful of browsers.
+- **A public certificate** for a real domain, which needs that domain to resolve
+  to the server and a renewal path that does not involve remembering.
+- **Keep self-signing but do it properly** — every name and IP in the SAN,
+  including whatever goes in *Address in the link*, and the root trusted on the
+  machines that matter. Cheapest, and it does not fix the acceptance page for
+  anybody outside those machines.
+
+Whichever it is, two things go with it: **a renewal that is not a diary entry**
+(this one expires 13 Aug 2027 and nothing will say so), and `make-cert.sh`
+taking more than one host so the SAN can carry the panel's address, each
+assistant's, and the enrolment name together.
