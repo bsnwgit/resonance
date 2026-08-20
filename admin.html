@@ -508,11 +508,28 @@
     border:1px solid rgba(var(--glass),.55);
     margin:0;padding:2px 10px 4px;min-width:0;
   }
-  .tabbox > legend{
-    padding:0 8px;
-    font-size:calc(8.5px * var(--fs));letter-spacing:.2em;
-    text-transform:uppercase;color:rgba(var(--paper),.80);
+  /* The legend carries a CHIP, not text: these are the same labels the bar
+     and the lists use, and they should not stop looking like one because they
+     have moved into a border. The legend itself is only the notch — its
+     padding is the gap either side of the box. */
+  .tabbox > legend{padding:0 8px}
+  /* Milk, as the two groups were when they were inside one box: a group is a
+     division of the row, and ice is what the row-level labels wear. */
+  .tabbox > legend .tablabel{
+    border-color:rgba(var(--pal-milk),.70);
+    background:rgba(var(--pal-milk),.30);
   }
+  /* …and the heading over them keeps ice, which is what it always had. */
+  .profhead .tablabel{
+    border-color:rgba(var(--pal-ice),.70);
+    background:rgba(var(--pal-ice),.26);
+  }
+  /* The rule either side runs to the label rather than under it, so the two
+     lines of `.rulehead` meet the chip's edges. */
+  /* The chip brings its own type, so the heading's is only for a rulehead
+     that has bare text in it — the group list's Defaults and Custom. */
+  .rulehead .tablabel{flex:0 0 auto;text-transform:none;
+                      font-size:calc(9px * var(--fs))}
   .tabbox .tabs{margin:0}
   /* The two groups at opposite ends of the row, the same way they were inside
      one box. `wrap` so a narrow panel stacks them instead of shrinking both
@@ -2326,10 +2343,10 @@
        border: the panel's ground is translucent, so a patch of "background"
        laid over the line would be a slightly different colour than the thing
        behind it. A legend cuts a real gap. -->
-  <div class="rulehead profhead">Profiles</div>
+  <div class="rulehead profhead"><span class="tablabel">PROFILES</span></div>
   <div class="tabrow profrow">
     <fieldset class="tabbox">
-      <legend>Layouts</legend>
+      <legend><span class="tablabel">LAYOUTS</span></legend>
       <!-- WHAT A SCREEN IS, in five parts: the four that describe it and the
            one that names them. LAYOUT reads last because it is built from the
            four before it. -->
@@ -2348,7 +2365,7 @@
       </div>
     </fieldset>
     <fieldset class="tabbox">
-      <legend>Connections</legend>
+      <legend><span class="tablabel">CONNECTIONS</span></legend>
       <!-- The two halves of an endpoint that are not the endpoint — what it
            speaks to and what it answers on — and then the pair of them under
            one name, which is the order they are built in. -->
