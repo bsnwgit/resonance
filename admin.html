@@ -530,6 +530,21 @@
      other, so a hairline with a row's own spacing either side of it reads as
      one more row. */
   .grouprule{margin:14px 0 12px}
+  /* A RULE WITH A WORD IN IT, naming the rows under it. Two lines that grow to
+     fill whatever the label leaves, rather than one background with a gap cut
+     out of it — the label can be any length and the halves stay even without
+     anybody measuring. */
+  .rulehead{
+    display:flex;align-items:center;gap:10px;margin:14px 0 10px;
+    font-size:calc(8.5px * var(--fs));letter-spacing:.2em;
+    text-transform:uppercase;color:rgba(var(--paper),.62);
+  }
+  /* The first one heads the list rather than dividing anything, so it gets
+     less air above it than between two sections. */
+  .rulehead:first-child{margin-top:4px}
+  .rulehead::before,.rulehead::after{
+    content:'';flex:1 1 auto;height:1px;background:rgba(var(--glass),.55);
+  }
 
   /* The topics are bounded, so it is obvious where the list of them starts
      and stops rather than the column running on into the foot. Same strength
@@ -7868,14 +7883,17 @@ async function refreshGroups(){
   const addrow = $('gr_addrow');
   if (addrow) addrow.hidden = !!OPENGR && GROUPS.some(x=> x.id === OPENGR);
   GROUPS.forEach((g, i)=>{
-    /* The server sorts the two it keeps to the top; this draws the line under
-       them. Between the last default and the first custom one, and only where
-       both exist — a rule with nothing on one side of it is a line, not a
-       division. */
-    if (!g.system && i && GROUPS[i - 1].system){
-      const rule = document.createElement('div');
-      rule.className = 'rule grouprule';
-      box.appendChild(rule);
+    /* A HEADING PER SECTION, naming the rows under it rather than dividing
+       two anonymous halves. The server sorts the two it keeps to the top, so
+       this is DEFAULTS and then CUSTOM — and each is drawn at the first row of
+       its own kind, which means a list with only one kind in it gets the one
+       heading that is true rather than a rule with nothing on one side. */
+    const first = !i || GROUPS[i - 1].system !== g.system;
+    if (first){
+      const head = document.createElement('div');
+      head.className = 'rulehead';
+      head.textContent = g.system ? 'Defaults' : 'Custom';
+      box.appendChild(head);
     }
     const row = document.createElement('div');
     row.className = 'erow';
