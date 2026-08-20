@@ -692,6 +692,14 @@
     font-size:calc(9px * var(--fs));letter-spacing:.06em;line-height:1.6;color:#f0cf94;
     white-space:pre-line;
   }
+  /* The .pending rule's colour and rule, and its own spacing for the buttons
+     underneath — it is the only one of these that can be answered. */
+  .openwarn{
+    border-left:2px solid #e8b04a;padding-left:8px;margin-top:10px;
+    font-size:calc(9px * var(--fs));letter-spacing:.06em;line-height:1.6;
+    color:#f0cf94;display:flex;flex-direction:column;gap:8px;
+  }
+  .openwarn .seg{margin:0}
   #portgrid,.numgrid{display:grid;grid-template-columns:1fr auto;gap:6px 10px;
             align-items:center;margin-top:8px}
   #portgrid label,.numgrid label{font-size:calc(9.5px * var(--fs));letter-spacing:.08em;color:rgba(var(--paper),.9)}
@@ -5075,28 +5083,25 @@ function postureSync(){
               : 'every interface on this machine';
   $('posturenow').textContent = 'Reachable at ' + where + '.' +
     (bind === 'loopback' ? ' No certificate needed.' : '');
-  /* Warn against what is being CHOSEN, before it is saved — the server warns
-     again on save and again at every restart. Three times is not too many for
-     the one arrangement that is wide open.
+  /* A POINTER, not the warning. The warning itself is on the endpoint it is
+     true of — CONNECTIONS ▸ AI, under Sign in — because that is the control
+     that causes it and the page somebody actually opens; this is the page
+     about exposure, which is only what makes it matter.
 
-     It asks the ENDPOINTS now rather than one deployment switch: what is
-     exposed is an assistant anybody can use, and that is a fact about the
-     endpoints, so the warning counts them. */
+     It was four paragraphs here and nothing there, which put the whole of it
+     furthest from the setting that decides it. What is left is the count, so
+     this page still says the arrangement exists, and where to go.
+
+     Not dismissable, unlike the one on the endpoint: this is a line rather
+     than a block, and there is nothing here to read past. */
   const w = $('posturewarn');
   const open = (RT.routes || []).filter(r=> r.enabled !== false
                                           && !r.needs_signin);
   if (open.length && bind !== 'loopback'){
-    w.textContent = 'REACHABLE FROM THE NETWORK, AND ' + open.length +
-      ' ASSISTANT(S) NEED NO SIGN-IN\n' +
-      'Anyone who can reach this machine can use ' +
-      (open.length === 1 ? '“' + (open[0].name || 'it') + '”'
-                         : 'them') +
-      ', and whatever it costs to run. The admin panel is not affected: that ' +
-      'always asks.\n\n' +
-      'Allowed — you may want exactly this on a network you control. But a ' +
-      'machine set up this way that later joins an office network will not ' +
-      'have changed on the day that matters.\n\n' +
-      'Set NEEDS SIGN-IN on an endpoint under CONNECTIONS ▸ AI to close it.';
+    w.textContent = open.length + (open.length === 1 ? ' assistant needs'
+                                                     : ' assistants need')
+      + ' no sign-in and can be used by anyone who reaches this machine — '
+      + 'CONNECTIONS ▸ AI. The admin panel always asks.';
     w.hidden = false;
   } else w.hidden = true;
 }
@@ -5338,7 +5343,12 @@ let rescanGroups = ()=>{};     // ditto — this tab builds sections at runtime
    existed, "arriving" meant clicking, so the tab the panel OPENS on was the
    one tab whose fetch never ran. */
 let loadTab = ()=>{};
-let RT = {routes: [], default: '', voices: []};
+let RT = {routes: [], default: '', voices: [], exposed: false, acked: []};
+/* NOT NOW, and no further than this tab. The other answer is recorded on the
+   admin account, because it is a decision about what this person needs to be
+   told rather than about this browser; this one is deliberately the opposite
+   and goes when the page does. */
+const OPENACK_NOW = new Set();
 let LEARNING = '';             // which block asked the display to LEARN
 
 function rtListNote(m, bad){
@@ -5393,6 +5403,21 @@ never spoken and never matched against.</div>
   <div class="seg" data-f="needs_signin">
     <button data-v="0" class="on">NOT REQUIRED</button>
     <button data-v="1">REQUIRED</button>
+  </div>
+  <!-- WHAT NOT REQUIRED COSTS, said on the endpoint it is true of. It used to
+       be one long block on ADMIN ▸ IP Address, which is a page nobody opens
+       twice — so the warning was furthest from the control that causes it and
+       nearest to the setting that merely makes it matter.
+
+       Dismissable, because a warning that cannot be is one people learn to
+       read past. Two answers: not now, which lasts as long as this tab, and
+       one recorded against this admin account. -->
+  <div class="openwarn" data-r="openwarn" hidden>
+    <div data-r="openwarntext"></div>
+    <div class="seg">
+      <button type="button" data-r="openacknow">NOT NOW</button>
+      <button type="button" data-r="openackever">I KNOW — STOP TELLING ME</button>
+    </div>
   </div>
   <div class="note" data-r="signinnote"></div>
   <div class="note help">Whether somebody must be <b>signed in as a person</b>
@@ -5731,8 +5756,33 @@ function blockPaint(blk, r){
     b.classList.toggle('on', (b.dataset.v === '1') === !!r.restricted));
   blk.querySelectorAll('[data-f="needs_signin"] button').forEach(b=>
     b.classList.toggle('on', (b.dataset.v === '1') === !!r.needs_signin));
+  /* The two answers. NOT NOW is this page's alone; the other is recorded
+     against the account, so it follows this admin to the next machine and
+     leaves a colleague still being told. */
+  const wnow = blk.querySelector('[data-r="openacknow"]');
+  if (wnow) wnow.onclick = ()=>{
+    OPENACK_NOW.add(r.id || '');
+    blockSyncOpen(blk);
+  };
+  const wever = blk.querySelector('[data-r="openackever"]');
+  if (wever) wever.onclick = async ()=>{
+    if (!r.id) return;
+    try{
+      const j = await api('/routes/ack', {method:'POST',
+                                          body: JSON.stringify({id: r.id})});
+      RT.acked = j.acked || RT.acked;
+    }catch(e){
+      /* Said, and then treated as NOT NOW: a dismissal that silently did not
+         stick would be a message somebody believes they have turned off. */
+      OPENACK_NOW.add(r.id);
+    }
+    blockSyncOpen(blk);
+  };
   blockFillWho(blk, r);
   blockSyncSignin(blk);
+  /* Painted with the rest of the block, so a row opened fresh already carries
+     the answer rather than waiting for somebody to touch the control. */
+  blockSyncOpen(blk);
   /* The model picker, by profile name. A profile that has been deleted is
      still offered on the endpoint naming it, marked, rather than silently
      reading as the default. */
@@ -6059,6 +6109,41 @@ function blockFillWho(blk, r){
    one thing that grant does not cover; and a neighbour on the same port that
    does not require it is still reachable without signing in, which is the
    configuration somebody sets by accident when they meant to close a port. */
+/* THE COST OF BEING OPEN, on the endpoint that is. Three things have to be
+   true at once for it to be worth saying, and each of them is why the old
+   single deployment-wide warning was in the wrong place:
+
+     this endpoint does not ask anybody to sign in — which is a fact about the
+       endpoint, and the reason this lives here;
+     this machine can be reached from a network — bound to loopback the same
+       setting is somebody's own computer and there is nothing to warn about;
+     and whoever is reading has not already said they know.
+
+   Read from the CONTROL rather than the record, so it appears and disappears
+   as the segmented control is pressed rather than after a save. */
+function blockSyncOpen(blk){
+  const box = blk.querySelector('[data-r="openwarn"]');
+  if (!box) return;
+  const rec = blk._rec || {};
+  const rid = rec.id || '';
+  const on = blk.querySelector('[data-f="needs_signin"] button.on');
+  const needsIn = !!on && on.dataset.v === '1';
+  const enabled = rec.enabled !== false;
+  const acked = OPENACK_NOW.has(rid) || (RT.acked || []).indexOf(rid) >= 0;
+  const show = !needsIn && enabled && RT.exposed && !acked;
+  box.hidden = !show;
+  if (!show) return;
+  const t = box.querySelector('[data-r="openwarntext"]');
+  /* SHORT. The long version was four paragraphs on a page nobody opens twice;
+     what somebody needs at the control is the consequence, in one line. */
+  if (t) t.textContent = 'Anyone who can reach this machine can use “'
+    + (rec.name || 'this endpoint') + '”, and whatever it costs to run.';
+  /* A row that has never been saved has no id to record an answer against.
+     NOT NOW still works on it, because that is only a Set in this page. */
+  const ever = box.querySelector('[data-r="openackever"]');
+  if (ever) ever.hidden = !rid;
+}
+
 function blockSyncSignin(blk){
   const note = blk.querySelector('[data-r="signinnote"]');
   if (!note) return;
@@ -6278,7 +6363,13 @@ function wireBlock(blk){
       seg.querySelectorAll('button').forEach(x=> x.classList.toggle('on', x === b));
       if (seg.dataset.f === 'restricted'
           || seg.dataset.f === 'needs_signin') blockSyncWho(blk);
-      if (seg.dataset.f === 'needs_signin') blockSyncSignin(blk);
+      if (seg.dataset.f === 'needs_signin'){
+        blockSyncSignin(blk);
+        /* Pressing REQUIRED takes the warning away at once rather than at the
+           next save: the control is the thing being warned about, so what it
+           says now is what the message has to answer to. */
+        blockSyncOpen(blk);
+      }
       return;
     }
     const act = b.dataset.a;
@@ -10268,7 +10359,8 @@ async function loadBackend(){
     await loadDisplays();
     await loadGroups();
     const j = await api('/routes/all');
-    RT = {routes: j.routes || [], default: j.default || '', voices: j.voices || []};
+    RT = {routes: j.routes || [], default: j.default || '', voices: j.voices || [],
+          exposed: !!j.exposed, acked: j.acked || []};
     paintBlocks();
   }catch(e){ rtListNote(e.message, true); }
 }

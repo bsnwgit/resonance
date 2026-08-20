@@ -285,6 +285,58 @@ def posture_warning(cfg):
     return ""
 
 
+def open_acked(user):
+    """Which open endpoints this ADMIN has said they know about.
+
+    Per person, not per deployment. The warning is for whoever is looking at
+    the panel, and one admin dismissing it must not be the reason a colleague
+    never sees it — a shared "do not show this again" on a security notice is
+    the setting that makes the notice worthless.
+
+    Held on the account rather than in a browser, so it follows them to the
+    next machine. The panel keeps a second, lighter answer of its own for
+    "not now", which lasts as long as the tab does and is nobody else's
+    business."""
+    rec = read_users().get(str(user or "")) or {}
+    return [str(r)[:32] for r in (rec.get("acked_open") or [])]
+
+
+def ack_open(user, rid, on=True):
+    """Add or remove one endpoint from that list. Returns the list."""
+    users = read_users()
+    rec = users.get(str(user or ""))
+    if not rec:
+        return []
+    have = [str(r)[:32] for r in (rec.get("acked_open") or [])]
+    if on and rid not in have:
+        have.append(rid)
+    elif not on:
+        have = [r for r in have if r != rid]
+    rec["acked_open"] = have[:MAX_ROUTES]
+    write_users(users)
+    return have
+
+
+def unack_open(rid):
+    """Forget every admin's acknowledgement of one endpoint.
+
+    Called when it stops being open. An acknowledgement is of a STATE — this
+    one can be used without signing in and I know — so the moment somebody
+    closes it the thing that was acknowledged no longer exists, and opening it
+    again is a new fact rather than a repeat of an old one. Without this, an
+    endpoint could be closed, reopened months later by somebody else, and go
+    quietly unmentioned because of a dismissal nobody remembers."""
+    users = read_users()
+    hit = False
+    for rec in users.values():
+        have = rec.get("acked_open") or []
+        if rid in have:
+            rec["acked_open"] = [r for r in have if r != rid]
+            hit = True
+    if hit:
+        write_users(users)
+
+
 def read_app():
     cfg = dict(APP_DEFAULTS)
     try:
@@ -6499,6 +6551,7 @@ ADMIN_ONLY_FILES = ("/admin.html",)
 #: rather than a list of paths and methods.
 ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/routes/all", "/routes/new", "/routes/save",
+                     "/routes/ack",
                      "/routes/delete", "/routes/enable", "/routes/default",
                      "/routes/test",
                      "/embeds", "/embeds/delete", "/embeds/enable",
@@ -7269,6 +7322,16 @@ class Handler(SimpleHTTPRequestHandler):
             doc = read_routes()
             return self._json(200, {"routes": admin_routes(doc),
                                     "default": doc["default"],
+                                    # WHETHER BEING OPEN MATTERS HERE. An
+                                    # endpoint anybody can use is only a bill
+                                    # anybody can run up if this machine can be
+                                    # reached; bound to loopback the same
+                                    # setting is somebody's own computer.
+                                    "exposed": exposed(read_app()),
+                                    # …and which of them this admin has already
+                                    # said they know about.
+                                    "acked": open_acked(
+                                        (self._session() or {}).get("user")),
                                     "providers": list(PROVIDERS),
                                     "dialects": list(OPENAI_DIALECT),
                                     "voices": voice_list(),
@@ -7747,6 +7810,26 @@ class Handler(SimpleHTTPRequestHandler):
         # privileged path sits under a prefix and /routes itself is purely the
         # public document. One list can then hide the whole admin half from
         # the display listeners without hiding the half a display must read.
+        if parsed.path == "/routes/ack":
+            # "I KNOW", recorded against the admin who said it. The panel's
+            # other answer — not for this visit — never reaches here: it lasts
+            # as long as the tab and is nobody else's business.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            rid = str(obj.get("id") or "")[:32]
+            if rid not in read_routes()["routes"]:
+                return self._json(404, {"error": "no such endpoint"})
+            on = obj.get("on", True) is not False
+            have = ack_open(s["user"], rid, on)
+            print("endpoint %s open-warning %s by %s"
+                  % (rid, "acknowledged" if on else "un-acknowledged",
+                     s["user"]), flush=True)
+            return self._json(200, {"ok": True, "acked": have})
+
         if parsed.path in ("/routes/new", "/routes/save"):
             s = self._require("admin")
             if not s:
@@ -7784,6 +7867,12 @@ class Handler(SimpleHTTPRequestHandler):
             if guest_path_broken(doc):
                 return self._json(409, {"error": GUEST_PATH_MSG})
             write_routes(doc)
+            # AN ACKNOWLEDGEMENT IS OF A STATE, so closing this one ends it.
+            # See unack_open: an endpoint closed and reopened later is a new
+            # fact, and it must not go unmentioned because somebody dismissed
+            # the old one months ago.
+            if rec.get("needs_signin"):
+                unack_open(rid)
             # The wake word and the adapter kind, and never the key or the
             # URL it points at: a log is read by more people than the panel.
             print("route %s (%s) saved by %s: wake=%s model=%s"
