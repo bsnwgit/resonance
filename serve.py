@@ -8104,20 +8104,19 @@ class Handler(SimpleHTTPRequestHandler):
             # both directions are one rule rather than a check here and an
             # assumption everywhere else.
             token = path[len(PERSON_PREFIX):]
-            here = self._display()
-            if here and here.get("approved"):
-                # A DEVICE IS A DEVICE. Signing a person into a screen several
-                # people share is the middle ground this phase deliberately
-                # leaves for later, and a kiosk is the case it is explicitly
-                # NOT for — so it is refused where it was attempted, visibly,
-                # rather than accepted here and quietly ignored on some later
-                # request. The URL is not spent by this: it still works
-                # everywhere it should.
-                self.send_response(303)
-                self.send_header("Location", "/?person=isdevice")
-                self.send_header("Content-Length", "0")
-                self.end_headers()
-                return
+            # A DISPLAY TOKEN IN THE JAR MEANS NOTHING HERE. This used to
+            # refuse a link outright on any browser holding one — "a device is
+            # a device" — and what it actually refused was the machine an
+            # administrator works from, because a cookie is scoped to a host
+            # and not to a port: the token handed out on an assistant's
+            # listener is sent to this one as well. So the one browser certain
+            # to be carrying it was the one that had just minted the link.
+            #
+            # It was not buying what it looked like it was buying either. This
+            # prefix answers on the enrolment listener and 404s everywhere
+            # else, so it never stood between a wall screen and an assistant;
+            # what a person may reach once they are signed in is decided by
+            # their grants, on the listener they reach it from.
             rec = find_identity(token)
             # THREE ANSWERS, because the link means two different things now.
             # An account with no password is somebody arriving for the first

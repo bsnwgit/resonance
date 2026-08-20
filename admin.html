@@ -3774,11 +3774,19 @@ behaves like the rest of the building rather than like nothing.</div>
        collect. -->
   <div id="idurl" class="idurl"></div>
   <div class="note" id="idnote"></div>
-  <!-- ONLY THE ONES STILL ARRIVING. A person who has set a password is under
+  <!-- WHERE THE MAKING STOPS AND THE QUEUE STARTS. Everything above is one
+       act — the two fields, the assistants they are being given, and the link
+       itself the moment it exists; everything below is who is still holding
+       one. A `rulehead`, which is the panel's own divider: the rule runs in
+       from both sides and stops at the word, so the label sits IN the line
+       rather than above it. Same shape as the group lists' own headings.
+
+       ONLY THE ONES STILL ARRIVING. A person who has set a password is under
        IDENTITY ▸ USER with everybody else the server knows about; this is the
        ones who have not, which is the same thing WAITING FOR THEIR CODE is
        for a screen. It is a queue, and a queue you have emptied should look
        empty. -->
+  <div class="rulehead">PENDING</div>
   <div id="idlist"></div>
   <div class="note help">A person, as against a device. A device is one screen
 standing in one room; a person moves between a phone, a laptop and a borrowed
@@ -3817,9 +3825,11 @@ it is called REISSUE THE LINK, and it is the whole of account recovery — a new
 link, the old password cleared, every browser they were signed in on signed
 out. A forgotten password and a leaked link want the same answer.
 
-<b>A link will not work on a screen you approved.</b> A device is a device,
-and turning a shared kiosk into somebody's personal session is the case it is
-least for. The link is not spent by being refused there.</div>
+<b>A link works wherever it is opened</b>, including a browser that is also an
+approved screen — a display token is held per host rather than per port, so
+refusing one here refused the machine you administer from. What somebody may
+reach once they have signed in is decided by their grants, not by where they
+chose their password.</div>
     </div>
   </section>
 
@@ -7391,54 +7401,62 @@ async function refreshIdentities(){
     namerow.appendChild(del);
     row.appendChild(namerow);
 
-    /* THEIR OWN WAKE WORD. Checked as it is typed rather than on save: a
-       word is refused for a reason somebody has to act on, and a form that
-       only says so after they commit tells them they wasted their time. */
-    const wrow = document.createElement('div');
-    wrow.className = 'namerow';
-    const wlab = document.createElement('b');
-    wlab.textContent = 'Wakes to';
-    wrow.appendChild(wlab);
-    const wf = document.createElement('input');
-    wf.type = 'text'; wf.className = 'nmedit'; wf.spellcheck = false;
-    wf.value = p.wakeword || '';
-    wf.placeholder = 'shared words only';
-    wrow.appendChild(wf);
-    row.appendChild(wrow);
-    const wnote = document.createElement('div');
-    wnote.className = 'note';
-    row.appendChild(wnote);
+    /* THEIR OWN WAKE WORD — and NOT while they are still an enrolment. A
+       personal word is heard on the devices that person is signed in on, so
+       one set before anybody has signed in anywhere is a setting with nothing
+       to apply it to. It appears on the row the moment they use their link
+       and become an identity, which is the first moment it can mean anything.
 
-    let wtimer = 0;
-    const wcheck = ()=>{
-      clearTimeout(wtimer);
-      const w = (wf.value || '').trim();
-      if (!w){ wnote.className = 'note'; wnote.textContent = ''; return; }
-      wtimer = setTimeout(async ()=>{
-        try{
-          const j = await api('/identities/wake/check?w=' + encodeURIComponent(w)
-                              + '&id=' + encodeURIComponent(p.id));
-          wnote.className = 'note' + (j.ok ? '' : ' bad');
-          wnote.textContent = j.ok ? 'nothing else answers to that' : j.why;
-        }catch(e){ wnote.className = 'note bad'; wnote.textContent = e.message; }
-      }, 250);
-    };
-    wf.addEventListener('input', wcheck);
-    wf.onchange = async ()=>{
-      const j = await idAction('/identities/wake',
-                               {id: p.id, word: (wf.value || '').trim()});
-      if (j){
-        wnote.className = 'note';
-        wnote.textContent = (wf.value || '').trim()
-          ? 'saved — only their own devices hear it'
-          : 'cleared — the shared words again';
-        refreshIdentities();
-      }else{
-        /* idAction has put the reason in the row's own note; leave the field
-           holding what they typed so it can be edited rather than retyped. */
-        wcheck();
-      }
-    };
+       Checked as it is typed rather than on save: a word is refused for a
+       reason somebody has to act on, and a form that only says so after they
+       commit tells them they wasted their time. */
+    if (p.ready){
+      const wrow = document.createElement('div');
+      wrow.className = 'namerow';
+      const wlab = document.createElement('b');
+      wlab.textContent = 'Wakes to';
+      wrow.appendChild(wlab);
+      const wf = document.createElement('input');
+      wf.type = 'text'; wf.className = 'nmedit'; wf.spellcheck = false;
+      wf.value = p.wakeword || '';
+      wf.placeholder = 'shared words only';
+      wrow.appendChild(wf);
+      row.appendChild(wrow);
+      const wnote = document.createElement('div');
+      wnote.className = 'note';
+      row.appendChild(wnote);
+
+      let wtimer = 0;
+      const wcheck = ()=>{
+        clearTimeout(wtimer);
+        const w = (wf.value || '').trim();
+        if (!w){ wnote.className = 'note'; wnote.textContent = ''; return; }
+        wtimer = setTimeout(async ()=>{
+          try{
+            const j = await api('/identities/wake/check?w=' + encodeURIComponent(w)
+                                + '&id=' + encodeURIComponent(p.id));
+            wnote.className = 'note' + (j.ok ? '' : ' bad');
+            wnote.textContent = j.ok ? 'nothing else answers to that' : j.why;
+          }catch(e){ wnote.className = 'note bad'; wnote.textContent = e.message; }
+        }, 250);
+      };
+      wf.addEventListener('input', wcheck);
+      wf.onchange = async ()=>{
+        const j = await idAction('/identities/wake',
+                                 {id: p.id, word: (wf.value || '').trim()});
+        if (j){
+          wnote.className = 'note';
+          wnote.textContent = (wf.value || '').trim()
+            ? 'saved — only their own devices hear it'
+            : 'cleared — the shared words again';
+          refreshIdentities();
+        }else{
+          /* idAction has put the reason in the row's own note; leave the field
+             holding what they typed so it can be edited rather than retyped. */
+          wcheck();
+        }
+      };
+    }
 
     /* THE ADDRESS THEY SIGN IN WITH, editable. People change surname,
        employer and provider, and an account whose login cannot be corrected

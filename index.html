@@ -968,11 +968,11 @@ function paintGate(){
   const invite = GATE === 'invite';
   const spent = GATE === 'spent';
   const signing = (GATE === 'login' || setup) && !invite && !spent;
-  /* The two failures a link can have. Said here rather than nowhere: the
+  /* The one failure a link can have. Said here rather than nowhere: the
      server answers a redirect with one word, and somebody who followed a link
      that did not work should be told, not left looking at a page behaving as
      though they never clicked it. */
-  const failed = PERSON_ARRIVED === 'bad' || PERSON_ARRIVED === 'isdevice';
+  const failed = PERSON_ARRIVED === 'bad';
   const head = $('gatehead'), note = $('gatenote');
   const fields = $('gatefields'), links = $('gatelinks');
   const user = $('gateuser'), pass = $('gatepass'), pass2 = $('gatepass2');
@@ -997,8 +997,6 @@ function paintGate(){
        two failures could never appear. */
     head.textContent =
         done    ? 'You are set up'
-      : failed && PERSON_ARRIVED === 'isdevice'
-                           ? 'This screen belongs to the building'
       : failed             ? 'That link did not work'
       : invite  ? 'Invitations are accepted here'
       : spent   ? 'That link has been used'
@@ -1016,10 +1014,6 @@ function paintGate(){
                       + 'just chose, at whichever of these you want:'
                     : 'Nothing has been granted to this account yet — an '
                       + 'administrator has to say which assistant you may use.')
-      : failed && PERSON_ARRIVED === 'isdevice'
-                           ? 'It is set up as a display, so a personal link '
-                             + 'cannot be opened on it. Use your own device, '
-                             + 'or open the link in a private window.'
       : failed             ? 'It may have been replaced since it was sent to '
                              + 'you. Ask an administrator for a new one.'
       : invite  ? 'Open the link you were sent. It is the only way in from '
@@ -1195,10 +1189,9 @@ async function gateArrived(j){
   applyPrefs();
 }
 
-/* Said even where hello never reports a person, which is both failure cases:
-   a link that means nothing leaves no cookie, and a display's browser is a
-   display. */
-if (PERSON_ARRIVED === 'bad' || PERSON_ARRIVED === 'isdevice')
+/* Said even where hello never reports a person, which is what a failure is:
+   a link that means nothing leaves no cookie to report. */
+if (PERSON_ARRIVED === 'bad')
   window.addEventListener('DOMContentLoaded', paintGate);
 /* The forced state. Nothing else can be done on this page until there is a
    password, so it is set before anything paints rather than switched to. */
