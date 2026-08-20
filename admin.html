@@ -376,7 +376,7 @@
      of links behind a label now, and a menu bar that wraps onto three lines at
      560px is one nobody can scan. The search that used to sit above them, and
      was held to that measure, is in the foot with the other row. */
-  #panelhead > .tabs{max-width:none}
+  #panelhead > .profbox{max-width:none}
   /* …but the tab row itself runs the whole width, out to the edge of the
      preview, because it now carries two groups that have to sit apart. */
   #panelhead > .tabrow{max-width:none}
@@ -491,11 +491,39 @@
      Brighter than the hairline between topics, so they group rather than
      merge into the section rules. */
   .rule{height:1px;margin:9px 0 2px;background:rgba(var(--glass),.55)}
-  /* Tighter than the one that closes the row. It sits between a label and the
-     thing the label names, which is a shorter distance than between one
-     subject and the next — the rule below has a whole row above it and the
-     topics below, and it needs the air. */
-  .headrule{margin:5px 0 8px}
+  /* THE BOX, and the step is its top edge.
+
+     WHICH BORDER LIVES WHERE MATTERS. The right side belongs to the TAB ROW
+     and not to the box, because it has to begin where the step comes down —
+     put on the box it would start at the very top and leave a stub of line
+     above the step with nothing to meet. The left side is the box's, since
+     that one does run the whole height. */
+  .profbox{
+    border-left:1px solid rgba(var(--glass),.55);
+    border-bottom:1px solid rgba(var(--glass),.55);
+    margin-bottom:2px;
+  }
+  /* `stretch` is what makes the step work: the piece filling the rest of the
+     row is as tall as the label, so its left border is the drop and its
+     bottom border comes out level with the label's own foot. */
+  .tabhead{align-items:stretch}
+  .stepnest{
+    display:flex;align-items:center;
+    /* Above the label, and clear of it on both sides: the left padding holds
+       it off the box's edge, the right holds the drop off the chip's own
+       border — touching, those two would read as one thicker edge. */
+    padding:5px 12px 0 12px;
+    border-top:1px solid rgba(var(--glass),.55);
+  }
+  .steprest{
+    flex:1 1 auto;
+    border-left:1px solid rgba(var(--glass),.55);
+    border-bottom:1px solid rgba(var(--glass),.55);
+  }
+  .profbox .tabs{
+    border-right:1px solid rgba(var(--glass),.55);
+    margin:0;padding:8px 12px;
+  }
   /* Between the groups the server keeps and the ones an admin made. More air
      than the rule above the topics gets, because it is separating two halves
      of one list rather than capping a column — rows sit tight against each
@@ -1666,7 +1694,7 @@
      under the current one, and separated by the same hairline. */
   .tabs{display:flex;align-items:stretch;gap:0;margin-bottom:10px;flex-wrap:wrap}
   /* A label on a line of its own, naming the row under it. */
-  .tabhead{display:flex;margin-bottom:6px}
+  .tabhead{display:flex}
   /* …and the space that divides one group of tabs from the next, the same
      width the bar at the top uses between its subjects. `button + button`
      draws the divider between neighbours, so a label after this gap starts
@@ -2183,11 +2211,19 @@
        groups now, and a third label sitting inline among them would read as a
        third group rather than as the name of the row. Everything under it is a
        profile; the two labels below say which KIND. -->
-  <div class="tabhead"><span class="tablabel">PROFILES</span></div>
-  <!-- …and a line under it, so it caps the row rather than floating above it.
-       The same hairline that closes the row at the bottom: what is between the
-       two is one subject. -->
-  <div class="rule headrule"></div>
+  <!-- ONE BOX, with a stepped top edge. The line runs above the label, turns
+       down at the end of it, and carries on along the bottom of that row for
+       the rest of the width; the left side runs the whole height, the right
+       side picks up where the step left off, and the foot closes it.
+
+       Six borders on four elements, and each one is on the element whose edge
+       it actually is — nothing is positioned, so a longer label or a wrapped
+       row moves the corners with it. -->
+  <div class="profbox">
+  <div class="tabhead">
+    <span class="stepnest"><span class="tablabel">PROFILES</span></span>
+    <span class="steprest"></span>
+  </div>
   <div class="tabs">
     <!-- WHAT A SCREEN IS, in five parts. The four that describe it and the one
          that names them: a layout profile points at an appearance and a
@@ -2220,8 +2256,7 @@
     <button data-tab="models">MODELS</button>
     <button data-tab="network">NETWORK</button>
   </div>
-
-  <div class="rule"></div>
+  </div><!-- /profbox — its foot is the rule that used to sit here -->
   </div><!-- /panelhead -->
 
   <div id="grpbox">
