@@ -2579,6 +2579,53 @@ using. Below 1024 needs root, and the server runs as an ordinary user.</div>
     </div>
   </section>
 
+  <!-- ITS OWN SECTION, not a fourth row in the port grid. The port is one of
+       three answers that only mean anything together — a port, the interface
+       it answers on, and what to call that interface in the link — and an
+       admin setting this is answering one question, not three unrelated
+       ones. -->
+  <section class="grp wide" data-tab="app">
+    <h4>Enrolment</h4>
+    <div class="grpbody">
+  <div id="portgrid">
+    <label for="ap_enrolport">port</label>
+    <input id="ap_enrolport" type="number" inputmode="numeric">
+    <div class="now" id="now_enrol"></div>
+  </div>
+  <label class="bklab">Interface</label>
+  <select id="ap_enroladdr"></select>
+  <label class="bklab">Address in the link</label>
+  <input id="ap_enrolhost" type="text" spellcheck="false" autocomplete="off"
+         autocapitalize="none" placeholder="join.example.com — optional">
+  <div class="note" id="enrolnow"></div>
+  <div class="note help">Where an invitation is accepted, and the only place
+it can be. A link you hand somebody opens here and <b>nowhere else</b>: the
+same link on any other port of this server answers 404, so somebody who knows
+a working address cannot substitute it for the one you chose.
+
+<b>Nothing else is on this port.</b> No assistant, no microphone, no device
+enrolment — a browser that opens an invitation must not come away holding a
+display token. What it answers is the link, the page that asks for a password,
+and that password being set. Once it is set, the page hands over the addresses
+of the assistants that person was granted, because this port is not one of
+them.
+
+<b>Interface</b> is which of this machine's addresses it answers on, the same
+choice a network profile makes. Leaving it on every address is fine; naming
+one is how you keep enrolment off a network it has no business being on.
+
+<b>Address in the link</b> is optional, and it is a name rather than a second
+binding — the listener answers on the interface above whatever this says. Set
+it and the link reads <i>https://join.example.com:9703/…</i> instead of four
+numbers nobody checks. It has to resolve to the interface above, and the
+certificate has to carry it or every browser will complain: run
+<i>./make-cert.sh &lt;name&gt;</i> and restart.
+
+Changing the port or the interface needs a restart. The name does not — it is
+read when a link is minted.</div>
+    </div>
+  </section>
+
 
   <!-- ONE CONNECTION, TWO USERS. It lived inside the alerting block and only
        appeared once you ticked "send alerts by email", which is why somebody
@@ -3264,24 +3311,20 @@ behaves like the rest of the building rather than like nothing.</div>
              autocapitalize="none" placeholder="sarah@example.com">
       <button id="b_idnew" class="act-add">CREATE A PERSON</button>
     </div>
-    <!-- WHICH ASSISTANT THEY ARE GIVEN, and therefore WHERE THEIR LINK IS
-         OPENED: the address and the port come from the network profile that
-         endpoint answers on, which is the difference between handing somebody
-         an address they can reach and one that is this server's opinion of
-         where it lives.
+    <!-- WHICH ASSISTANTS THEY MAY USE ONCE THEY ACCEPT, ticked while they
+         are created rather than found afterwards on a row among fifty. The
+         same control the screen box has, and the same one on their own row.
 
-         A PICKER, where the screen box above has ticks. A screen may hold
-         several assistants; a link can only name one address, so a person is
-         enrolled on one. More can be granted afterwards on CONNECTIONS ▸ AI,
-         and those change what they may use without moving where their link
-         points.
+         TICKS, where this was briefly a picker. It was a picker only while
+         the one endpoint chosen here also decided the address their link was
+         opened at — enrolment has a listener of its own now, so the address
+         is a deployment's answer and this is purely the grant. A person may
+         be given several, exactly as a screen may.
 
-         AI, the same word the ticks above use and the tab they come from. -->
-    <div class="setuprow">
-      <span class="setpair">
-        <label class="bklab" for="id_endpoint">AI</label>
-        <select id="id_endpoint" class="ppick"></select>
-      </span>
+         AI, the same word the screen box uses and the tab they come from. -->
+    <div class="newends">
+      <label class="bklab">AI</label>
+      <div class="cks" id="id_endpoints"></div>
     </div>
   </div>
   <!-- Where the URL appears, once. Same place the enrolment code appears, and
@@ -3299,23 +3342,22 @@ behaves like the rest of the building rather than like nothing.</div>
 standing in one room; a person moves between a phone, a laptop and a borrowed
 browser and is the same person in all three.
 
-<b>Name them, give them an address, pick their assistant, hand over the
+<b>Name them, give them an address, tick their assistants, hand over the
 link.</b> The address is what they will sign in with; the link is what lets
 them choose a password, and it buys exactly that one thing.
 
-<b>The assistant decides two things, and the second is the one you can see.</b>
-It grants them that endpoint — the same grant its own <i>Who may use it</i>
-list makes — and it decides the address in the link you are about to hand over,
-because a link has to be opened somewhere and an endpoint answers on a network
-profile with an address and a port. Leave it on NONE and the link points at
-whichever port is bound, which is what every link did before this picker
-existed. An endpoint that is open to everyone is reachable already, so the
-grant half adds nothing there; the address half applies either way.
+<b>The ticks are the grant</b>, and the same grant each endpoint's own
+<i>Who may use it</i> list makes. Tick none and they reach whatever is open to
+everyone; an endpoint that is open to everyone is reachable already, so ticking
+it grants nothing. They can be changed afterwards on the person's own row, or
+from the endpoint.
 
-<b>One here, more later.</b> A person can be given other endpoints afterwards,
-on CONNECTIONS ▸ AI. Their link keeps pointing at the one they were enrolled
-on — it is spendable at any bound address anyway, so the worst a changed grant
-costs is a second address to try. It is shown <b>once</b>, here, at the moment
+<b>The link always opens in one place</b> — the enrolment listener, under
+SETTINGS ▸ ADMIN ▸ Enrolment. The same link on any other port of this server
+answers 404, so somebody who knows a working address cannot substitute it. Once
+they have chosen a password, that page hands them the addresses of the
+assistants you ticked, because the enrolment port is deliberately not one of
+them. It is shown <b>once</b>, here, at the moment
 you create it — what is stored is a hash, so this page cannot show it to you a
 second time. Hand it over before you leave the row.
 
@@ -4977,6 +5019,7 @@ window.addEventListener('beforeunload', e=>{
    can take effect while the process is running, so the page's real job is to
    be honest about what is configured versus what is actually bound. */
 const APP_FIELDS = {ap_admin:'admin_port',
+                    ap_enrolport:'enrol_port',
                     ap_session:'session_idle_minutes',
                     ap_poll:'poll_seconds',
                     ap_retries:'retry_attempts',
@@ -4986,7 +5029,32 @@ const APP_FIELDS = {ap_admin:'admin_port',
    rather than special-cased inside it, because everything that loop does —
    parseInt on save, a blank meaning "leave it alone" — is wrong for a time
    somebody is allowed to clear. */
-const APP_TEXT = {ap_refresh:'refresh_at', ap_restart:'restart_at'};
+const APP_TEXT = {ap_refresh:'refresh_at', ap_restart:'restart_at',
+                  /* Sent even when empty, which is how the name is taken back
+                     off and the link goes to naming the address again. */
+                  ap_enrolhost:'enrol_host'};
+
+/* WHAT A LINK WILL ACTUALLY SAY, under the three fields that decide it. The
+   pieces are on screen separately and the thing an admin is trying to get
+   right is the sentence they make — which is what gets handed to a person, and
+   the one part of this that is wrong silently. */
+function enrolNow(j){
+  const el = $('enrolnow');
+  if (!el) return;
+  const a = (j && j.app) || {};
+  const running = (j && j.running) || {};
+  const port = a.enrol_port || 0;
+  if (!port){
+    el.className = 'note bad';
+    el.textContent = 'No port set, so no invitation can be accepted.';
+    return;
+  }
+  const host = (a.enrol_host || '').trim() || (a.enrol_address || '').trim()
+             || location.hostname;
+  el.className = 'note';
+  el.textContent = 'Links will read https://' + host + ':' + port + '/p/…'
+    + (running.enrol_port === port ? '' : ' — once this server is restarted');
+}
 
 /* The two axes are a segmented control each, so they read as one choice from
    a closed set rather than a value you could mistype. */
@@ -5037,9 +5105,11 @@ function showPending(j, into){
   const box = $(into || 'apppending');
   const names = {http_port:'display · plain HTTP', https_port:'display · HTTPS',
                  admin_port:'administration', session_idle_minutes:'session length',
+                 enrol_port:'the enrolment port',
+                 enrol_address:'the enrolment interface',
                  bind:'reachable at', bind_address:'which address'};
   const run = j.running || {};
-  ['admin'].forEach(k=>{
+  ['admin', 'enrol'].forEach(k=>{
     const el = $('now_' + k), p = run[k + '_port'];
     if (el) el.textContent = p ? 'running on ' + p : 'not bound';
   });
@@ -5095,6 +5165,31 @@ async function loadApp(){
       sel.appendChild(o);
     }
     sel.value = j.app.bind_address || '';
+    /* The same addresses, one question over — and EVERY ADDRESS at the top of
+       it, because that is this one's default where the bind above reaches it
+       through a segmented control. */
+    const esel = $('ap_enroladdr');
+    if (esel){
+      esel.innerHTML = '';
+      const any = document.createElement('option');
+      any.value = ''; any.textContent = 'EVERY ADDRESS';
+      esel.appendChild(any);
+      (j.addresses || []).forEach(a=>{
+        const o = document.createElement('option');
+        o.value = a; o.textContent = a; esel.appendChild(o);
+      });
+      if (j.app.enrol_address && !(j.addresses || []).includes(j.app.enrol_address)){
+        // Gone since — a lease that moved, an interface that is down. Shown
+        // flagged rather than silently swapped for one nobody chose.
+        const o = document.createElement('option');
+        o.value = j.app.enrol_address;
+        o.textContent = j.app.enrol_address + ' — not on this machine now';
+        esel.appendChild(o);
+      }
+      esel.value = j.app.enrol_address || '';
+    }
+    if ($('ap_enrolhost')) $('ap_enrolhost').value = j.app.enrol_host || '';
+    enrolNow(j);
     segSet('ap_bind', j.app.bind);
     postureSync();
     showPending(j);
@@ -5174,6 +5269,9 @@ $('b_appsave').addEventListener('click', async ()=>{
   });
   body.bind = segValue('ap_bind');
   body.bind_address = body.bind === 'address' ? ($('ap_bindaddr').value || '') : '';
+  /* Always sent, empty included: empty is EVERY address, which is a real
+     answer and one somebody has to be able to come back to. */
+  body.enrol_address = $('ap_enroladdr') ? ($('ap_enroladdr').value || '') : '';
   try{
     const j = await api('/app', {method:'POST', body: JSON.stringify(body)});
     /* This tab holds one topic — the speaker labels — that belongs to the
@@ -6411,12 +6509,6 @@ async function loadDisplays(){
    nowhere else: there is no email and nothing to vouch for a name, so anybody
    who could mint their own could mint somebody else's. */
 let IDENTITIES = [], IDBASE = '', OPENPID = '', IDPWMIN = 10;
-/* ONE BASE PER ROW. A person enrolled on an endpoint is sent to that
-   endpoint's address and port, so a single base for the whole list stopped
-   being the truth the moment one could differ — the same move the enrolment
-   codes made. IDBASE stays as the answer for a row enrolled on nothing. */
-let IDBASES = {};
-
 async function loadIdentities(){
   try{
     const j = await api('/identities');
@@ -6426,7 +6518,6 @@ async function loadIdentities(){
        that asked should not change the answer. */
     if (j.endpoints) DPEND = j.endpoints;
     IDBASE = j.base || '';
-    IDBASES = j.bases || {};
     IDPWMIN = j.pw_min || 10;
   }catch(e){ IDENTITIES = []; }
   return IDENTITIES;
@@ -6531,8 +6622,8 @@ function showPersonUrl(name, token, mailed, base, pid){
      screen with nowhere to use it. */
   const at = base || IDBASE;
   line.textContent = at ? at + token
-    : 'no display port is bound — give an endpoint a network profile under '
-      + 'PROFILES ▸ NETWORK, then reissue this link';
+    : 'the enrolment listener is not bound — set its port under SETTINGS ▸ '
+      + 'ADMIN ▸ Enrolment, restart, then reissue this link';
   const sub = document.createElement('span');
   /* WHETHER IT WAS ALSO EMAILED. The server says so and this ignored it,
      which left an admin copying a link by hand with no way to know one had
@@ -6829,22 +6920,11 @@ async function refreshIdentities(){
 
     const meta = document.createElement('div');
     meta.className = 'meta';
-    /* WHERE THEIR LINK POINTS, on the row, because it is the one fact about
-       a person that cannot be read off anything else here — the URL itself is
-       shown once and never again, so without this a row minted last week is a
-       row nobody can say the address of.
-
-       The NAME comes with the row rather than being looked up in DPEND: this
-       list is drawn on two tabs and only one of them has ever fetched the
-       endpoints, so looking it up here would print a name on ENROLLMENTS and
-       an id on IDENTITY for the same person. */
-    [['Enrolled on', (()=>{
-        if (!p.endpoint_name) return 'no assistant — the link uses whichever '
-                                   + 'port is bound';
-        const at = (IDBASES[p.id] || '').replace(/\/p\/$/, '');
-        return p.endpoint_name + (at ? ' · ' + at : '');
-      })()],
-     ['Created', dispWhen(p.created)
+    /* NO "ENROLLED ON" LINE. There was one while the endpoint somebody was
+       enrolled on decided the address of their link; enrolment has a listener
+       of its own now, so every link goes to the same place and the row has
+       nothing to say about it that the ticks above do not. */
+    [['Created', dispWhen(p.created)
                  + (p.created_by ? ' by ' + p.created_by : '')],
      ['Password set', p.pw_set_at ? dispWhen(p.pw_set_at)
                                   : 'not yet — the link is still outstanding'],
@@ -6899,18 +6979,20 @@ $('b_idnew').addEventListener('click', async ()=>{
     mail.focus();
     return;
   }
-  /* The picker's value straight off the control. NONE is the empty string and
-     a legitimate answer — the server reads it as enrolled on nothing. */
-  const j = await idAction('/identities/new',
-                           {name, email, endpoint: $('id_endpoint').value});
+  /* However many were ticked, and none is a legitimate answer: a person with
+     no grant reaches whatever is open to everyone, which is what every account
+     did before endpoints could be restricted. */
+  const j = await idAction('/identities/new', {name, email,
+    endpoints: [...$('id_endpoints').querySelectorAll('input:checked')]
+                 .map(c=> c.dataset.r)});
   if (!j || !j.token) return;           // idAction has said why
   /* Cleared only on success. A refused address left in the box is one that can
      be corrected; clearing it first would make somebody retype the whole
      thing to fix a typo.
 
-     THE PICKER IS NOT CLEARED. Enrolling a department onto one assistant is
-     the ordinary case, and resetting it to NONE would make that a choice per
-     person — the same reasoning that keeps the screen box's ticks. */
+     THE TICKS ARE NOT CLEARED. Enrolling a department onto one assistant is
+     the ordinary case, and clearing them would make that a choice per person
+     — the same reasoning that keeps the screen box's. */
   el.value = '';
   mail.value = '';
   showPersonUrl(name, j.token, j.mailed, j.base, j.id);
@@ -9909,27 +9991,34 @@ $('b_bulkapply').addEventListener('click', async ()=>{
    offered here without a reload, and neither box can be offering a set the
    other is not. */
 function paintPersonEndpoint(){
-  const sel = $('id_endpoint');
-  if (!sel) return;
-  /* Kept across the repaint. This runs whenever the display document is
-     refetched, which is on a timer and after every action, and a choice
-     somebody made and has not pressed CREATE A PERSON on yet must not be
-     dropped underneath them. */
-  const had = sel.value;
-  sel.innerHTML = '';
-  const none = document.createElement('option');
-  /* NONE, first and the default, and a real answer rather than an empty one:
-     the link then points at whichever port is bound. A deployment that has
-     not configured an endpoint yet still has to be able to enrol somebody. */
-  none.value = '';
-  none.textContent = (DPEND || []).length ? 'NONE' : 'NONE — no endpoints yet';
-  sel.appendChild(none);
-  (DPEND || []).forEach(e=>{
-    const o = document.createElement('option');
-    o.value = e.id; o.textContent = e.name;
-    sel.appendChild(o);
+  const box = $('id_endpoints');
+  if (!box) return;
+  /* Ticked already, kept. This runs whenever either document is refetched —
+     on a timer and after every action — and a form somebody is halfway
+     through filling in must not be emptied underneath them by a refresh they
+     did not ask for. Same rule the screen box's ticks follow. */
+  const had = new Set([...box.querySelectorAll('input:checked')]
+                        .map(c=> c.dataset.r));
+  box.innerHTML = '';
+  if (!(DPEND || []).length){
+    const none = document.createElement('div');
+    none.className = 'note';
+    none.textContent = 'No endpoints configured yet — CONNECTIONS ▸ AI.';
+    box.appendChild(none);
+    return;
+  }
+  DPEND.forEach(e=>{
+    const lab = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.dataset.r = e.id;
+    cb.checked = had.has(e.id);
+    lab.appendChild(cb);
+    /* The same sentence every other copy of this list carries: an endpoint
+       open to everyone is reachable already, and ticking it grants nothing. */
+    lab.appendChild(document.createTextNode(
+      ' ' + e.name + (e.restricted ? '' : ' — open to all anyway')));
+    box.appendChild(lab);
   });
-  sel.value = had;
 }
 
 function paintNewSetup(){

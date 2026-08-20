@@ -310,26 +310,43 @@ not the same kind of row and they are not created the same way.
 There is no self-registration here and nothing that verifies an address, so
 anybody who could create their own account could create somebody else's.
 
-**Pick their assistant while you are there, and the link comes out pointing at
-it.** The **AI** picker on that box does two things in one press: it grants
-them the endpoint — the same grant its own *Who may use it* list makes — and it
-decides the address in the link you are handed, because an endpoint answers on
-a network profile and a network profile is an address and a port. Left on NONE
-the link points at whichever port is bound, which is what every link did before
-the picker existed. An endpoint open to everyone is reachable already, so the
-grant half adds nothing there; the address half applies either way.
+**Tick their assistants while you are there.** The **AI** ticks on that box are
+the grant, and the same grant each endpoint's own *Who may use it* list makes.
+Tick none and they reach whatever is open to everyone; an endpoint that is open
+to everyone is reachable already, so ticking it grants nothing. The same ticks
+are on the person's own row afterwards, so a grant made here can be changed
+there.
 
-**A picker, where a screen gets ticks.** A screen may hold several assistants
-and usually does; a person is enrolled on one, because a link has to be opened
-somewhere and one link is one address. They can be given others afterwards on
-CONNECTIONS ▸ AI, and their link keeps pointing at the one they were enrolled
-on. It is spendable at any bound address anyway — the setup route is served by
-every listener, because spending a link is not an endpoint's business — so a
-changed grant costs somebody a second address to try and never their account.
+### Where a link is opened
 
-The row says where it points, under **Enrolled on**, which is the one fact
-about a person that cannot be read off anything else: the link itself is shown
-once and never again.
+**Every invitation opens on one port, and an admin chose it.** It is under
+SETTINGS ▸ ADMIN ▸ **Enrolment** — a port, the interface it answers on, and
+optionally a name to put in front of it. The default is **9703**.
+
+**The same link on any other port of this server answers 404.** That is the
+point of the port existing: somebody holding a link who also knows a working
+address cannot substitute one for the other. It used to be spendable anywhere,
+which made the address in the link a guess that happened to work — nothing to
+firewall, and nothing a deployment could state.
+
+**Nothing else is on that port.** No assistant, no microphone, no device
+enrolment — a browser that opens an invitation must not come away holding a
+display token. It answers the link, the page that asks for a password, and that
+password being set, and 404s everything else.
+
+**Once the password is set, that page hands over the addresses** of the
+assistants they may use, because the enrolment port is deliberately not one of
+them. The list is computed with the same test that will be applied when they
+arrive, so every line on it is a door that opens.
+
+**The name is optional and is not a second binding.** The listener answers on
+the interface whatever the name says; the name is the word put in front of the
+port when a link is minted, so it has to resolve to that interface — and the
+certificate has to carry it, or every browser will complain. `./make-cert.sh
+<name>` writes the SAN.
+
+Changing the port or the interface needs a restart. The name does not: it is
+read at the moment a link is made.
 
 **The link buys one thing: the page that asks them to choose a password.** It
 is shown once — what is stored is a hash of it, so the panel cannot show it to
@@ -353,10 +370,10 @@ password, and signs out every browser they had open. A forgotten password and
 a leaked link want the same answer, and neither of them is an admin typing a
 password they would then know.
 
-It comes out at the same address the first one did, because it is read off the
-same endpoint. A recovery link arriving from a different host than the one
-somebody was originally sent is how a legitimate link gets treated as a
-phishing attempt.
+It comes out at the enrolment address, the same as the first one did — there is
+only one, so a recovery link can never arrive from a different host than the
+one somebody was originally sent, which is how a legitimate link gets treated
+as a phishing attempt.
 
 **A session is a person or a device, never both, and the URL decides which.** A
 device you approved operates as a device; opening a person's URL on one is

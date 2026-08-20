@@ -126,6 +126,30 @@ APP_DEFAULTS = {
     "http_port": 9700,               # the display, no microphone
     "https_port": 9701,              # the display in full
     "admin_port": 9702,              # this interface
+    # ---- where somebody ACCEPTS an invitation ----
+    # Its own listener, and the whole point of it is that it is the ONLY one.
+    # A setup link used to be spendable at any bound port, on the reasoning
+    # that spending one is not an endpoint's business — true, and it made the
+    # address in the link a guess: it named a port an admin had not chosen and
+    # would work at any other, so there was no answer to "where do people
+    # accept" that a deployment could state or firewall.
+    #
+    # One port, named here, and /p/ answers nowhere else. Somebody who knows
+    # another valid port cannot substitute it, which is the property that makes
+    # this a door rather than a hint.
+    "enrol_port": 9703,
+    # WHICH INTERFACE it answers on — "" is every one the app itself reaches,
+    # the same meaning the network profiles give an empty address, and bounded
+    # the same way: an app pinned to one address does not let this outrun it.
+    "enrol_address": "",
+    # …and what to CALL that address in the link. A name people can read and
+    # type, where an IP is a string nobody checks — and it is the link that
+    # carries it, so it has to be a name that resolves to the address above.
+    # Empty means the address itself, which is what this always did.
+    #
+    # It is not a second binding. The listener answers on `enrol_address`
+    # whatever this says; this is the word that goes in front of the port.
+    "enrol_host": "",
     # Minutes, and a short default on purpose. An admin session is a window
     # onto a configuration everyone else is looking at the results of; it
     # should last a piece of work, not a working day. The panel signs you
@@ -1414,7 +1438,7 @@ def validate_app(obj, current):
                               % what)
             v = "%02d:%s" % (int(m.group(1)), m.group(2))
         cfg[k] = v
-    for k in ("http_port", "https_port", "admin_port"):
+    for k in ("http_port", "https_port", "admin_port", "enrol_port"):
         if k not in obj:
             continue
         try:
@@ -1426,9 +1450,10 @@ def validate_app(obj, current):
                           "and this server runs as an ordinary user"
                           % (k.replace("_", " "), PORT_MIN, PORT_MAX, PORT_MIN))
         cfg[k] = v
-    ports = [cfg["http_port"], cfg["https_port"], cfg["admin_port"]]
-    if len(set(ports)) != 3:
-        return None, "the three ports must all differ"
+    ports = [cfg["http_port"], cfg["https_port"], cfg["admin_port"],
+             cfg["enrol_port"]]
+    if len(set(ports)) != len(ports):
+        return None, "those ports must all differ"
 
     # Binding, before the port check, because which addresses count as taken
     # depends on what is being bound.
@@ -1439,6 +1464,24 @@ def validate_app(obj, current):
         cfg["bind"] = v
     if "bind_address" in obj:
         cfg["bind_address"] = str(obj["bind_address"] or "").strip()
+    if "enrol_address" in obj:
+        v = str(obj["enrol_address"] or "").strip()
+        # Refused rather than accepted and failed at the next restart: a
+        # listener that does not come up takes enrolment with it, and the
+        # symptom is a link that reaches nothing rather than a message.
+        if v and not address_bindable(v):
+            return None, ("this machine has no address %s — enrolment would "
+                          "fail to start on it" % v)
+        cfg["enrol_address"] = v
+    if "enrol_host" in obj:
+        v = str(obj["enrol_host"] or "").strip().lower()[:120]
+        # A HOSTNAME, not a URL. Somebody pasting https://name/ or name:9703
+        # means the same thing and would produce a link with the scheme or the
+        # port in it twice, so it is refused where it is typed.
+        if v and not re.match(r"^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$", v):
+            return None, ("that reads as a URL rather than a name — just the "
+                          "host, with no https:// in front and no port after")
+        cfg["enrol_host"] = v
     if cfg["bind"] == "address":
         if not cfg["bind_address"]:
             return None, "choose which address to bind, or bind everything"
@@ -1460,9 +1503,16 @@ def validate_app(obj, current):
                 return None, ("port %d is the network profile %s — the admin "
                               "portal cannot sit on a port the app answers on"
                               % (got, n["name"]))
+            # …and enrolment for the same reason and a sharper one: it answers
+            # ONLY the acceptance flow, so sharing a port with an assistant
+            # would mean one of the two silently not being there.
+            if got and got == cfg["enrol_port"]:
+                return None, ("port %d is the network profile %s — enrolment "
+                              "cannot sit on a port an assistant answers on"
+                              % (got, n["name"]))
 
     host = bind_host(cfg)
-    for k in ("http_port", "https_port", "admin_port"):
+    for k in ("http_port", "https_port", "admin_port", "enrol_port"):
         if cfg[k] != current[k] and not port_free(cfg[k], host):
             return None, ("port %d is already in use by something else on this "
                           "machine — the server would fail to start on it"
@@ -3129,34 +3179,6 @@ def display_network_clash(rids, doc=None):
     return "Unable to use AI Assistants that run on different network ports"
 
 
-def identity_network(rec, doc=None):
-    """WHICH PORT A PERSON'S LINK IS OPENED AT — the profile the endpoint they
-    were enrolled on answers on, or "".
-
-    The twin of display_network, and deliberately not the same derivation. A
-    screen is one address, so its profile is read back off every endpoint it
-    was granted and two of them is a contradiction. A person is not one
-    address: they sign in from a phone, a laptop and a borrowed browser, and
-    being granted two assistants on two ports is an ordinary thing to be. So
-    the link names the endpoint they were ENROLLED on — one, chosen while they
-    were created — and later grants change what they may use without moving
-    where their link points.
-
-    ENABLED, because only an enabled endpoint gets its profile bound: see the
-    listener loop. An address nothing is listening on is worse than the
-    fallback, which at least answers."""
-    rid = str((rec or {}).get("endpoint") or "")
-    if not rid:
-        return ""
-    doc = doc or read_routes()
-    route = doc["routes"].get(rid)
-    # Deleted since, or switched off. Either way this is not an address to
-    # hand anybody, and the caller falls back to one that is bound.
-    if not route or not route.get("enabled", True):
-        return ""
-    return str(route.get("network") or "")
-
-
 def net_base_for(nid, prefix, host):
     """Where a link on network profile `nid` is opened — scheme, address, port
     and the prefix — or "" if that profile names no port.
@@ -3177,6 +3199,31 @@ def net_base_for(nid, prefix, host):
         return ""
     return "https://%s:%d%s" % (str(vals.get("address") or "").strip() or host,
                                 port, prefix)
+
+
+def identity_places(rec, pid, host):
+    """WHERE THIS PERSON CAN ACTUALLY GO, as (name, address) pairs.
+
+    The enrolment listener has no assistant on it — that is the point of it —
+    so somebody who has just chosen a password is standing on a port that will
+    never answer them. This is what the page shows them instead of leaving them
+    to guess, and it is computed rather than configured: `subject_may` is the
+    same test that will be applied when they arrive, so a name printed here is
+    a door that opens.
+
+    Endpoints with no port are skipped. An endpoint nothing is listening on
+    would be a link to nowhere, which is worse than one line fewer."""
+    doc = read_routes()
+    who = dict(rec or {}, id=pid)
+    out = []
+    for rid in route_order(doc):
+        r = doc["routes"][rid]
+        if not r.get("enabled", True) or not subject_may(r, ident=who):
+            continue
+        url = net_base_for(str(r.get("network") or ""), "/", host)
+        if url:
+            out.append({"name": r.get("name") or rid, "url": url})
+    return out
 
 
 def enrol_base_for(rec, host, secure, nid=""):
@@ -4508,23 +4555,12 @@ IDENTITY_DEFAULTS = {
     # at a screen standing in a room, so there is no place carrying the risk to
     # set it from. Zero takes the deployment default.
     "session_hours": 0,
-    # THE ENDPOINT THEY WERE ENROLLED ON, and the whole of what it decides is
-    # WHERE THEIR LINK IS OPENED — an address and a port, taken from the
-    # network profile that endpoint answers on. Without it the link was built
-    # from the host header the panel happened to be read on and whichever port
-    # was bound first, which is this server's opinion of where it lives rather
-    # than the address somebody is standing at.
-    #
-    # It is not the grant. The grant is on the ENDPOINT, in its own allow-list,
-    # exactly as it is for a screen, and a person can be given more of them
-    # afterwards without touching this. This is the one that was chosen while
-    # they were being created, kept because a link has to name one address and
-    # a set of grants has no order anybody would recognise.
-    #
-    # The ENDPOINT is stored, never its address. A port moved on the profile
-    # moves the link with it — the same rule display_network follows since the
-    # stored `network` field came off display rows.
-    "endpoint": "",
+    # NO ENDPOINT ON THE ROW. There was one, for exactly as long as the link's
+    # address was derived from it — enrolment has a listener of its own now, so
+    # the address is a deployment's answer rather than a property of the person
+    # standing at it, and the only thing left for an endpoint to be here is the
+    # grant. Grants live on the endpoint, in its allow-list, where a screen's
+    # already did.
 }
 
 #: What a person is allowed to keep. An ALLOW-list, not a filter: this store is
@@ -4836,7 +4872,7 @@ def identity_label(rec):
     return rec.get("name") or "unnamed person"
 
 
-def new_identity(name, email, by, endpoint=""):
+def new_identity(name, email, by):
     """Mint one, and hand back (setup token, record) — or (None, error).
 
     The token is shown once, in the URL an admin hands over. What is stored is
@@ -4864,10 +4900,6 @@ def new_identity(name, email, by, endpoint=""):
     salt, dk = hash_key(secret)
     rows[pid] = dict(IDENTITY_DEFAULTS, name=name, email=email,
                      salt=salt, hash=dk,
-                     # Not validated here. An id naming nothing is read back as
-                     # no endpoint at all — see identity_network — so a stale
-                     # one costs the fallback base and never a broken link.
-                     endpoint=str(endpoint or "")[:32],
                      created=int(time.time()), created_by=str(by or "")[:60])
     write_identities(rows)
     # Filed with their own population the moment they exist, and the group is
@@ -4945,8 +4977,6 @@ def admin_identities():
     # up itself would print an id on that tab and a name on the other one for
     # the same row. Read once for the whole list.
     doc = read_routes()
-    named = {rid: (rec.get("name") or rid)
-             for rid, rec in doc["routes"].items()}
     # WHAT EACH OF THEM IS ACTUALLY GRANTED, read off the allow-lists rather
     # than stored on the row — the endpoint owns the grant and this is the
     # same set its own `Who may use it` list shows. `granted` and not
@@ -4961,11 +4991,8 @@ def admin_identities():
     # register, and it is the one thing an admin cannot do for them.
     return [dict({k: rec.get(k) for k in
                   ("name", "email", "created", "last_seen", "created_by",
-                   "pw_set_at", "endpoint")},
+                   "pw_set_at")},
                  id=pid, label=identity_label(rec),
-                 # "" where it names one that has since been deleted, which
-                 # reads as no assistant — which is what it now is.
-                 endpoint_name=named.get(rec.get("endpoint") or "", ""),
                  granted=held.get(pid, []),
                  wakeword=rec.get("wakeword") or "",
                  ready=identity_ready(rec))
@@ -5562,7 +5589,11 @@ def app_pending(cfg):
     on load and again on save, and two copies would drift into disagreeing
     about whether a restart is owed."""
     keys = ("http_port", "https_port", "admin_port", "session_idle_minutes",
-            "bind", "bind_address")
+            "bind", "bind_address",
+            # The listener, and the interface it answers on. NOT enrol_host:
+            # that is the word put in front of the port when a link is built,
+            # read at the moment one is minted, and nothing binds to it.
+            "enrol_port", "enrol_address")
     return sorted(k for k in keys
                   if RUNNING.get(k) is not None and RUNNING[k] != cfg[k])
 
@@ -6489,11 +6520,24 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
 #: where an enrolment code is typed. On the display listeners only — it hands
 #: out a display's token, and the admin listener is not a display.
 ENROL_PREFIX = "/e/"
-#: where a person's minted URL is spent. On the display listeners only, and for
-#: the same reason /display/hello is: it hands out an identity's cookie, and
-#: the admin listener is not somewhere anybody stands and uses this. Everything
-#: an ADMIN does to an identity sits under /identities, well away from it.
+#: where a person's minted URL is spent — on the ENROLMENT listener and nowhere
+#: else now. It was every display listener, on the reasoning that spending a
+#: link is not an endpoint's business: true, and it made the address in the
+#: link a guess rather than an answer. A deployment could not say where people
+#: accept invitations, could not firewall it, and anybody holding a link could
+#: substitute any other port they happened to know.
+#:
+#: One port, set by an admin, and this route 404s on every other listener. See
+#: ENROL_GET and enrol_only.
 PERSON_PREFIX = "/p/"
+#: WHAT THE ENROLMENT LISTENER SERVES, and it is the whole list. The page and
+#: what it draws itself with, the link being spent, and the one POST that
+#: chooses a password. No assistant, no microphone, no device enrolment — a
+#: browser that opens an invitation must not come away holding a display token,
+#: which is exactly what /display/hello would hand it.
+ENROL_GET = ("/", "/index.html", "/lockup.svg", "/icon.svg", "/favicon.ico",
+             "/settings")
+ENROL_POST = ("/user/setup",)
 #: the other half of the embed API: reachable from the display listeners,
 #: because that is where a host server and a host browser can actually get to
 EMBED_ROUTES = ("/embed", "/embed/session")
@@ -6537,13 +6581,18 @@ class Handler(SimpleHTTPRequestHandler):
     #: to. Blank is the admin listener, which is not a display port and
     #: answers about all of them.
     pinned_net = ""
+    #: WHICH LISTENER THIS IS. Three kinds now: an assistant's, the admin
+    #: portal's, and this one — where invitations are accepted and nothing
+    #: else happens. See enrol_only.
+    enrol_port = False
 
     def __init__(self, *args, admin_port=False, redirect_to=None,
-                 pinned_net="", **kw):
+                 pinned_net="", enrol_port=False, **kw):
         # must land before super().__init__, which serves the request outright
         self.admin_port = admin_port
         self.redirect_to = redirect_to
         self.pinned_net = pinned_net
+        self.enrol_port = enrol_port
         super().__init__(*args, **kw)
 
     def _redirected(self):
@@ -6748,58 +6797,34 @@ class Handler(SimpleHTTPRequestHandler):
             return None, ident
         return disp, None
 
-    def _person_base(self, rec=None):
+    def _person_base(self):
         """Where a minted link lives, whole: scheme, host, port and the prefix.
 
-        THE PERSON'S OWN ENDPOINT FIRST, where they were enrolled on one. Its
-        network profile names an address and a port, and those are the two
-        halves an admin is about to read aloud or a mail is about to carry —
-        so they come from the thing that was chosen for them rather than from
-        wherever this panel happens to be being read.
+        ONE ADDRESS, and an admin chose it. This used to be assembled from
+        whatever was to hand — the host header the panel happened to be read
+        on, and whichever port was bound first — because the link worked at any
+        of them and the address was therefore a suggestion. It is not one any
+        more: /p/ answers on the enrolment listener alone, so the address here
+        is the only one that opens and this has to be exactly it.
 
-        Everything below that line is the answer for somebody enrolled on no
-        endpoint, and it is the answer this had for everybody:
+        The NAME first, where one is set: an address people can read and type
+        beats four numbers nobody checks, and it is the admin's job to point it
+        at the interface below. Then the interface itself. Then the host header
+        — which is what a deployment that has configured neither is left with,
+        and is right often enough to be worth having.
 
-        The HOST HEADER, not a stored hostname — an admin is about to hand this
-        address to somebody, or this server is about to mail it, so it has to
-        be the address somebody is actually at rather than this server's
-        opinion of where it lives.
-
-        The port is a listener's, and with no built-in display listener left
-        there may be several. It takes whichever one is bound: any of them
-        serves this route, because spending a link is not an endpoint's
-        business — which is also why the endpoint above is a preference and
-        never a restriction. A link handed out for one port is still spendable
-        at any of them, so naming the wrong one costs somebody a second
-        address to try and never their account."""
-        host = re.sub(r":\d+$", "", self.headers.get("Host") or "") or LOOPBACK
-        mine = net_base_for(identity_network(rec), PERSON_PREFIX, host)
-        if mine:
-            return mine
-        secure = RUNNING.get("https_port")
-        if not secure:
-            # A PROFILE THAT IS ACTUALLY BOUND. Taking the first one with a
-            # port would happily name a profile no endpoint has been given —
-            # and those are not bound at all, so the link would point at a
-            # port nothing is listening on. A person cannot be told that; they
-            # just get nothing.
-            doc = read_routes()
-            live = {str(r.get("network") or "") for r in doc["routes"].values()
-                    if r.get("enabled", True)}
-            for _n in display_settings()["networks"]:
-                _p = (_n.get("values") or {}).get("port")
-                if _p and _n["id"] in live:
-                    secure = int(_p)
-                    break
-        port = secure or RUNNING.get("http_port") or 0
-        if not port:
-            # NOTHING IS BOUND. Empty rather than a URL naming port 0: the
-            # callers concatenate a token onto this, so anything returned here
-            # that is not a real base becomes a broken link with a live secret
-            # inside it. Both callers check.
+        EMPTY WHERE NOTHING IS LISTENING, and every caller checks. A link with
+        a live secret in it and no port to spend it at is worse than no link:
+        it looks like something somebody can fix by editing the address."""
+        if not RUNNING.get("enrol_port"):
             return ""
-        return "%s://%s:%d%s" % ("https" if secure else "http", host, port,
-                                 PERSON_PREFIX)
+        app = read_app()
+        host = (str(app.get("enrol_host") or "").strip()
+                or str(app.get("enrol_address") or "").strip()
+                or re.sub(r":\d+$", "", self.headers.get("Host") or "")
+                or LOOPBACK)
+        return "%s://%s:%d%s" % ("https" if RUNNING.get("enrol_tls") else "http",
+                                 host, RUNNING["enrol_port"], PERSON_PREFIX)
 
     def _user_pid(self):
         """Which person this browser has SIGNED IN as, or "". Read straight
@@ -6973,6 +6998,17 @@ class Handler(SimpleHTTPRequestHandler):
                                     or path == "/docs"
                                     or path.startswith("/docs/")):
             return self._json(404, {"error": "not found"})
+        # THE ENROLMENT LISTENER, both ways round. On it, only the acceptance
+        # flow exists; off it, the link does not. 404 rather than a refusal for
+        # the same reason the admin routes give one: a 403 would confirm that
+        # somewhere on this machine the route is real, and the whole property
+        # being bought here is that a port somebody guesses cannot be
+        # substituted for the one an admin named.
+        if self.enrol_port:
+            if not (path in ENROL_GET or path.startswith(PERSON_PREFIX)):
+                return self._json(404, {"error": "not found"})
+        elif path.startswith(PERSON_PREFIX):
+            return self._json(404, {"error": "not found"})
 
         # Documentation. Signed in, but NOT admin-only: a viewer can read the
         # configuration, so a viewer should be able to read what it means —
@@ -7087,8 +7123,10 @@ class Handler(SimpleHTTPRequestHandler):
             # characters and needs four rules around it to be safe; this is 32
             # bytes from the system generator, and a rate limit on guessing it
             # would be a control against nothing.
-            if self.admin_port:
-                return self._json(404, {"error": "not found"})
+            #
+            # Which listener this is was decided at the top of do_GET, where
+            # both directions are one rule rather than a check here and an
+            # assumption everywhere else.
             token = path[len(PERSON_PREFIX):]
             here = self._display()
             if here and here.get("approved"):
@@ -7162,8 +7200,16 @@ class Handler(SimpleHTTPRequestHandler):
             # three profile tabs; without those keys for every real display,
             # which reads its appearance from the profiles it names and from
             # nowhere else. See display_document.
-            return self._json(200,
-                              {"settings": display_document(bool(self.admin_port))})
+            doc = display_document(bool(self.admin_port))
+            if self.enrol_port:
+                # WHAT THIS LISTENER IS, told to the page in the one call it
+                # is allowed to make. Without it the page loads believing it
+                # is a display: it would ask for a device token, fetch the
+                # endpoints, start polling, and — because none of that answers
+                # here — end up telling somebody accepting an invitation that
+                # the screen has lost the server.
+                doc = dict(doc, enrol_only=True)
+            return self._json(200, {"settings": doc})
         if path == "/auth/me":
             s = self._session()
             if not s:
@@ -7407,13 +7453,10 @@ class Handler(SimpleHTTPRequestHandler):
             # somebody, so it has to be whole rather than a path they finish by
             # guessing. A stored hostname would be this server's opinion of
             # where it lives; the Host header is where somebody actually is.
-            # ONE BASE PER ROW, for the same reason the enrolment codes have
-            # one: a person enrolled on an endpoint is sent to that endpoint's
-            # address and port, so a single base for the whole list stopped
-            # being the truth the moment one could differ. `base` stays as the
-            # answer for a row enrolled on nothing, and as what the box at the
-            # top shows before it has made anybody.
-            _rows = read_identities()
+            # ONE BASE, again. It was one per row while the address came off
+            # the endpoint somebody was enrolled on; enrolment has a listener
+            # of its own now, so there is one answer for everybody and a map
+            # would be the same string repeated.
             _doc = read_routes()
             return self._json(200, {"identities": admin_identities(),
                                     # THE ENDPOINTS, WITH THE PEOPLE. The ticks
@@ -7432,8 +7475,6 @@ class Handler(SimpleHTTPRequestHandler):
                                     "max": MAX_IDENTITIES,
                                     "pw_min": MIN_PASSWORD,
                                     "mail": mail_ready(),
-                                    "bases": {pid: self._person_base(r)
-                                              for pid, r in _rows.items()},
                                     "base": self._person_base()})
         if path == "/app":
             if not self._require("admin"):
@@ -7531,6 +7572,11 @@ class Handler(SimpleHTTPRequestHandler):
         return obj
 
     def do_POST(self):
+        # See the GET gate. One POST exists here — the password being chosen —
+        # and everything else this server answers is on another listener.
+        if getattr(self, "enrol_port", False):
+            if self.path.split("?")[0] not in ENROL_POST:
+                return self._json(404, {"error": "not found"})
         from urllib.parse import urlparse, parse_qs
         if self._redirected():
             return
@@ -8327,36 +8373,35 @@ class Handler(SimpleHTTPRequestHandler):
             obj = self._json_body()
             if obj is None:
                 return
-            # WHICH ASSISTANT THEY ARE BEING GIVEN, chosen while they are
-            # created rather than found afterwards on a row among fifty — the
-            # same move the device box makes with its ticks, and the reason
-            # this one is a single picker is that the link it decides has to
-            # name one address.
+            # WHICH ASSISTANTS THEY MAY USE ONCE THEY ACCEPT, ticked while
+            # they are created rather than found afterwards on a row among
+            # fifty — the same move the device box makes, and now the same
+            # control: a picker was only ever right while the one endpoint
+            # chosen here also decided where the link was opened.
             #
-            # Refused rather than stored, where it names nothing. A live
-            # deployment cannot produce this — the picker is filled from the
-            # endpoint list — so an id that does not resolve is a stale panel
-            # or a hand-made request, and silently keeping it would leave a row
-            # claiming an endpoint nobody could see.
-            rid = str(obj.get("endpoint") or "")[:32]
-            if rid and rid not in read_routes()["routes"]:
+            # Refused rather than dropped, where one names nothing. A live
+            # panel cannot produce this — the ticks are drawn from the endpoint
+            # list — so an id that does not resolve is a stale page or a
+            # hand-made request, and quietly saving the rest would report
+            # success for a grant that was never made.
+            rids = [str(r)[:32] for r in (obj.get("endpoints") or [])][:MAX_ALLOW]
+            known = read_routes()["routes"]
+            if [r for r in rids if r not in known]:
                 return self._json(404, {"error": "no such endpoint"})
             token, rec = new_identity(obj.get("name"), obj.get("email"),
-                                      s["user"], endpoint=rid)
+                                      s["user"])
             if not token:                        # `rec` is the reason
                 return self._json(409, {"error": rec})
-            # THE GRANT ITSELF, which the row does not hold: enrolling somebody
-            # on an assistant and letting them use it are one gesture, and the
+            # THE GRANT ITSELF, which the row does not hold: inviting somebody
+            # and letting them use something are one gesture, and the
             # allow-list is where the second half lives. Written after the row
             # exists because it is keyed on the id that creating it minted.
-            if rid:
-                set_identity_endpoints(rec["id"], [rid])
-            # Built from the row, so it is the address of the endpoint they
-            # were just put on rather than the port this panel is read at.
-            base = self._person_base(rec)
-            print("identity %s (%s) created by %s%s"
-                  % (rec["id"], identity_label(rec), s["user"],
-                     (" on endpoint %s" % rid) if rid else ""), flush=True)
+            if rids:
+                set_identity_endpoints(rec["id"], rids)
+            base = self._person_base()
+            print("identity %s (%s) created by %s — %d endpoint(s)"
+                  % (rec["id"], identity_label(rec), s["user"], len(rids)),
+                  flush=True)
             sent = mail_setup_link(rec, base, token)
             if sent:
                 print("identity %s: setup link mailed to %s"
@@ -8522,6 +8567,15 @@ class Handler(SimpleHTTPRequestHandler):
             self._set_user_cookie(token, hours)
             body = json.dumps({"ok": True, "hours": hours,
                                "name": rec.get("name") or "",
+                               # …AND WHERE TO GO. This listener is not one of
+                               # them and never will be, so the last thing the
+                               # acceptance page does is hand over the doors
+                               # this account opens.
+                               "places": identity_places(
+                                   rec, claim,
+                                   re.sub(r":\d+$", "",
+                                          self.headers.get("Host") or "")
+                                   or LOOPBACK),
                                "settings": identity_settings(claim)}).encode()
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
@@ -8648,7 +8702,7 @@ class Handler(SimpleHTTPRequestHandler):
             # the one somebody was originally sent is the sort of difference
             # that gets a legitimate link treated as a phishing attempt.
             _rec = read_identities().get(_pid)
-            base = self._person_base(_rec)
+            base = self._person_base()
             sent = mail_setup_link(_rec, base, token, again=True)
             if sent:
                 print("identity %s: new link mailed" % _pid, flush=True)
@@ -8900,14 +8954,7 @@ class Handler(SimpleHTTPRequestHandler):
                       or next((a["value"] for a in (rec.get("answers") or [])
                                if (a.get("value") or "").strip()), "") \
                       or display_label(rec)
-                # THE FIRST OF THE TICKS, as the one their link names. The
-                # ticks here are a list because approving is granting and a
-                # person may be given several; the enrolment endpoint is one
-                # because an address is one. Order is the panel's, which is
-                # the endpoint order an admin was looking at when they ticked.
-                _ends = [str(r)[:32] for r in (obj.get("endpoints") or [])]
-                token, made = new_identity(who, rec["req_email"], s["user"],
-                                           endpoint=_ends[0] if _ends else "")
+                token, made = new_identity(who, rec["req_email"], s["user"])
                 if not token:                    # `made` is the reason
                     return self._json(409, {"error": made})
                 rec["setup"] = token
@@ -8941,7 +8988,7 @@ class Handler(SimpleHTTPRequestHandler):
                 # standing at it — so this is the copy for somebody who filled
                 # the form in and walked away.
                 _made = read_identities().get(made["id"])
-                _base = self._person_base(_made)
+                _base = self._person_base()
                 sent = mail_setup_link(_made, _base, token)
                 if sent:
                     print("identity %s: setup link mailed to %s"
@@ -9582,15 +9629,17 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def make_server(port, admin_port=False, host="0.0.0.0", redirect_to=None,
-                pinned_net=""):
+                pinned_net="", enrol_port=False):
     handler = functools.partial(Handler, directory=ROOT, admin_port=admin_port,
-                                redirect_to=redirect_to, pinned_net=pinned_net)
+                                redirect_to=redirect_to, pinned_net=pinned_net,
+                                enrol_port=enrol_port)
     return ThreadingHTTPServer((host, port), handler)
 
 
-def start_tls(port, cert, key, admin_port=False, host="0.0.0.0", pinned_net=""):
+def start_tls(port, cert, key, admin_port=False, host="0.0.0.0", pinned_net="",
+              enrol_port=False):
     srv = make_server(port, admin_port=admin_port, host=host,
-                      pinned_net=pinned_net)
+                      pinned_net=pinned_net, enrol_port=enrol_port)
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.load_cert_chain(cert, key)
     srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
@@ -9862,6 +9911,64 @@ def main():
               "over plain HTTP.", flush=True)
         print("       run ./make-cert.sh <host> and restart, or bind to "
               "loopback, where no certificate is needed.", flush=True)
+
+    # ---- enrolment listener ----
+    # WHERE AN INVITATION IS ACCEPTED, and the only place it can be. It carries
+    # no assistant, no microphone and no device enrolment: the whole of what it
+    # answers is the link, the page that asks for a password, and that password
+    # being set. See ENROL_GET.
+    #
+    # Its own port because the address in a minted link has to be a fact an
+    # admin stated. While /p/ answered everywhere, the address was a guess that
+    # happened to work — nothing could be firewalled to it, nothing could be
+    # said about it, and anybody holding a link could substitute another port.
+    #
+    # NOT FATAL when the port is taken. Everything else still answers and the
+    # panel is still reachable, which is where somebody fixes it — the same
+    # rule a network profile's port already follows.
+    _enr = int(app.get("enrol_port") or 0)
+    if _enr:
+        # The interface, bounded by the app's own binding: an app pinned to one
+        # address does not let this outrun it. Same function the profiles use.
+        _ehost = net_host({"address": app.get("enrol_address")}, host)
+        try:
+            if have_tls:
+                start_tls(_enr, cert, key, host=_ehost, enrol_port=True)
+            else:
+                _esrv = make_server(_enr, host=_ehost, enrol_port=True)
+                threading.Thread(target=_esrv.serve_forever, daemon=True).start()
+            RUNNING["enrol_port"] = _enr
+            RUNNING["enrol_tls"] = bool(have_tls)
+            # What it is BOUND to, as the config words it — so app_pending
+            # compares like with like and does not report a restart owed
+            # forever because one side says "" and the other 0.0.0.0.
+            RUNNING["enrol_address"] = str(app.get("enrol_address") or "")
+            # What the link will actually say, printed because it is the one
+            # address an admin hands to other people and the one most likely to
+            # be wrong — a name that resolves somewhere else shows up here as a
+            # name, not as a mystery six weeks later.
+            # …and where ANY has no one address to name, say so rather than
+            # print 0.0.0.0, which is not a thing anybody can open.
+            _ename = str(app.get("enrol_host") or "").strip() \
+                or str(app.get("enrol_address") or "").strip() \
+                or (_ehost if _ehost not in ("0.0.0.0", "") else "<this machine>")
+            print("ENROL on %s:%d  (%s, invitations only) → %s://%s:%d/p/"
+                  % (_ehost, _enr, "HTTPS" if have_tls else "HTTP",
+                     "https" if have_tls else "http", _ename, _enr), flush=True)
+            if not have_tls and exposed(app):
+                # Said here rather than discovered by somebody halfway through
+                # accepting: /user/setup refuses a password over plain HTTP off
+                # loopback, so this listener is up and cannot finish the job.
+                print("       NO CERTIFICATE — a password cannot be chosen "
+                      "over plain HTTP. Run ./make-cert.sh and restart.",
+                      flush=True)
+        except OSError as exc:
+            print("ENROL on %s:%d  NOT bound: %s — nobody can accept an "
+                  "invitation until this is free" % (_ehost, _enr, exc),
+                  flush=True)
+    else:
+        print("ENROL disabled — no port set, so no invitation can be "
+              "accepted.", flush=True)
 
     warn = posture_warning(app)
     if warn:
