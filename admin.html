@@ -824,7 +824,8 @@
     border-bottom:1px solid transparent;
   }
   #navlinks button:hover{color:rgba(var(--paper),.95)}
-  #navlinks button.on{color:var(--hue);border-bottom-color:var(--hue-dim)}
+  /* Selected is painted with the tab rows' rule, further down — one gradient,
+     one place. What stays here is the transparent border it paints into. */
   /* One between each pair, and only between a pair. There used to be one
      before the first link as well, separating the places you can go from the
      title of the page you are on — and it came off when that title moved into
@@ -1774,16 +1775,21 @@
   /* Between each pair and never after the label: the label already has an edge
      of its own, and a rule against it is a line beside a line. */
   .tabs button + button{border-left:1px solid rgba(var(--glass),.28)}
-  /* THE SELECTED TAB'S UNDERLINE runs the five palette colours rather than one
-     of them. They are the five a display can be set to, taken from the same
-     values the labels are shaded from — so the line under whichever tab you
-     are standing on is the whole palette, and the tabs above it are each one
-     colour out of it.
+  /* THE UNDERLINE UNDER WHATEVER IS SELECTED, wherever one is drawn — the
+     links in the bar at the top and the tab rows under it. ONE RULE rather
+     than a five-stop gradient written out twice: they are the same mark
+     meaning the same thing, and two copies is two things to keep in step.
+
+     It runs the five palette colours rather than one of them. They are the
+     five a display can be set to, taken from the same values the labels are
+     shaded from — so the line under wherever you are standing is the whole
+     palette, and each label above it is one colour out of it.
 
      A background rather than a border, because a border cannot hold a
-     gradient: the border stays as the transparent placeholder that keeps the
-     row from moving by a pixel when a tab is selected, and the paint is a
+     gradient: the transparent border stays as the placeholder that keeps a row
+     from moving by a pixel when something is selected, and the paint is a
      background image sitting in its place. */
+  #navlinks button.on,
   .tabs button.on{
     color:var(--hue);
     background-image:linear-gradient(90deg,
