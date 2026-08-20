@@ -531,11 +531,14 @@
      have moved into a border. The legend itself is only the notch — its
      padding is the gap either side of the box. */
   .tabbox > legend{padding:0 8px}
-  /* Milk, as the two groups were when they were inside one box: a group is a
-     division of the row, and ice is what the row-level labels wear. */
+  /* RUST on the groups, ice on the row that holds them. Milk first, on the
+     reasoning that a group is a division of the row and should be quieter than
+     it — and quieter is exactly wrong here: the row's label names the page you
+     are on, the group labels name the three subjects you choose between, and
+     those are the ones the eye should land on. */
   .tabbox > legend .tablabel{
-    border-color:rgba(var(--pal-milk),.70);
-    background:rgba(var(--pal-milk),.30);
+    border-color:rgba(var(--pal-rust),.75);
+    background:rgba(var(--pal-rust),.30);
   }
   /* …and the heading over them keeps ice, which is what it always had. */
   .profhead .tablabel{
