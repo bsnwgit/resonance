@@ -421,15 +421,33 @@
   /* The only red on the row, because it is the only thing here that takes
      something away. Not styled as a link: a ✕ that looked like the three
      beside it would read as a fourth place to go. */
+  /* IN A CIRCLE OF ITS OWN. It was a bare glyph the colour of a warning, and
+     next to a field with text in it that is a small red mark somebody has to
+     go looking for. A ring makes it a control: round rather than square
+     because nothing else on this row is round, and the one thing here that
+     TAKES SOMETHING AWAY should not be the same shape as the things that take
+     you somewhere.
+
+     Rust is --rust, the deeper one SIGN OUT wears, not the palette's rust
+     swatch — that is a pale salmon meant to be read as a tint behind a label,
+     and it disappears at this size against a dark row. Both are red-ish; only
+     one of them is a colour you can see at 22 pixels. */
   #b_findclear,
   #b_docfindclear{
-    flex:0 0 auto;padding:2px 9px;cursor:pointer;
-    background:none;border:0;border-bottom:1px solid transparent;
-    font:inherit;font-size:calc(11px * var(--fs));line-height:1;
-    color:#e0716b;
+    flex:0 0 auto;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    width:22px;height:22px;padding:0;margin-left:6px;
+    border-radius:50%;
+    border:1px solid rgba(var(--rust),.85);
+    background:rgba(var(--rust),.30);
+    font:inherit;font-size:calc(10px * var(--fs));line-height:1;
+    color:rgba(var(--paper),.96);
   }
   #b_findclear:hover,
-  #b_docfindclear:hover{color:#ff8a8a}
+  #b_docfindclear:hover{
+    background:rgba(var(--rust),.62);
+    border-color:rgba(var(--rust),1);
+  }
 
   /* The app tab's own commit row, at the foot of the box. Hidden outright
      on every other tab: a save button that belongs to settings you cannot
@@ -1858,12 +1876,22 @@
      something that has none. */
   .tabs button:hover:not(:disabled){color:rgba(var(--paper),.95)}
   .findrow{display:flex;margin:0 0 4px}
+  /* A BLUE EDGE, because this is the one thing on the row you TYPE IN. The
+     glass grey it wore is the border every inert box on the panel has, so the
+     field read as another panel rather than as somewhere to put a cursor.
+     Blue is the palette's own — the same colour the bar's subject labels are
+     shaded from — so it stands out without introducing a colour. */
   #rigfind,
   #docfind{
     flex:1;min-width:0;margin:0;font:inherit;font-size:calc(9.5px * var(--fs));padding:5px 7px;
     background:rgba(0,0,0,.5);color:var(--text);
-    border:1px solid rgba(var(--glass),.18);outline:0;-webkit-appearance:none;appearance:none;
+    border:1px solid rgba(var(--pal-blue),.85);outline:0;-webkit-appearance:none;appearance:none;
   }
+  /* …and brighter with the cursor in it. A field that looks the same typed in
+     as not is the reason somebody leaves one filtered and reports the panel
+     having lost half its settings. */
+  #rigfind:focus,
+  #docfind:focus{border-color:rgba(var(--pal-blue),.95)}
   #rigfind::placeholder,
   #docfind::placeholder{color:rgba(var(--paper),.62)}
 
