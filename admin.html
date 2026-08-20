@@ -1695,11 +1695,21 @@
   .tabs{display:flex;align-items:stretch;gap:0;margin-bottom:10px;flex-wrap:wrap}
   /* A label on a line of its own, naming the row under it. */
   .tabhead{display:flex}
-  /* …and the space that divides one group of tabs from the next, the same
-     width the bar at the top uses between its subjects. `button + button`
-     draws the divider between neighbours, so a label after this gap starts
-     its group without one — which is what a new subject should look like. */
-  .tabgap{flex:0 0 auto;width:34px}
+  /* THE SPACE THAT DIVIDES ONE GROUP OF TABS FROM THE NEXT, and it takes
+     whatever is left over: the group after it sits against the right edge of
+     the box rather than trailing the group before it. A fixed width put the
+     two groups next to each other with the whole right half of a wide panel
+     empty behind them, which reads as one long row that happens to have a gap
+     in it rather than as two subjects at opposite ends.
+
+     It keeps a floor of 34px — the width the bar at the top uses between its
+     own subjects — so on a panel too narrow to spread them the gap is still a
+     gap and not a collision.
+
+     `button + button` draws the divider between neighbours, so a label after
+     this starts its group without one, which is what a new subject should
+     look like. */
+  .tabgap{flex:1 1 34px;min-width:34px}
   .tabs button{
     display:flex;align-items:center;
     font:inherit;font-size:calc(9px * var(--fs));letter-spacing:.18em;
