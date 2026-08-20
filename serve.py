@@ -3636,6 +3636,12 @@ def kiosk_of(rec, savers=None, looks=None, kiosks=None,
             "keep_awake": bool(prof.get("keep_awake", KIOSK_OFF["keep_awake"])),
             "listen": bool(prof.get("listen", KIOSK_OFF["listen"])),
             "prompt": bool(prof.get("prompt", KIOSK_OFF["prompt"])),
+            # THE FOURTH PLACE a profile's fields are written out one by one:
+            # clean_kiosks stores them, paintKiosks copies them for the editor,
+            # the panel's SAVE posts them, and this hands them to the screen. A
+            # field added to three of the four saves, shows a tick, and does
+            # nothing — which is exactly how this one arrived.
+            "clock": bool(prof.get("clock", KIOSK_OFF["clock"])),
             # The admin's words where there are any, and the empty string where
             # there are not — the display builds the automatic line itself,
             # because only the browser knows which wake words it is currently
