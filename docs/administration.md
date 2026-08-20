@@ -810,7 +810,7 @@ it waits until they have finished. RELOAD on a row under CONNECTIONS asks one
 directly.
 
 
-### Kiosk assignment — changing several at once
+### Layout assignment — changing several at once
 
 The bar above the two lists on **CONNECTIONS**. Tick the rows you want, choose
 a layout profile, and APPLY TO SELECTED gives all of them that profile in one
