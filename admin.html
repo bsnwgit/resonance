@@ -374,7 +374,7 @@
      of links behind a label now, and a menu bar that wraps onto three lines at
      560px is one nobody can scan. The search that used to sit above them, and
      was held to that measure, is in the foot with the other row. */
-  #panelhead > .profbox{max-width:none}
+  #panelhead > .profrow{max-width:none}
   /* …but the tab row itself runs the whole width, out to the edge of the
      preview, because it now carries two groups that have to sit apart. */
   #panelhead > .tabrow{max-width:none}
@@ -496,6 +496,31 @@
      put on the box it would start at the very top and leave a stub of line
      above the step with nothing to meet. The left side is the box's, since
      that one does run the whole height. */
+  /* A GROUP OF TABS THAT NAMES ITSELF. A fieldset because a legend cuts a real
+     gap in the border — the panel's ground is translucent over the page, so a
+     label with a background laid over the line would be a slightly different
+     colour than whatever is behind it.
+
+     `min-width:0` because a fieldset refuses to shrink below its content by
+     default, which on a narrow panel pushes the row off the edge instead of
+     wrapping it. */
+  .tabbox{
+    border:1px solid rgba(var(--glass),.55);
+    margin:0;padding:2px 10px 4px;min-width:0;
+  }
+  .tabbox > legend{
+    padding:0 8px;
+    font-size:calc(8.5px * var(--fs));letter-spacing:.2em;
+    text-transform:uppercase;color:rgba(var(--paper),.80);
+  }
+  .tabbox .tabs{margin:0}
+  /* The two groups at opposite ends of the row, the same way they were inside
+     one box. `wrap` so a narrow panel stacks them instead of shrinking both
+     past reading. */
+  .profrow{flex-wrap:wrap;align-items:flex-start}
+  .profrow .tabbox:last-child{margin-left:auto}
+  .profhead{margin:2px 0 10px}
+
   .profbox{
     border-left:1px solid rgba(var(--glass),.55);
     border-bottom:1px solid rgba(var(--glass),.55);
@@ -2291,60 +2316,49 @@
        are different subjects that happen to share a row. -->
   <!-- One group, the full width of the panel. What a display looks and
        sounds like: nothing else shares this row. -->
-  <!-- PROFILES ON A LINE OF ITS OWN. The row beneath carries two labelled
-       groups now, and a third label sitting inline among them would read as a
-       third group rather than as the name of the row. Everything under it is a
-       profile; the two labels below say which KIND. -->
-  <!-- ONE BOX, with a stepped top edge. The line runs above the label, turns
-       down at the end of it, and carries on along the bottom of that row for
-       the rest of the width; the left side runs the whole height, the right
-       side picks up where the step left off, and the foot closes it.
+  <!-- PROFILES NAMES THE ROW, and the two boxes under it are its parts. It
+       was one box with both groups inside and a stepped top edge; two groups
+       in one box need a label each anyway, and a label inside a box is a box
+       inside a box — the thing this panel has been taking out everywhere else.
 
-       Six borders on four elements, and each one is on the element whose edge
-       it actually is — nothing is positioned, so a longer label or a wrapped
-       row moves the corners with it. -->
-  <div class="profbox">
-  <div class="tabhead">
-    <span class="stepnest"><span class="tablabel">PROFILES</span></span>
-    <span class="steprest"></span>
+       So the heading is a heading, and each group is a box that says its own
+       name in its own top edge. A FIELDSET rather than a label painted over a
+       border: the panel's ground is translucent, so a patch of "background"
+       laid over the line would be a slightly different colour than the thing
+       behind it. A legend cuts a real gap. -->
+  <div class="rulehead profhead">Profiles</div>
+  <div class="tabrow profrow">
+    <fieldset class="tabbox">
+      <legend>Layouts</legend>
+      <!-- WHAT A SCREEN IS, in five parts: the four that describe it and the
+           one that names them. LAYOUT reads last because it is built from the
+           four before it. -->
+      <div class="tabs">
+        <!-- APPEARANCE rather than LOOK, so the tab and the "Appearance
+             profiles" read as the same subject. data-tab stays "look": it is
+             the storage key, and renaming it would rewrite every stored
+             document for a label. -->
+        <button data-tab="look" class="on">APPEARANCE</button>
+        <!-- GEOMETRY rather than MOTION, and data-tab stays "motion" for the
+             same reason. -->
+        <button data-tab="motion">GEOMETRY</button>
+        <button data-tab="speech">SPEECH</button>
+        <button data-tab="savers">SCREENSAVER</button>
+        <button data-tab="devprof">LAYOUT</button>
+      </div>
+    </fieldset>
+    <fieldset class="tabbox">
+      <legend>Connections</legend>
+      <!-- The two halves of an endpoint that are not the endpoint — what it
+           speaks to and what it answers on — and then the pair of them under
+           one name, which is the order they are built in. -->
+      <div class="tabs">
+        <button data-tab="models">MODELS</button>
+        <button data-tab="network">NETWORK</button>
+        <button data-tab="connection">CONNECTION</button>
+      </div>
+    </fieldset>
   </div>
-  <div class="tabs">
-    <!-- WHAT A SCREEN IS, in five parts. The four that describe it and the one
-         that names them: a layout profile points at an appearance and a
-         screensaver rather than carrying copies. -->
-    <span class="tablabel">LAYOUTS</span>
-    <!-- APPEARANCE rather than LOOK, so the tab and the "Appearance
-     profiles" read as the same subject. data-tab stays "look": it is
-     the storage key, and renaming it would rewrite every stored
-     document for a label. -->
-    <button data-tab="look" class="on">APPEARANCE</button>
-    <!-- GEOMETRY rather than MOTION, and data-tab stays "motion" for the
-     same reason. -->
-    <button data-tab="motion">GEOMETRY</button>
-    <button data-tab="speech">SPEECH</button>
-    <button data-tab="savers">SCREENSAVER</button>
-    <!-- LAST of the five, where it used to be last of seven — it is the one
-         that NAMES the others, so it reads after the pieces it is built from.
-         data-tab stays "devprof" for the same reason APPEARANCE keeps "look":
-         it is the storage key, and renaming it would rewrite every stored
-         document for a label. -->
-    <button data-tab="devprof">LAYOUT</button>
-    <!-- The gap is what says these are a different subject, the same way the
-         one in the bar at the top does. Left of it is what a screen IS; right
-         of it is what an assistant is wired to. -->
-    <span class="tabgap"></span>
-    <!-- The two halves of an endpoint that are not the endpoint: what it
-         speaks to, and what it answers on. They were among the five above,
-         which made the row a list of seven unrelated things. -->
-    <span class="tablabel">CONNECTIONS</span>
-    <button data-tab="models">MODELS</button>
-    <button data-tab="network">NETWORK</button>
-    <!-- AFTER THE TWO IT IS MADE OF, because that is the order it is built in:
-         a model to speak to, a port to answer on, and then the pair of them
-         under one name. -->
-    <button data-tab="connection">CONNECTION</button>
-  </div>
-  </div><!-- /profbox — its foot is the rule that used to sit here -->
   </div><!-- /panelhead -->
 
   <div id="grpbox">
