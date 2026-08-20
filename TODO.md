@@ -300,3 +300,41 @@ a setting, and the question is whose:
 
 Worth knowing while deciding: `_user_sessions` is an in-memory map, so **a
 server restart already ends every session**, and nothing anywhere says so.
+
+---
+
+## 8 · An approved request lands the person on a JSON error
+
+**A regression, and a recent one.** Somebody asks for access on a display, an
+admin approves, and their screen shows `{"error": "not found"}`. The admin sees
+the link, which is working as intended; the person sees a JSON body.
+
+The cause, exactly:
+
+- Approving a request with an email on it mints an identity and puts the setup
+  token on the display row, and `_display_state` hands the page
+  `setup_url = "/p/<token>"` — **a path, not a URL**.
+- The page polls, sees `state === 'setup'`, and does `location.href =
+  this.setupUrl`, which resolves on **the port that display is loaded from** —
+  an assistant's.
+- `/p/` now answers on the enrolment listener and 404s on every other one. That
+  was the point of giving enrolment a port of its own, and this redirect is the
+  one caller that was still assuming the old rule.
+
+**The wanted behaviour is not to fix the redirect.** Send the person back to
+the sign-in page with a message: their request was received, and if it is
+approved they will get an email with a link. That is the better answer anyway —
+the display they asked from is a device, the account is theirs, and the link
+should reach them on something they own rather than open on a screen in a
+hallway that anybody may walk up to next.
+
+Which means:
+
+- the page stops navigating on `state === 'setup'` and says so instead;
+- the display row probably stops carrying `setup` at all, since nothing on the
+  screen will spend it — worth checking what else reads it before removing it;
+- **the promise has to be true.** `mail_setup_link()` already runs on approve,
+  but it needs an SMTP host and there is none configured on the test box today
+  (`mail_host` is empty), so the message would promise an email nobody sends.
+  Either the wording changes when `mail_ready()` is false — *an administrator
+  will give you a link* — or the panel refuses to say the mail half at all.
