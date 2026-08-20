@@ -55,8 +55,8 @@ rather than tabs, because they do not switch which controls you are editing;
 they change the subject entirely.
 
 **Every label is shaded from the display's own palette**, a colour per subject
-— the three in the bar in **blue**, PROFILES and CONNECTIONS in **ice**, SEARCH
-in **milk**. They are the same five colours a display can be set to, taken from
+— the three in the bar in **blue**, PROFILES, LAYOUTS, CONNECTIONS and
+ACCESS in **ice**, SEARCH in **milk**. They are the same five colours a display can be set to, taken from
 the same values rather than matched by eye, so the panel and the thing it
 configures are not two people's idea of one palette. The colour is there to
 tell the rows apart at a glance; it is not saying anything you have to decode.
@@ -129,16 +129,25 @@ a word against a key inside an example sends you to a line that cannot answer
 you. Whether it found anything is said directly under the field.
 
 Below the bar, two more rows built the same way — a boxed label, then links
-marked by colour and a rule underneath rather than by a box of their own:
+marked by colour and a rule underneath rather than by a box of their own.
 
-- **PROFILES** — and after it **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER /
-  MODELS / NETWORK / DISPLAY**. Each is a list of profiles, and the controls
-  for one appear inside it when you open it. MODELS and NETWORK are the two
-  halves of an endpoint that are not the endpoint: what it speaks to, and what
-  it answers on.
+**PROFILES** names the first of them, on a line of its own with the row boxed
+beneath it: the line runs above the label, turns down at the end of it and
+carries on along the top of the row, so what is inside the turn is one subject.
+Everything in it is a list of profiles, and the controls for one appear inside
+it when you open it. Two groups, at opposite ends of the row:
 
-**CONNECTIONS**, at the foot — what this server is wired to, as opposed to what
-you administer about it:
+- **LAYOUTS** — **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER / LAYOUT**.
+  What a screen is. LAYOUT reads last because it is the one that *names* the
+  four before it rather than describing anything itself.
+- **CONNECTIONS**, at the right edge — **MODELS / NETWORK**. The two halves of
+  an endpoint that are not the endpoint: what it speaks to, and what it answers
+  on. They sat among the five until 2026-08-20, which made the row a list of
+  seven unrelated things.
+
+**ACCESS**, at the foot — who and what may reach this server, as opposed to
+what you administer about it. It was called CONNECTIONS until the word was
+needed for the pair above:
 
 - **AI** — the endpoints, each naming a speech profile, a model profile and a
   network profile.
@@ -474,7 +483,7 @@ neither wants to read the other's queue while doing it.
 
 So an arrival is under **ENROLLMENTS** — ▸ USER while a person waits on a
 decision, ▸ DEVICE while a screen has not taken its code — and everything
-working is under **CONNECTIONS**, in its own area. A row
+working is under **ACCESS**, in its own area. A row
 moves itself the moment it starts working.
 
 Ordering survives inside each list: anything waiting sorts by how much it wants
@@ -812,7 +821,7 @@ directly.
 
 ### Layout assignment — changing several at once
 
-The bar above the two lists on **CONNECTIONS**. Tick the rows you want, choose
+The bar above the two lists on **ACCESS**. Tick the rows you want, choose
 a layout profile, and APPLY TO SELECTED gives all of them that profile in one
 gesture — which is what a building of identical hallway screens wants after a
 profile is renamed or a new one is made.

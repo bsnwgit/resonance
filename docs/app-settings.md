@@ -150,15 +150,25 @@ address and password they set from their enrolment link. On **nothing**, they
 do not — opening the link is the whole of it. One switch, because "is this
 server reachable by people I have not met" is one question.
 
-## Ports
+## Admin Portal
 
-**One port is configured here: the admin portal's**, 9702 by default — the page
-you are reading this in, which requires a sign-in.
+**Two settings, one answer: where this page is.** They were two sections — a
+binding under *IP Address* and a port under *Ports* — which asked somebody to
+already know they were halves of the same sentence. One section now, interface
+first and then the port, the order every other pair on the panel is in.
+
+**The port is 9702 by default** — the page you are reading this in, which
+requires a sign-in — and it is the only port set here.
 
 Everything the app answers on is a **network profile** instead, under
 PROFILES ▸ NETWORK. A deployment can want several, and which endpoint each one
 carries is a question about the app rather than about the portal. See
 *Assistants* → *Network profiles*.
+
+**Where invitations are accepted is its own section below this one** —
+*Enrolment* — with a port, the interface it answers on and, optionally, a name
+to put in front of it in the link. It is the only listener a setup link opens
+on; see *Administration* → *Where a link is opened*.
 
 **A port carries one endpoint.** Ports were shareable once — several
 assistants on one, told apart by wake word — and that went when signing in
