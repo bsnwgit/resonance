@@ -160,6 +160,21 @@
      low, so it never lands on top of the invitation — and dimmer than a
      warning would be on a workstation, because this hangs on a wall in a
      house and the failure it reports is usually a router. */
+  /* Sized off the shorter side like everything else in this frame, so it is
+     legible across a hallway on a portrait screen and on a landscape one
+     without either being tuned by hand. The time is the half anybody actually
+     reads at a distance, so it carries the size and the date sits under the
+     same rule one step down. */
+  #clockline{
+    display:none;align-items:flex-start;justify-content:space-between;
+    padding:3.2% 6% 0;z-index:5;
+    font-size:clamp(11px, 2.2vmin, 22px);letter-spacing:.18em;
+    color:rgba(var(--paper),.42);
+    text-shadow:0 0 18px rgba(0,0,0,.7);
+    font-variant-numeric:tabular-nums;
+  }
+  #cktime{font-size:1.35em;letter-spacing:.14em;color:rgba(var(--paper),.62)}
+  #ckdate{padding-top:.45em}
   #offline{
     display:none;align-items:flex-start;justify-content:center;
     padding:6% 6% 0;z-index:6;
@@ -624,6 +639,11 @@
      into the canvas for the duration, because an outage lasts hours and a
      stationary line held that long on a screen whose whole purpose at that
      moment is that nothing stays still is the one thing left to burn in. */
+  /* NOT WHILE IT DRIFTS. A line that never moves is the exact thing the
+     screensaver exists to drift away from, so the clock goes with the rest of
+     the overlays rather than being the one that burns in. Same rule, same
+     shape, as the lost-server line below it. */
+  body[data-clock]:not([data-saver]) #clockline{display:flex}
   body[data-offline]:not([data-saver]) #offline{display:flex}
 </style>
 </head>
@@ -639,6 +659,16 @@
          voice-only display there is no transcript, no composer and no hint of
          any kind. Only ever drawn on a wall: a browser tab was opened
          deliberately by somebody who already knows what it is. -->
+    <!-- THE TIME, on the screens whose layout asks for one. Across the top and
+         at the two ends, out of the figure's way and out of the invitation's:
+         the frame is read from the middle outwards, so the corners are where
+         something you glance at rather than look at belongs. Dim, for the same
+         reason the invitation is — the brightest thing on a wall should stay
+         the thing the wall is for. -->
+    <div class="ov" id="clockline">
+      <span id="ckdate"></span>
+      <span id="cktime"></span>
+    </div>
     <div class="ov" id="prompt"></div>
     <!-- The screen has lost the server and has said so once. High in the
          frame, where the invitation is low, so the two never argue over the
@@ -1377,6 +1407,66 @@ const Display = {
    stays in localStorage untouched, so a display taken off the wall and turned
    back into an ordinary tab gets that person's own choice back rather than
    the policy's. */
+/* THE WALL CLOCK. Whether it appears is the layout's (`clock`); what it says
+   is the deployment's, under SETTINGS ▸ ADMIN ▸ Time format, and arrives in
+   the shared settings as `clock_time` and `clock_date`.
+
+   THE DEVICE'S OWN CLOCK, deliberately. The server's time is what a screen is
+   told for anything it has to agree with the server about — a token's life, a
+   check-in window — and this is the opposite: it is the time in the room, read
+   by somebody standing in it, and a tablet whose clock is wrong is a tablet
+   whose owner wants to know. */
+const Clock = {
+  timer: 0,
+  start(){ this.paint(); this.arm(); },
+  stop(){ clearTimeout(this.timer); this.timer = 0; },
+  /* ON THE MINUTE, not every sixty seconds from whenever this happened to
+     start: a clock that turns over at seventeen seconds past is one people
+     notice, and two screens in a corridor disagreeing by half a minute is
+     worse than either being a second late. */
+  arm(){
+    clearTimeout(this.timer);
+    const now = new Date();
+    const ms = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+    this.timer = setTimeout(()=>{ this.paint(); this.arm(); },
+                            Math.max(1000, ms));
+  },
+  two(n){ return String(n).padStart(2, '0'); },
+  time(d){
+    const f = S.clock_time || 'locale';
+    if (f === '24')
+      return d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit',
+                                       hour12: false});
+    if (f === '12')
+      return d.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit',
+                                       hour12: true});
+    /* The device's own, and the two-digit hour is not forced: a region that
+       writes 9:05 should write 9:05 here too. */
+    return d.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
+  },
+  date(d){
+    const f = S.clock_date || 'locale';
+    if (f === 'none')    return '';
+    if (f === 'weekday')
+      return d.toLocaleDateString([], {weekday: 'long', day: 'numeric',
+                                       month: 'long'});
+    if (f === 'dmy') return this.two(d.getDate()) + '/'
+                          + this.two(d.getMonth() + 1) + '/' + d.getFullYear();
+    if (f === 'mdy') return this.two(d.getMonth() + 1) + '/'
+                          + this.two(d.getDate()) + '/' + d.getFullYear();
+    if (f === 'iso') return d.getFullYear() + '-' + this.two(d.getMonth() + 1)
+                          + '-' + this.two(d.getDate());
+    return d.toLocaleDateString();
+  },
+  paint(){
+    const t = $('cktime'), dl = $('ckdate');
+    if (!t || !dl) return;
+    const now = new Date();
+    t.textContent = this.time(now);
+    dl.textContent = this.date(now);
+  },
+};
+
 const Kiosk = {
   on: false,
   voiceOnly: false,
@@ -1423,6 +1513,10 @@ const Kiosk = {
     this.listen = !!w.listen;
     this.prompt = w.prompt !== false;
     this.promptText = w.prompt_text || '';
+    /* OFF where the server said nothing, like `listen` and unlike the two
+       above it: those are conveniences a preview should show anyway, and a
+       clock is a decision about a place. */
+    this.clock = !!w.clock;
     Saver.configure(w.saver);
     this.apply();
   },
@@ -1447,6 +1541,11 @@ const Kiosk = {
   apply(){
     document.body.toggleAttribute('data-kiosk', this.on);
     document.body.toggleAttribute('data-voiceonly', this.voiceOnly);
+    /* NOT IN AN EMBED. A host page composes what it wants from the parts it
+       was granted, and a clock arriving because the endpoint's layout happens
+       to have one ticked is this product decorating somebody else's page. */
+    document.body.toggleAttribute('data-clock', this.clock && !EMBED);
+    if (this.clock && !EMBED) Clock.start(); else Clock.stop();
     this.applyLook();
 
     /* SPEAK ONLY, and it follows from being on a wall rather than being a
@@ -2065,6 +2164,12 @@ Prefs.load();
 /* ---------------------------------------------------------------- state */
 const S = {
   mode:'ridge', palette:'blue', layout:'hero',
+  /* HOW THE CLOCK READS, from SETTINGS ▸ ADMIN ▸ Time format. Declared here
+     with the shipped default and not merely read off the document, because a
+     settings load takes only the keys this page already has — see the merge in
+     loadSettings — so a key with no default here is a setting the server sends
+     and the display silently drops. */
+  clock_time:'locale', clock_date:'locale',
   /* WHAT THE SCREEN SAYS ALOUD WHEN SOMEBODY SIGNS IN, and when somebody
      fails to. BOTH EMPTY BY DEFAULT, which means silent — and that is the
      right default rather than a timid one. A wall in a shared space
@@ -5611,6 +5716,10 @@ function repaintNames(){
 
 /* Rebuild every control from S — used after settings load. */
 function repaintAll(){
+  /* The format lives in the shared settings, so a change to it arrives the
+     same way an appearance change does — and waiting until the next minute to
+     honour it would make the panel's picker look broken for up to a minute. */
+  if (typeof Clock !== 'undefined') Clock.paint();
   SLIDERS.forEach(f=>f());
   FIELDS.forEach(f=>f());
   ['mode','palette','layout','tmode','src','ptt','wake','micdsp','sttmodel','byeontimeout','ttsengine','face','fs']

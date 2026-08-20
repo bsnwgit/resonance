@@ -634,6 +634,18 @@ TALK and AUDIO stay. A browser will not open a microphone unless somebody asks
 it to, so TALK is pressed once when the screen is commissioned and the wake word
 carries it from there.
 
+**Date and time across the top** is a tick of its own, off by default. A screen
+people walk past wants the time on it; a browser tab has one in the corner
+already, which is why this is the layout's decision rather than something every
+display gets. It sits at the two ends of the top edge, dim, and **goes while the
+screensaver drifts** — a line that never moves is the exact thing the drift
+exists to prevent.
+
+What it *says* — 24-hour or 12-hour, and which of the date formats — is set once
+for the deployment under **SETTINGS ▸ ADMIN ▸ Time format**, not here. A
+building whose screens disagreed about how to write the time would be a building
+with two answers to one question.
+
 **And it goes full screen on the first touch**, unless the profile says otherwise. An address bar, a tab strip and
 somebody's bookmarks across the top of a hallway screen is a browser that
 happens to be running a display. The page cannot remove that chrome — no page
