@@ -4091,51 +4091,24 @@ def request_access(did, answers):
 
 
 def set_identity_endpoints(pid, rids):
-    """Which endpoints this PERSON may use. The identity half of
-    set_display_endpoints, and deliberately its twin: added where it is named,
-    removed everywhere else, allow-lists only.
+    """Which endpoints this PERSON may use, from their own row.
 
-    It exists because approving a request now creates a person rather than a
-    device, and the ticks beside APPROVE have to land somewhere. Sending them
-    to the display half would have written the browser's id into a list that
-    is read for people — a grant that looks made and reaches nobody."""
-    doc = read_routes()
-    want = set(rids or [])
-    changed = False
-    for rid, rec in doc["routes"].items():
-        has = pid in (rec.get("identities") or [])
-        if rid in want and not has:
-            rec["identities"] = list(rec.get("identities") or []) + [pid]
-            changed = True
-        elif rid not in want and has:
-            rec["identities"] = [p for p in rec["identities"] if p != pid]
-            changed = True
-    if changed:
-        write_routes(doc)
+    The identity half of set_display_endpoints, and deliberately its twin. It
+    exists because approving a request creates a person rather than a device,
+    and the ticks beside APPROVE have to land somewhere.
+
+    IT WROTE A LIST ON THE ENDPOINT until 2026-08-20, which stopped being
+    consulted the day an endpoint began naming a permission — the grant was
+    made, stored and read back, and reached nobody. It writes the authorize
+    profile now, which is where the answer is."""
+    return set_member_endpoints("identities", pid, rids)
 
 
 def set_display_endpoints(did, rids):
     """Which endpoints this display may use, as one gesture: added where it is
     named, removed everywhere else. The ticks are the whole truth rather than
-    an addition to something invisible.
-
-    Only ever the allow-lists. Naming an endpoint that is open to any display
-    does not restrict it — that would lock everybody else out as a side effect
-    of granting one person access, which is the opposite of what was asked."""
-    doc = read_routes()
-    want = set(rids or [])
-    changed = False
-    for rid, rec in doc["routes"].items():
-        has = did in (rec.get("displays") or [])
-        if rid in want and not has:
-            rec["displays"] = list(rec.get("displays") or []) + [did]
-            changed = True
-        elif rid not in want and has:
-            rec["displays"] = [d for d in rec["displays"] if d != did]
-            changed = True
-    if changed:
-        write_routes(doc)
-    return changed
+    an addition to something invisible."""
+    return set_member_endpoints("displays", did, rids)
 
 
 def open_default(doc):
@@ -4210,6 +4183,112 @@ def route_perm(rec, cfg=None):
             "displays": list(zv.get("displays") or []),
             "identities": list(zv.get("identities") or []),
             "groups": list(zv.get("groups") or [])}
+
+
+#: The two allow-lists a row can be named in, and the two names the panel uses
+#: for them. `groups` is the third, and is never set from a row's own page.
+GRANT_KEYS = ("displays", "identities", "groups")
+
+
+def route_authz_id(rec, cfg):
+    """Which AUTHORIZE profile decides who may use this endpoint, or "".
+
+    One step short of route_perm on purpose: granting is a write, and a write
+    has to know the profile's identity rather than the flattened answer."""
+    pid = str((rec or {}).get("permission") or "")
+    perm = next((p for p in cfg.get("permissions") or [] if p["id"] == pid), None)
+    if not perm:
+        return ""
+    return str((perm.get("values") or {}).get("authz") or "")
+
+
+def granted_map(key, cfg=None, doc=None):
+    """member id -> the endpoints it may use, read through the permissions.
+
+    The panel draws a person's and a device's ticks from this. It used to read
+    a list on the endpoint itself, which stopped being consulted the day an
+    endpoint started naming a permission — so every one of those ticks was
+    still being drawn from a field nothing decided anything with."""
+    cfg = cfg or display_settings()
+    doc = doc or read_routes()
+    out = {}
+    for rid in route_order(doc):
+        perm = route_perm(doc["routes"][rid], cfg)
+        if not perm:
+            continue
+        for member in perm.get(key) or []:
+            out.setdefault(member, []).append(rid)
+    return out
+
+
+def set_member_endpoints(key, mid, rids):
+    """Which endpoints one row may use, written where the grant now lives.
+
+    THE PROFILE IS THE GRANT, and a profile can be named by more than one
+    endpoint — so ticking an endpoint grants every endpoint sharing its rule,
+    and unticking one takes the grant away from all of them. That is what
+    naming a rule once means, and it is the reason this returns the set that
+    actually resulted: the panel redraws from that rather than from what was
+    asked for, so an admin sees the reach of what they just did instead of a
+    tick list that disagrees with the server.
+
+    Only ever the allow-lists. A profile set to ANY DISPLAY is not restricted
+    by being named here — that would lock everybody else out as a side effect
+    of granting one person access, which is the opposite of what was asked."""
+    if key not in ("displays", "identities"):
+        raise ValueError("not a grantable list: %s" % key)
+    ddoc = read_displays_doc()
+    cfg = ddoc.get("settings")
+    if not isinstance(cfg, dict):
+        cfg = {}
+        ddoc["settings"] = cfg
+    doc = read_routes()
+    want = set(rids or [])
+    by = {}
+    for rid, rec in doc["routes"].items():
+        aid = route_authz_id(rec, cfg)
+        if aid:
+            by.setdefault(aid, []).append(rid)
+    changed = False
+    for a in cfg.get("authzs") or []:
+        here = by.get(a.get("id") or "") or []
+        if not here:
+            continue                     # a profile no endpoint uses
+        vals = a.setdefault("values", {})
+        lst = [x for x in (vals.get(key) or []) if isinstance(x, str)]
+        keep = any(r in want for r in here)
+        if keep and mid not in lst:
+            vals[key] = (lst + [mid])[:MAX_ALLOW]
+            changed = True
+        elif not keep and mid in lst:
+            vals[key] = [x for x in lst if x != mid]
+            changed = True
+    if changed:
+        _write_displays_doc(ddoc)
+    return granted_map(key, display_settings(), doc).get(mid, [])
+
+
+def drop_member_grants(mid):
+    """Every grant a deleted row held, in every authorize profile.
+
+    An allow-list holding somebody who no longer exists is a permission nobody
+    can see and nobody can withdraw — and worse than invisible now that a
+    profile is shared, because the next row to be given that id inherits it."""
+    ddoc = read_displays_doc()
+    cfg = ddoc.get("settings")
+    if not isinstance(cfg, dict):
+        return 0
+    hit = 0
+    for a in cfg.get("authzs") or []:
+        vals = a.get("values") or {}
+        for key in GRANT_KEYS:
+            lst = vals.get(key) or []
+            if mid in lst:
+                vals[key] = [x for x in lst if x != mid]
+                hit += 1
+    if hit:
+        _write_displays_doc(ddoc)
+    return hit
 
 
 def vouched(disp):
@@ -4420,16 +4499,13 @@ def admin_displays():
     out = []
     displays = read_displays()
     now_ = int(time.time())
-    # WHICH ENDPOINTS EACH ROW IS ON, read once for the whole list. It lives on
-    # the endpoint rather than on the display — an allow-list is a property of
-    # the thing being protected — so a panel drawing a row had to have the
-    # routes document to know, and the tabs that draw these rows never fetch
-    # it. The grant was made, stored and invisible: ticks that could only ever
-    # be empty on the one page that shows a device's settings.
-    granted = {}
-    for rid, rrec in read_routes()["routes"].items():
-        for member in (rrec.get("displays") or []):
-            granted.setdefault(member, []).append(rid)
+    # WHICH ENDPOINTS EACH ROW IS ON, read once for the whole list. It lives
+    # with the endpoint rather than on the display — an allow-list is a
+    # property of the thing being protected — so a panel drawing a row had to
+    # have the routes document to know, and the tabs that draw these rows never
+    # fetch it. The grant was made, stored and invisible: ticks that could only
+    # ever be empty on the one page that shows a device's settings.
+    granted = granted_map("displays")
     for did, rec in sorted(displays.items(), key=lambda kv: kv[1]["created"]):
         row = {k: rec.get(k) for k in
                ("name", "asked", "approved", "hint", "created", "last_seen",
@@ -5843,15 +5919,12 @@ def admin_identities():
     # up itself would print an id on that tab and a name on the other one for
     # the same row. Read once for the whole list.
     doc = read_routes()
-    # WHAT EACH OF THEM IS ACTUALLY GRANTED, read off the allow-lists rather
-    # than stored on the row — the endpoint owns the grant and this is the
-    # same set its own `Who may use it` list shows. `granted` and not
-    # `endpoints`, because that is the key grantList reads for a display and
-    # the ticks on a person are meant to be the same control.
-    held = {}
-    for rid in route_order(doc):
-        for p in (doc["routes"][rid].get("identities") or []):
-            held.setdefault(p, []).append(rid)
+    # WHAT EACH OF THEM IS ACTUALLY GRANTED, read through each endpoint's
+    # permission rather than off a list on the endpoint — the authorize profile
+    # owns the grant, and this is the same set that profile's own list shows.
+    # `granted` and not `endpoints`, because that is the key grantList reads
+    # for a display and the ticks on a person are meant to be the same control.
+    held = granted_map("identities", doc=doc)
     # WHETHER, never what. That they have set a password is the fact the panel
     # is built on: it is what moves a row from the enrolment queue to the
     # register, and it is the one thing an admin cannot do for them.
@@ -9718,14 +9791,7 @@ class Handler(SimpleHTTPRequestHandler):
             # An allow-list holding somebody who no longer exists is a
             # permission nobody can see and nobody can withdraw. Cleared here,
             # exactly as a deleted display's is.
-            doc = read_routes()
-            touched = [r for r, o in doc["routes"].items()
-                       if pid in (o.get("identities") or [])]
-            for r in touched:
-                doc["routes"][r]["identities"] = [
-                    p for p in doc["routes"][r]["identities"] if p != pid]
-            if touched:
-                write_routes(doc)
+            touched = [None] * drop_member_grants(pid)
             print("identity %s (%s) deleted by %s%s%s"
                   % (pid, name, s["user"],
                      " — removed from %d endpoint(s)" % len(touched)
@@ -9802,14 +9868,7 @@ class Handler(SimpleHTTPRequestHandler):
             # nobody can see and nobody can withdraw — the same reasoning that
             # clears a deleted display from an allow-list, and a deleted
             # endpoint from a fallthrough.
-            doc = read_routes()
-            touched = [r for r, o in doc["routes"].items()
-                       if gid in (o.get("groups") or [])]
-            for r in touched:
-                doc["routes"][r]["groups"] = [g for g in doc["routes"][r]["groups"]
-                                              if g != gid]
-            if touched:
-                write_routes(doc)
+            touched = [None] * drop_member_grants(gid)
             print("group %s (%s) deleted by %s%s"
                   % (gid, name, s["user"],
                      " — removed from %d endpoint(s)" % len(touched)
@@ -10304,14 +10363,7 @@ class Handler(SimpleHTTPRequestHandler):
             # An allow-list holding the id of a display that no longer exists
             # is a permission nobody can see and nobody can withdraw. Cleared
             # here, for the same reason a deleted endpoint's fallthrough is.
-            doc = read_routes()
-            touched = [r for r, o in doc["routes"].items()
-                       if did in (o.get("displays") or [])]
-            for r in touched:
-                doc["routes"][r]["displays"] = [d for d in doc["routes"][r]["displays"]
-                                                if d != did]
-            if touched:
-                write_routes(doc)
+            touched = [None] * drop_member_grants(did)
             print("display %s (%s) deleted by %s%s%s"
                   % (did, name, s["user"],
                      " — removed from %d endpoint(s)" % len(touched)

@@ -970,11 +970,20 @@
     border-color:rgba(var(--pal-rust),.70);
     background:rgba(var(--pal-rust),.30);
   }
-  /* Milk is the palest of the five, so it carries a little more of itself to
-     land at the same visual weight as the other two. */
+  /* ICE, the same as PROFILES above it. SEARCH is not a subject you choose
+     between — it is a way into the ones already there — so it takes the
+     heading's colour rather than a fifth one of its own. It wore milk, and
+     inherited the group boxes' rust edge on top of it, which read as a third
+     kind of label made by accident. */
   .findside .tablabel{
-    border-color:rgba(var(--pal-milk),.70);
-    background:rgba(var(--pal-milk),.30);
+    border-color:rgba(var(--pal-ice),.70);
+    background:rgba(var(--pal-ice),.30);
+  }
+  /* Past `.tabbox > legend .tablabel`, which is a rule deeper and would
+     otherwise keep the rust edge under an ice fill. */
+  .findside > .tabbox > legend .tablabel{
+    border-color:rgba(var(--pal-ice),.70);
+    background:rgba(var(--pal-ice),.30);
   }
   /* The foot has a darker ground of its own — rgba(0,0,0,.5) laid over the
      panel's own .35 — so an identical tint reads weaker down there than the
@@ -982,7 +991,7 @@
      reason while the ones above it were already shaded. A few points more so
      all five land at one weight rather than at one number. */
   #panelfoot .tablabel{background:rgba(var(--pal-ice),.34)}
-  #panelfoot .findside .tablabel{background:rgba(var(--pal-milk),.38)}
+  #panelfoot .findside .tablabel{background:rgba(var(--pal-ice),.38)}
   #navlinks .bartitle{margin-left:10px}
   /* …except the one that opens the bar. That margin is what holds a label off
      the link before it, and there is no link before the first — left in, it
@@ -5870,6 +5879,42 @@ what you change there reaches all of them.</div>
     </div>
   </div>
 
+  <!-- Its own section, and not part of the permission above it. A layout is
+       what a screen LOOKS LIKE and what it is CALLED; the section above is
+       about who may use it. Somebody going looking for the first opens the
+       section called Layout — and subsections are collapsed until opened, so
+       a control in the wrong one is a control that does not exist.
+
+       IT WAS DELETED BY ACCIDENT on 2026-08-20 and restored the same day: it
+       sat between the two sections that became the permission picker, and a
+       removal taken as one span took it with them. -->
+  <div class="subgrp" data-g="display">
+    <h5>Layout<span class="subsum"></span></h5>
+    <div class="subbody">
+  <select data-f="kiosk_profile" class="ppick"></select>
+  <div class="note help">The <b>layout profile</b> every screen opened on this
+endpoint's <b>port</b> gets. A browser on the Demo port is a Demo screen
+because that is the address it was opened at — nothing to tick, and no list to
+keep in step.
+
+<b>A screen's own choice always wins.</b> A row that names a profile is a
+screen somebody decided about, and nothing set here moves it — this is read
+only where that row's picker is left on INHERIT.
+
+<b>The port, not the grant.</b> Which screens an endpoint <i>permits</i> is a
+separate question, on the section above. A page is loaded from exactly one
+address and a port carries one endpoint, so there is never more than one answer
+here and never anything to disambiguate.
+
+<b>Every option here is a real profile.</b> There is no "none": an endpoint
+that has never been given one reads <i>choose a layout profile</i> until it
+is.
+
+<b>An endpoint with no port reaches nothing</b>, this included — it is attached
+to nothing and answers nowhere, which the Network section says.</div>
+    </div>
+  </div>
+
   <div class="subgrp" data-g="conn">
     <h5>Connection<span class="subsum"></span></h5>
     <div class="subbody">
@@ -6098,6 +6143,7 @@ function blockPaint(blk, r){
     }
     blockSyncOpen(blk);
   };
+  fillPermPicker(blk, r);
   blockSyncPerm(blk);
   blockSyncSignin(blk);
   /* Painted with the rest of the block, so a row opened fresh already carries
@@ -6158,29 +6204,6 @@ function blockPaint(blk, r){
     const h = blk.querySelector('[data-g="' + g + '"] .subsum');
     if (h) h.textContent = sums[g];
   });
-
-  /* THE PERMISSIONS, by name. Unlike a connection none is deliberately shared
-     between endpoints, so nothing is filtered out of this list: two endpoints
-     answering to the same rule is the point of naming it once. */
-  const pm = F(blk, 'permission');
-  if (pm){
-    const want = r.permission || '';
-    const all = (DPCFG && DPCFG.permissions) || [];
-    /* NONE reads as the refusal it is. It was the shape of a half-built
-       endpoint before and it meant OPEN then; saying so at the control is the
-       cheapest place to correct that expectation. */
-    const opts = [['', 'NONE — refused to everybody']]
-      .concat(all.map(p=> [p.id, p.name]));
-    if (want && !all.some(p=> p.id === want))
-      opts.push([want, 'a permission that no longer exists']);
-    pm.innerHTML = '';
-    opts.forEach(([v, label])=>{
-      const o = document.createElement('option');
-      o.value = v; o.textContent = label;
-      pm.appendChild(o);
-    });
-    pm.value = want;
-  }
 
   const cn = F(blk, 'connection');
   if (cn){
@@ -6302,19 +6325,32 @@ function blockFillWho(blk, r){
       && !(pbox && pbox.contains(document.activeElement))){
     if (pbox){
       pbox.innerHTML = '';
-      IDENTITIES.forEach(p=>{
+      /* ONLY THE ONES WHO HAVE ARRIVED. A person with a setup link still
+         outstanding has not chosen a password, cannot sign in, and so cannot
+         satisfy the tick that would be made for them — an entry that grants
+         nothing and reads as though it granted something. They appear here the
+         moment they use their link.
+
+         One already ticked is still shown, whatever state it is in: hiding a
+         grant that exists would take it away on the next save without anybody
+         asking for that. */
+      const people = IDENTITIES.filter(p=> p.ready || wantP.indexOf(p.id) >= 0);
+      people.forEach(p=>{
         const lab = document.createElement('label');
         const cb = document.createElement('input');
         cb.type = 'checkbox'; cb.dataset.p = p.id;
         cb.checked = wantP.indexOf(p.id) >= 0;
         lab.appendChild(cb);
-        lab.appendChild(document.createTextNode(' ' + (p.label || p.id)));
+        lab.appendChild(document.createTextNode(
+          ' ' + (p.label || p.id) + (p.ready ? '' : ' — link not used yet')));
         pbox.appendChild(lab);
       });
-      if (!IDENTITIES.length){
+      if (!people.length){
         const em = document.createElement('span');
-        em.textContent = 'nobody yet — people are created under '
-                       + 'ENROLLMENTS ▸ USER';
+        em.textContent = IDENTITIES.length
+          ? 'nobody has finished enrolling yet — a person appears here once '
+            + 'they have used their link and chosen a password'
+          : 'nobody yet — people are created under ENROLLMENTS ▸ USER';
         pbox.appendChild(em);
       }
     }
@@ -6359,7 +6395,14 @@ function blockFillWho(blk, r){
     }
     if (box){
     box.innerHTML = '';
-    DISPLAYS.forEach(d=>{
+    /* APPROVED ONLY, the same rule as the people above. A screen that has not
+       been approved is one nobody has decided should be here yet, and it is
+       refused whatever this list says — so offering it made a tick that could
+       not do anything and looked like it had. Approve it under ACCESS and it
+       appears. One already ticked stays visible, so a grant is never taken
+       away by a list quietly dropping it. */
+    const screens = DISPLAYS.filter(d=> d.approved || want.indexOf(d.id) >= 0);
+    screens.forEach(d=>{
       const lab = document.createElement('label');
       const cb = document.createElement('input');
       cb.type = 'checkbox'; cb.dataset.d = d.id;
@@ -6369,9 +6412,12 @@ function blockFillWho(blk, r){
         ' ' + d.label + (d.approved ? '' : ' — not approved')));
       box.appendChild(lab);
     });
-    if (!DISPLAYS.length){
+    if (!screens.length){
       const em = document.createElement('span');
-      em.textContent = 'no displays have loaded the page yet';
+      em.textContent = DISPLAYS.length
+        ? 'no approved screens yet — one appears here once it is approved '
+          + 'under ACCESS ▸ NODES'
+        : 'no displays have loaded the page yet';
       box.appendChild(em);
     }
     }
@@ -6449,12 +6495,44 @@ function blockSyncPerm(blk){
 /* The record as it stands IN THE PANEL — the picker's value rather than the
    saved one, so every note answers to what somebody has just chosen instead of
    to what was last written. */
+/* THE PERMISSIONS, by name. Unlike a connection none is deliberately shared
+   between endpoints, so nothing is filtered out of this list: two endpoints
+   answering to the same rule is the point of naming it once.
+
+   Its own function because the notes under it read the picker, and they run
+   before the rest of the block is filled. */
+function fillPermPicker(blk, r){
+  const pm = F(blk, 'permission');
+  if (!pm) return;
+  const want = r.permission || '';
+  const all = (DPCFG && DPCFG.permissions) || [];
+  /* NONE reads as the refusal it is. It was the shape of a half-built endpoint
+     before and it meant OPEN then; saying so at the control is the cheapest
+     place to correct that expectation. */
+  const opts = [['', 'NONE — refused to everybody']]
+    .concat(all.map(p=> [p.id, p.name]));
+  if (want && !all.some(p=> p.id === want))
+    opts.push([want, 'a permission that no longer exists']);
+  pm.innerHTML = '';
+  opts.forEach(([v, label])=>{
+    const o = document.createElement('option');
+    o.value = v; o.textContent = label;
+    pm.appendChild(o);
+  });
+  pm.value = want;
+}
+
 function blkRoute(blk){
   const rec = Object.assign({}, blk._rec || {});
+  /* ONLY ONCE IT HAS OPTIONS. A select with none cannot hold a value, so
+     reading it during the paint that fills it returned "" for every endpoint
+     — and every note under it then said the endpoint named no permission
+     while the picker beside it, filled a moment later, showed the right one.
+     Empty means not drawn yet, not chosen nothing. */
   const sel = F(blk, 'permission');
-  if (sel) rec.permission = sel.value;
+  if (sel && sel.options.length) rec.permission = sel.value;
   const cn = F(blk, 'connection');
-  if (cn) rec.connection = cn.value;
+  if (cn && cn.options.length) rec.connection = cn.value;
   return rec;
 }
 
@@ -8901,9 +8979,22 @@ function paintPerms(list){
       bits.push('the authorize profile has nothing ticked, so this permission '
               + 'admits nobody at all');
     else if (v.authn && v.authz && A.needs_signin && Z.restricted
-             && !(Z.identities || []).length)
-      bits.push('sign-in is required and only screens are named — a screen is '
-              + 'not a person, so no caller can satisfy both');
+             && !(Z.identities || []).length && !(Z.groups || []).length
+             && (Z.displays || []).length
+             && !(Z.displays || []).some(id=>{
+                  const d = DISPLAYS.find(x=> x.id === id);
+                  return d && d.arrived === 'invited';
+                }))
+      /* A SCREEN ENROLLED WITH A CODE SATISFIES SIGN-IN, so naming only
+         screens is not the contradiction it was before 2026-08-20 — minting a
+         code and carrying it to the device is an admin deciding that screen
+         should be here, which is what being known means. What is still a dead
+         end is a screen that merely opened the page and asked: nobody vouched
+         for it, and it cannot become a person. Only that case warns, and only
+         when nothing else on the list could get in either. */
+      bits.push('sign-in is required and the only screens named asked from '
+              + 'the page rather than being given a code — a code is what '
+              + 'makes a screen a known caller, so none of these can get in');
     if (bits.length){
       const w = document.createElement('div');
       w.className = 'note bad'; w.textContent = bits.join(' · ');
