@@ -90,6 +90,19 @@ but it **warns at every startup and in the admin panel**, because a laptop
 configured this way that later joins an office network will not have changed
 on the day that matters.
 
+**The warning is on the endpoint**, under CONNECTIONS ▸ AI ▸ *Sign in*, because
+that is the control that causes it — one line saying what being open costs,
+shown only where that endpoint asks nobody to sign in and this machine can be
+reached. This page keeps the count and a pointer, since being reachable is what
+makes it matter rather than what decides it.
+
+**It can be answered, two ways.** *Not now* lasts as long as the tab. *I know*
+is recorded against your admin account, so it follows you to another machine
+and leaves a colleague still being told — a shared "never show this again" on a
+security notice is a notice worth nothing. Either way it is an acknowledgement
+of a **state**: close the endpoint and every acknowledgement of it is forgotten,
+so reopening it later is a new fact rather than a repeat of an old one.
+
 It used to banner the display as well. That is gone: a description of this
 server's exposure is not something to hand to every browser that loads a
 screen. The reasoning that made it safe — anybody reading it could have opened

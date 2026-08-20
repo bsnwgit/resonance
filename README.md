@@ -3210,10 +3210,14 @@ the assistant tab became a list rather than a form.
 - **Binding to one address** rather than every interface, chosen from the
   addresses the machine actually has. An address it does not have is a server
   that will not start, and it would take the admin page with it.
-- **Beyond loopback with no sign-in is allowed and never quiet** — a banner in
-  the panel before saving, a warning on save, a loud one at every startup, and
-  a banner across the display itself. A machine set up this way on a network
-  its owner controls may later join one they do not.
+- **Beyond loopback with no sign-in is allowed and never quiet** — a line on
+  the endpoint that is open, a warning on save, and a loud one at every
+  startup. A machine set up this way on a network its owner controls may later
+  join one they do not. The endpoint is where the line lives because that is
+  the control that decides it; the exposure page keeps a count and a pointer.
+  It is dismissable — for the tab, or against the admin account — because a
+  warning that cannot be answered is one people learn to read past, and the
+  dismissal is of a state: closing the endpoint forgets it.
 - **The plain listener redirects to HTTPS**, keeping bookmarks, kiosk URLs and
   QR codes alive with path and query intact. **307, not a permanent redirect**
   — the target is configuration an admin can change, and a cached permanent
