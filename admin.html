@@ -660,6 +660,9 @@
     background:rgba(var(--glass),.035);
     padding:0 11px 10px;
   }
+  /* The box's own foot closes the last section on a tab, so that one does not
+     draw a second line ten pixels above it. See render(). */
+  #grpbox .grp.lastvis:not(.shut){border-bottom:0}
   /* …and it goes when that section is the only one on the tab. See render().
      TRANSPARENT rather than `border:0`, so the box model does not change and
      nothing on the page moves by a pixel when a profile is expanded and the
@@ -11576,8 +11579,17 @@ function panelNav(){
        there are several, every one keeps its edge, because there the border
        is what tells one topic from the next. */
     const box = $('grpbox');
-    if (box) box.classList.toggle('solo',
-                                  groups.filter(g=> !g.hidden).length === 1);
+    const live = groups.filter(g=> !g.hidden);
+    if (box) box.classList.toggle('solo', live.length === 1);
+    /* THE LAST ONE DOES NOT DRAW ITS OWN FOOT. The box already has one, so a
+       section that closes itself puts two lines a padding's width apart at the
+       bottom of every tab — most visibly where the last section is a list, and
+       the list's own last row is a third. Marked here rather than with
+       :last-of-type because the sections that are not on this tab are hidden,
+       not removed, and the last of them in the document is usually not the
+       last one on screen. */
+    groups.forEach(g=> g.classList.remove('lastvis'));
+    if (live.length) live[live.length - 1].classList.add('lastvis');
   }
   /* Two homes now: the row at the top and the pinned entry at the foot.
      Treat them as one set so exactly one is ever lit. */
