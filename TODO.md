@@ -7,45 +7,7 @@ again.
 
 ---
 
-## 1 · What belongs to a display and what belongs to an AI connection
-
-**There are settings in both places that answer the same question**, and which
-one wins is decided by fallback chains rather than by anybody having drawn the
-line. Before any of it is moved, the line has to be drawn: what is a property
-of the **connection** (a provider, a model, a key, a port, who may use it) and
-what is a property of the **place** (a voice, a greeting, a wake word, a look).
-
-What is actually there today:
-
-- **A wake word can live in three places.** An endpoint carries its own
-  `wakeword` and `aliases`; the **speech profile** it names carries the same
-  two; and a **person** carries one on their identity row. `wake_words_in_use()`
-  reads the profile first and falls back to the endpoint's own pair, which
-  makes the endpoint's copy read as legacy — but nothing says so, and both are
-  editable.
-- **`voice` is on the endpoint** and blank means "whatever the shared settings
-  chose", while the speech profile is the thing that otherwise describes how a
-  place sounds.
-- **`greeting` is on the endpoint**, blank meaning the shared phrases — same
-  shape as `voice`, same question.
-- **`kiosk_profile` is on the endpoint *and* on the display row.** This one is
-  deliberate — the endpoint's is what a screen on its port inherits when the
-  row is left on INHERIT — but it is the only two-place setting that is
-  intended, so it should be obvious which of the pairs above are like it and
-  which are duplicates.
-- **An endpoint mixes both kinds already**: `network`, `restricted`,
-  `needs_signin`, `displays` are access and address; `greeting`, `voice`,
-  `speech`, `kiosk_profile` are appearance.
-
-**To decide first:** whether an endpoint keeps any appearance at all, or names
-a speech profile and nothing else. If it keeps none, the endpoint's `wakeword`,
-`aliases`, `voice` and `greeting` become migrations into a profile rather than
-fields to delete — a deployment that set them on the endpoint must not go
-silent on upgrade.
-
----
-
-## 2 · Choosing what gets logged
+## 1 · Choosing what gets logged
 
 **Everything is recorded and there is no way to say otherwise.** The nine kinds
 in `EVENT_KINDS` — `mic_denied`, `no_recorder`, `stt_slow`, `stt_error`,
@@ -74,7 +36,7 @@ answer badly.
 
 ---
 
-## 3 · Building up embeds
+## 2 · Building up embeds
 
 **Scope this before building any of it** — the list below is what is there and
 what is plainly missing, not a decision about which of it is wanted.
@@ -122,53 +84,7 @@ Directions worth weighing, each of which is a different product:
 
 ---
 
-## 4 · "transcribing…" still shows on the Home Assistant wall display
-
-**Reported again**, on a display in full screen. Two rounds of fixes have gone
-at this already — the first asked the wake gate and was silently useless
-(`Wake.armed()` is false in auto and push-to-talk, so it hushed nothing), the
-second moved the question to whether the screen is in a conversation and also
-hushed the error-flagged notes, which are the frequent ones. It is still
-appearing, so **reproduce it on that screen and find out what `hush()` actually
-returns before changing `hush()` a third time.** Both previous attempts were
-reasoned about rather than watched.
-
-What it tests today — `index.html`, `hush()`:
-
-```
-Drive.phase !== 'idle'   -> do not hush (it is in a conversation)
-Wake.awake               -> do not hush (somebody woke it)
-otherwise                -> hush unless the screen was touched in the last few seconds
-```
-
-Both note surfaces go through it: `micNote()` writes `#micnote`, `note()`
-writes `#ttsnote`, and each takes the same gate. `relay()` still sends
-everything to the panel either way, so the panel is not evidence that hushing
-failed.
-
-**`hush()` never asks what kind of surface this is.** `Kiosk.on` and
-`Kiosk.fullscreen` are not in it. That is the gap the report points at: a
-browser tab somebody is using should narrate itself, and a screen on a wall
-should not, and the current test cannot tell them apart — it only asks whether
-anybody is mid-conversation with it.
-
-Three candidates, in the order worth checking:
-
-1. **`Wake.awake` is stuck true** on that screen. It is set on a wake hit and
-   cleared in four places; if the HA endpoint's arrangement leaves it set, every
-   note paints and the gate is working exactly as written.
-2. **Something is updating `lastTouch` that is not a person** — a pushed
-   command, a poll, a synthetic event — which buys `TOUCH_GRACE` seconds of
-   narration each time.
-3. **`Drive.phase` never returns to `idle`** on that endpoint, which would
-   disable the gate outright.
-
-If it turns out to be none of those, the answer is probably that a wall screen
-should hush on being a wall screen rather than on nobody talking to it.
-
----
-
-## 5 · A real certificate on the server
+## 3 · A real certificate on the server
 
 **Self-signed, and it is the reason for most of what looks broken.** What is on
 the box today:
@@ -219,7 +135,7 @@ assistant's, and the enrolment name together.
 
 ---
 
-## 6 · Signing out — by voice, and on screen
+## 4 · Signing out — by voice, and on screen
 
 **The server can already do it and nothing can reach it.** `/user/logout`
 exists, works, and is called by nobody: it closes the account's sessions and
@@ -258,7 +174,7 @@ Two surfaces are wanted and they are not the same feature:
 
 ---
 
-## 7 · Ending a session when the browser closes
+## 5 · Ending a session when the browser closes
 
 **Nothing ends when a browser closes today.** The cookie is written with
 `Max-Age = hours × 3600`, so it survives being closed and reopened, and the
@@ -266,7 +182,7 @@ server's own record — `_user_sessions[token] = {pid, expires}` — knows nothi
 about browsers at all. Closing the window leaves a live session that anybody
 returning to that machine walks straight into.
 
-Pairs with **§6**: this is the same question asked from the other end, and both
+Pairs with **§4**: this is the same question asked from the other end, and both
 run into `close_user_sessions()` ending every session that person has anywhere.
 
 Three mechanisms, and only one of them actually ends anything:
@@ -303,7 +219,7 @@ server restart already ends every session**, and nothing anywhere says so.
 
 ---
 
-## 8 · An approved request lands the person on a JSON error
+## 6 · An approved request lands the person on a JSON error
 
 **A regression, and a recent one.** Somebody asks for access on a display, an
 admin approves, and their screen shows `{"error": "not found"}`. The admin sees
