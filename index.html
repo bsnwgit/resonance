@@ -1052,7 +1052,13 @@ function paintGate(){
      alternative to a form that fails for a reason nobody can see. */
   const invite = GATE === 'invite';
   const spent = GATE === 'spent';
-  const signing = (GATE === 'login' || setup) && !invite && !spent;
+  /* SIGNED IN AND STILL LOOKING AT THIS. Not a failure and not a sign-in: the
+     password worked, and what is missing is a grant only an admin can make.
+     Asking for the password again is the one thing that cannot help, and it is
+     what this page did — the gate asked whether any endpoint was usable and
+     never whether somebody had already answered it. */
+  const nogrant = GATE === 'nogrant';
+  const signing = (GATE === 'login' || setup) && !invite && !spent && !nogrant;
   /* The one failure a link can have. Said here rather than nowhere: the
      server answers a redirect with one word, and somebody who followed a link
      that did not work should be told, not left looking at a page behaving as
@@ -1081,7 +1087,8 @@ function paintGate(){
        opened the link they were sent, and the two messages written for the
        two failures could never appear. */
     head.textContent =
-        done    ? 'You are set up'
+        nogrant ? 'Nothing here is yours yet'
+      : done    ? 'You are set up'
       : failed             ? 'That link did not work'
       : invite  ? 'Invitations are accepted here'
       : spent   ? 'That link has been used'
@@ -1094,7 +1101,11 @@ function paintGate(){
      leaves its own message here and repainting the mode must not wipe it. */
   if (note && !note.classList.contains('bad')){
     note.textContent =
-        done    ? (PLACES.length
+        nogrant ? ('Signed in as ' + (Person.name || Person.email || 'you')
+                   + '. This assistant has not been granted to you — an '
+                   + 'administrator ticks it on your row under IDENTITY ▸ '
+                   + 'USER, or on the endpoint itself.')
+      : done    ? (PLACES.length
                     ? 'Sign in with your email address and the password you '
                       + 'just chose, at whichever of these you want:'
                     : 'Nothing has been granted to this account yet — an '
@@ -1723,6 +1734,24 @@ function paintRequest(){
      unfinished boot — or a dropped request — as a configuration fault. */
   const emptyPort = D.known && Routes.loaded && !(Routes.list || []).length;
   const canEnrol = D.known && D.state !== 'approved' && !usableHere && !emptyPort;
+  /* A SIGN-IN BOX IS NEVER THE ANSWER TO SOMEBODY WHO IS SIGNED IN. Above the
+     enrolment branches on purpose: every one of them offers a way to prove who
+     you are, and this is the state where that has already happened and did not
+     help. Only where nothing is usable — a person with a grant falls straight
+     through to the display, which is what signing in was for. */
+  if (typeof Person !== 'undefined' && Person.is() && !usableHere && !emptyPort){
+    document.body.toggleAttribute('data-request', true);
+    document.body.toggleAttribute('data-gate', true);
+    ['reqhead', 'reqform', 'reqsend', 'reqnote', 'enrol'].forEach(id=>{
+      const el = $(id);
+      if (el) el.style.display = 'none';
+    });
+    const links = $('gatelinks');
+    if (links) links.style.display = 'none';
+    GATE = 'nogrant';
+    paintGate();
+    return;
+  }
   if (emptyPort){
     document.body.toggleAttribute('data-request', true);
     document.body.toggleAttribute('data-gate', true);
