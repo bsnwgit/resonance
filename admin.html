@@ -4318,7 +4318,11 @@ than being silently missing because it was not in a list written today.
 health list and syslog is somebody else's aggregator, read by somebody who
 thinks in severities rather than in this product's nine words. So that one is
 set by level, not by kind.</div>
-  <div class="setuprow" id="ev_kinds"></div>
+  <!-- `.cks`, the same two-column tick grid the group members and the endpoint
+       grants use. It was a `.setuprow`, which is a wrapping line — nine ticks
+       in it read as one long sentence with boxes in it rather than as a list
+       of nine things. -->
+  <div class="cks" id="ev_kinds"></div>
   <div class="note" id="evkindnote"></div>
   <div class="seg actrow">
     <button id="b_evsave" class="act-save">SAVE</button>
@@ -7915,7 +7919,6 @@ function paintEventKinds(cfg){
   box.innerHTML = '';
   kinds.forEach(k=>{
     const lab = document.createElement('label');
-    lab.className = 'vo';
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.dataset.kind = k;
