@@ -9820,10 +9820,11 @@ function queueEmpty(){
     const b = $(id);
     return !!(b && b.querySelector('.erow'));
   });
+  /* SHORT, because the row it replaces is short and the chips do the
+     explaining the moment there is one. Both ways in, named once each. */
   el.textContent = any ? ''
-    : 'Nobody waiting. Name somebody above and you are handed a link to give '
-    + 'them, or they can ask from a screen and appear here for you to approve '
-    + '— either way this is where they wait.';
+    : 'Nobody waiting. Anyone you name above, and anyone who asks from a '
+    + 'screen, waits here.';
 }
 
 /* Just the numbers, without the id and the name — what a display is sent and
