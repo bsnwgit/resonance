@@ -1128,7 +1128,11 @@ function paintGate(){
   if (links){
     /* Neither of those routes answers on the enrolment listener, so offering
        them would be two buttons that 404. */
-    links.style.display = (setup || ENROL_ONLY) ? 'none' : '';
+    /* …and not to somebody who is already signed in. Both of these are ways
+       to prove who you are — a code, or asking to be let in as a device — and
+       a person holding a session has done that. What they are short of is a
+       grant, which neither button can fetch. */
+    links.style.display = (setup || ENROL_ONLY || nogrant) ? 'none' : '';
     const code = $('gatecode'), req = $('gatereq');
     if (code) code.textContent = GATE === 'code' ? 'Sign In Instead'
                                                  : 'Use Code Instead';
