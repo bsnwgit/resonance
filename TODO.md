@@ -132,3 +132,51 @@ Whichever it is, two things go with it: **a renewal that is not a diary entry**
 (this one expires 13 Aug 2027 and nothing will say so), and `make-cert.sh`
 taking more than one host so the SAN can carry the panel's address, each
 assistant's, and the enrolment name together.
+
+---
+
+## 4 · Password rules an admin can set
+
+**There is one rule and it is a constant.** `MIN_PASSWORD = 10`, in
+`serve.py`, and length is the whole of it — nothing asks for a mix of cases, a
+digit, a symbol, or anything a password is not. A deployment with a policy to
+meet cannot say so, and one that wants something laxer for a house full of
+tablets cannot say that either.
+
+What is actually there today:
+
+- **One number for both populations, deliberately.** `password_fault()` says so
+  in as many words: "there is one rule in this product for how long a password
+  has to be, and a second number for a second population would be two answers
+  to one question." It judges a person's password; the panel's own accounts are
+  judged by two separate `len(new) < MIN_PASSWORD` tests in the admin routes.
+- **So the rule is written out three times.** `password_fault()` for people,
+  and twice more where an admin account's password is set or changed. A fourth
+  rule added to only one of them is a rule that applies to some passwords.
+- **The panel is told the number** — `pw_min` rides along with the identities
+  payload — so whatever is chosen has somewhere to be shown without a second
+  fetch.
+- **512 is the ceiling**, and it is not a policy: it is there so a hash is not
+  computed over a megabyte somebody pasted.
+
+**To decide first**, and each answer is a different amount of work:
+
+- **A length, or a policy?** A number in a box is one setting and covers most
+  of what a deployment is asked to prove. Character classes are four more
+  ticks, and they are the part security guidance has been moving away from for
+  a decade — worth deciding on purpose rather than adding because a form
+  usually has them.
+- **One rule or two?** The comment above is a decision already taken, and a
+  panel account and a hallway sign-in are genuinely different risks. Changing
+  it means saying why the earlier reasoning no longer holds.
+- **What happens to passwords that already exist.** Raising the minimum cannot
+  retroactively refuse them: they are hashes, and the length is unknowable. So
+  either the rule applies at the next change only — quiet, and leaves weak
+  passwords in place — or somebody has to be forced to set a new one, which is
+  a mechanism this product does not have.
+- **Where it is said.** The rule has to reach the person choosing a password,
+  on a page they open from a one-shot link, or they find out by being refused.
+
+Whatever it becomes, it should be **one place that answers "is this password
+allowed"**, called by all three sites — the value is a setting, the judgement
+is not three copies of an `if`.
