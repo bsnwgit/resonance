@@ -918,7 +918,10 @@
      the other. */
   #panelbar{
     flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:8px 14px;
-    border-bottom:1px solid rgba(var(--glass),.1);
+    /* NO RULE UNDER IT. There was a hairline here closing the bar off, and it
+       landed a few pixels above the PROFILES rule — two lines across the panel
+       with nothing between them, the second of which says what it is dividing.
+       The bar is told apart by what is in it, not by an edge. */
     font-size:calc(9px * var(--fs));letter-spacing:.16em;color:rgba(var(--paper),.75);
   }
   /* The way around the panel, as LINKS rather than as buttons. They sit in a
