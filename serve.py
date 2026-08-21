@@ -3843,9 +3843,25 @@ def display_network(did, doc=None):
     is a screen that cannot be loaded from a single address and is refused
     where it is made rather than discovered later."""
     doc = doc or read_routes()
-    nids = {route_network(r)
+    # THROUGH THE PERMISSION, which is where a grant lives. It read
+    # `r["displays"]` — the route's own allow-list — and that field was retired
+    # when permissions became profiles: set_display_endpoints writes into the
+    # AUTHORIZE profile the route names, so this looked in the one place the
+    # answer is no longer kept and found nothing for every screen.
+    #
+    # What that cost: a display's port is derived from its grant, so a screen
+    # ticked onto an endpoint came out with no network profile, and the
+    # enrolment address fell back to a plain listener that is not running in a
+    # deployment whose ports all come from profiles — `http://host:0/e/CODE`.
+    # The same read is what subject_may does, one function down.
+    # One read of the settings for the whole loop: the panel asks this once per
+    # display row, and route_perm reaches for them again on every route it is
+    # handed. A register of fifty screens was fifty times the routes' worth of
+    # file reads to answer a question about ports.
+    cfg = display_settings()
+    nids = {route_network(r, cfg)
             for r in doc["routes"].values()
-            if did in (r.get("displays") or [])}
+            if did in ((route_perm(r, cfg) or {}).get("displays") or [])}
     if len(nids) > 1:
         return "", nids
     return (nids.pop() if nids else ""), None
