@@ -1244,11 +1244,24 @@ The two worth considering first in a working house are **woke on a near miss**
 and **transcription ran long**: they are the noisiest, and the least likely to
 be acted on.
 
-**Syslog is set separately, and by level.** The ledger is this panel's own
-health list; the sink is somebody else's aggregator, read by somebody who
-thinks in severities rather than in this product's nine words. So the sink has
-one floor — everything, warnings and errors, or errors only — beside the host
-and facility it is pointed at.
+**With syslog on, everything recorded is also sent.** Every event goes to the
+collector as it happens, not only the ones that cross an alert threshold — so
+the catalog governs both the local ledger and the sink, and unticking a kind
+stops it in both at once.
+
+**How much of it the collector gets is set by level**, beside the host and
+facility: everything, warnings and errors, or errors only. The reader at that
+end is an aggregator and every one of them is pointed at a severity rather than
+at this product's own words.
+
+Alerts still go too, and they are a different thing: an alert is a threshold
+crossed — five slow transcriptions from one screen in an hour — where an event
+is the fact itself. A collector receiving both sees the fault and then the
+judgement about it.
+
+**`server.log` is not part of this.** That is the process's own output — every
+HTTP request, saves, restarts — written beside the program and forwarded
+nowhere.
 
 ## Groups
 

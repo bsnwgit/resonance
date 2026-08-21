@@ -4682,6 +4682,49 @@ def level_wanted(level, cfg=None):
     return order.get(level, 0) >= order.get(floor, 0)
 
 
+#: WHAT EACH KIND IS CALLED IN THE SINK. The ledger's own words where the
+#: alert map already has them, so a collector and this panel say the same thing
+#: about the same fault, and the kind itself where it has none — the door
+#: events are not alerts and never will be.
+EVENT_WORDS = {
+    "mic_denied": "microphone refused",
+    "no_recorder": "no recorder in this browser",
+    "stt_slow": "transcription ran long",
+    "stt_error": "the recogniser errored",
+    "tts_fallback": "fell back to the browser voice",
+    "wake_fuzzy": "woke on a near miss",
+    "no_intent": "asked for something it cannot do",
+    "backend_error": "the assistant errored",
+    "backend_slow": "the assistant ran long",
+    "login_ok": "signed in",
+    "login_fail": "sign-in refused",
+}
+
+
+def event_to_sink(row):
+    """One recorded event, forwarded to syslog as it happens.
+
+    EVERY EVENT, not only the ones that become alerts. An alert is a threshold
+    crossed — five slow transcriptions in an hour — and a collector pointed at
+    this server is there to hold what happened, not the server's opinion about
+    when enough of it has happened. The floor decides how much: see
+    level_wanted.
+
+    Called outside the events lock by both capture paths. syslog_send is a
+    socket write and holding a file lock across one would make a busy screen's
+    faults serialise on the collector being slow."""
+    if not row:
+        return
+    who = display_label(read_displays().get(row.get("did"))) if row.get("did") else ""
+    text = "%s%s%s%s" % ((who + " ") if who else "",
+                         EVENT_WORDS.get(row["kind"], row["kind"]),
+                         (" [%s]" % row["route"]) if row.get("route") else "",
+                         (": " + row["detail"]) if row.get("detail") else "")
+    if row.get("ms"):
+        text += " (%dms)" % row["ms"]
+    syslog_send(row.get("level") or "info", text)
+
+
 def note_event(kind, did="", level="info", detail="", route="", ms=0):
     """One event, kept. Silent about anything it does not recognise rather than
     refusing: this is called from the paths that ARE the fault being reported,
@@ -4689,6 +4732,7 @@ def note_event(kind, did="", level="info", detail="", route="", ms=0):
     the first."""
     if kind not in EVENT_KINDS or not event_wanted(kind):
         return
+    row = None
     with _events_lock:
         rows = read_events()
         rows.append({"kind": kind, "did": str(did or "")[:32],
@@ -4696,7 +4740,9 @@ def note_event(kind, did="", level="info", detail="", route="", ms=0):
                      "detail": str(detail or "")[:300],
                      "route": str(route or "")[:60],
                      "ms": max(0, int(ms or 0)), "at": int(time.time())})
+        row = rows[-1]
         write_events(rows)
+    event_to_sink(row)
 
 
 def take_events(did, rows):
@@ -4710,6 +4756,7 @@ def take_events(did, rows):
     if not isinstance(rows, list):
         return 0
     kept = 0
+    sent = []
     with _events_lock:
         have = read_events()
         for r in rows[:MAX_EVENTS_PER_POLL]:
@@ -4728,9 +4775,12 @@ def take_events(did, rows):
                          "route": str(r.get("route") or "")[:60],
                          "ms": max(0, min(600000, int(r.get("ms") or 0))),
                          "at": int(time.time())})
+            sent.append(have[-1])
             kept += 1
         if kept:
             write_events(have)
+    for r in sent:
+        event_to_sink(r)
     return kept
 
 

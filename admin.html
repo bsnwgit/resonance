@@ -4314,10 +4314,14 @@ nothing that happened while it was off. There is no hidden copy.
 a kind added in a later version records itself until you say otherwise, rather
 than being silently missing because it was not in a list written today.
 
-<b>The sink is a separate question</b>, below: the ledger is this panel's own
-health list and syslog is somebody else's aggregator, read by somebody who
-thinks in severities rather than in this product's nine words. So that one is
-set by level, not by kind.</div>
+<b>What is recorded is also what is sent.</b> With syslog switched on below,
+every event written here goes to the collector as it happens — not only the
+ones that cross an alert threshold. Unticking a kind therefore stops it in both
+places at once, which is the point of one catalog.
+
+<b>How much of it the collector gets is set by level</b>, in the syslog box
+below, because the reader at that end is an aggregator and every one of them is
+pointed at a severity rather than at this product's own words.</div>
   <!-- `.cks`, the same two-column tick grid the group members and the endpoint
        grants use. It was a `.setuprow`, which is a wrapping line — nine ticks
        in it read as one long sentence with boxes in it rather than as a list
