@@ -298,6 +298,22 @@ Changing a role or a password drops that account's existing sessions, so the
 new rights or the new password take effect at the next sign-in rather than
 whenever the old session happens to expire.
 
+**Closing the browser ends it too.** The sign-in cookie is a session cookie —
+no expiry written into it — so the browser forgets it on close and reopening
+asks for a password again. Reloading the page does not: a reload is the same
+browser run, and a sign-in that could not survive F5 would be one nobody used.
+
+The hours above still apply, and they are enforced on the server rather than in
+the cookie: the deadline lives with the session, where a browser cannot edit
+it, and is checked on every request. So the sign-in ends at whichever comes
+first — the browser closing, the idle deadline, or the hours running out.
+
+What this does **not** do is end the session on the server the moment a window
+closes. The browser forgets the token; the session it named runs to its own
+deadlines. For somebody closing a laptop that is the same thing. For a wall
+screen that crashed or lost power it is not, and the answer there is a
+heartbeat rather than a cookie attribute — it is on the todo list.
+
 ## Maintenance
 
 What keeps a screen nobody touches working: how often every display checks in,

@@ -135,51 +135,35 @@ assistant's, and the enrolment name together.
 
 ---
 
-## 4 · Ending a session when the browser closes
+## 4 · A session that is ENDED when a browser goes, not merely forgotten
 
-**Nothing ends when a browser closes today.** The cookie is written with
-`Max-Age = hours × 3600`, so it survives being closed and reopened, and the
-server's own record — `_user_sessions[token] = {pid, expires}` — knows nothing
-about browsers at all. Closing the window leaves a live session that anybody
-returning to that machine walks straight into.
+**The browser half is done.** The sign-in cookie is a session cookie now — no
+Max-Age — so closing the browser forgets it and reopening asks for a password.
+The hours are enforced on the server, in `_user_sessions`, where a browser
+cannot edit them.
 
-**Signing out is built and this is not**, which is the same question asked from
-the other end: one is somebody saying they are finished, the other is nobody
-saying anything. The knot they shared is untied — `close_one_session()` ends
-this browser's session and nothing else, so whatever answers this can end one
-session too.
+**What is left is the server half.** The token is forgotten; the session it
+named is still live until its absolute or idle deadline. That is enough for
+somebody closing a laptop and it is not enough for the case this was written
+for: a wall screen that crashed, was switched off at the socket, or lost the
+network. Nothing tells the server those ended, so the session sits open for
+its full life.
 
-Three mechanisms, and only one of them actually ends anything:
+Two mechanisms are left, and only one covers that case:
 
-1. **Make it a session cookie** — drop `Max-Age` and the browser forgets it on
-   close. One line, and it is the weakest of the three: the server session is
-   still open and still valid until it expires, so the token is *forgotten*
-   rather than *ended*. Anybody holding a copy still gets in.
-2. **A beacon on the way out** — `pagehide` / `visibilitychange` with
-   `sendBeacon('/user/logout')`. Genuinely ends it, and unreliable in exactly
-   the cases that matter: a killed tab, a crash, a dead network, a machine
-   switched off at the wall. It also fires on ordinary navigation, so it has to
-   tell leaving from moving.
-3. **A heartbeat and an idle sweep** — the page already polls; a session not
+1. **A beacon on the way out** — `pagehide` with `sendBeacon('/user/logout')`.
+   Genuinely ends it, and **it cannot tell a close from a reload**: pagehide
+   fires on both, so a beacon would sign somebody out every time they pressed
+   F5. That is why the cookie change was made on its own. Any use of this needs
+   a way to distinguish leaving from moving, and there is not an honest one.
+2. **A heartbeat and an idle sweep** — the page already polls; a session not
    seen for N seconds is closed server-side. The only one that covers a crashed
-   browser or a yanked power cable, which is the wall-screen case, and the only
-   one where "ended" means ended.
+   browser or a yanked power cable, and the only one where *ended* means ended.
 
-**To decide first:** this contradicts a decision already made on purpose. The
-session is persistent on that browser because *being asked again every half hour
-would end with people avoiding the assistants that ask* — and that is still true
-of somebody's own laptop. A shared machine wants the opposite. So it is probably
-a setting, and the question is whose:
-
-- **the person's** — they know whether it is their laptop, and `session_hours`
-  is already theirs to set;
-- **the display profile's** — the deployment knows which screens are shared,
-  and the person may never have seen the machine before;
-- **both**, with one winning, which needs the rule written down before either
-  is built.
-
-Worth knowing while deciding: `_user_sessions` is an in-memory map, so **a
-server restart already ends every session**, and nothing anywhere says so.
+**To decide first:** what N is, and whether it is the deployment's or the
+person's. A wall screen polls constantly and would never trip it; a laptop
+shut at 5pm should. Note `_user_sessions` is in memory, so **a server restart
+already ends every session**, and nothing anywhere says so.
 
 ---
 

@@ -7806,8 +7806,31 @@ class Handler(SimpleHTTPRequestHandler):
         return m.value if m else ""
 
     def _set_user_cookie(self, token, hours):
+        """A SESSION COOKIE, which is the point: it is gone when the browser
+        closes, so reopening asks for a password again.
+
+        `hours` no longer writes a Max-Age and is kept because the caller has
+        it and the server still enforces it — the deadline lives in
+        `_user_sessions`, where a browser cannot edit it, and is checked on
+        every request by user_session_pid. Writing it into the cookie as well
+        only ever meant the browser and the server each holding half of the
+        same rule.
+
+        WHAT THIS IS AND IS NOT. The token is forgotten by the browser; the
+        session it named is not ended on the server, and runs to its own
+        absolute and idle deadlines. That is enough for somebody closing a
+        laptop and it is not enough for a screen that crashed, which is the
+        other half of this and needs a heartbeat rather than a cookie
+        attribute — see TODO. Anybody holding a copy of the token still gets
+        in until it expires, and it is HttpOnly, so holding a copy means
+        having had the machine.
+
+        Clearing still passes hours=0 and still writes Max-Age=0, because
+        expiring a cookie is the only way to remove one."""
         bits = ["%s=%s" % (USER_COOKIE, token), "Path=/", "HttpOnly",
-                "SameSite=Strict", "Max-Age=%d" % int(hours * 3600)]
+                "SameSite=Strict"]
+        if not token or hours <= 0:
+            bits.append("Max-Age=0")
         if isinstance(self.connection, ssl.SSLSocket):
             bits.insert(3, "Secure")
         self.send_header("Set-Cookie", "; ".join(bits))
