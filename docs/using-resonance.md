@@ -189,6 +189,45 @@ Under the sign-in box are two links for the two people who are not signing in:
 somebody asking to be let in. Each one swaps the box for the thing it names, and
 offers the way back.
 
+**If it says you do not have access**, your password worked and the assistant on
+that address has not been granted to your account. There is nothing to try again
+and nothing you did wrong: it is one tick on your row in the panel, and only an
+administrator can make it.
+
+## Signing out
+
+**A SIGN OUT button** appears beside AUDIO and TEXT whenever somebody is signed
+in. It asks first, naming who is about to be signed out, because on a machine
+two people share the person pressing it may not be the person signed in.
+
+**It ends this screen's session and no other.** If you are signed in on your own
+laptop as well, that stays signed in — ending every session you have anywhere is
+account recovery, and it is what a new link from an administrator does.
+
+**There may also be a phrase**, if your administrator set one — something like
+*sign me out*, alongside the sleep word. The two are not the same: the sleep
+word ends the conversation and leaves you signed in; this ends the session.
+Where a phrase is set, anybody in earshot can say it, which is the trade for a
+screen on a wall being able to be left properly.
+
+**Closing the tab signs you out too**, after about fifteen seconds — and so does
+a browser that crashes, sleeps or loses the network, after three minutes of
+silence. Reloading the page does not: that is the same browser still there, and
+a sign-in that could not survive a refresh would be one nobody used.
+
+## The date and time
+
+Some screens carry the **date and time across the top**. Whether they do is set
+per place — a wall people walk past wants it; a browser tab has a clock in the
+corner already — and how it reads is set once for the whole deployment, so two
+screens in a corridor never disagree about how to write the hour.
+
+It reads **the device's own clock**, not the server's, so a tablet set to the
+wrong time shows the wrong time. That is deliberate: it is the time in the room,
+and a screen quietly showing a different one from every other clock around it is
+worse than one that is visibly wrong. It stays visible while the screensaver
+drifts, travelling with the figure rather than holding still.
+
 ## Setting a screen up with a code
 
 If somebody has given you a **six-character code** — for a screen going on a
