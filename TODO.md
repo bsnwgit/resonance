@@ -7,36 +7,7 @@ again.
 
 ---
 
-## 1 · Choosing what gets logged
-
-**Everything is recorded and there is no way to say otherwise.** The nine kinds
-in `EVENT_KINDS` — `mic_denied`, `no_recorder`, `stt_slow`, `stt_error`,
-`tts_fallback`, `wake_fuzzy`, `no_intent`, `backend_error`, `backend_slow` —
-are all captured, all kept for `event_days`, and all forwarded to the syslog
-sink when `syslog_on`. `EVENT_LEVELS` (`info`, `warn`, `error`) exists and is
-recorded per row, but nothing filters on it.
-
-The noisy ones in a working house are `wake_fuzzy` and `stt_slow`, and they
-are the two least likely to be acted on.
-
-**To decide first:** three separate questions that a single control would
-answer badly.
-
-- **Per kind, or per level?** Nine ticks describes exactly what you want and
-  goes stale every time a kind is added; three levels survives new kinds and
-  cannot say "everything except near-miss wakes".
-- **Does the choice apply to the ledger, to the syslog sink, or to each
-  separately?** They are read by different people for different reasons — the
-  ledger is the panel's own health list, the sink is somebody else's
-  aggregator — so one setting for both is likely wrong.
-- **Not recorded, or recorded and not shown?** Filtering at capture is what
-  makes a busy deployment cheaper; filtering at display is what lets somebody
-  turn a kind back on and still see last week. They are different features and
-  only the second is reversible.
-
----
-
-## 2 · Building up embeds
+## 1 · Building up embeds
 
 **Scope this before building any of it** — the list below is what is there and
 what is plainly missing, not a decision about which of it is wanted.
@@ -84,7 +55,7 @@ Directions worth weighing, each of which is a different product:
 
 ---
 
-## 3 · A real certificate on the server
+## 2 · A real certificate on the server
 
 **Self-signed, and it is the reason for most of what looks broken.** What is on
 the box today:
@@ -135,7 +106,7 @@ assistant's, and the enrolment name together.
 
 ---
 
-## 4 · Password rules an admin can set
+## 3 · Password rules an admin can set
 
 **There is one rule and it is a constant.** `MIN_PASSWORD = 10`, in
 `serve.py`, and length is the whole of it — nothing asks for a mix of cases, a
