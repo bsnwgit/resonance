@@ -8087,6 +8087,10 @@ const EV_WORDS = {
   backend_slow:  'the assistant ran long',
   login_ok:      'signed in',
   login_fail:    'sign-in refused',
+  user_added:    'person created',
+  user_removed:  'person deleted',
+  device_added:  'display created',
+  device_removed:'display deleted',
 };
 
 function evNote(m, bad){
@@ -11211,9 +11215,18 @@ async function refreshDisplays(){
       row.appendChild(clock);
       const c = document.createElement('div');
       c.className = 'dcode';
-      c.textContent = (ENROL_BASES[d.id] || ENROL_BASE) + dispCode(d.code);
+      /* NO BASE MEANS NOTHING IS LISTENING to spend it at, and the code is
+         still shown — it is the thing the row is for, and it will work the
+         moment a port exists. What changes is the sentence beside it: an
+         address is a promise, and one nobody can open is worse than being
+         told there is not one yet. */
+      const at = ENROL_BASES[d.id] || ENROL_BASE;
+      c.textContent = at ? at + dispCode(d.code) : dispCode(d.code);
       const sub = document.createElement('span');
-      sub.textContent = ' · case and dashes do not matter';
+      sub.textContent = at
+        ? ' · case and dashes do not matter'
+        : ' · no display port is bound yet — give an endpoint a network '
+          + 'profile with a port, and this becomes an address';
       c.appendChild(sub);
       row.appendChild(c);
       startClock(clock, d);

@@ -151,3 +151,51 @@ What is actually there today:
 Whatever it becomes, it should be **one place that answers "is this password
 allowed"**, called by all three sites — the value is a setting, the judgement
 is not three copies of an `if`.
+
+---
+
+## 4 · Home Assistant, and ending a conversation properly
+
+**Reported 2026-08-21 and not yet reproduced in detail** — what is written here
+is what the code does today, so whoever picks it up starts from the mechanism
+rather than from the complaint.
+
+**HA holds the conversation and this server holds nothing.** `ask_homeassistant`
+sends `{text, conversation_id, agent_id}` and no history, no system prompt and
+no limits: the conversation lives in HA against that id, and the panel hides
+those fields on purpose. So "ending a conversation" is two things at once — the
+display's awake window, and the id HA is still holding — and only one of them
+is ours.
+
+**Where the id is dropped, today:**
+
+- `sleepNow()` — the sleep word, or the awake window running out — calls
+  `forgetConversation()` and clears `Wake.convo`.
+- switching endpoints mid-conversation clears it, at `index.html` where
+  `switching` is true.
+- and that is all. **Nothing tells HA.** The id is simply not sent again, which
+  leaves whatever HA keeps against it to HA's own expiry.
+
+**`continue_conversation` is read and deliberately ignored**, and the reasoning
+is worth reading before changing it: acting on `false` was tried for one day and
+measured on the first real installation — the display went silently to sleep
+after each command, five further utterances were transcribed and dropped at the
+wake gate, and the person concluded it had locked up. Staying awake is what
+makes the house behave like every other endpoint. **So if the fault is that a
+conversation does not end, the answer is probably not to start honouring that
+flag.**
+
+**What to find out first, on the wall display rather than by reasoning:**
+
+- **What actually fails.** A conversation that will not end, one that ends too
+  early, or one that ends here and stays open in HA — three different faults
+  with three different fixes, and the note this entry came from does not say
+  which.
+- **Whether the id outlives what it should.** A display asleep for an hour and
+  then woken sends no id — but a person walking up mid-window continues
+  somebody else's conversation, which is the same leak `forgetConversation`
+  exists to prevent on the transcript side.
+- **Whether HA should be told.** There is no "end this conversation" call in
+  the adapter, and HA's own timeout is the only thing closing them. Whether
+  that matters is a question for a real installation with a real agent behind
+  it.

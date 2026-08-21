@@ -3843,9 +3843,25 @@ def display_network(did, doc=None):
     is a screen that cannot be loaded from a single address and is refused
     where it is made rather than discovered later."""
     doc = doc or read_routes()
-    nids = {route_network(r)
+    # THROUGH THE PERMISSION, which is where a grant lives. It read
+    # `r["displays"]` — the route's own allow-list — and that field was retired
+    # when permissions became profiles: set_display_endpoints writes into the
+    # AUTHORIZE profile the route names, so this looked in the one place the
+    # answer is no longer kept and found nothing for every screen.
+    #
+    # What that cost: a display's port is derived from its grant, so a screen
+    # ticked onto an endpoint came out with no network profile, and the
+    # enrolment address fell back to a plain listener that is not running in a
+    # deployment whose ports all come from profiles — `http://host:0/e/CODE`.
+    # The same read is what subject_may does, one function down.
+    # One read of the settings for the whole loop: the panel asks this once per
+    # display row, and route_perm reaches for them again on every route it is
+    # handed. A register of fifty screens was fifty times the routes' worth of
+    # file reads to answer a question about ports.
+    cfg = display_settings()
+    nids = {route_network(r, cfg)
             for r in doc["routes"].values()
-            if did in (r.get("displays") or [])}
+            if did in ((route_perm(r, cfg) or {}).get("displays") or [])}
     if len(nids) > 1:
         return "", nids
     return (nids.pop() if nids else ""), None
@@ -3919,10 +3935,39 @@ def enrol_base_for(rec, host, secure, nid=""):
     """Where the code for this row is typed — an address and a port, because a
     code without them is six characters and no idea where to put them. The
     profile comes from display_network: what this screen was granted decides
-    where it is loaded from."""
-    return (net_base_for(nid, "/e/", host) if nid else "") \
-        or "%s://%s:%d/e/" % ("https" if secure else "http", host,
-                              secure or RUNNING.get("http_port") or 0)
+    where it is loaded from.
+
+    EMPTY WHERE NOTHING IS LISTENING, the same rule the person's base follows.
+    It used to end `or 0` and hand back `http://host:0/e/`, which is what a row
+    with no grant yet gets in a deployment whose display ports all come from
+    network profiles: there is no plain listener to fall back to, `http_port`
+    is 0 unless PORT was set in the environment, and 0 went straight into the
+    address. A link to a port nothing answers on is worse than no link — it
+    looks like something somebody can fix by editing the address.
+
+    A NEW ROW HAS NO GRANT, which is the case this is mostly asked about: an
+    admin names a screen, gets a code, and the ticks come later or never. So
+    the default endpoint's port answers for it — that is where a screen with
+    nothing chosen is commissioned — and then any profile that names one,
+    because `/e/` answers on every display listener and any of them will spend
+    the code."""
+    base = net_base_for(nid, "/e/", host) if nid else ""
+    if base:
+        return base
+    doc = read_routes()
+    dflt = doc.get("default")
+    if dflt and dflt in (doc.get("routes") or {}):
+        base = net_base_for(route_network(doc["routes"][dflt]), "/e/", host)
+        if base:
+            return base
+    for n in display_settings().get("networks") or []:
+        base = net_base_for(n.get("id"), "/e/", host)
+        if base:
+            return base
+    if secure:
+        return "https://%s:%d/e/" % (host, secure)
+    plain = RUNNING.get("http_port")
+    return "http://%s:%d/e/" % (host, plain) if plain else ""
 
 
 def invite_display(name, by, setup=None):
@@ -3942,6 +3987,19 @@ def invite_display(name, by, setup=None):
     if len(displays) >= limit:
         return None, ("that is %d displays already — remove one, or raise the "
                       "limit on the DISPLAYS tab" % limit)
+    # NOT TWO SCREENS WITH ONE NAME, the same rule an identity has had since it
+    # existed and for the same reason: it is not a security property — a row is
+    # its token and nothing else — it is that a register holding two rows
+    # called *kitchen wall* is a register an admin cannot act on. Which one did
+    # you just approve, and which one is on the wall?
+    #
+    # Refused where the name is typed, so it is answerable while somebody is
+    # looking at the box, rather than discovered on a list of fifty.
+    want = str(name or "").strip()
+    if any((r.get("name") or "").strip().lower() == want.lower()
+           for r in displays.values() if want):
+        return None, ("there is already a display called \u201c%s\u201d — give "
+                      "this one a name of its own, or remove the other" % want)
     did = "d" + secrets.token_hex(6)
     now_ = int(time.time())
     rec = dict(DISPLAY_DEFAULTS)
@@ -4629,6 +4687,15 @@ EVENT_KINDS = (
     # did not ask for either.
     "login_ok",          # somebody signed in, and who
     "login_fail",        # …or was refused, and on which address
+    # THE REGISTER CHANGING SHAPE. Not faults either, and kept at `info` for
+    # that reason — a deliberate deletion is not a warning, it is the thing you
+    # will want to find in six months when somebody asks what happened to a
+    # screen. A sink set to warnings and errors therefore does not carry them,
+    # which is the right default: they are a record, and the ledger holds it.
+    "user_added",        # an identity minted, and by whom
+    "user_removed",      # …and deleted
+    "device_added",      # a display row created, and by whom
+    "device_removed",    # …and deleted
 )
 #: Where an event came from. A display sends its own; the server records the
 #: legs it can see, which a browser cannot.
@@ -4698,6 +4765,10 @@ EVENT_WORDS = {
     "backend_slow": "the assistant ran long",
     "login_ok": "signed in",
     "login_fail": "sign-in refused",
+    "user_added": "person created",
+    "user_removed": "person deleted",
+    "device_added": "display created",
+    "device_removed": "display deleted",
 }
 
 
@@ -8512,9 +8583,12 @@ class Handler(SimpleHTTPRequestHandler):
                                         None, host, secure,
                                         display_network(d["id"], doc)[0])
                                         for d in admin_displays()},
-                                    "enrol_base": "%s://%s:%d/e/"
-                                                  % ("https" if secure else "http", host,
-                                                     secure or RUNNING.get("http_port") or 0)})
+                                    # …and the one for a row that has no id yet
+                                    # — the box that mints a code. Same rule,
+                                    # same function, so the two cannot disagree
+                                    # about where a code is typed.
+                                    "enrol_base": enrol_base_for(None, host,
+                                                                 secure)})
         if path == "/groups":
             if not self._require("admin"):
                 return
@@ -9563,6 +9637,16 @@ class Handler(SimpleHTTPRequestHandler):
                 if disp["id"] in rows:
                     rows[disp["id"]]["req_email"] = email
                     write_displays(rows)
+                    # SAID TO THE ADMIN AND NOT TO THE ASKER. Somebody standing
+                    # at a public screen must not be told which addresses have
+                    # accounts here — that is the same list the sign-in refuses
+                    # to leak, one answer for both halves — so the duplicate is
+                    # noted in the log where an admin reads it and shown on the
+                    # row, and the form says the ordinary thing either way.
+                    if identity_by_email(email):
+                        print("display %s asked for access with %s, which "
+                              "already has an account" % (disp["id"], email),
+                              flush=True)
                     rec = dict(rows[disp["id"]], id=disp["id"])
             print("display %s (%s) asked for access%s"
                   % (rec["id"], display_label(rec),
@@ -9640,6 +9724,8 @@ class Handler(SimpleHTTPRequestHandler):
             if rids:
                 set_identity_endpoints(rec["id"], rids)
             base = self._person_base()
+            note_event("user_added",
+                       detail="%s — by %s" % (identity_label(rec), s["user"]))
             print("identity %s (%s) created by %s — %d endpoint(s)"
                   % (rec["id"], identity_label(rec), s["user"], len(rids)),
                   flush=True)
@@ -10064,6 +10150,7 @@ class Handler(SimpleHTTPRequestHandler):
             # permission nobody can see and nobody can withdraw. Cleared here,
             # exactly as a deleted display's is.
             touched = [None] * drop_member_grants(pid)
+            note_event("user_removed", detail="%s — by %s" % (name, s["user"]))
             print("identity %s (%s) deleted by %s%s%s"
                   % (pid, name, s["user"],
                      " — removed from %d endpoint(s)" % len(touched)
@@ -10400,6 +10487,8 @@ class Handler(SimpleHTTPRequestHandler):
                 print("display %s invited with endpoint%s %s by %s"
                       % (rec["id"], "" if len(eps) == 1 else "s",
                          ", ".join(eps), s["user"]), flush=True)
+            note_event("device_added", did=rec["id"],
+                       detail="%s — by %s" % (display_label(rec), s["user"]))
             print("display %s (%s) invited by %s — code issued"
                   % (rec["id"], display_label(rec), s["user"]), flush=True)
             # …and how long it is worth anything for, so the panel can count
@@ -10646,6 +10735,8 @@ class Handler(SimpleHTTPRequestHandler):
             # is a permission nobody can see and nobody can withdraw. Cleared
             # here, for the same reason a deleted endpoint's fallthrough is.
             touched = [None] * drop_member_grants(did)
+            note_event("device_removed", did=did,
+                       detail="%s — by %s" % (name, s["user"]))
             print("display %s (%s) deleted by %s%s%s"
                   % (did, name, s["user"],
                      " — removed from %d endpoint(s)" % len(touched)

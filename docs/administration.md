@@ -1226,12 +1226,20 @@ cover it.
 
 *Under SETTINGS ▸ ALERT.*
 
-Eleven kinds of event are captured from the screens and from the server — a
-refused microphone, a slow transcription, a near-miss wake, an assistant that
-errored, and the door itself: **signed in** and **sign-in refused**, the latter
-saying whether it was a wrong password, an address with no account behind it,
-or too many attempts. Both are filed against the screen it happened at, so they
-read in the same per-display list as everything else. **Every one is recorded until you untick it**, and what is
+Fifteen kinds of event are captured from the screens and from the server.
+
+Nine are faults a screen reports about itself — a refused microphone, a slow
+transcription, a near-miss wake, an assistant that errored. Two are the door:
+**signed in** and **sign-in refused**, the latter saying whether it was a wrong
+password, an address with no account behind it, or too many attempts. Four are
+the register changing shape: **person created**, **person deleted**, **display
+created**, **display deleted**, each naming who did it.
+
+The last six are not faults and are recorded at `info`, so a sink set to
+warnings and errors does not carry them — they are a record rather than
+something wrong, and the ledger holds it either way. Everything that happened
+at a screen is filed against that screen, so it reads in the same per-display
+list as the rest. **Every one is recorded until you untick it**, and what is
 stored is the list you switched OFF, so a kind added in a later version records
 itself rather than being silently missing from a list written today.
 
