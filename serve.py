@@ -5608,6 +5608,8 @@ def user_session_pid(token):
     seen = float(rec.get("seen") or 0)
     if seen and now_ - seen > USER_GONE:
         _user_sessions.pop(str(token), None)
+        print("user %s: session ended — %ds without a word"
+              % (rec.get("pid"), int(now_ - seen)), flush=True)
         return ""
     # …AND THE PAGE SAID IT WAS GOING. Checked before the stamp for the same
     # reason silence is, and cleared after it: this request IS the browser
@@ -5616,6 +5618,8 @@ def user_session_pid(token):
     going = float(rec.get("leaving") or 0)
     if going and now_ - going > USER_LEAVING:
         _user_sessions.pop(str(token), None)
+        print("user %s: session ended — the page said it was leaving %ds ago"
+              % (rec.get("pid"), int(now_ - going)), flush=True)
         return ""
     rec["seen"] = now_
     rec.pop("leaving", None)
