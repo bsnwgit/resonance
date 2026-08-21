@@ -4621,6 +4621,14 @@ EVENT_KINDS = (
     "no_intent",         # the house was asked for something it cannot do
     "backend_error",     # what answers a route returned an error
     "backend_slow",      # …or took longer than that route allows for
+    # WHO GOT IN AND WHO DID NOT. The other nine are faults a screen reports
+    # about itself; these two are the door. They are in the same ledger because
+    # they are read for the same reason and about the same thing — what has
+    # been happening at that screen — and because an admin who has switched the
+    # catalog down to errors should not be quietly keeping a sign-in log they
+    # did not ask for either.
+    "login_ok",          # somebody signed in, and who
+    "login_fail",        # …or was refused, and on which address
 )
 #: Where an event came from. A display sends its own; the server records the
 #: legs it can see, which a browser cannot.
@@ -9638,28 +9646,42 @@ class Handler(SimpleHTTPRequestHandler):
             obj = self._json_body()
             if obj is None:
                 return
+            asked_for = str(obj.get("email") or "").strip()[:120]
+            # WHICH SCREEN IT HAPPENED AT, where there is one. The ledger is
+            # read per display — "what has this screen been reporting" — so a
+            # sign-in filed against nothing would be invisible in the one view
+            # that matters.
+            at = (self._display() or {}).get("id", "")
             who = identity_by_email(obj.get("email"))
             # ONE ANSWER FOR BOTH HALVES. "no such account" tells somebody
             # standing at a public screen which addresses are real here, which
             # is a list worth having before you start guessing passwords.
             wrong = {"error": "that is not an email and password we know"}
             if not who:
+                note_event("login_fail", did=at, level="warn",
+                           detail="no account for %s" % (asked_for or "(blank)"))
                 return self._json(401, wrong)
             pid = who["id"]
             if user_login_blocked(pid):
                 # The number is not given: "wait 47 seconds" is a clock an
                 # attacker can read, and the person who typed it wrong twice
                 # needs to know to stop rather than to know when.
+                note_event("login_fail", did=at, level="warn",
+                           detail="%s — refused, too many attempts"
+                                  % identity_label(who))
                 return self._json(429, {"error": "too many attempts — wait a "
                                                  "little and try again"})
             if not verify_identity_password(pid, obj.get("password")):
                 print("sign-in refused for %s from %s"
                       % (pid, self.address_string()), flush=True)
+                note_event("login_fail", did=at, level="warn",
+                           detail="%s — wrong password" % identity_label(who))
                 return self._json(401, wrong)
             hours = identity_hours(who)
             token = open_user_session(pid, hours)
             note_identity_seen(pid)
             print("identity %s signed in for %dh" % (pid, hours), flush=True)
+            note_event("login_ok", did=at, detail=identity_label(who))
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self._set_user_cookie(token, hours)

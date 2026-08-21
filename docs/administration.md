@@ -1226,9 +1226,12 @@ cover it.
 
 *Under SETTINGS ▸ ALERT.*
 
-Nine kinds of event are captured from the screens and from the server —
-a refused microphone, a slow transcription, a near-miss wake, an assistant that
-errored, and so on. **Every one is recorded until you untick it**, and what is
+Eleven kinds of event are captured from the screens and from the server — a
+refused microphone, a slow transcription, a near-miss wake, an assistant that
+errored, and the door itself: **signed in** and **sign-in refused**, the latter
+saying whether it was a wrong password, an address with no account behind it,
+or too many attempts. Both are filed against the screen it happened at, so they
+read in the same per-display list as everything else. **Every one is recorded until you untick it**, and what is
 stored is the list you switched OFF, so a kind added in a later version records
 itself rather than being silently missing from a list written today.
 
