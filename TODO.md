@@ -135,46 +135,7 @@ assistant's, and the enrolment name together.
 
 ---
 
-## 4 · Signing out — by voice, and on screen
-
-**The server can already do it and nothing can reach it.** `/user/logout`
-exists, works, and is called by nobody: it closes the account's sessions and
-clears the cookie, and there is no button, no phrase and no gesture anywhere
-that sends a request to it. A person signs in and the only ways back out are
-waiting for the session to expire or an admin reissuing their link, which is
-account recovery being used as a sign-out.
-
-Two surfaces are wanted and they are not the same feature:
-
-- **On screen** — a control wherever the signed-in person is visible. It has to
-  say who is being signed out, because the case that matters is a shared
-  machine and the person pressing it may not be the person signed in.
-- **By voice** — a phrase, alongside the sleep word. `heardSleep()` already
-  matches a configurable word (`sleepword`, default *goodbye*, with aliases) and
-  calls `sleepNow()`; a sign-out phrase would hang off the same matcher and the
-  same profile, so it is one more word rather than a new mechanism.
-
-**To decide first, and it is the whole of the design:**
-
-- **`close_user_sessions()` ends EVERY session that person has**, on every
-  machine. That is right for a leaked link and wrong for "sign me out of this
-  wall screen" — a person who says it in the hallway would be signed out of the
-  laptop on their desk. So either sign-out learns to end one session, or the
-  voice and screen versions do something narrower than the recovery path does.
-- **Voice sign-out on a shared screen is a security control operated by anyone
-  in earshot.** That may be exactly right — the risk of a stranger signing
-  somebody OUT is small, and the alternative is an account left open on a wall.
-  But it should be a decision, not a side effect of reusing the sleep matcher.
-- **What the screen becomes afterwards.** Back to the gate, or back to whatever
-  the display was before anybody signed in — which are different answers on a
-  kiosk and on somebody's own browser.
-- **Whether saying goodbye should sign out at all.** The sleep word and a
-  sign-out word are close enough in meaning that a person will use one for the
-  other, and today the sleep word only puts the figure to rest.
-
----
-
-## 5 · Ending a session when the browser closes
+## 4 · Ending a session when the browser closes
 
 **Nothing ends when a browser closes today.** The cookie is written with
 `Max-Age = hours × 3600`, so it survives being closed and reopened, and the
@@ -182,8 +143,11 @@ server's own record — `_user_sessions[token] = {pid, expires}` — knows nothi
 about browsers at all. Closing the window leaves a live session that anybody
 returning to that machine walks straight into.
 
-Pairs with **§4**: this is the same question asked from the other end, and both
-run into `close_user_sessions()` ending every session that person has anywhere.
+**Signing out is built and this is not**, which is the same question asked from
+the other end: one is somebody saying they are finished, the other is nobody
+saying anything. The knot they shared is untied — `close_one_session()` ends
+this browser's session and nothing else, so whatever answers this can end one
+session too.
 
 Three mechanisms, and only one of them actually ends anything:
 
@@ -219,7 +183,7 @@ server restart already ends every session**, and nothing anywhere says so.
 
 ---
 
-## 6 · An approved request lands the person on a JSON error
+## 5 · An approved request lands the person on a JSON error
 
 **A regression, and a recent one.** Somebody asks for access on a display, an
 admin approves, and their screen shows `{"error": "not found"}`. The admin sees

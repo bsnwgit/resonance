@@ -2722,6 +2722,45 @@ itself; <b>{name}</b> is the word that was said to reach whoever answered.</div>
     <div id="sleepstate" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5"></div>
     </div>
 </section>
+
+  <!-- A SEPARATE WORD FROM THE SLEEP WORD, on purpose. One ends the
+       conversation and leaves the person signed in; this one ends the
+       session. They are close enough in meaning that somebody will reach for
+       the wrong one, which is the argument for two words rather than for one
+       word doing both — a sleep word that signed people out would sign them
+       out every time they said goodbye. -->
+  <section class="grp" data-prof="speech" data-tab="speech">
+    <h4>Sign-out phrase</h4>
+    <div class="grpbody">
+  <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:0">phrase that ends the session</label>
+  <input id="signoutword" type="text" spellcheck="false" autocomplete="off" placeholder="e.g. sign me out">
+  <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:10px">also accept</label>
+  <textarea id="signoutaliases" rows="2" spellcheck="false" placeholder="one per line"></textarea>
+  <div class="note help"><b>Blank, and there is no spoken sign-out at all</b>
+— which is the default, because a screen anybody can walk up to should not
+have a spoken security control nobody asked for.
+
+Set one and a person signed in at a screen using this profile can end their
+session by saying it. <b>It ends this screen's session and no other</b>: the
+laptop on their desk stays signed in, because ending that too is a surprise
+nobody can predict from the words they said.
+
+<b>Several words are matched exactly</b> — no near-misses and no fuzzy
+spellings, unlike the wake word. That is the right tolerance for the one
+spoken command here that takes something away, and it is why a phrase is
+better than a single word.
+
+<b>Anybody in earshot can say it.</b> That is a real property of a shared
+screen and it is worth deciding about rather than discovering: the risk of a
+stranger signing somebody OUT is small, and the alternative is an account left
+open on a wall. A screen where that is the wrong trade should leave this
+blank and use the button.
+
+The button is always there, next to AUDIO and TEXT, whenever somebody is
+signed in — and it names them, because whoever presses it on a shared machine
+may not be who is signed in.</div>
+    </div>
+</section>
   <section class="grp" data-prof="speech" data-tab="speech">
     <h4>Speech in (mic, STT)</h4>
     <div class="grpbody">
@@ -5251,6 +5290,7 @@ function buildControls(){
   // no wakeword or wakealiases: those are a route's, saved with the route
   ['wakeword','wakealiases',
    'sleepword','sleepaliases','greetings','farewells',
+   'signoutword','signoutaliases',
    'loginok','loginbad',
    'clock_time','clock_date',
    'opname','ainame']

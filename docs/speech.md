@@ -71,6 +71,39 @@ Also here: whether it says a farewell when it times out, or just goes quiet.
 On a wall display in a quiet office, quiet is usually the better manners.
 
 
+## Sign-out phrase
+
+**Blank by default, and blank means there is no spoken sign-out at all.** A
+screen anybody can walk up to should not carry a spoken security control
+nobody asked for.
+
+Set a phrase and somebody signed in at a screen using this profile can end
+their session by saying it. It is deliberately **not** the sleep word: one ends
+the conversation and leaves them signed in, the other ends the session. They
+are close enough in meaning that people reach for the wrong one, which is the
+argument for two words rather than for one doing both — a sleep word that
+signed people out would sign them out every time they said goodbye.
+
+**It ends this screen's session and no other.** The laptop on their desk stays
+signed in. Ending every session somebody has is account recovery, and that is
+what REISSUE THE LINK is for.
+
+**A phrase of several words is matched exactly** — no near-misses, no fuzzy
+spellings, unlike the wake word. That is the right tolerance for the one spoken
+command here that takes something away, and it is why a phrase reads better
+than a single word.
+
+**Anybody in earshot can say it**, which is a real property of a shared screen
+and worth deciding about rather than discovering. The risk of a stranger
+signing somebody OUT is small and the alternative is an account left open on a
+wall — but a deployment where that is the wrong trade leaves this blank and
+uses the button instead.
+
+The button is always there whenever somebody is signed in, beside AUDIO and
+TEXT, and it **names them**: whoever presses it on a shared machine may not be
+the person it is about.
+
+
 ## Speech in (mic, STT)
 
 ### How it decides you have finished

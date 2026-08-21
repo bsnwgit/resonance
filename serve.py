@@ -5568,6 +5568,22 @@ def user_session_pid(token):
     return rec["pid"]
 
 
+def close_one_session(token):
+    """This browser's session, and only this one. Returns the person it
+    belonged to, or "".
+
+    SIGNING OUT IS NOT ACCOUNT RECOVERY, which is the distinction the pair of
+    these draws. close_user_sessions below ends every session a person has
+    anywhere, because it is called where their password changed hands and a
+    session opened by a credential that no longer exists is a door left open.
+    Somebody saying "sign me out" in a hallway means the screen in front of
+    them — ending the laptop on their desk at the same time is a surprise they
+    have no way to predict from the words they used."""
+    with _user_lock:
+        rec = _user_sessions.pop(str(token or ""), None)
+    return (rec or {}).get("pid", "")
+
+
 def close_user_sessions(pid):
     """Every signed-in browser for one person, ended. Called where their
     password changes hands — them setting a new one, or an admin reissuing the
@@ -9514,9 +9530,29 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(404, {"error": "not found"})
             if not self._same_origin():
                 return self._json(403, {"error": "cross-origin request refused"})
+            # THIS SESSION. `all` is the door-slam — every browser that person
+            # is signed in on — and it is not what a sign-out button or a
+            # spoken phrase means, so it has to be asked for explicitly.
+            everywhere = (parse_qs(parsed.query).get("all") or [""])[0] == "1"
+            token = self._user_token()
             pid = self._user_pid()
-            if pid:
+            if pid and everywhere:
                 close_user_sessions(pid)
+            elif token:
+                close_one_session(token)
+            if pid:
+                # WHO, WHERE FROM, AND HOW MANY. A session ending is the one
+                # half of a sign-in the log never recorded, which made a
+                # person's account impossible to follow past the moment they
+                # arrived.
+                left = 0
+                with _user_lock:
+                    left = len([1 for v in _user_sessions.values()
+                                if v["pid"] == pid])
+                print("user %s signed out from %s%s — %d session(s) still open"
+                      % (pid, self.address_string(),
+                         " (everywhere)" if everywhere else "", left),
+                      flush=True)
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self._set_user_cookie("", 0)
