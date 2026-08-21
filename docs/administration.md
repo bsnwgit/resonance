@@ -1222,7 +1222,7 @@ reaches it. Relaunching a browser at a URL on boot is the device's job:
 Saying that plainly is better than a Maintenance page that quietly fails to
 cover it.
 
-## What gets recorded
+## Logging catalog
 
 *Under SETTINGS ▸ ALERT.*
 
