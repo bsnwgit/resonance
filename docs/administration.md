@@ -314,16 +314,20 @@ through.** A person opens the display page and asks; a device is named here
 and takes a code to the screen. They have almost nothing in common except
 that both end up connected, so neither has to read the other's queue.
 
-**PERSON** (under ENROLLMENTS) — people, and only people. One list:
-**People**, under a PENDING divider, holding the ones you have minted a link
-for who have not used it yet.
+**PERSON** (under ENROLLMENTS) — people, and only people. **One list**,
+under a PENDING divider, holding everybody who is not in yet whichever way
+they got there:
 
-**Requests are not listed there.** Somebody asking from a display still
-reaches the server and is still recorded, but the queue that decided them —
-*Waiting for approval* — is no longer on that tab, so there is nowhere in the
-panel to approve or refuse one.
+| chip | what it is | what it is waiting on |
+|---|---|---|
+| **ENROLL** | you named them and were handed a link | them, to open it and choose a password |
+| **FORM** | they asked from a screen | you, to APPROVE or REFUSE |
 
-What a request *asks* is still **SETTINGS ▸ ADMIN ▸ Enrollment Request Form**.
+They were two separate boxes, which asked you to know the difference before
+you could find either. The chip says which a row is, and that was the whole of
+what the split was telling you.
+
+What a request *asks* is **SETTINGS ▸ ADMIN ▸ Enrollment Request Form**.
 
 ### A person, as against a device
 

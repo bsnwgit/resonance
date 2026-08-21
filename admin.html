@@ -2981,7 +2981,11 @@ be answered.
 
 If you do not ask for a name, rows arrive labelled by their id and you approve
 them on whatever you did ask for. Ask for nothing at all and a request carries
-nothing but that id.</div>
+nothing but that id.
+
+The requests themselves arrive under <b>ENROLLMENTS ▸ USER</b>, in the same
+queue as the people you enrolled — chipped <b>FORM</b> where they asked and
+<b>ENROLL</b> where you named them.</div>
 
   <div class="seg actrow">
     <button id="b_formsave" class="act-save">SAVE THE FORM</button>
@@ -3871,6 +3875,14 @@ behaves like the rest of the building rather than like nothing.</div>
        empty. -->
   <div class="rulehead">PENDING</div>
   <div id="idlist"></div>
+  <!-- AND THE ONES WHO ASKED, in the same queue rather than a box of their
+       own. Both lists are people who are not in yet and who are waiting on
+       something: one on somebody opening the link they were handed, the other
+       on an admin deciding. They were two sections, which asked you to know
+       the difference before you could find either — the chip on each row says
+       which it is, which is the whole of what the split was telling you. -->
+  <div id="asklist"></div>
+  <div class="note" id="asknote"></div>
   <div class="note help">A person, as against a device. A device is one screen
 standing in one room; a person moves between a phone, a laptop and a borrowed
 browser and is the same person in all three.
@@ -7371,6 +7383,14 @@ async function refreshIdentities(){
        address they sign in with, which is the fact worth reading off a row
        without opening it. */
     const mark = document.createElement('span');
+    /* WHERE THIS ROW CAME FROM, first, because the queue holds two kinds now:
+       somebody an admin named and handed a link to, and somebody who asked
+       from a screen. What you can do about them is different — one is waiting
+       on them, the other is waiting on you. */
+    const from = document.createElement('span');
+    from.className = 'badge';
+    from.textContent = 'ENROLL';
+    top.appendChild(from);
     mark.className = 'badge' + (p.ready ? '' : ' warn');
     mark.textContent = p.ready ? (p.email || 'no address')
                                : 'LINK NOT USED';
@@ -10716,9 +10736,9 @@ async function refreshDisplays(){
       || (b.last_seen || 0) - (a.last_seen || 0)
       || (b.created || 0) - (a.created || 0));
   const EMPTY = {
-    waiting: 'Nobody is waiting. A person appears here when they fill in the '
-             + 'form and press REQUEST ACCESS — opening the display page is '
-             + 'not a request and puts nobody in this queue.',
+    waiting: 'Nobody has asked. A person appears here when they fill in the '
+             + 'form on a screen and press REQUEST ACCESS — opening the '
+             + 'display page is not a request and puts nobody in this queue.',
     enrol: 'No devices being set up. Name one above to get a code.',
     devices: 'Nothing is connected yet. A device appears here the moment it '
              + 'takes its code, or the moment you approve one that asked.',
@@ -10781,6 +10801,16 @@ async function refreshDisplays(){
     nmt.textContent = d.label;
     namecell.appendChild(nmt);
     top.appendChild(namecell);
+    /* …and the other half of that pair. Only on the queue: this same renderer
+       draws the device register and the code queue on two other tabs, where
+       nothing arrived through a form and the chip would be a claim about
+       something that never happened. */
+    if (bucket === 'waiting'){
+      const from = document.createElement('span');
+      from.className = 'badge';
+      from.textContent = 'FORM';
+      top.appendChild(from);
+    }
     /* Shut, the name is the row's title. Open, it is the field you rename it
        in — same place, so the thing you are editing does not jump somewhere
        else the moment you open the row. */
@@ -10792,7 +10822,7 @@ async function refreshDisplays(){
          two could never be looked at together anyway, and a row left open on a
          tab you walked away from is a row you come back to already scrolled
          past. */
-      document.querySelectorAll('#enrollist .erow, '
+      document.querySelectorAll('#asklist .erow, #enrollist .erow, '
                                 + '#conndevices .erow')
               .forEach(x=> x.classList.add('shut'));
       row.classList.toggle('shut', !opening);
@@ -11489,7 +11519,7 @@ function decide(d, name, row){
    element happens to live on — which, since GET A CODE moved to its own tab,
    is not the tab anybody pressing APPROVE is looking at. */
 function dispNoteEl(){
-  return $({enrol: 'dispnote',
+  return $({displays: 'asknote', enrol: 'dispnote',
             devices: 'connnote'}[CURRENT_TAB] || 'dispnote') || $('dispnote');
 }
 
