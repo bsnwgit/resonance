@@ -2081,6 +2081,22 @@ DISPLAY_SETTINGS = {
     # Where alerts go besides the list. Off by default: a server that started
     # posting somewhere on first run would be making a decision about somebody
     # else's network.
+    # WHICH KINDS ARE RECORDED AT ALL, as the ones switched OFF rather than the
+    # ones switched on. Stored as the exception so a kind added in a later
+    # version is recorded until somebody says otherwise — the alternative is a
+    # list of nine that silently stops covering the tenth, which is the failure
+    # mode a tick-list has and a level list does not.
+    #
+    # AND IT FILTERS AT CAPTURE. A kind turned off is not written, which is
+    # what makes a busy deployment cheaper — and it means turning it back on
+    # shows nothing that happened while it was off. That is the trade: cost
+    # now against history later, and the panel says so where it is chosen.
+    "event_off": [],
+    # …AND WHAT THE SINK IS SENT, which is a different question with a
+    # different reader. The ledger is this panel's own health list; the sink is
+    # somebody else's aggregator, and aggregators are pointed at severities
+    # rather than at nine product-specific words. So: one floor, by level.
+    "syslog_min": "info",
     "syslog_on": 0,
     "syslog_host": "",                   # blank means the local daemon
     "syslog_port": 514,
@@ -2512,6 +2528,21 @@ def validate_display_settings(obj, current):
                       "cannot exceed the total")
     # The syslog sink. Its own block because none of it is a range: a switch, a
     # host that may be blank on purpose, a port, and a name from a fixed list.
+    if "event_off" in obj:
+        got = obj["event_off"]
+        if not isinstance(got, (list, tuple)):
+            return None, "event_off has to be a list of event kinds"
+        # Unknown names are DROPPED rather than refused: a panel one version
+        # ahead naming a kind this server has never heard of is not a mistake
+        # anybody made, and refusing the save would make the whole box
+        # unusable over a word this build does not have.
+        cfg["event_off"] = [k for k in EVENT_KINDS if k in set(map(str, got))]
+    if "syslog_min" in obj:
+        want = str(obj["syslog_min"] or "").strip()
+        if want not in EVENT_LEVELS:
+            return None, ("syslog_min must be one of: %s"
+                          % ", ".join(EVENT_LEVELS))
+        cfg["syslog_min"] = want
     if "syslog_on" in obj:
         cfg["syslog_on"] = 1 if obj["syslog_on"] else 0
     if "syslog_host" in obj:
@@ -4590,6 +4621,14 @@ EVENT_KINDS = (
     "no_intent",         # the house was asked for something it cannot do
     "backend_error",     # what answers a route returned an error
     "backend_slow",      # …or took longer than that route allows for
+    # WHO GOT IN AND WHO DID NOT. The other nine are faults a screen reports
+    # about itself; these two are the door. They are in the same ledger because
+    # they are read for the same reason and about the same thing — what has
+    # been happening at that screen — and because an admin who has switched the
+    # catalog down to errors should not be quietly keeping a sign-in log they
+    # did not ask for either.
+    "login_ok",          # somebody signed in, and who
+    "login_fail",        # …or was refused, and on which address
 )
 #: Where an event came from. A display sends its own; the server records the
 #: legs it can see, which a browser cannot.
@@ -4625,13 +4664,75 @@ def event_window_days():
     return int(display_settings().get("event_days") or EVENT_DAYS_DEFAULT)
 
 
+def event_wanted(kind, cfg=None):
+    """Is this kind recorded at all? Read at the moment of capture, so turning
+    one off stops the next one being written and turning it back on starts the
+    one after — there is nothing to sweep and nothing to migrate."""
+    cfg = display_settings() if cfg is None else cfg
+    return kind not in set(cfg.get("event_off") or ())
+
+
+def level_wanted(level, cfg=None):
+    """Is this severe enough for the sink? A FLOOR rather than a list: the
+    reader at the far end is an aggregator, and every one of them is configured
+    in terms of "this and worse"."""
+    cfg = display_settings() if cfg is None else cfg
+    floor = str(cfg.get("syslog_min") or "info")
+    order = {"info": 0, "warn": 1, "error": 2}
+    return order.get(level, 0) >= order.get(floor, 0)
+
+
+#: WHAT EACH KIND IS CALLED IN THE SINK. The ledger's own words where the
+#: alert map already has them, so a collector and this panel say the same thing
+#: about the same fault, and the kind itself where it has none — the door
+#: events are not alerts and never will be.
+EVENT_WORDS = {
+    "mic_denied": "microphone refused",
+    "no_recorder": "no recorder in this browser",
+    "stt_slow": "transcription ran long",
+    "stt_error": "the recogniser errored",
+    "tts_fallback": "fell back to the browser voice",
+    "wake_fuzzy": "woke on a near miss",
+    "no_intent": "asked for something it cannot do",
+    "backend_error": "the assistant errored",
+    "backend_slow": "the assistant ran long",
+    "login_ok": "signed in",
+    "login_fail": "sign-in refused",
+}
+
+
+def event_to_sink(row):
+    """One recorded event, forwarded to syslog as it happens.
+
+    EVERY EVENT, not only the ones that become alerts. An alert is a threshold
+    crossed — five slow transcriptions in an hour — and a collector pointed at
+    this server is there to hold what happened, not the server's opinion about
+    when enough of it has happened. The floor decides how much: see
+    level_wanted.
+
+    Called outside the events lock by both capture paths. syslog_send is a
+    socket write and holding a file lock across one would make a busy screen's
+    faults serialise on the collector being slow."""
+    if not row:
+        return
+    who = display_label(read_displays().get(row.get("did"))) if row.get("did") else ""
+    text = "%s%s%s%s" % ((who + " ") if who else "",
+                         EVENT_WORDS.get(row["kind"], row["kind"]),
+                         (" [%s]" % row["route"]) if row.get("route") else "",
+                         (": " + row["detail"]) if row.get("detail") else "")
+    if row.get("ms"):
+        text += " (%dms)" % row["ms"]
+    syslog_send(row.get("level") or "info", text)
+
+
 def note_event(kind, did="", level="info", detail="", route="", ms=0):
     """One event, kept. Silent about anything it does not recognise rather than
     refusing: this is called from the paths that ARE the fault being reported,
     and a diagnostic that raises inside a failure is a second fault on top of
     the first."""
-    if kind not in EVENT_KINDS:
+    if kind not in EVENT_KINDS or not event_wanted(kind):
         return
+    row = None
     with _events_lock:
         rows = read_events()
         rows.append({"kind": kind, "did": str(did or "")[:32],
@@ -4639,7 +4740,9 @@ def note_event(kind, did="", level="info", detail="", route="", ms=0):
                      "detail": str(detail or "")[:300],
                      "route": str(route or "")[:60],
                      "ms": max(0, int(ms or 0)), "at": int(time.time())})
+        row = rows[-1]
         write_events(rows)
+    event_to_sink(row)
 
 
 def take_events(did, rows):
@@ -4653,10 +4756,17 @@ def take_events(did, rows):
     if not isinstance(rows, list):
         return 0
     kept = 0
+    sent = []
     with _events_lock:
         have = read_events()
         for r in rows[:MAX_EVENTS_PER_POLL]:
             if not isinstance(r, dict) or r.get("kind") not in EVENT_KINDS:
+                continue
+            # A SCREEN STILL SENDS THEM, and they are dropped here. The display
+            # cannot be trusted to filter for the deployment — it would be one
+            # more setting to get to every browser, and a screen that had not
+            # picked up the change yet would go on filling the store.
+            if not event_wanted(r["kind"]):
                 continue
             have.append({"kind": r["kind"], "did": did,
                          "level": r.get("level") if r.get("level") in EVENT_LEVELS
@@ -4665,9 +4775,12 @@ def take_events(did, rows):
                          "route": str(r.get("route") or "")[:60],
                          "ms": max(0, min(600000, int(r.get("ms") or 0))),
                          "at": int(time.time())})
+            sent.append(have[-1])
             kept += 1
         if kept:
             write_events(have)
+    for r in sent:
+        event_to_sink(r)
     return kept
 
 
@@ -4984,7 +5097,7 @@ def syslog_send(level, text):
     """One line, to wherever an admin pointed it. Silent on every failure: this
     is called from the path that IS the fault being reported."""
     cfg = display_settings()
-    if not cfg.get("syslog_on"):
+    if not cfg.get("syslog_on") or not level_wanted(level, cfg):
         return
     host = str(cfg.get("syslog_host") or "").strip()
     try:
@@ -5550,6 +5663,41 @@ def touch_user_session(token, minutes):
         rec["idle"] = (time.time() + minutes * 60) if minutes > 0 else 0.0
 
 
+#: HOW LONG A SIGNED-IN PAGE MAY GO UNSEEN before the session is treated as
+#: gone. A page that is open talks constantly — it polls for its display state
+#: every few seconds — so this is not a timeout anybody using the product can
+#: reach: it is how long after the last word from a browser the server decides
+#: that browser is not there any more.
+#:
+#: WHY THIS EXISTS AT ALL, given the cookie is a session cookie: a session
+#: cookie is a promise the browser makes and several browsers do not keep it.
+#: macOS keeps the application running when the last window closes, and
+#: Firefox's "open previous windows and tabs" restores session cookies across a
+#: real restart. Neither can be reached from here. What can be reached is
+#: whether anybody is still talking, and a browser that has gone quiet for
+#: three minutes has closed, crashed, slept or lost the network — every one of
+#: which should end a session on a machine somebody else may walk up to.
+#:
+#: Three minutes rather than thirty seconds: a backgrounded tab has its timers
+#: throttled hard, and signing somebody out because their laptop deprioritised
+#: the window they were about to come back to would be worse than the thing
+#: this prevents.
+USER_GONE = 180
+
+#: …and how long after a page SAYS it is going before the session is over.
+#: A tab closing sends a beacon on its way out, which is the only moment a
+#: browser can tell the server it is leaving. It is not proof: `pagehide` fires
+#: on a RELOAD as well, and on ordinary navigation, so a beacon that ended a
+#: session outright would sign somebody out every time they pressed F5.
+#:
+#: So it is a countdown rather than a closure. Anything the browser does next
+#: cancels it — a reloaded page polls within a second or two and the session is
+#: never touched — and a tab that is really gone does nothing, so the countdown
+#: runs out. Fifteen seconds is long enough for a slow reload of a page this
+#: size and short enough that walking away and coming back means signing in.
+USER_LEAVING = 15
+
+
 def user_session_pid(token):
     """Which person this browser has signed in as, or "". Expiry is read HERE
     rather than swept on a clock, so a session that has run out is over the
@@ -5565,7 +5713,46 @@ def user_session_pid(token):
     if rec["expires"] <= now_ or (idle and idle <= now_):
         _user_sessions.pop(str(token), None)
         return ""
+    # …AND SO DOES SILENCE. Read before the stamp is written, or every request
+    # would refresh the very thing it is being measured against and the gap
+    # could never grow. A session with no stamp yet is one from before this
+    # existed, or one a second old: it is given the benefit of the doubt once
+    # and stamped below.
+    seen = float(rec.get("seen") or 0)
+    if seen and now_ - seen > USER_GONE:
+        _user_sessions.pop(str(token), None)
+        print("user %s: session ended — %ds without a word"
+              % (rec.get("pid"), int(now_ - seen)), flush=True)
+        return ""
+    # …AND THE PAGE SAID IT WAS GOING. Checked before the stamp for the same
+    # reason silence is, and cleared after it: this request IS the browser
+    # doing something next, which is what tells a reload apart from a tab that
+    # closed. See USER_LEAVING.
+    going = float(rec.get("leaving") or 0)
+    if going and now_ - going > USER_LEAVING:
+        _user_sessions.pop(str(token), None)
+        print("user %s: session ended — the page said it was leaving %ds ago"
+              % (rec.get("pid"), int(now_ - going)), flush=True)
+        return ""
+    rec["seen"] = now_
+    rec.pop("leaving", None)
     return rec["pid"]
+
+
+def close_one_session(token):
+    """This browser's session, and only this one. Returns the person it
+    belonged to, or "".
+
+    SIGNING OUT IS NOT ACCOUNT RECOVERY, which is the distinction the pair of
+    these draws. close_user_sessions below ends every session a person has
+    anywhere, because it is called where their password changed hands and a
+    session opened by a credential that no longer exists is a door left open.
+    Somebody saying "sign me out" in a hallway means the screen in front of
+    them — ending the laptop on their desk at the same time is a surprise they
+    have no way to predict from the words they used."""
+    with _user_lock:
+        rec = _user_sessions.pop(str(token or ""), None)
+    return (rec or {}).get("pid", "")
 
 
 def close_user_sessions(pid):
@@ -7790,8 +7977,31 @@ class Handler(SimpleHTTPRequestHandler):
         return m.value if m else ""
 
     def _set_user_cookie(self, token, hours):
+        """A SESSION COOKIE, which is the point: it is gone when the browser
+        closes, so reopening asks for a password again.
+
+        `hours` no longer writes a Max-Age and is kept because the caller has
+        it and the server still enforces it — the deadline lives in
+        `_user_sessions`, where a browser cannot edit it, and is checked on
+        every request by user_session_pid. Writing it into the cookie as well
+        only ever meant the browser and the server each holding half of the
+        same rule.
+
+        WHAT THIS IS AND IS NOT. The token is forgotten by the browser; the
+        session it named is not ended on the server, and runs to its own
+        absolute and idle deadlines. That is enough for somebody closing a
+        laptop and it is not enough for a screen that crashed, which is the
+        other half of this and needs a heartbeat rather than a cookie
+        attribute — see TODO. Anybody holding a copy of the token still gets
+        in until it expires, and it is HttpOnly, so holding a copy means
+        having had the machine.
+
+        Clearing still passes hours=0 and still writes Max-Age=0, because
+        expiring a cookie is the only way to remove one."""
         bits = ["%s=%s" % (USER_COOKIE, token), "Path=/", "HttpOnly",
-                "SameSite=Strict", "Max-Age=%d" % int(hours * 3600)]
+                "SameSite=Strict"]
+        if not token or hours <= 0:
+            bits.append("Max-Age=0")
         if isinstance(self.connection, ssl.SSLSocket):
             bits.insert(3, "Secure")
         self.send_header("Set-Cookie", "; ".join(bits))
@@ -8419,7 +8629,8 @@ class Handler(SimpleHTTPRequestHandler):
                 # panel fills that box from the same fetch rather than a second
                 # one that can disagree with it.
                 "settings": {k: panel_settings().get(k)
-                             for k in ("syslog_on", "syslog_host",
+                             for k in ("event_off", "syslog_min",
+                                       "syslog_on", "syslog_host",
                                        "syslog_port", "syslog_name",
                                        "syslog_facility",
                                        "hook_on", "hook_url",
@@ -9195,6 +9406,18 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(200, {"ok": True, "gen": config_gen(),
                                         "reload": False, "cfg": cfg,
                                         "now": now_})
+            # THE SIGN-IN'S HEARTBEAT, and it has to be here rather than on
+            # the ask path: somebody signed in at a screen they are not
+            # currently talking to is still standing in front of it, and a
+            # session that only counted questions would end mid-conversation
+            # because nobody said anything for three minutes.
+            #
+            # Reading it is what stamps it — see user_session_pid — so this
+            # line is the whole of the heartbeat. Before the early return
+            # below, because a person can be signed in on a screen that has not
+            # been approved as a display and their session is no less real for
+            # it.
+            self._user_pid()
             disp = self._display()
             if not disp:
                 # No cookie, or one naming a row that is gone. Still a 200:
@@ -9473,28 +9696,42 @@ class Handler(SimpleHTTPRequestHandler):
             obj = self._json_body()
             if obj is None:
                 return
+            asked_for = str(obj.get("email") or "").strip()[:120]
+            # WHICH SCREEN IT HAPPENED AT, where there is one. The ledger is
+            # read per display — "what has this screen been reporting" — so a
+            # sign-in filed against nothing would be invisible in the one view
+            # that matters.
+            at = (self._display() or {}).get("id", "")
             who = identity_by_email(obj.get("email"))
             # ONE ANSWER FOR BOTH HALVES. "no such account" tells somebody
             # standing at a public screen which addresses are real here, which
             # is a list worth having before you start guessing passwords.
             wrong = {"error": "that is not an email and password we know"}
             if not who:
+                note_event("login_fail", did=at, level="warn",
+                           detail="no account for %s" % (asked_for or "(blank)"))
                 return self._json(401, wrong)
             pid = who["id"]
             if user_login_blocked(pid):
                 # The number is not given: "wait 47 seconds" is a clock an
                 # attacker can read, and the person who typed it wrong twice
                 # needs to know to stop rather than to know when.
+                note_event("login_fail", did=at, level="warn",
+                           detail="%s — refused, too many attempts"
+                                  % identity_label(who))
                 return self._json(429, {"error": "too many attempts — wait a "
                                                  "little and try again"})
             if not verify_identity_password(pid, obj.get("password")):
                 print("sign-in refused for %s from %s"
                       % (pid, self.address_string()), flush=True)
+                note_event("login_fail", did=at, level="warn",
+                           detail="%s — wrong password" % identity_label(who))
                 return self._json(401, wrong)
             hours = identity_hours(who)
             token = open_user_session(pid, hours)
             note_identity_seen(pid)
             print("identity %s signed in for %dh" % (pid, hours), flush=True)
+            note_event("login_ok", did=at, detail=identity_label(who))
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self._set_user_cookie(token, hours)
@@ -9514,9 +9751,29 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(404, {"error": "not found"})
             if not self._same_origin():
                 return self._json(403, {"error": "cross-origin request refused"})
+            # THIS SESSION. `all` is the door-slam — every browser that person
+            # is signed in on — and it is not what a sign-out button or a
+            # spoken phrase means, so it has to be asked for explicitly.
+            everywhere = (parse_qs(parsed.query).get("all") or [""])[0] == "1"
+            token = self._user_token()
             pid = self._user_pid()
-            if pid:
+            if pid and everywhere:
                 close_user_sessions(pid)
+            elif token:
+                close_one_session(token)
+            if pid:
+                # WHO, WHERE FROM, AND HOW MANY. A session ending is the one
+                # half of a sign-in the log never recorded, which made a
+                # person's account impossible to follow past the moment they
+                # arrived.
+                left = 0
+                with _user_lock:
+                    left = len([1 for v in _user_sessions.values()
+                                if v["pid"] == pid])
+                print("user %s signed out from %s%s — %d session(s) still open"
+                      % (pid, self.address_string(),
+                         " (everywhere)" if everywhere else "", left),
+                      flush=True)
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self._set_user_cookie("", 0)
@@ -9524,6 +9781,28 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+            return
+
+        if parsed.path == "/user/leaving":
+            # A PAGE ON ITS WAY OUT, and nothing more than that. It starts a
+            # countdown; it does not end anything, because pagehide fires on a
+            # reload too. Deliberately NOT reading the session through
+            # _user_pid: that path stamps the session as seen and would cancel
+            # the very thing this is setting.
+            if self.admin_port:
+                return self._json(404, {"error": "not found"})
+            if not self._same_origin():
+                return self._json(403, {"error": "cross-origin request refused"})
+            tok = self._user_token()
+            with _user_lock:
+                rec = _user_sessions.get(tok) if tok else None
+                if rec:
+                    rec["leaving"] = time.time()
+            # 204: a beacon is fire-and-forget and the page is already gone by
+            # the time this is written. There is nobody to read a body.
+            self.send_response(204)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
             return
 
         if parsed.path == "/user/setup":
@@ -10045,11 +10324,21 @@ class Handler(SimpleHTTPRequestHandler):
             # back anything a previous approval gave, or "denied" is a word on
             # a row rather than a thing that happened.
             set_display_endpoints(did, obj.get("endpoints") if approve else [])
+            # THE WHOLE OF THE REFUSAL, because the row leaves the queue the
+            # moment this is written and this line is where it is recorded.
+            # The reason is what an admin typed for the person and the note is
+            # what they typed for themselves; both are worth having six months
+            # later, and neither is readable anywhere else once the row is out
+            # of the list.
             print("display %s (%s) %s by %s%s"
                   % (did, display_label(rec),
                      "approved" if approve else "refused", s["user"],
                      "" if approve else
-                     (" — may ask again" if rec["deny_repeat"] else " — final")),
+                     ((" — may ask again" if rec["deny_repeat"] else " — final")
+                      + (", reason: %s" % rec["deny_reason"]
+                         if rec["deny_reason"] else "")
+                      + (", note: %s" % rec["deny_note"]
+                         if rec["deny_note"] else ""))),
                   flush=True)
             return self._json(200, {"ok": True, "displays": admin_displays()})
 

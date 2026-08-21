@@ -2321,6 +2321,46 @@ on a desk. A tablet bolted to a wall, answering a household, moves them:
 
 Newest first.
 
+### 2026-08-20 — the door, the clock, and one queue for everybody waiting
+
+A session's worth of work on the two ends of a deployment: who gets in, and
+what a screen carries while nobody is talking to it.
+
+- **A personal link opens wherever it is sent.** `/p/` refused an invitation on
+  any browser holding a display token — and a display token is scoped per host
+  rather than per port, so the browser certain to be carrying one was the panel's
+  own. The check only ever fired on the enrolment listener, where invitations
+  are the entire point, so it went.
+- **One queue for everybody who is not in yet**, chipped ENROLL or FORM. The
+  people an admin named and the people who asked from a screen were two boxes
+  that asked you to know the difference before you could find either; the chip
+  says which a row is, which was the whole of what the split was telling you. A
+  refusal now leaves that queue and lands in the log, reason and note included.
+- **What an assistant is called moved to its voice.** The wake and sleep words
+  sat on the layout for an afternoon; a layout is what an endpoint LOOKS like,
+  and what it is called is part of how it sounds — so both live on the speech
+  profile the layout names, edited once for every endpoint wearing it.
+- **A screen can carry the date and time**, ticked per layout, formatted once
+  for the deployment under SETTINGS ▸ ADMIN. It reads the device's clock, turns
+  over on the minute, and rides the screensaver rather than vanishing into it —
+  painted into the canvas so it travels with the figure instead of burning in.
+- **Signing out exists.** A button that names who it is about, and an optional
+  spoken phrase that is nobody's default. It ends this screen's session and no
+  other: `close_one_session` draws the line that `close_user_sessions` — account
+  recovery — deliberately does not.
+- **A session ends when the browser goes.** The cookie is a session cookie, a
+  closing tab starts a fifteen-second countdown that a reload cancels, and three
+  minutes of silence ends one regardless. The last is the only mechanism that
+  survives a crash, and the first two are what make it immediate.
+- **A logging catalog.** Everything was captured and everything was kept; now
+  each kind can be switched off, at capture, and with the sink on every event is
+  forwarded as it happens rather than only the ones crossing an alert threshold.
+  The door is in the catalog too — signed in, and sign-in refused.
+- **A signed-in person is never asked to sign in again.** The gate asked whether
+  any endpoint was usable and never whether somebody had already answered it, so
+  a missing grant wore the costume of a broken login. It now names the assistant
+  and says whose decision it is.
+
 ### 2026-08-19 — nothing stands in for a choice nobody made
 
 Two threads, and they turned out to be the same one. Every list in the panel

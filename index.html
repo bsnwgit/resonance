@@ -805,6 +805,11 @@ Case and dashes do not matter.</div>
       <button id="talkbtn" title="speak to Resonance — mic drives the geometry and your words are transcribed"><span class="ico">🎤</span><span class="lbl">TALK</span></button>
       <button id="mute" class="on" title="mute its voice"><span class="ico">🔊</span><span class="lbl">AUDIO</span></button>
       <button id="textbtn" class="on" title="hide the transcript and give the space to the field"><span class="ico">▤</span><span class="lbl">TEXT</span></button>
+      <!-- ONLY WHILE SOMEBODY IS SIGNED IN, and it says WHO. The case that
+           matters is a machine two people share: whoever presses this may not
+           be the person it is about, so the name is on the button rather than
+           in a tooltip nobody opens. -->
+      <button id="signoutbtn" hidden title="end this session on this screen"><span class="ico">⏻</span><span class="lbl">SIGN OUT</span></button>
     </span>
   </div>
 </div>
@@ -971,8 +976,56 @@ const Person = {
        for the rest of the session. Guarded because this object is taken at
        load, before the transcript exists. */
     if (typeof repaintNames === 'function') repaintNames();
+    if (typeof paintSignOut === 'function') paintSignOut();
   },
 };
+
+/* THE CONTROL, and it names the person it is about. On a machine two people
+   share, whoever presses this may not be who is signed in — a button that
+   said only SIGN OUT would be one you press to find out. Hidden entirely
+   while nobody is signed in rather than drawn inert: there is nothing to end,
+   so it is not a control that is unavailable, it is one that does not apply. */
+function paintSignOut(){
+  const b = $('signoutbtn');
+  if (!b) return;
+  const on = typeof Person !== 'undefined' && Person.is();
+  b.hidden = !on;
+  if (!on) return;
+  /* JUST THE WORDS. The name went on the label to say who was about to be
+     signed out, and it made the one button in this bar twice the width of the
+     three beside it and a different width per person. The question asked on
+     the press names them, which is where it matters — nobody is signed out by
+     reading a label. */
+  const who = Person.name || Person.email || '';
+  b.title = who ? 'end ' + who + '\u2019s session on this screen'
+                : 'end this session on this screen';
+}
+
+/* END THIS SESSION — this browser's, not every browser this person is signed
+   in on. The server draws that line; see close_one_session.
+
+   A RELOAD RATHER THAN UNPICKING IT BY HAND. A signed-in page holds their
+   preferences, their transcript label, whatever the conversation was carrying
+   and a gate that has been switched off; putting all of that back is a list
+   nobody can keep correct as the page grows, and the one thing worse than a
+   sign-out that looks untidy is one that leaves something of theirs behind.
+   The cookie is gone by then, so the page comes back at the gate. */
+async function signOut(spoken){
+  /* Said before the reload takes the page away, because it is the only
+     confirmation a voice-only screen can give — there is nothing on it to
+     read. */
+  if (spoken) announce('Signing you out.');
+  try{
+    await fetch('user/logout', {method:'POST'});
+  }catch(e){
+    /* The session is ended server-side or it is not, and either way this
+       browser must stop presenting itself as signed in. Falling through to
+       the reload is what makes that true: the cookie either went with the
+       response or it expires on its own, and the page comes back asking. */
+  }
+  forgetConversation();
+  location.reload();
+}
 
 /* WHICH OF THE FOUR THINGS THIS PAGE IS ASKING FOR. One at a time, because
    they are four different conversations and only one of them is ever yours:
@@ -999,7 +1052,13 @@ function paintGate(){
      alternative to a form that fails for a reason nobody can see. */
   const invite = GATE === 'invite';
   const spent = GATE === 'spent';
-  const signing = (GATE === 'login' || setup) && !invite && !spent;
+  /* SIGNED IN AND STILL LOOKING AT THIS. Not a failure and not a sign-in: the
+     password worked, and what is missing is a grant only an admin can make.
+     Asking for the password again is the one thing that cannot help, and it is
+     what this page did — the gate asked whether any endpoint was usable and
+     never whether somebody had already answered it. */
+  const nogrant = GATE === 'nogrant';
+  const signing = (GATE === 'login' || setup) && !invite && !spent && !nogrant;
   /* The one failure a link can have. Said here rather than nowhere: the
      server answers a redirect with one word, and somebody who followed a link
      that did not work should be told, not left looking at a page behaving as
@@ -1027,8 +1086,20 @@ function paintGate(){
        refusal painted "open the link you were sent" at somebody who had just
        opened the link they were sent, and the two messages written for the
        two failures could never appear. */
+    /* NAMED. The server sends every endpoint on this port whether or not the
+       caller may use it — `allowed` is the answer, the name comes either way —
+       so the page can say WHICH assistant is refusing rather than leaving
+       somebody to work out what "this" refers to on a screen with nothing
+       else on it. */
+    const here = (typeof Routes !== 'undefined' ? (Routes.list || []) : [])
+                   .map(r=> r.name).filter(Boolean);
+    const named = here.length === 1 ? here[0]
+                : here.length ? here.slice(0, -1).join(', ') + ' or ' + here[here.length - 1]
+                : '';
     head.textContent =
-        done    ? 'You are set up'
+        nogrant ? (named ? 'You do not have access to ' + named
+                         : 'You do not have access here')
+      : done    ? 'You are set up'
       : failed             ? 'That link did not work'
       : invite  ? 'Invitations are accepted here'
       : spent   ? 'That link has been used'
@@ -1041,7 +1112,16 @@ function paintGate(){
      leaves its own message here and repainting the mode must not wipe it. */
   if (note && !note.classList.contains('bad')){
     note.textContent =
-        done    ? (PLACES.length
+        nogrant ? ('You are signed in as '
+                   + (Person.name || Person.email || 'yourself')
+                   + ' and your sign-in worked. '
+                   + (named ? named + ' has' : 'This assistant has')
+                   + ' not been granted to your account, which is a setting '
+                   + 'only an administrator can change — there is nothing to '
+                   + 'try again here and nothing you have done wrong. Ask an '
+                   + 'administrator to grant it: it is one tick on your row '
+                   + 'under IDENTITY ▸ USER in the panel.')
+      : done    ? (PLACES.length
                     ? 'Sign in with your email address and the password you '
                       + 'just chose, at whichever of these you want:'
                     : 'Nothing has been granted to this account yet — an '
@@ -1064,7 +1144,11 @@ function paintGate(){
   if (links){
     /* Neither of those routes answers on the enrolment listener, so offering
        them would be two buttons that 404. */
-    links.style.display = (setup || ENROL_ONLY) ? 'none' : '';
+    /* …and not to somebody who is already signed in. Both of these are ways
+       to prove who you are — a code, or asking to be let in as a device — and
+       a person holding a session has done that. What they are short of is a
+       grant, which neither button can fetch. */
+    links.style.display = (setup || ENROL_ONLY || nogrant) ? 'none' : '';
     const code = $('gatecode'), req = $('gatereq');
     if (code) code.textContent = GATE === 'code' ? 'Sign In Instead'
                                                  : 'Use Code Instead';
@@ -1670,6 +1754,24 @@ function paintRequest(){
      unfinished boot — or a dropped request — as a configuration fault. */
   const emptyPort = D.known && Routes.loaded && !(Routes.list || []).length;
   const canEnrol = D.known && D.state !== 'approved' && !usableHere && !emptyPort;
+  /* A SIGN-IN BOX IS NEVER THE ANSWER TO SOMEBODY WHO IS SIGNED IN. Above the
+     enrolment branches on purpose: every one of them offers a way to prove who
+     you are, and this is the state where that has already happened and did not
+     help. Only where nothing is usable — a person with a grant falls straight
+     through to the display, which is what signing in was for. */
+  if (typeof Person !== 'undefined' && Person.is() && !usableHere && !emptyPort){
+    document.body.toggleAttribute('data-request', true);
+    document.body.toggleAttribute('data-gate', true);
+    ['reqhead', 'reqform', 'reqsend', 'reqnote', 'enrol'].forEach(id=>{
+      const el = $(id);
+      if (el) el.style.display = 'none';
+    });
+    const links = $('gatelinks');
+    if (links) links.style.display = 'none';
+    GATE = 'nogrant';
+    paintGate();
+    return;
+  }
   if (emptyPort){
     document.body.toggleAttribute('data-request', true);
     document.body.toggleAttribute('data-gate', true);
@@ -2179,6 +2281,12 @@ const S = {
      loadSettings — so a key with no default here is a setting the server sends
      and the display silently drops. */
   clock_time:'locale', clock_date:'locale',
+  /* WHAT ENDS A SESSION OUT LOUD. Blank by default and therefore off: a screen
+     anybody can walk up to should not have a spoken security control nobody
+     asked for, and the phrase somebody wants is deployment-specific in a way
+     "goodbye" is not. It rides the speech profile with the wake and sleep
+     words, so it is one assistant's phrase rather than the building's. */
+  signoutword:'', signoutaliases:'',
   /* WHAT THE SCREEN SAYS ALOUD WHEN SOMEBODY SIGNS IN, and when somebody
      fails to. BOTH EMPTY BY DEFAULT, which means silent — and that is the
      right default rather than a timid one. A wall in a shared space
@@ -5140,6 +5248,7 @@ const Wake = {
     return list.filter(Boolean);
   },
   sleepCandidates(){ return this._list(S.sleepword, S.sleepaliases); },
+  signOutCandidates(){ return this._list(S.signoutword, S.signoutaliases); },
   /* The same, for the word that WAKES it — which is a setting now rather than
      a property of a route, so it is asked for the same way. */
   wakeCandidates(){ return this._list(S.wakeword, S.wakealiases); },
@@ -5151,6 +5260,22 @@ const Wake = {
     const toks = this.norm(text).split(' ').filter(Boolean);
     if (!toks.length) return false;
     for (const w of this.sleepCandidates()) if (this._tryWord(toks, w)) return true;
+    return false;
+  },
+
+  /* ENDING THE SESSION, which is not the same as ending the conversation and
+     is deliberately a separate word. The sleep word rests the figure and the
+     next person walks up to it as themselves; this one ends the sign-in.
+
+     Nothing matches when no phrase is set, and a phrase of several words is
+     matched EXACTLY by _tryWord — no fuzz, no near-miss. That is the right
+     tolerance for the one spoken command here that takes something away. */
+  heardSignOut(text){
+    const words = this.signOutCandidates();
+    if (!words.length) return false;
+    const toks = this.norm(text).split(' ').filter(Boolean);
+    if (!toks.length) return false;
+    for (const w of words) if (this._tryWord(toks, w)) return true;
     return false;
   },
 
@@ -5279,6 +5404,15 @@ const Wake = {
   gate(text){
     if (!this.armed()) return text;
     if (this.awake && wallNow() < this.until){
+      /* BEFORE THE SLEEP WORD. A deployment whose phrase contains its sleep
+         word — "goodbye, sign me out" — would otherwise be put to sleep by
+         the first match and never reach this one. Only where there is a
+         session to end: on a screen nobody has signed in at, the phrase is
+         just something somebody said. */
+      if (typeof Person !== 'undefined' && Person.is() && this.heardSignOut(text)){
+        signOut(true);
+        return null;
+      }
       if (this.heardSleep(text)){ this.sleepNow(true); return null; }
       /* Mid-conversation, another route's wake word switches to it. One
          person at one tablet changing what they are addressing — say the
@@ -5665,6 +5799,34 @@ muteBtn.addEventListener('click', ()=> setMuted(!muted, true));
    Kept in localStorage rather than the shared settings document, because one
    person wanting a clean field should not take the transcript away from
    everyone else looking at the same URL. */
+/* ASKED FIRST, because the person pressing it may not be the person it is
+   about and the two are standing next to each other. Named in the question for
+   the same reason it is named on the button. */
+const signOutBtn = $('signoutbtn');
+if (signOutBtn) signOutBtn.addEventListener('click', ()=>{
+  const who = Person.name || Person.email || 'this session';
+  if (confirm('Sign out ' + who + ' on this screen?')) signOut(false);
+});
+paintSignOut();
+
+/* SAYING SO ON THE WAY OUT. A closed tab is a session nobody is using, and
+   the only moment a browser can tell the server it is going is this one.
+
+   `pagehide` rather than `beforeunload`, which browsers ignore without a
+   dialogue, and `sendBeacon` rather than fetch, which is cancelled the instant
+   the page dies. What the server does with it is a COUNTDOWN and not a
+   sign-out: this fires on a reload as well, and the reloaded page cancels it
+   by simply existing — its first poll lands inside the grace. A tab that has
+   really gone sends nothing more and the countdown runs out.
+
+   Only where somebody is signed in. On a wall display nobody has signed in
+   at, there is no session to end and this would be a request every time a
+   screen reloaded itself overnight. */
+window.addEventListener('pagehide', ()=>{
+  if (typeof Person === 'undefined' || !Person.is()) return;
+  if (navigator.sendBeacon) navigator.sendBeacon('user/leaving');
+});
+
 const textBtn = $('textbtn');
 function setTextVisible(on, remember){
   /* …except where the display itself is voice only, which is the one place a

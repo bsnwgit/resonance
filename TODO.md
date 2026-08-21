@@ -7,36 +7,7 @@ again.
 
 ---
 
-## 1 · Choosing what gets logged
-
-**Everything is recorded and there is no way to say otherwise.** The nine kinds
-in `EVENT_KINDS` — `mic_denied`, `no_recorder`, `stt_slow`, `stt_error`,
-`tts_fallback`, `wake_fuzzy`, `no_intent`, `backend_error`, `backend_slow` —
-are all captured, all kept for `event_days`, and all forwarded to the syslog
-sink when `syslog_on`. `EVENT_LEVELS` (`info`, `warn`, `error`) exists and is
-recorded per row, but nothing filters on it.
-
-The noisy ones in a working house are `wake_fuzzy` and `stt_slow`, and they
-are the two least likely to be acted on.
-
-**To decide first:** three separate questions that a single control would
-answer badly.
-
-- **Per kind, or per level?** Nine ticks describes exactly what you want and
-  goes stale every time a kind is added; three levels survives new kinds and
-  cannot say "everything except near-miss wakes".
-- **Does the choice apply to the ledger, to the syslog sink, or to each
-  separately?** They are read by different people for different reasons — the
-  ledger is the panel's own health list, the sink is somebody else's
-  aggregator — so one setting for both is likely wrong.
-- **Not recorded, or recorded and not shown?** Filtering at capture is what
-  makes a busy deployment cheaper; filtering at display is what lets somebody
-  turn a kind back on and still see last week. They are different features and
-  only the second is reversible.
-
----
-
-## 2 · Building up embeds
+## 1 · Building up embeds
 
 **Scope this before building any of it** — the list below is what is there and
 what is plainly missing, not a decision about which of it is wanted.
@@ -84,7 +55,7 @@ Directions worth weighing, each of which is a different product:
 
 ---
 
-## 3 · A real certificate on the server
+## 2 · A real certificate on the server
 
 **Self-signed, and it is the reason for most of what looks broken.** What is on
 the box today:
@@ -135,122 +106,48 @@ assistant's, and the enrolment name together.
 
 ---
 
-## 4 · Signing out — by voice, and on screen
+## 3 · Password rules an admin can set
 
-**The server can already do it and nothing can reach it.** `/user/logout`
-exists, works, and is called by nobody: it closes the account's sessions and
-clears the cookie, and there is no button, no phrase and no gesture anywhere
-that sends a request to it. A person signs in and the only ways back out are
-waiting for the session to expire or an admin reissuing their link, which is
-account recovery being used as a sign-out.
+**There is one rule and it is a constant.** `MIN_PASSWORD = 10`, in
+`serve.py`, and length is the whole of it — nothing asks for a mix of cases, a
+digit, a symbol, or anything a password is not. A deployment with a policy to
+meet cannot say so, and one that wants something laxer for a house full of
+tablets cannot say that either.
 
-Two surfaces are wanted and they are not the same feature:
+What is actually there today:
 
-- **On screen** — a control wherever the signed-in person is visible. It has to
-  say who is being signed out, because the case that matters is a shared
-  machine and the person pressing it may not be the person signed in.
-- **By voice** — a phrase, alongside the sleep word. `heardSleep()` already
-  matches a configurable word (`sleepword`, default *goodbye*, with aliases) and
-  calls `sleepNow()`; a sign-out phrase would hang off the same matcher and the
-  same profile, so it is one more word rather than a new mechanism.
+- **One number for both populations, deliberately.** `password_fault()` says so
+  in as many words: "there is one rule in this product for how long a password
+  has to be, and a second number for a second population would be two answers
+  to one question." It judges a person's password; the panel's own accounts are
+  judged by two separate `len(new) < MIN_PASSWORD` tests in the admin routes.
+- **So the rule is written out three times.** `password_fault()` for people,
+  and twice more where an admin account's password is set or changed. A fourth
+  rule added to only one of them is a rule that applies to some passwords.
+- **The panel is told the number** — `pw_min` rides along with the identities
+  payload — so whatever is chosen has somewhere to be shown without a second
+  fetch.
+- **512 is the ceiling**, and it is not a policy: it is there so a hash is not
+  computed over a megabyte somebody pasted.
 
-**To decide first, and it is the whole of the design:**
+**To decide first**, and each answer is a different amount of work:
 
-- **`close_user_sessions()` ends EVERY session that person has**, on every
-  machine. That is right for a leaked link and wrong for "sign me out of this
-  wall screen" — a person who says it in the hallway would be signed out of the
-  laptop on their desk. So either sign-out learns to end one session, or the
-  voice and screen versions do something narrower than the recovery path does.
-- **Voice sign-out on a shared screen is a security control operated by anyone
-  in earshot.** That may be exactly right — the risk of a stranger signing
-  somebody OUT is small, and the alternative is an account left open on a wall.
-  But it should be a decision, not a side effect of reusing the sleep matcher.
-- **What the screen becomes afterwards.** Back to the gate, or back to whatever
-  the display was before anybody signed in — which are different answers on a
-  kiosk and on somebody's own browser.
-- **Whether saying goodbye should sign out at all.** The sleep word and a
-  sign-out word are close enough in meaning that a person will use one for the
-  other, and today the sleep word only puts the figure to rest.
+- **A length, or a policy?** A number in a box is one setting and covers most
+  of what a deployment is asked to prove. Character classes are four more
+  ticks, and they are the part security guidance has been moving away from for
+  a decade — worth deciding on purpose rather than adding because a form
+  usually has them.
+- **One rule or two?** The comment above is a decision already taken, and a
+  panel account and a hallway sign-in are genuinely different risks. Changing
+  it means saying why the earlier reasoning no longer holds.
+- **What happens to passwords that already exist.** Raising the minimum cannot
+  retroactively refuse them: they are hashes, and the length is unknowable. So
+  either the rule applies at the next change only — quiet, and leaves weak
+  passwords in place — or somebody has to be forced to set a new one, which is
+  a mechanism this product does not have.
+- **Where it is said.** The rule has to reach the person choosing a password,
+  on a page they open from a one-shot link, or they find out by being refused.
 
----
-
-## 5 · Ending a session when the browser closes
-
-**Nothing ends when a browser closes today.** The cookie is written with
-`Max-Age = hours × 3600`, so it survives being closed and reopened, and the
-server's own record — `_user_sessions[token] = {pid, expires}` — knows nothing
-about browsers at all. Closing the window leaves a live session that anybody
-returning to that machine walks straight into.
-
-Pairs with **§4**: this is the same question asked from the other end, and both
-run into `close_user_sessions()` ending every session that person has anywhere.
-
-Three mechanisms, and only one of them actually ends anything:
-
-1. **Make it a session cookie** — drop `Max-Age` and the browser forgets it on
-   close. One line, and it is the weakest of the three: the server session is
-   still open and still valid until it expires, so the token is *forgotten*
-   rather than *ended*. Anybody holding a copy still gets in.
-2. **A beacon on the way out** — `pagehide` / `visibilitychange` with
-   `sendBeacon('/user/logout')`. Genuinely ends it, and unreliable in exactly
-   the cases that matter: a killed tab, a crash, a dead network, a machine
-   switched off at the wall. It also fires on ordinary navigation, so it has to
-   tell leaving from moving.
-3. **A heartbeat and an idle sweep** — the page already polls; a session not
-   seen for N seconds is closed server-side. The only one that covers a crashed
-   browser or a yanked power cable, which is the wall-screen case, and the only
-   one where "ended" means ended.
-
-**To decide first:** this contradicts a decision already made on purpose. The
-session is persistent on that browser because *being asked again every half hour
-would end with people avoiding the assistants that ask* — and that is still true
-of somebody's own laptop. A shared machine wants the opposite. So it is probably
-a setting, and the question is whose:
-
-- **the person's** — they know whether it is their laptop, and `session_hours`
-  is already theirs to set;
-- **the display profile's** — the deployment knows which screens are shared,
-  and the person may never have seen the machine before;
-- **both**, with one winning, which needs the rule written down before either
-  is built.
-
-Worth knowing while deciding: `_user_sessions` is an in-memory map, so **a
-server restart already ends every session**, and nothing anywhere says so.
-
----
-
-## 6 · An approved request lands the person on a JSON error
-
-**A regression, and a recent one.** Somebody asks for access on a display, an
-admin approves, and their screen shows `{"error": "not found"}`. The admin sees
-the link, which is working as intended; the person sees a JSON body.
-
-The cause, exactly:
-
-- Approving a request with an email on it mints an identity and puts the setup
-  token on the display row, and `_display_state` hands the page
-  `setup_url = "/p/<token>"` — **a path, not a URL**.
-- The page polls, sees `state === 'setup'`, and does `location.href =
-  this.setupUrl`, which resolves on **the port that display is loaded from** —
-  an assistant's.
-- `/p/` now answers on the enrolment listener and 404s on every other one. That
-  was the point of giving enrolment a port of its own, and this redirect is the
-  one caller that was still assuming the old rule.
-
-**The wanted behaviour is not to fix the redirect.** Send the person back to
-the sign-in page with a message: their request was received, and if it is
-approved they will get an email with a link. That is the better answer anyway —
-the display they asked from is a device, the account is theirs, and the link
-should reach them on something they own rather than open on a screen in a
-hallway that anybody may walk up to next.
-
-Which means:
-
-- the page stops navigating on `state === 'setup'` and says so instead;
-- the display row probably stops carrying `setup` at all, since nothing on the
-  screen will spend it — worth checking what else reads it before removing it;
-- **the promise has to be true.** `mail_setup_link()` already runs on approve,
-  but it needs an SMTP host and there is none configured on the test box today
-  (`mail_host` is empty), so the message would promise an email nobody sends.
-  Either the wording changes when `mail_ready()` is false — *an administrator
-  will give you a link* — or the panel refuses to say the mail half at all.
+Whatever it becomes, it should be **one place that answers "is this password
+allowed"**, called by all three sites — the value is a setting, the judgement
+is not three copies of an `if`.

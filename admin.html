@@ -2722,6 +2722,45 @@ itself; <b>{name}</b> is the word that was said to reach whoever answered.</div>
     <div id="sleepstate" style="font-size:calc(9px * var(--fs));letter-spacing:.06em;color:rgba(var(--paper),.88);margin-top:6px;line-height:1.5"></div>
     </div>
 </section>
+
+  <!-- A SEPARATE WORD FROM THE SLEEP WORD, on purpose. One ends the
+       conversation and leaves the person signed in; this one ends the
+       session. They are close enough in meaning that somebody will reach for
+       the wrong one, which is the argument for two words rather than for one
+       word doing both — a sleep word that signed people out would sign them
+       out every time they said goodbye. -->
+  <section class="grp" data-prof="speech" data-tab="speech">
+    <h4>Sign-out phrase</h4>
+    <div class="grpbody">
+  <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:0">phrase that ends the session</label>
+  <input id="signoutword" type="text" spellcheck="false" autocomplete="off" placeholder="e.g. sign me out">
+  <label style="display:block;font-size:calc(9.5px * var(--fs));letter-spacing:.1em;color:rgba(var(--paper),.9);margin-top:10px">also accept</label>
+  <textarea id="signoutaliases" rows="2" spellcheck="false" placeholder="one per line"></textarea>
+  <div class="note help"><b>Blank, and there is no spoken sign-out at all</b>
+— which is the default, because a screen anybody can walk up to should not
+have a spoken security control nobody asked for.
+
+Set one and a person signed in at a screen using this profile can end their
+session by saying it. <b>It ends this screen's session and no other</b>: the
+laptop on their desk stays signed in, because ending that too is a surprise
+nobody can predict from the words they said.
+
+<b>Several words are matched exactly</b> — no near-misses and no fuzzy
+spellings, unlike the wake word. That is the right tolerance for the one
+spoken command here that takes something away, and it is why a phrase is
+better than a single word.
+
+<b>Anybody in earshot can say it.</b> That is a real property of a shared
+screen and it is worth deciding about rather than discovering: the risk of a
+stranger signing somebody OUT is small, and the alternative is an account left
+open on a wall. A screen where that is the wrong trade should leave this
+blank and use the button.
+
+The button is always there, next to AUDIO and TEXT, whenever somebody is
+signed in — and it names them, because whoever presses it on a shared machine
+may not be who is signed in.</div>
+    </div>
+</section>
   <section class="grp" data-prof="speech" data-tab="speech">
     <h4>Speech in (mic, STT)</h4>
     <div class="grpbody">
@@ -2981,7 +3020,11 @@ be answered.
 
 If you do not ask for a name, rows arrive labelled by their id and you approve
 them on whatever you did ask for. Ask for nothing at all and a request carries
-nothing but that id.</div>
+nothing but that id.
+
+The requests themselves arrive under <b>ENROLLMENTS ▸ USER</b>, in the same
+queue as the people you enrolled — chipped <b>FORM</b> where they asked and
+<b>ENROLL</b> where you named them.</div>
 
   <div class="seg actrow">
     <button id="b_formsave" class="act-save">SAVE THE FORM</button>
@@ -3870,7 +3913,22 @@ behaves like the rest of the building rather than like nothing.</div>
        for a screen. It is a queue, and a queue you have emptied should look
        empty. -->
   <div class="rulehead">PENDING</div>
+  <!-- ONE MESSAGE FOR ONE QUEUE. The two lists under this divider are painted
+       by two different refreshes, and each used to write its own "nobody
+       here" into its own box — so an empty queue said it twice, and a queue
+       holding one enrolment still had the other half announcing that nobody
+       had asked. The note belongs to the queue rather than to either list:
+       written here, and only while both are empty. See queueEmpty(). -->
+  <div class="note" id="queueempty"></div>
   <div id="idlist"></div>
+  <!-- AND THE ONES WHO ASKED, in the same queue rather than a box of their
+       own. Both lists are people who are not in yet and who are waiting on
+       something: one on somebody opening the link they were handed, the other
+       on an admin deciding. They were two sections, which asked you to know
+       the difference before you could find either — the chip on each row says
+       which it is, which is the whole of what the split was telling you. -->
+  <div id="asklist"></div>
+  <div class="note" id="asknote"></div>
   <div class="note help">A person, as against a device. A device is one screen
 standing in one room; a person moves between a phone, a laptop and a borrowed
 browser and is the same person in all three.
@@ -4238,6 +4296,44 @@ voice it may be dropped silently; nothing else breaks.</div>
     </div>
   </section>
 
+  <!-- WHAT IS WORTH RECORDING, above the places it is sent to. Everything was
+       captured and everything was kept, and the two noisiest kinds in a working
+       house — a near-miss wake and a slow transcription — are also the two
+       least likely to be acted on. -->
+  <section class="grp wide" data-tab="alerts">
+    <h4>Logging catalog</h4>
+    <div class="grpbody">
+  <div class="note help">Every kind is recorded until you untick it here.
+
+<b>Unticking one stops it being written at all.</b> That is what makes a busy
+deployment cheaper — the ledger is a file, and a screen with a broken
+microphone can fill it — and it is also the cost: a kind you turn back on shows
+nothing that happened while it was off. There is no hidden copy.
+
+<b>New kinds arrive ticked.</b> What is stored is the list you switched OFF, so
+a kind added in a later version records itself until you say otherwise, rather
+than being silently missing because it was not in a list written today.
+
+<b>What is recorded is also what is sent.</b> With syslog switched on below,
+every event written here goes to the collector as it happens — not only the
+ones that cross an alert threshold. Unticking a kind therefore stops it in both
+places at once, which is the point of one catalog.
+
+<b>How much of it the collector gets is set by level</b>, in the syslog box
+below, because the reader at that end is an aggregator and every one of them is
+pointed at a severity rather than at this product's own words.</div>
+  <!-- `.cks`, the same two-column tick grid the group members and the endpoint
+       grants use. It was a `.setuprow`, which is a wrapping line — nine ticks
+       in it read as one long sentence with boxes in it rather than as a list
+       of nine things. -->
+  <div class="cks" id="ev_kinds"></div>
+  <div class="note" id="evkindnote"></div>
+  <div class="seg actrow">
+    <button id="b_evsave" class="act-save">SAVE</button>
+  </div>
+    </div>
+  </section>
+
   <section class="grp wide" data-tab="alerts">
     <h4>Alerts</h4>
     <div class="grpbody">
@@ -4269,6 +4365,14 @@ voice it may be dropped silently; nothing else breaks.</div>
     <span class="setpair">
       <label class="bklab" for="sl_fac">Facility</label>
       <select id="sl_fac" class="ppick"></select>
+    </span>
+    <span class="setpair">
+      <label class="bklab" for="sl_min">Send</label>
+      <select id="sl_min" class="ppick">
+        <option value="info">everything</option>
+        <option value="warn">warnings and errors</option>
+        <option value="error">errors only</option>
+      </select>
     </span>
     <button id="b_slsave" class="act-save">SAVE</button>
   </div>
@@ -5232,6 +5336,7 @@ function buildControls(){
   // no wakeword or wakealiases: those are a route's, saved with the route
   ['wakeword','wakealiases',
    'sleepword','sleepaliases','greetings','farewells',
+   'signoutword','signoutaliases',
    'loginok','loginbad',
    'clock_time','clock_date',
    'opname','ainame']
@@ -7371,6 +7476,14 @@ async function refreshIdentities(){
        address they sign in with, which is the fact worth reading off a row
        without opening it. */
     const mark = document.createElement('span');
+    /* WHERE THIS ROW CAME FROM, first, because the queue holds two kinds now:
+       somebody an admin named and handed a link to, and somebody who asked
+       from a screen. What you can do about them is different — one is waiting
+       on them, the other is waiting on you. */
+    const from = document.createElement('span');
+    from.className = 'badge';
+    from.textContent = 'ENROLL';
+    top.appendChild(from);
     mark.className = 'badge' + (p.ready ? '' : ' warn');
     mark.textContent = p.ready ? (p.email || 'no address')
                                : 'LINK NOT USED';
@@ -7636,17 +7749,18 @@ async function refreshIdentities(){
      two are empty for opposite reasons: one because nobody has been made yet,
      the other because everybody made has already turned up. */
   const EMPTY = {
-    waiting: 'Nobody waiting. Name somebody above and you are handed the link '
-           + 'to give them; they stay on this list until they use it.',
+    /* NOT `waiting`. That box is half of the queue under PENDING and its
+       message is the queue's, not this list's — see queueEmpty(). */
     here: 'Nobody yet. A person appears here the moment they open the link you '
         + 'handed them and choose a password — until then they are on '
         + 'ENROLLMENTS ▸ USER, with the box that mints one.',
   };
   live.forEach(k=>{
-    if (filled[k]) return;
+    if (filled[k] || !EMPTY[k]) return;
     boxes[k].className = 'note';
     boxes[k].textContent = EMPTY[k];
   });
+  queueEmpty();
 }
 
 $('b_idnew').addEventListener('click', async ()=>{
@@ -7796,8 +7910,33 @@ async function refreshAlerts(){
 /* ---- syslog, the one sink that costs nothing to reach ---- */
 const SYSLOG_FACILITIES = ['user', 'local0', 'local1', 'local2', 'local3',
                            'local4', 'local5', 'local6', 'local7'];
+/* ONE TICK PER KIND, drawn from the same map the ledger labels itself with —
+   so a kind and its words cannot drift apart, and a kind this build does not
+   know about still gets a box with its raw name in it rather than vanishing.
+   TICKED MEANS RECORDED: what is stored is the list switched off, so this is
+   drawn as the inverse of it. */
+function paintEventKinds(cfg){
+  const box = $('ev_kinds');
+  if (!box) return;
+  const kinds = (EVENTS && EVENTS.kinds) || Object.keys(EV_WORDS);
+  const off = new Set((cfg && cfg.event_off) || []);
+  box.innerHTML = '';
+  kinds.forEach(k=>{
+    const lab = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.dataset.kind = k;
+    cb.checked = !off.has(k);
+    lab.appendChild(cb);
+    lab.appendChild(document.createTextNode(' ' + (EV_WORDS[k] || k)));
+    box.appendChild(lab);
+  });
+}
+
 function paintSyslog(cfg){
   if (!cfg || !$('sl_on')) return;
+  $('sl_min').value = cfg.syslog_min || 'info';
+  paintEventKinds(cfg);
   $('hk_on').checked = !!cfg.hook_on;
   $('hk_url').value = cfg.hook_url || '';
   $('ha_on').checked = !!cfg.ha_on;
@@ -7851,6 +7990,26 @@ function syncSyslog(){
   const el = $(id);
   if (el) el.addEventListener('change', syncSyslog);
 });
+const bev = $('b_evsave');
+if (bev) bev.addEventListener('click', async ()=>{
+  const note = $('evkindnote');
+  /* The list switched OFF, which is what is stored — see event_off. Read off
+     the boxes rather than kept in a variable, so what is saved is what is on
+     screen even after a repaint. */
+  const off = [...document.querySelectorAll('#ev_kinds input[type=checkbox]')]
+                .filter(c=> !c.checked).map(c=> c.dataset.kind);
+  note.className = 'note';
+  note.textContent = 'saving…';
+  try{
+    await api('/displays/settings', {method:'POST',
+                                     body: JSON.stringify({event_off: off})});
+    note.textContent = off.length
+      ? 'saved — ' + off.length + ' kind' + (off.length === 1 ? '' : 's')
+        + ' no longer recorded'
+      : 'saved — every kind is recorded';
+  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+});
+
 const bsl = $('b_slsave');
 if (bsl) bsl.addEventListener('click', async ()=>{
   const note = $('slnote');
@@ -7861,6 +8020,7 @@ if (bsl) bsl.addEventListener('click', async ()=>{
       syslog_port: parseInt($('sl_port').value, 10) || 514,
       syslog_name: ($('sl_name').value || '').trim(),
       syslog_facility: $('sl_fac').value,
+      syslog_min: $('sl_min').value,
       hook_on: $('hk_on').checked ? 1 : 0,
       hook_url: ($('hk_url').value || '').trim(),
       ha_on: $('ha_on').checked ? 1 : 0,
@@ -7925,6 +8085,8 @@ const EV_WORDS = {
   no_intent:     'asked for something it cannot do',
   backend_error: 'the assistant errored',
   backend_slow:  'the assistant ran long',
+  login_ok:      'signed in',
+  login_fail:    'sign-in refused',
 };
 
 function evNote(m, bad){
@@ -9780,6 +9942,25 @@ PROFILE_KINDS.forEach(kind=>{
   });
 });
 
+/* THE QUEUE'S ONE MESSAGE. Called by both refreshes, because either of them
+   can be the one that empties or fills it and neither knows about the other.
+   Read off the rendered rows rather than off the two data sets: the lists are
+   fetched separately and a check against arrays would be right only while both
+   fetches happened to be in step. */
+function queueEmpty(){
+  const el = $('queueempty');
+  if (!el) return;
+  const any = ['idlist', 'asklist'].some(id=>{
+    const b = $(id);
+    return !!(b && b.querySelector('.erow'));
+  });
+  /* SHORT, because the row it replaces is short and the chips do the
+     explaining the moment there is one. Both ways in, named once each. */
+  el.textContent = any ? ''
+    : 'Nobody waiting. Anyone you name above, and anyone who asks from a '
+    + 'screen, waits here.';
+}
+
 /* Just the numbers, without the id and the name — what a display is sent and
    what the preview is driven with. */
 function saverOf(s){
@@ -10625,6 +10806,18 @@ function dispBucket(d){
      worse than a queue full of people who want nothing is a queue missing
      somebody who does. */
   if (person && !d.requested_at && !((d.answers || []).length)) return null;
+  /* REFUSED IS DECIDED, so it leaves the queue — the same rule `converted`
+     follows a few lines up, and for the same reason: a queue is what is still
+     owed, and a decision already made sitting in it reads as one still to
+     make. The refusal is written to the server's log as it happens, with who
+     made it and whether they may ask again, so nothing about it is lost with
+     the row leaving the list.
+
+     THE ROW ITSELF IS KEPT, not deleted. `deny_repeat` is what stops somebody
+     refused for good from asking again the same afternoon, and a row deleted
+     is a row that comes straight back the next time that browser opens the
+     page — a final refusal that lasts until they press reload is not one. */
+  if (person && d.denied) return null;
   return person ? 'waiting' : 'enrol';
 }
 
@@ -10716,9 +10909,7 @@ async function refreshDisplays(){
       || (b.last_seen || 0) - (a.last_seen || 0)
       || (b.created || 0) - (a.created || 0));
   const EMPTY = {
-    waiting: 'Nobody is waiting. A person appears here when they fill in the '
-             + 'form and press REQUEST ACCESS — opening the display page is '
-             + 'not a request and puts nobody in this queue.',
+    waiting: '',
     enrol: 'No devices being set up. Name one above to get a code.',
     devices: 'Nothing is connected yet. A device appears here the moment it '
              + 'takes its code, or the moment you approve one that asked.',
@@ -10781,6 +10972,16 @@ async function refreshDisplays(){
     nmt.textContent = d.label;
     namecell.appendChild(nmt);
     top.appendChild(namecell);
+    /* …and the other half of that pair. Only on the queue: this same renderer
+       draws the device register and the code queue on two other tabs, where
+       nothing arrived through a form and the chip would be a claim about
+       something that never happened. */
+    if (bucket === 'waiting'){
+      const from = document.createElement('span');
+      from.className = 'badge';
+      from.textContent = 'FORM';
+      top.appendChild(from);
+    }
     /* Shut, the name is the row's title. Open, it is the field you rename it
        in — same place, so the thing you are editing does not jump somewhere
        else the moment you open the row. */
@@ -10792,7 +10993,7 @@ async function refreshDisplays(){
          two could never be looked at together anyway, and a row left open on a
          tab you walked away from is a row you come back to already scrolled
          past. */
-      document.querySelectorAll('#enrollist .erow, '
+      document.querySelectorAll('#asklist .erow, #enrollist .erow, '
                                 + '#conndevices .erow')
               .forEach(x=> x.classList.add('shut'));
       row.classList.toggle('shut', !opening);
@@ -11110,10 +11311,13 @@ async function refreshDisplays(){
      box under a heading is indistinguishable from one that failed to load,
      and these three are empty at different times for different reasons. */
   live.forEach(k=>{
-    if (seen[k]) return;
+    /* `waiting` is half of the queue under PENDING and its message is the
+       queue's — the other half is painted by another refresh entirely. */
+    if (seen[k] || !EMPTY[k]) return;
     box[k].className = 'note';
     box[k].textContent = EMPTY[k];
   });
+  queueEmpty();
   /* No summary line. Every row already says what it is, and a count above a
      list you can see the whole of is a sentence describing what is directly
      underneath it. */
@@ -11489,7 +11693,7 @@ function decide(d, name, row){
    element happens to live on — which, since GET A CODE moved to its own tab,
    is not the tab anybody pressing APPROVE is looking at. */
 function dispNoteEl(){
-  return $({enrol: 'dispnote',
+  return $({displays: 'asknote', enrol: 'dispnote',
             devices: 'connnote'}[CURRENT_TAB] || 'dispnote') || $('dispnote');
 }
 

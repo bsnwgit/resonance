@@ -298,6 +298,35 @@ Changing a role or a password drops that account's existing sessions, so the
 new rights or the new password take effect at the next sign-in rather than
 whenever the old session happens to expire.
 
+**Closing the browser ends it too.** The sign-in cookie is a session cookie —
+no expiry written into it — so the browser forgets it on close and reopening
+asks for a password again. Reloading the page does not: a reload is the same
+browser run, and a sign-in that could not survive F5 would be one nobody used.
+
+The hours above still apply, and they are enforced on the server rather than in
+the cookie: the deadline lives with the session, where a browser cannot edit
+it, and is checked on every request. So the sign-in ends at whichever comes
+first — the browser closing, the idle deadline, or the hours running out.
+
+**Closing the tab ends it too, and so does walking away from a dead browser.**
+The cookie alone could not do that — macOS keeps Firefox running when its last
+window closes, and "open previous windows and tabs" restores session cookies
+across a real restart — so the server decides rather than the browser:
+
+- **A page on its way out says so.** Closing the tab sends a beacon, which
+  starts a fifteen-second countdown rather than ending the session outright:
+  the same event fires on a **reload**, and a reloaded page cancels the
+  countdown by polling within a second or two. A tab that has really gone sends
+  nothing more, and fifteen seconds later the session is over.
+- **A page that goes quiet ends anyway.** A signed-in page polls every few
+  seconds; three minutes without a word means the browser closed, crashed,
+  slept or lost the network, and every one of those should end a session on a
+  machine somebody else can walk up to. This is the backstop for the cases no
+  beacon survives — a crash, a power cut, a yanked cable.
+
+Neither can be reached by somebody using the product: an open page is never
+silent for three minutes, and a reload never spends its grace.
+
 ## Maintenance
 
 What keeps a screen nobody touches working: how often every display checks in,

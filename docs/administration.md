@@ -314,16 +314,20 @@ through.** A person opens the display page and asks; a device is named here
 and takes a code to the screen. They have almost nothing in common except
 that both end up connected, so neither has to read the other's queue.
 
-**PERSON** (under ENROLLMENTS) — people, and only people. One list:
-**People**, under a PENDING divider, holding the ones you have minted a link
-for who have not used it yet.
+**PERSON** (under ENROLLMENTS) — people, and only people. **One list**,
+under a PENDING divider, holding everybody who is not in yet whichever way
+they got there:
 
-**Requests are not listed there.** Somebody asking from a display still
-reaches the server and is still recorded, but the queue that decided them —
-*Waiting for approval* — is no longer on that tab, so there is nowhere in the
-panel to approve or refuse one.
+| chip | what it is | what it is waiting on |
+|---|---|---|
+| **ENROLL** | you named them and were handed a link | them, to open it and choose a password |
+| **FORM** | they asked from a screen | you, to APPROVE or REFUSE |
 
-What a request *asks* is still **SETTINGS ▸ ADMIN ▸ Enrollment Request Form**.
+They were two separate boxes, which asked you to know the difference before
+you could find either. The chip says which a row is, and that was the whole of
+what the split was telling you.
+
+What a request *asks* is **SETTINGS ▸ ADMIN ▸ Enrollment Request Form**.
 
 ### A person, as against a device
 
@@ -594,6 +598,18 @@ device may ask again or not.
 
 Refusing also takes back anything a previous approval gave. Otherwise *refused*
 would be a word on a row rather than a thing that happened.
+
+**The row leaves the queue as you refuse it**, because a queue is what is still
+owed and a decision already made sitting in it reads as one still to make. It is
+written to the server's log at that moment — who refused, whether they may ask
+again, and both messages — so the record outlives the row leaving the list.
+
+The row itself is kept rather than deleted: *may not ask again* is enforced off
+it, and a deleted row is one that comes straight back the next time that browser
+opens the page. Where they **may** ask again, asking puts them back in the queue
+with what they typed the second time. Where they may not, they cannot ask and
+the row stays out of sight — **so a final refusal cannot be taken back from the
+panel**, and that is the one decision here with no undo.
 
 **A refusal is per device, not per person.** Somebody turned away on their
 laptop can open the page on their phone and ask again from a clean row. That is
@@ -1205,6 +1221,47 @@ reaches it. Relaunching a browser at a URL on boot is the device's job:
 
 Saying that plainly is better than a Maintenance page that quietly fails to
 cover it.
+
+## Logging catalog
+
+*Under SETTINGS ▸ ALERT.*
+
+Eleven kinds of event are captured from the screens and from the server — a
+refused microphone, a slow transcription, a near-miss wake, an assistant that
+errored, and the door itself: **signed in** and **sign-in refused**, the latter
+saying whether it was a wrong password, an address with no account behind it,
+or too many attempts. Both are filed against the screen it happened at, so they
+read in the same per-display list as everything else. **Every one is recorded until you untick it**, and what is
+stored is the list you switched OFF, so a kind added in a later version records
+itself rather than being silently missing from a list written today.
+
+**Unticking one stops it being written at all.** That is the point — the ledger
+is a file, and one screen with a broken microphone can fill it — and it is also
+the cost: a kind you turn back on shows nothing that happened while it was off.
+There is no hidden copy kept for later.
+
+The two worth considering first in a working house are **woke on a near miss**
+and **transcription ran long**: they are the noisiest, and the least likely to
+be acted on.
+
+**With syslog on, everything recorded is also sent.** Every event goes to the
+collector as it happens, not only the ones that cross an alert threshold — so
+the catalog governs both the local ledger and the sink, and unticking a kind
+stops it in both at once.
+
+**How much of it the collector gets is set by level**, beside the host and
+facility: everything, warnings and errors, or errors only. The reader at that
+end is an aggregator and every one of them is pointed at a severity rather than
+at this product's own words.
+
+Alerts still go too, and they are a different thing: an alert is a threshold
+crossed — five slow transcriptions from one screen in an hour — where an event
+is the fact itself. A collector receiving both sees the fault and then the
+judgement about it.
+
+**`server.log` is not part of this.** That is the process's own output — every
+HTTP request, saves, restarts — written beside the program and forwarded
+nowhere.
 
 ## Groups
 
