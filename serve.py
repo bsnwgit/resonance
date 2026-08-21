@@ -3987,6 +3987,19 @@ def invite_display(name, by, setup=None):
     if len(displays) >= limit:
         return None, ("that is %d displays already — remove one, or raise the "
                       "limit on the DISPLAYS tab" % limit)
+    # NOT TWO SCREENS WITH ONE NAME, the same rule an identity has had since it
+    # existed and for the same reason: it is not a security property — a row is
+    # its token and nothing else — it is that a register holding two rows
+    # called *kitchen wall* is a register an admin cannot act on. Which one did
+    # you just approve, and which one is on the wall?
+    #
+    # Refused where the name is typed, so it is answerable while somebody is
+    # looking at the box, rather than discovered on a list of fifty.
+    want = str(name or "").strip()
+    if any((r.get("name") or "").strip().lower() == want.lower()
+           for r in displays.values() if want):
+        return None, ("there is already a display called \u201c%s\u201d — give "
+                      "this one a name of its own, or remove the other" % want)
     did = "d" + secrets.token_hex(6)
     now_ = int(time.time())
     rec = dict(DISPLAY_DEFAULTS)
@@ -4674,6 +4687,15 @@ EVENT_KINDS = (
     # did not ask for either.
     "login_ok",          # somebody signed in, and who
     "login_fail",        # …or was refused, and on which address
+    # THE REGISTER CHANGING SHAPE. Not faults either, and kept at `info` for
+    # that reason — a deliberate deletion is not a warning, it is the thing you
+    # will want to find in six months when somebody asks what happened to a
+    # screen. A sink set to warnings and errors therefore does not carry them,
+    # which is the right default: they are a record, and the ledger holds it.
+    "user_added",        # an identity minted, and by whom
+    "user_removed",      # …and deleted
+    "device_added",      # a display row created, and by whom
+    "device_removed",    # …and deleted
 )
 #: Where an event came from. A display sends its own; the server records the
 #: legs it can see, which a browser cannot.
@@ -4743,6 +4765,10 @@ EVENT_WORDS = {
     "backend_slow": "the assistant ran long",
     "login_ok": "signed in",
     "login_fail": "sign-in refused",
+    "user_added": "person created",
+    "user_removed": "person deleted",
+    "device_added": "display created",
+    "device_removed": "display deleted",
 }
 
 
@@ -9611,6 +9637,16 @@ class Handler(SimpleHTTPRequestHandler):
                 if disp["id"] in rows:
                     rows[disp["id"]]["req_email"] = email
                     write_displays(rows)
+                    # SAID TO THE ADMIN AND NOT TO THE ASKER. Somebody standing
+                    # at a public screen must not be told which addresses have
+                    # accounts here — that is the same list the sign-in refuses
+                    # to leak, one answer for both halves — so the duplicate is
+                    # noted in the log where an admin reads it and shown on the
+                    # row, and the form says the ordinary thing either way.
+                    if identity_by_email(email):
+                        print("display %s asked for access with %s, which "
+                              "already has an account" % (disp["id"], email),
+                              flush=True)
                     rec = dict(rows[disp["id"]], id=disp["id"])
             print("display %s (%s) asked for access%s"
                   % (rec["id"], display_label(rec),
@@ -9688,6 +9724,8 @@ class Handler(SimpleHTTPRequestHandler):
             if rids:
                 set_identity_endpoints(rec["id"], rids)
             base = self._person_base()
+            note_event("user_added",
+                       detail="%s — by %s" % (identity_label(rec), s["user"]))
             print("identity %s (%s) created by %s — %d endpoint(s)"
                   % (rec["id"], identity_label(rec), s["user"], len(rids)),
                   flush=True)
@@ -10112,6 +10150,7 @@ class Handler(SimpleHTTPRequestHandler):
             # permission nobody can see and nobody can withdraw. Cleared here,
             # exactly as a deleted display's is.
             touched = [None] * drop_member_grants(pid)
+            note_event("user_removed", detail="%s — by %s" % (name, s["user"]))
             print("identity %s (%s) deleted by %s%s%s"
                   % (pid, name, s["user"],
                      " — removed from %d endpoint(s)" % len(touched)
@@ -10448,6 +10487,8 @@ class Handler(SimpleHTTPRequestHandler):
                 print("display %s invited with endpoint%s %s by %s"
                       % (rec["id"], "" if len(eps) == 1 else "s",
                          ", ".join(eps), s["user"]), flush=True)
+            note_event("device_added", did=rec["id"],
+                       detail="%s — by %s" % (display_label(rec), s["user"]))
             print("display %s (%s) invited by %s — code issued"
                   % (rec["id"], display_label(rec), s["user"]), flush=True)
             # …and how long it is worth anything for, so the panel can count
@@ -10694,6 +10735,8 @@ class Handler(SimpleHTTPRequestHandler):
             # is a permission nobody can see and nobody can withdraw. Cleared
             # here, for the same reason a deleted endpoint's fallthrough is.
             touched = [None] * drop_member_grants(did)
+            note_event("device_removed", did=did,
+                       detail="%s — by %s" % (name, s["user"]))
             print("display %s (%s) deleted by %s%s%s"
                   % (did, name, s["user"],
                      " — removed from %d endpoint(s)" % len(touched)
