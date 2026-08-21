@@ -3874,6 +3874,13 @@ behaves like the rest of the building rather than like nothing.</div>
        for a screen. It is a queue, and a queue you have emptied should look
        empty. -->
   <div class="rulehead">PENDING</div>
+  <!-- ONE MESSAGE FOR ONE QUEUE. The two lists under this divider are painted
+       by two different refreshes, and each used to write its own "nobody
+       here" into its own box — so an empty queue said it twice, and a queue
+       holding one enrolment still had the other half announcing that nobody
+       had asked. The note belongs to the queue rather than to either list:
+       written here, and only while both are empty. See queueEmpty(). -->
+  <div class="note" id="queueempty"></div>
   <div id="idlist"></div>
   <!-- AND THE ONES WHO ASKED, in the same queue rather than a box of their
        own. Both lists are people who are not in yet and who are waiting on
@@ -7656,17 +7663,18 @@ async function refreshIdentities(){
      two are empty for opposite reasons: one because nobody has been made yet,
      the other because everybody made has already turned up. */
   const EMPTY = {
-    waiting: 'Nobody waiting. Name somebody above and you are handed the link '
-           + 'to give them; they stay on this list until they use it.',
+    /* NOT `waiting`. That box is half of the queue under PENDING and its
+       message is the queue's, not this list's — see queueEmpty(). */
     here: 'Nobody yet. A person appears here the moment they open the link you '
         + 'handed them and choose a password — until then they are on '
         + 'ENROLLMENTS ▸ USER, with the box that mints one.',
   };
   live.forEach(k=>{
-    if (filled[k]) return;
+    if (filled[k] || !EMPTY[k]) return;
     boxes[k].className = 'note';
     boxes[k].textContent = EMPTY[k];
   });
+  queueEmpty();
 }
 
 $('b_idnew').addEventListener('click', async ()=>{
@@ -9800,6 +9808,24 @@ PROFILE_KINDS.forEach(kind=>{
   });
 });
 
+/* THE QUEUE'S ONE MESSAGE. Called by both refreshes, because either of them
+   can be the one that empties or fills it and neither knows about the other.
+   Read off the rendered rows rather than off the two data sets: the lists are
+   fetched separately and a check against arrays would be right only while both
+   fetches happened to be in step. */
+function queueEmpty(){
+  const el = $('queueempty');
+  if (!el) return;
+  const any = ['idlist', 'asklist'].some(id=>{
+    const b = $(id);
+    return !!(b && b.querySelector('.erow'));
+  });
+  el.textContent = any ? ''
+    : 'Nobody waiting. Name somebody above and you are handed a link to give '
+    + 'them, or they can ask from a screen and appear here for you to approve '
+    + '— either way this is where they wait.';
+}
+
 /* Just the numbers, without the id and the name — what a display is sent and
    what the preview is driven with. */
 function saverOf(s){
@@ -10748,9 +10774,7 @@ async function refreshDisplays(){
       || (b.last_seen || 0) - (a.last_seen || 0)
       || (b.created || 0) - (a.created || 0));
   const EMPTY = {
-    waiting: 'Nobody has asked. A person appears here when they fill in the '
-             + 'form on a screen and press REQUEST ACCESS — opening the '
-             + 'display page is not a request and puts nobody in this queue.',
+    waiting: '',
     enrol: 'No devices being set up. Name one above to get a code.',
     devices: 'Nothing is connected yet. A device appears here the moment it '
              + 'takes its code, or the moment you approve one that asked.',
@@ -11152,10 +11176,13 @@ async function refreshDisplays(){
      box under a heading is indistinguishable from one that failed to load,
      and these three are empty at different times for different reasons. */
   live.forEach(k=>{
-    if (seen[k]) return;
+    /* `waiting` is half of the queue under PENDING and its message is the
+       queue's — the other half is painted by another refresh entirely. */
+    if (seen[k] || !EMPTY[k]) return;
     box[k].className = 'note';
     box[k].textContent = EMPTY[k];
   });
+  queueEmpty();
   /* No summary line. Every row already says what it is, and a count above a
      list you can see the whole of is a sentence describing what is directly
      underneath it. */
