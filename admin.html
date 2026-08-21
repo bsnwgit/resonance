@@ -4296,6 +4296,36 @@ voice it may be dropped silently; nothing else breaks.</div>
     </div>
   </section>
 
+  <!-- WHAT IS WORTH RECORDING, above the places it is sent to. Everything was
+       captured and everything was kept, and the two noisiest kinds in a working
+       house — a near-miss wake and a slow transcription — are also the two
+       least likely to be acted on. -->
+  <section class="grp wide" data-tab="alerts">
+    <h4>What gets recorded</h4>
+    <div class="grpbody">
+  <div class="note help">Every kind is recorded until you untick it here.
+
+<b>Unticking one stops it being written at all.</b> That is what makes a busy
+deployment cheaper — the ledger is a file, and a screen with a broken
+microphone can fill it — and it is also the cost: a kind you turn back on shows
+nothing that happened while it was off. There is no hidden copy.
+
+<b>New kinds arrive ticked.</b> What is stored is the list you switched OFF, so
+a kind added in a later version records itself until you say otherwise, rather
+than being silently missing because it was not in a list written today.
+
+<b>The sink is a separate question</b>, below: the ledger is this panel's own
+health list and syslog is somebody else's aggregator, read by somebody who
+thinks in severities rather than in this product's nine words. So that one is
+set by level, not by kind.</div>
+  <div class="setuprow" id="ev_kinds"></div>
+  <div class="note" id="evkindnote"></div>
+  <div class="seg actrow">
+    <button id="b_evsave" class="act-save">SAVE</button>
+  </div>
+    </div>
+  </section>
+
   <section class="grp wide" data-tab="alerts">
     <h4>Alerts</h4>
     <div class="grpbody">
@@ -4327,6 +4357,14 @@ voice it may be dropped silently; nothing else breaks.</div>
     <span class="setpair">
       <label class="bklab" for="sl_fac">Facility</label>
       <select id="sl_fac" class="ppick"></select>
+    </span>
+    <span class="setpair">
+      <label class="bklab" for="sl_min">Send</label>
+      <select id="sl_min" class="ppick">
+        <option value="info">everything</option>
+        <option value="warn">warnings and errors</option>
+        <option value="error">errors only</option>
+      </select>
     </span>
     <button id="b_slsave" class="act-save">SAVE</button>
   </div>
@@ -7864,8 +7902,34 @@ async function refreshAlerts(){
 /* ---- syslog, the one sink that costs nothing to reach ---- */
 const SYSLOG_FACILITIES = ['user', 'local0', 'local1', 'local2', 'local3',
                            'local4', 'local5', 'local6', 'local7'];
+/* ONE TICK PER KIND, drawn from the same map the ledger labels itself with —
+   so a kind and its words cannot drift apart, and a kind this build does not
+   know about still gets a box with its raw name in it rather than vanishing.
+   TICKED MEANS RECORDED: what is stored is the list switched off, so this is
+   drawn as the inverse of it. */
+function paintEventKinds(cfg){
+  const box = $('ev_kinds');
+  if (!box) return;
+  const kinds = (EVENTS && EVENTS.kinds) || Object.keys(EV_WORDS);
+  const off = new Set((cfg && cfg.event_off) || []);
+  box.innerHTML = '';
+  kinds.forEach(k=>{
+    const lab = document.createElement('label');
+    lab.className = 'vo';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.dataset.kind = k;
+    cb.checked = !off.has(k);
+    lab.appendChild(cb);
+    lab.appendChild(document.createTextNode(' ' + (EV_WORDS[k] || k)));
+    box.appendChild(lab);
+  });
+}
+
 function paintSyslog(cfg){
   if (!cfg || !$('sl_on')) return;
+  $('sl_min').value = cfg.syslog_min || 'info';
+  paintEventKinds(cfg);
   $('hk_on').checked = !!cfg.hook_on;
   $('hk_url').value = cfg.hook_url || '';
   $('ha_on').checked = !!cfg.ha_on;
@@ -7919,6 +7983,26 @@ function syncSyslog(){
   const el = $(id);
   if (el) el.addEventListener('change', syncSyslog);
 });
+const bev = $('b_evsave');
+if (bev) bev.addEventListener('click', async ()=>{
+  const note = $('evkindnote');
+  /* The list switched OFF, which is what is stored — see event_off. Read off
+     the boxes rather than kept in a variable, so what is saved is what is on
+     screen even after a repaint. */
+  const off = [...document.querySelectorAll('#ev_kinds input[type=checkbox]')]
+                .filter(c=> !c.checked).map(c=> c.dataset.kind);
+  note.className = 'note';
+  note.textContent = 'saving…';
+  try{
+    await api('/displays/settings', {method:'POST',
+                                     body: JSON.stringify({event_off: off})});
+    note.textContent = off.length
+      ? 'saved — ' + off.length + ' kind' + (off.length === 1 ? '' : 's')
+        + ' no longer recorded'
+      : 'saved — every kind is recorded';
+  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+});
+
 const bsl = $('b_slsave');
 if (bsl) bsl.addEventListener('click', async ()=>{
   const note = $('slnote');
@@ -7929,6 +8013,7 @@ if (bsl) bsl.addEventListener('click', async ()=>{
       syslog_port: parseInt($('sl_port').value, 10) || 514,
       syslog_name: ($('sl_name').value || '').trim(),
       syslog_facility: $('sl_fac').value,
+      syslog_min: $('sl_min').value,
       hook_on: $('hk_on').checked ? 1 : 0,
       hook_url: ($('hk_url').value || '').trim(),
       ha_on: $('ha_on').checked ? 1 : 0,

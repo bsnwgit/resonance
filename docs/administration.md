@@ -1222,6 +1222,31 @@ reaches it. Relaunching a browser at a URL on boot is the device's job:
 Saying that plainly is better than a Maintenance page that quietly fails to
 cover it.
 
+## What gets recorded
+
+*Under SETTINGS ▸ ALERT.*
+
+Nine kinds of event are captured from the screens and from the server —
+a refused microphone, a slow transcription, a near-miss wake, an assistant that
+errored, and so on. **Every one is recorded until you untick it**, and what is
+stored is the list you switched OFF, so a kind added in a later version records
+itself rather than being silently missing from a list written today.
+
+**Unticking one stops it being written at all.** That is the point — the ledger
+is a file, and one screen with a broken microphone can fill it — and it is also
+the cost: a kind you turn back on shows nothing that happened while it was off.
+There is no hidden copy kept for later.
+
+The two worth considering first in a working house are **woke on a near miss**
+and **transcription ran long**: they are the noisiest, and the least likely to
+be acted on.
+
+**Syslog is set separately, and by level.** The ledger is this panel's own
+health list; the sink is somebody else's aggregator, read by somebody who
+thinks in severities rather than in this product's nine words. So the sink has
+one floor — everything, warnings and errors, or errors only — beside the host
+and facility it is pointed at.
+
 ## Groups
 
 A name for a set of them, so a grant is made once instead of ticked twelve

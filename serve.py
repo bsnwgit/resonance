@@ -2081,6 +2081,22 @@ DISPLAY_SETTINGS = {
     # Where alerts go besides the list. Off by default: a server that started
     # posting somewhere on first run would be making a decision about somebody
     # else's network.
+    # WHICH KINDS ARE RECORDED AT ALL, as the ones switched OFF rather than the
+    # ones switched on. Stored as the exception so a kind added in a later
+    # version is recorded until somebody says otherwise — the alternative is a
+    # list of nine that silently stops covering the tenth, which is the failure
+    # mode a tick-list has and a level list does not.
+    #
+    # AND IT FILTERS AT CAPTURE. A kind turned off is not written, which is
+    # what makes a busy deployment cheaper — and it means turning it back on
+    # shows nothing that happened while it was off. That is the trade: cost
+    # now against history later, and the panel says so where it is chosen.
+    "event_off": [],
+    # …AND WHAT THE SINK IS SENT, which is a different question with a
+    # different reader. The ledger is this panel's own health list; the sink is
+    # somebody else's aggregator, and aggregators are pointed at severities
+    # rather than at nine product-specific words. So: one floor, by level.
+    "syslog_min": "info",
     "syslog_on": 0,
     "syslog_host": "",                   # blank means the local daemon
     "syslog_port": 514,
@@ -2512,6 +2528,21 @@ def validate_display_settings(obj, current):
                       "cannot exceed the total")
     # The syslog sink. Its own block because none of it is a range: a switch, a
     # host that may be blank on purpose, a port, and a name from a fixed list.
+    if "event_off" in obj:
+        got = obj["event_off"]
+        if not isinstance(got, (list, tuple)):
+            return None, "event_off has to be a list of event kinds"
+        # Unknown names are DROPPED rather than refused: a panel one version
+        # ahead naming a kind this server has never heard of is not a mistake
+        # anybody made, and refusing the save would make the whole box
+        # unusable over a word this build does not have.
+        cfg["event_off"] = [k for k in EVENT_KINDS if k in set(map(str, got))]
+    if "syslog_min" in obj:
+        want = str(obj["syslog_min"] or "").strip()
+        if want not in EVENT_LEVELS:
+            return None, ("syslog_min must be one of: %s"
+                          % ", ".join(EVENT_LEVELS))
+        cfg["syslog_min"] = want
     if "syslog_on" in obj:
         cfg["syslog_on"] = 1 if obj["syslog_on"] else 0
     if "syslog_host" in obj:
@@ -4625,12 +4656,30 @@ def event_window_days():
     return int(display_settings().get("event_days") or EVENT_DAYS_DEFAULT)
 
 
+def event_wanted(kind, cfg=None):
+    """Is this kind recorded at all? Read at the moment of capture, so turning
+    one off stops the next one being written and turning it back on starts the
+    one after — there is nothing to sweep and nothing to migrate."""
+    cfg = display_settings() if cfg is None else cfg
+    return kind not in set(cfg.get("event_off") or ())
+
+
+def level_wanted(level, cfg=None):
+    """Is this severe enough for the sink? A FLOOR rather than a list: the
+    reader at the far end is an aggregator, and every one of them is configured
+    in terms of "this and worse"."""
+    cfg = display_settings() if cfg is None else cfg
+    floor = str(cfg.get("syslog_min") or "info")
+    order = {"info": 0, "warn": 1, "error": 2}
+    return order.get(level, 0) >= order.get(floor, 0)
+
+
 def note_event(kind, did="", level="info", detail="", route="", ms=0):
     """One event, kept. Silent about anything it does not recognise rather than
     refusing: this is called from the paths that ARE the fault being reported,
     and a diagnostic that raises inside a failure is a second fault on top of
     the first."""
-    if kind not in EVENT_KINDS:
+    if kind not in EVENT_KINDS or not event_wanted(kind):
         return
     with _events_lock:
         rows = read_events()
@@ -4657,6 +4706,12 @@ def take_events(did, rows):
         have = read_events()
         for r in rows[:MAX_EVENTS_PER_POLL]:
             if not isinstance(r, dict) or r.get("kind") not in EVENT_KINDS:
+                continue
+            # A SCREEN STILL SENDS THEM, and they are dropped here. The display
+            # cannot be trusted to filter for the deployment — it would be one
+            # more setting to get to every browser, and a screen that had not
+            # picked up the change yet would go on filling the store.
+            if not event_wanted(r["kind"]):
                 continue
             have.append({"kind": r["kind"], "did": did,
                          "level": r.get("level") if r.get("level") in EVENT_LEVELS
@@ -4984,7 +5039,7 @@ def syslog_send(level, text):
     """One line, to wherever an admin pointed it. Silent on every failure: this
     is called from the path that IS the fault being reported."""
     cfg = display_settings()
-    if not cfg.get("syslog_on"):
+    if not cfg.get("syslog_on") or not level_wanted(level, cfg):
         return
     host = str(cfg.get("syslog_host") or "").strip()
     try:
@@ -8516,7 +8571,8 @@ class Handler(SimpleHTTPRequestHandler):
                 # panel fills that box from the same fetch rather than a second
                 # one that can disagree with it.
                 "settings": {k: panel_settings().get(k)
-                             for k in ("syslog_on", "syslog_host",
+                             for k in ("event_off", "syslog_min",
+                                       "syslog_on", "syslog_host",
                                        "syslog_port", "syslog_name",
                                        "syslog_facility",
                                        "hook_on", "hook_url",
