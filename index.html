@@ -1086,8 +1086,19 @@ function paintGate(){
        refusal painted "open the link you were sent" at somebody who had just
        opened the link they were sent, and the two messages written for the
        two failures could never appear. */
+    /* NAMED. The server sends every endpoint on this port whether or not the
+       caller may use it — `allowed` is the answer, the name comes either way —
+       so the page can say WHICH assistant is refusing rather than leaving
+       somebody to work out what "this" refers to on a screen with nothing
+       else on it. */
+    const here = (typeof Routes !== 'undefined' ? (Routes.list || []) : [])
+                   .map(r=> r.name).filter(Boolean);
+    const named = here.length === 1 ? here[0]
+                : here.length ? here.slice(0, -1).join(', ') + ' or ' + here[here.length - 1]
+                : '';
     head.textContent =
-        nogrant ? 'Nothing here is yours yet'
+        nogrant ? (named ? 'You do not have access to ' + named
+                         : 'You do not have access here')
       : done    ? 'You are set up'
       : failed             ? 'That link did not work'
       : invite  ? 'Invitations are accepted here'
@@ -1101,10 +1112,15 @@ function paintGate(){
      leaves its own message here and repainting the mode must not wipe it. */
   if (note && !note.classList.contains('bad')){
     note.textContent =
-        nogrant ? ('Signed in as ' + (Person.name || Person.email || 'you')
-                   + '. This assistant has not been granted to you — an '
-                   + 'administrator ticks it on your row under IDENTITY ▸ '
-                   + 'USER, or on the endpoint itself.')
+        nogrant ? ('You are signed in as '
+                   + (Person.name || Person.email || 'yourself')
+                   + ' and your sign-in worked. '
+                   + (named ? named + ' has' : 'This assistant has')
+                   + ' not been granted to your account, which is a setting '
+                   + 'only an administrator can change — there is nothing to '
+                   + 'try again here and nothing you have done wrong. Ask an '
+                   + 'administrator to grant it: it is one tick on your row '
+                   + 'under IDENTITY ▸ USER in the panel.')
       : done    ? (PLACES.length
                     ? 'Sign in with your email address and the password you '
                       + 'just chose, at whichever of these you want:'
