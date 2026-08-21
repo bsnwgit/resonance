@@ -10645,6 +10645,18 @@ function dispBucket(d){
      worse than a queue full of people who want nothing is a queue missing
      somebody who does. */
   if (person && !d.requested_at && !((d.answers || []).length)) return null;
+  /* REFUSED IS DECIDED, so it leaves the queue — the same rule `converted`
+     follows a few lines up, and for the same reason: a queue is what is still
+     owed, and a decision already made sitting in it reads as one still to
+     make. The refusal is written to the server's log as it happens, with who
+     made it and whether they may ask again, so nothing about it is lost with
+     the row leaving the list.
+
+     THE ROW ITSELF IS KEPT, not deleted. `deny_repeat` is what stops somebody
+     refused for good from asking again the same afternoon, and a row deleted
+     is a row that comes straight back the next time that browser opens the
+     page — a final refusal that lasts until they press reload is not one. */
+  if (person && d.denied) return null;
   return person ? 'waiting' : 'enrol';
 }
 

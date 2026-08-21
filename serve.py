@@ -10045,11 +10045,21 @@ class Handler(SimpleHTTPRequestHandler):
             # back anything a previous approval gave, or "denied" is a word on
             # a row rather than a thing that happened.
             set_display_endpoints(did, obj.get("endpoints") if approve else [])
+            # THE WHOLE OF THE REFUSAL, because the row leaves the queue the
+            # moment this is written and this line is where it is recorded.
+            # The reason is what an admin typed for the person and the note is
+            # what they typed for themselves; both are worth having six months
+            # later, and neither is readable anywhere else once the row is out
+            # of the list.
             print("display %s (%s) %s by %s%s"
                   % (did, display_label(rec),
                      "approved" if approve else "refused", s["user"],
                      "" if approve else
-                     (" — may ask again" if rec["deny_repeat"] else " — final")),
+                     ((" — may ask again" if rec["deny_repeat"] else " — final")
+                      + (", reason: %s" % rec["deny_reason"]
+                         if rec["deny_reason"] else "")
+                      + (", note: %s" % rec["deny_note"]
+                         if rec["deny_note"] else ""))),
                   flush=True)
             return self._json(200, {"ok": True, "displays": admin_displays()})
 

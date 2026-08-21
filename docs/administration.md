@@ -599,6 +599,18 @@ device may ask again or not.
 Refusing also takes back anything a previous approval gave. Otherwise *refused*
 would be a word on a row rather than a thing that happened.
 
+**The row leaves the queue as you refuse it**, because a queue is what is still
+owed and a decision already made sitting in it reads as one still to make. It is
+written to the server's log at that moment — who refused, whether they may ask
+again, and both messages — so the record outlives the row leaving the list.
+
+The row itself is kept rather than deleted: *may not ask again* is enforced off
+it, and a deleted row is one that comes straight back the next time that browser
+opens the page. Where they **may** ask again, asking puts them back in the queue
+with what they typed the second time. Where they may not, they cannot ask and
+the row stays out of sight — **so a final refusal cannot be taken back from the
+panel**, and that is the one decision here with no undo.
+
 **A refusal is per device, not per person.** Somebody turned away on their
 laptop can open the page on their phone and ask again from a clean row. That is
 what device identity is — anything stronger needs an identity that person
