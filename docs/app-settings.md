@@ -308,11 +308,24 @@ the cookie: the deadline lives with the session, where a browser cannot edit
 it, and is checked on every request. So the sign-in ends at whichever comes
 first — the browser closing, the idle deadline, or the hours running out.
 
-What this does **not** do is end the session on the server the moment a window
-closes. The browser forgets the token; the session it named runs to its own
-deadlines. For somebody closing a laptop that is the same thing. For a wall
-screen that crashed or lost power it is not, and the answer there is a
-heartbeat rather than a cookie attribute — it is on the todo list.
+**Closing the tab ends it too, and so does walking away from a dead browser.**
+The cookie alone could not do that — macOS keeps Firefox running when its last
+window closes, and "open previous windows and tabs" restores session cookies
+across a real restart — so the server decides rather than the browser:
+
+- **A page on its way out says so.** Closing the tab sends a beacon, which
+  starts a fifteen-second countdown rather than ending the session outright:
+  the same event fires on a **reload**, and a reloaded page cancels the
+  countdown by polling within a second or two. A tab that has really gone sends
+  nothing more, and fifteen seconds later the session is over.
+- **A page that goes quiet ends anyway.** A signed-in page polls every few
+  seconds; three minutes without a word means the browser closed, crashed,
+  slept or lost the network, and every one of those should end a session on a
+  machine somebody else can walk up to. This is the backstop for the cases no
+  beacon survives — a crash, a power cut, a yanked cable.
+
+Neither can be reached by somebody using the product: an open page is never
+silent for three minutes, and a reload never spends its grace.
 
 ## Maintenance
 

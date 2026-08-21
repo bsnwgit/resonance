@@ -5550,6 +5550,41 @@ def touch_user_session(token, minutes):
         rec["idle"] = (time.time() + minutes * 60) if minutes > 0 else 0.0
 
 
+#: HOW LONG A SIGNED-IN PAGE MAY GO UNSEEN before the session is treated as
+#: gone. A page that is open talks constantly — it polls for its display state
+#: every few seconds — so this is not a timeout anybody using the product can
+#: reach: it is how long after the last word from a browser the server decides
+#: that browser is not there any more.
+#:
+#: WHY THIS EXISTS AT ALL, given the cookie is a session cookie: a session
+#: cookie is a promise the browser makes and several browsers do not keep it.
+#: macOS keeps the application running when the last window closes, and
+#: Firefox's "open previous windows and tabs" restores session cookies across a
+#: real restart. Neither can be reached from here. What can be reached is
+#: whether anybody is still talking, and a browser that has gone quiet for
+#: three minutes has closed, crashed, slept or lost the network — every one of
+#: which should end a session on a machine somebody else may walk up to.
+#:
+#: Three minutes rather than thirty seconds: a backgrounded tab has its timers
+#: throttled hard, and signing somebody out because their laptop deprioritised
+#: the window they were about to come back to would be worse than the thing
+#: this prevents.
+USER_GONE = 180
+
+#: …and how long after a page SAYS it is going before the session is over.
+#: A tab closing sends a beacon on its way out, which is the only moment a
+#: browser can tell the server it is leaving. It is not proof: `pagehide` fires
+#: on a RELOAD as well, and on ordinary navigation, so a beacon that ended a
+#: session outright would sign somebody out every time they pressed F5.
+#:
+#: So it is a countdown rather than a closure. Anything the browser does next
+#: cancels it — a reloaded page polls within a second or two and the session is
+#: never touched — and a tab that is really gone does nothing, so the countdown
+#: runs out. Fifteen seconds is long enough for a slow reload of a page this
+#: size and short enough that walking away and coming back means signing in.
+USER_LEAVING = 15
+
+
 def user_session_pid(token):
     """Which person this browser has signed in as, or "". Expiry is read HERE
     rather than swept on a clock, so a session that has run out is over the
@@ -5565,6 +5600,25 @@ def user_session_pid(token):
     if rec["expires"] <= now_ or (idle and idle <= now_):
         _user_sessions.pop(str(token), None)
         return ""
+    # …AND SO DOES SILENCE. Read before the stamp is written, or every request
+    # would refresh the very thing it is being measured against and the gap
+    # could never grow. A session with no stamp yet is one from before this
+    # existed, or one a second old: it is given the benefit of the doubt once
+    # and stamped below.
+    seen = float(rec.get("seen") or 0)
+    if seen and now_ - seen > USER_GONE:
+        _user_sessions.pop(str(token), None)
+        return ""
+    # …AND THE PAGE SAID IT WAS GOING. Checked before the stamp for the same
+    # reason silence is, and cleared after it: this request IS the browser
+    # doing something next, which is what tells a reload apart from a tab that
+    # closed. See USER_LEAVING.
+    going = float(rec.get("leaving") or 0)
+    if going and now_ - going > USER_LEAVING:
+        _user_sessions.pop(str(token), None)
+        return ""
+    rec["seen"] = now_
+    rec.pop("leaving", None)
     return rec["pid"]
 
 
@@ -9234,6 +9288,18 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(200, {"ok": True, "gen": config_gen(),
                                         "reload": False, "cfg": cfg,
                                         "now": now_})
+            # THE SIGN-IN'S HEARTBEAT, and it has to be here rather than on
+            # the ask path: somebody signed in at a screen they are not
+            # currently talking to is still standing in front of it, and a
+            # session that only counted questions would end mid-conversation
+            # because nobody said anything for three minutes.
+            #
+            # Reading it is what stamps it — see user_session_pid — so this
+            # line is the whole of the heartbeat. Before the early return
+            # below, because a person can be signed in on a screen that has not
+            # been approved as a display and their session is no less real for
+            # it.
+            self._user_pid()
             disp = self._display()
             if not disp:
                 # No cookie, or one naming a row that is gone. Still a 200:
@@ -9583,6 +9649,28 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+            return
+
+        if parsed.path == "/user/leaving":
+            # A PAGE ON ITS WAY OUT, and nothing more than that. It starts a
+            # countdown; it does not end anything, because pagehide fires on a
+            # reload too. Deliberately NOT reading the session through
+            # _user_pid: that path stamps the session as seen and would cancel
+            # the very thing this is setting.
+            if self.admin_port:
+                return self._json(404, {"error": "not found"})
+            if not self._same_origin():
+                return self._json(403, {"error": "cross-origin request refused"})
+            tok = self._user_token()
+            with _user_lock:
+                rec = _user_sessions.get(tok) if tok else None
+                if rec:
+                    rec["leaving"] = time.time()
+            # 204: a beacon is fire-and-forget and the page is already gone by
+            # the time this is written. There is nobody to read a body.
+            self.send_response(204)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
             return
 
         if parsed.path == "/user/setup":

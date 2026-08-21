@@ -5760,6 +5760,24 @@ if (signOutBtn) signOutBtn.addEventListener('click', ()=>{
 });
 paintSignOut();
 
+/* SAYING SO ON THE WAY OUT. A closed tab is a session nobody is using, and
+   the only moment a browser can tell the server it is going is this one.
+
+   `pagehide` rather than `beforeunload`, which browsers ignore without a
+   dialogue, and `sendBeacon` rather than fetch, which is cancelled the instant
+   the page dies. What the server does with it is a COUNTDOWN and not a
+   sign-out: this fires on a reload as well, and the reloaded page cancels it
+   by simply existing — its first poll lands inside the grace. A tab that has
+   really gone sends nothing more and the countdown runs out.
+
+   Only where somebody is signed in. On a wall display nobody has signed in
+   at, there is no session to end and this would be a request every time a
+   screen reloaded itself overnight. */
+window.addEventListener('pagehide', ()=>{
+  if (typeof Person === 'undefined' || !Person.is()) return;
+  if (navigator.sendBeacon) navigator.sendBeacon('user/leaving');
+});
+
 const textBtn = $('textbtn');
 function setTextVisible(on, remember){
   /* …except where the display itself is voice only, which is the one place a
