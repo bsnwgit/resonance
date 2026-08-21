@@ -3034,12 +3034,6 @@ queue as the people you enrolled — chipped <b>FORM</b> where they asked and
     </div>
   </section>
 
-  <!-- ONE CONNECTION, TWO USERS. It lived inside the alerting block and only
-       appeared once you ticked "send alerts by email", which is why somebody
-       looking for SMTP configuration could not find it. It is server wiring —
-       a host, a port, credentials and a from-address — and it belongs beside
-       the ports and the bind address rather than inside the first feature
-       that happened to need it. -->
   <section class="grp wide" data-tab="app">
     <h4>Time format</h4>
     <div class="grpbody">
@@ -3082,6 +3076,72 @@ does not use it.</div>
     </div>
   </section>
 
+  <!-- ON ADMIN RATHER THAN ALERT, and called a MESSAGE rather than an alert,
+       because it is neither of the things that tab is for. Nothing here is
+       raised by a fault, nothing here is sent anywhere, and nobody is meant
+       to act on it: it is two lines a screen SAYS at its sign-in box, which
+       makes it a property of the deployment in the same way the time format
+       above it is. It sat under alerting on the strength of the word alert
+       alone, which is how somebody looking for it went to the wrong tab and
+       then went looking for a threshold that does not exist.
+
+       Beside Time format on purpose: those are the two topics on this tab
+       written to the SHARED settings document and read by the DISPLAY page
+       rather than to app.json, and neither of them waits for a restart. -->
+  <section class="grp wide" data-tab="app">
+    <h4>Login Message</h4>
+    <div class="grpbody">
+  <!-- TEXTAREAS, for two reasons that happen to agree. They are a POOL like
+       the greeting phrases — one per line, picked at random — so a screen
+       somebody signs into all day does not repeat itself. And a password
+       manager will not offer to fill a textarea: these two sit next to the
+       words "sign in", which is enough for LastPass to put its icon in a
+       single-line box and offer a password, whatever the opt-out attributes
+       say. The panel already hides that icon; not being a text input means it
+       never appears. -->
+  <label class="bklab" for="loginok">Say this on successful login</label>
+  <textarea id="loginok" rows="2" spellcheck="false"
+            placeholder="one per line — empty says nothing"></textarea>
+  <label class="bklab" for="loginbad">Say this on failed login</label>
+  <textarea id="loginbad" rows="2" spellcheck="false"
+            placeholder="one per line — empty says nothing"></textarea>
+  <!-- `seg actrow`, which is the idiom for a section's own commit: .seg is
+       what gives a button its type size, and .actrow pushes it to the bottom
+       right of the box. A bare .setuprow, which this was, left it hard left
+       at the browser's default font — the one button on the tab that did not
+       look like a button here. -->
+  <div class="seg actrow">
+    <button id="b_loginmsg" class="act-save">SAVE</button>
+  </div>
+  <div class="note" id="loginmsgnote"></div>
+  <div class="note help">What a screen <b>says out loud</b> at the sign-in box,
+and nothing else — it is spoken and the figure moves with it, but no line is
+written to the transcript. A sign-in is not part of anybody's conversation.
+
+<b>Both are empty by default, which means silent, and that is deliberate.</b> A
+wall in a shared space announcing <i>that did not work</i> tells everybody in
+earshot that somebody just got a password wrong; announcing the success tells
+them who is now signed in. Neither is a thing to switch on for somebody.
+
+<b>One per line.</b> Several lines and it picks one, the same as the greeting
+phrases — a screen somebody signs into all day should not say the same words
+every time. <b>{name}</b> and the other variables work here too.
+
+<b>It needs the local voice to be reliable.</b> A browser will only start
+speech synthesis inside the gesture that asked for it, and whether a sign-in
+worked is not known until the server has answered — by which time that gesture
+has been spent. The local engine plays audio instead and is not subject to
+that, so on <b>SPEECH ▸ engine LOCAL</b> this always speaks. On the browser
+voice it may be dropped silently; nothing else breaks.</div>
+    </div>
+  </section>
+
+  <!-- ONE CONNECTION, TWO USERS. It lived inside the alerting block and only
+       appeared once you ticked "send alerts by email", which is why somebody
+       looking for SMTP configuration could not find it. It is server wiring —
+       a host, a port, credentials and a from-address — and it belongs beside
+       the ports and the bind address rather than inside the first feature
+       that happened to need it. -->
   <section class="grp wide" data-tab="app">
     <h4>Email</h4>
     <div class="grpbody">
@@ -4246,54 +4306,6 @@ route name, <b>ALERT</b>, <b>refused</b>.</div>
        half the other is a page somebody has to learn twice. -->
   <section class="grp bare titleonly" data-tab="alerts">
     <div class="barehead"><span class="listtitle">Alert settings</span></div>
-  </section>
-
-  <section class="grp wide" data-tab="alerts">
-    <h4>Login alert</h4>
-    <div class="grpbody">
-  <!-- TEXTAREAS, for two reasons that happen to agree. They are a POOL like
-       the greeting phrases — one per line, picked at random — so a screen
-       somebody signs into all day does not repeat itself. And a password
-       manager will not offer to fill a textarea: these two sit next to the
-       words "sign in", which is enough for LastPass to put its icon in a
-       single-line box and offer a password, whatever the opt-out attributes
-       say. The panel already hides that icon; not being a text input means it
-       never appears. -->
-  <label class="bklab" for="loginok">Say this on successful login</label>
-  <textarea id="loginok" rows="2" spellcheck="false"
-            placeholder="one per line — empty says nothing"></textarea>
-  <label class="bklab" for="loginbad">Say this on failed login</label>
-  <textarea id="loginbad" rows="2" spellcheck="false"
-            placeholder="one per line — empty says nothing"></textarea>
-  <!-- `seg actrow`, which is the idiom for a section's own commit: .seg is
-       what gives a button its type size, and .actrow pushes it to the bottom
-       right of the box. A bare .setuprow, which this was, left it hard left
-       at the browser's default font — the one button on the tab that did not
-       look like a button here. -->
-  <div class="seg actrow">
-    <button id="b_loginalert" class="act-save">SAVE</button>
-  </div>
-  <div class="note" id="loginalertnote"></div>
-  <div class="note help">What a screen <b>says out loud</b> at the sign-in box,
-and nothing else — it is spoken and the figure moves with it, but no line is
-written to the transcript. A sign-in is not part of anybody's conversation.
-
-<b>Both are empty by default, which means silent, and that is deliberate.</b> A
-wall in a shared space announcing <i>that did not work</i> tells everybody in
-earshot that somebody just got a password wrong; announcing the success tells
-them who is now signed in. Neither is a thing to switch on for somebody.
-
-<b>One per line.</b> Several lines and it picks one, the same as the greeting
-phrases — a screen somebody signs into all day should not say the same words
-every time. <b>{name}</b> and the other variables work here too.
-
-<b>It needs the local voice to be reliable.</b> A browser will only start
-speech synthesis inside the gesture that asked for it, and whether a sign-in
-worked is not known until the server has answered — by which time that gesture
-has been spent. The local engine plays audio instead and is not subject to
-that, so on <b>SPEECH ▸ engine LOCAL</b> this always speaks. On the browser
-voice it may be dropped silently; nothing else breaks.</div>
-    </div>
   </section>
 
   <!-- WHAT IS WORTH RECORDING, above the places it is sent to. Everything was
@@ -5881,13 +5893,13 @@ $('b_appsave').addEventListener('click', async ()=>{
   body.enrol_address = $('ap_enroladdr') ? ($('ap_enroladdr').value || '') : '';
   try{
     const j = await api('/app', {method:'POST', body: JSON.stringify(body)});
-    /* This tab holds one topic — the speaker labels — that belongs to the
-       SHARED document rather than to app.json. It used to get a SAVE FOR
-       EVERYONE of its own, which left two commit rows on one tab and no way
-       to tell from the buttons which half you were writing. One SAVE writes
-       both, because "save what is on this tab" is what somebody pressing it
-       means. Merged, not replaced: another tab's unsaved edits are not this
-       button's business. */
+    /* This tab holds two topics — the time format and the login message —
+       that belong to the SHARED document rather than to app.json. It used to
+       get a SAVE FOR EVERYONE of its own, which left two commit rows on one
+       tab and no way to tell from the buttons which half you were writing.
+       One SAVE writes both, because "save what is on this tab" is what
+       somebody pressing it means. Merged, not replaced: another tab's unsaved
+       edits are not this button's business. */
     const shared = tabKeys('app');
     if (Object.keys(shared).length)
       await api('/settings', {method:'POST',
@@ -5901,6 +5913,30 @@ $('b_appsave').addEventListener('click', async ()=>{
       : 'saved — nothing here is waiting on a restart';
     showPending(j);
   }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+});
+
+/* Its own SAVE, drawn inside its own box the way Email and the request form
+   on this tab are. It writes the shared settings document rather than
+   app.json, because these two are read by the DISPLAY page — they have to be
+   on it before anybody has signed in, which is the one moment they are for.
+
+   ITS OWN TWO KEYS, NOT tabKeys('app'). It collected the whole tab while it
+   was the only shared-document topic on ALERT; on ADMIN it is not — the time
+   format sits in the same document a section above it — and pressing SAVE
+   under the login lines must not publish a clock somebody is halfway through
+   changing. The tab's own SAVE at the foot still writes both, which is what
+   somebody pressing THAT one means. */
+const blm = $('b_loginmsg');
+if (blm) blm.addEventListener('click', async ()=>{
+  const note = $('loginmsgnote');
+  const say = (m, bad)=>{ note.textContent = m; note.className = 'note' + (bad ? ' bad' : ''); };
+  say('saving…');
+  try{
+    const body = {settings: {loginok: S.loginok, loginbad: S.loginbad}, merge: true};
+    await api('/settings', {method:'POST', body: JSON.stringify(body)});
+    const on = [S.loginok && 'signed in', S.loginbad && 'refused'].filter(Boolean);
+    say(on.length ? 'saved · speaks on ' + on.join(' and ') : 'saved · silent');
+  }catch(e){ say(e.message, true); }
 });
 
 /* ------------------------------------------------- AI endpoints (routes) */
@@ -8299,23 +8335,6 @@ function logCfgNote(m, bad){
   el.className = 'note' + (bad ? ' bad' : '');
   el.textContent = m || '';
 }
-/* Its own SAVE, like every other section on this tab. It writes the shared
-   settings document rather than app.json, because these two are read by the
-   DISPLAY page — they have to be on it before anybody has signed in, which is
-   the one moment they are for. `tabKeys` is the same collector the profile
-   tabs use, and it returns exactly the keys this tab owns. */
-const bla = $('b_loginalert');
-if (bla) bla.addEventListener('click', async ()=>{
-  const note = $('loginalertnote');
-  const say = (m, bad)=>{ note.textContent = m; note.className = 'note' + (bad ? ' bad' : ''); };
-  say('saving…');
-  try{
-    const body = {settings: tabKeys('alerts'), merge: true};
-    await api('/settings', {method:'POST', body: JSON.stringify(body)});
-    const on = [S.loginok && 'signed in', S.loginbad && 'refused'].filter(Boolean);
-    say(on.length ? 'saved · speaks on ' + on.join(' and ') : 'saved · silent');
-  }catch(e){ say(e.message, true); }
-});
 
 const bll = $('b_loglines');
 if (bll) bll.addEventListener('click', async ()=>{

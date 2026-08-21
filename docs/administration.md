@@ -231,13 +231,13 @@ nothing else.** Nothing reaches a display until you press SAVE in the profile
 row you are editing, and REVERT does not exist — closing the row without
 saving leaves the stored profile as it was.
 
-### The login alert
+### The login message
 
-**ALERT ▸ Login alert** gives a screen two spoken lines: one when somebody
-signs in, one when a sign-in is refused. It is spoken and the figure moves with
-it, and **nothing is written to the transcript** — a sign-in is not part of
-anybody's conversation and should not be sitting in the log of whoever uses the
-screen next.
+**SETTINGS ▸ ADMIN ▸ Login Message** gives a screen two spoken lines: one when
+somebody signs in, one when a sign-in is refused. It is spoken and the figure
+moves with it, and **nothing is written to the transcript** — a sign-in is not
+part of anybody's conversation and should not be sitting in the log of whoever
+uses the screen next.
 
 **Both are empty by default, which means silent, and that is deliberate.** A
 wall in a shared space announcing *that did not work* tells everybody in
