@@ -3919,10 +3919,39 @@ def enrol_base_for(rec, host, secure, nid=""):
     """Where the code for this row is typed — an address and a port, because a
     code without them is six characters and no idea where to put them. The
     profile comes from display_network: what this screen was granted decides
-    where it is loaded from."""
-    return (net_base_for(nid, "/e/", host) if nid else "") \
-        or "%s://%s:%d/e/" % ("https" if secure else "http", host,
-                              secure or RUNNING.get("http_port") or 0)
+    where it is loaded from.
+
+    EMPTY WHERE NOTHING IS LISTENING, the same rule the person's base follows.
+    It used to end `or 0` and hand back `http://host:0/e/`, which is what a row
+    with no grant yet gets in a deployment whose display ports all come from
+    network profiles: there is no plain listener to fall back to, `http_port`
+    is 0 unless PORT was set in the environment, and 0 went straight into the
+    address. A link to a port nothing answers on is worse than no link — it
+    looks like something somebody can fix by editing the address.
+
+    A NEW ROW HAS NO GRANT, which is the case this is mostly asked about: an
+    admin names a screen, gets a code, and the ticks come later or never. So
+    the default endpoint's port answers for it — that is where a screen with
+    nothing chosen is commissioned — and then any profile that names one,
+    because `/e/` answers on every display listener and any of them will spend
+    the code."""
+    base = net_base_for(nid, "/e/", host) if nid else ""
+    if base:
+        return base
+    doc = read_routes()
+    dflt = doc.get("default")
+    if dflt and dflt in (doc.get("routes") or {}):
+        base = net_base_for(route_network(doc["routes"][dflt]), "/e/", host)
+        if base:
+            return base
+    for n in display_settings().get("networks") or []:
+        base = net_base_for(n.get("id"), "/e/", host)
+        if base:
+            return base
+    if secure:
+        return "https://%s:%d/e/" % (host, secure)
+    plain = RUNNING.get("http_port")
+    return "http://%s:%d/e/" % (host, plain) if plain else ""
 
 
 def invite_display(name, by, setup=None):
@@ -8512,9 +8541,12 @@ class Handler(SimpleHTTPRequestHandler):
                                         None, host, secure,
                                         display_network(d["id"], doc)[0])
                                         for d in admin_displays()},
-                                    "enrol_base": "%s://%s:%d/e/"
-                                                  % ("https" if secure else "http", host,
-                                                     secure or RUNNING.get("http_port") or 0)})
+                                    # …and the one for a row that has no id yet
+                                    # — the box that mints a code. Same rule,
+                                    # same function, so the two cannot disagree
+                                    # about where a code is typed.
+                                    "enrol_base": enrol_base_for(None, host,
+                                                                 secure)})
         if path == "/groups":
             if not self._require("admin"):
                 return
