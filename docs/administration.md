@@ -1226,22 +1226,34 @@ cover it.
 
 *Under SETTINGS ▸ ALERT.*
 
-Fifteen kinds of event are captured from the screens and from the server.
+Fifteen kinds of event are captured from the screens and from the server. They
+are ticked in **four runs**, each under its own divider, rather than as one
+grid of fifteen — fifteen ticks in a row is a list you read start to finish to
+find the one you came for.
 
-Nine are faults a screen reports about itself — a refused microphone, a slow
-transcription, a near-miss wake, an assistant that errored. Two are the door:
-**signed in** and **sign-in refused**, the latter saying whether it was a wrong
-password, an address with no account behind it, or too many attempts. Four are
-the register changing shape: **person created**, **person deleted**, **display
-created**, **display deleted**, each naming who did it.
+**Speech** is six faults about hearing and speaking: a refused microphone, no
+recorder in the browser at all, a transcription that ran long, a recogniser
+that errored, a fall back to the browser voice, a near-miss wake. **The
+assistant** is three about the thing answering — asked for something it cannot
+do, errored, ran long.
 
-The last six are not faults and are recorded at `info`, so a sink set to
-warnings and errors does not carry them — they are a record rather than
-something wrong, and the ledger holds it either way. Everything that happened
-at a screen is filed against that screen, so it reads in the same per-display
-list as the rest. **Every one is recorded until you untick it**, and what is
-stored is the list you switched OFF, so a kind added in a later version records
-itself rather than being silently missing from a list written today.
+**Signing in** is the door: **signed in** and **sign-in refused**, the latter
+saying whether it was a wrong password, an address with no account behind it,
+or too many attempts. **The register** is four — **person created**, **person
+deleted**, **display created**, **display deleted** — each naming who did it.
+
+**The runs are what you would do about a kind**, which is the same line the
+level setting falls on. The first two are faults a screen reports about itself.
+The last two are not faults at all and are recorded at `info`, so a sink set to
+warnings and errors does not carry them — they are a record of something
+somebody did deliberately rather than something wrong, and the ledger holds it
+either way. Everything that happened at a screen is filed against that screen,
+so it reads in the same per-display list as the rest. **Every one is recorded
+until you untick it**, and what is stored is the list you switched OFF, so a
+kind added in a later version records itself rather than being silently missing
+from a list written today. A kind this panel has no run for is ticked under a
+run of its own at the end rather than going unshown: a tick nobody can see is a
+setting nobody can turn off.
 
 **Unticking one stops it being written at all.** That is the point — the ledger
 is a file, and one screen with a broken microphone can fill it — and it is also

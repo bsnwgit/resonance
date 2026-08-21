@@ -1867,6 +1867,43 @@
   .cks label{display:flex;align-items:center;gap:6px;font-size:calc(9px * var(--fs));
              letter-spacing:.08em;color:rgba(var(--paper),.9);cursor:pointer}
   .cks input{accent-color:var(--hue);margin:0}
+  /* A RUN IS A COLUMN, not a band across the grid. `.cks` keeps its two
+     columns; what sits in one of them is now a whole run — its heading and
+     every tick under it — rather than a single tick. So a run reads top to
+     bottom in one column with the next run beside it, and every kind stays in
+     its own run's column.
+
+     Banding a run across both columns was the other way to do this and it is
+     worse: each heading then costs a full-width row of its own, the ticks
+     under it zig-zag left-right between two unrelated kinds, and four runs
+     stack into a column of headings twice the height of the list they
+     describe.
+
+     `align-items:start` so a short run keeps its own height instead of
+     stretching to match whatever is beside it, and `row-gap` because the
+     grid's own 2px is the space between two ticks, not between two runs. */
+  /* TWICE THE GAP `.cks` gives its ticks, and only here. Between two ticks
+     10px is a column gutter; between two RUNS it is the whole of what says
+     they are separate lists, competing with the space inside a run's own
+     label. Scoped to `.runs` so the group members and the endpoint grants,
+     which are still grids of plain ticks, keep the gutter they were drawn
+     with. */
+  .cks.runs{align-items:start;row-gap:15px;column-gap:20px}
+  /* A RUN IS ITSELF A GRID, so its ticks stand in columns of their own rather
+     than in one long stack. Six kinds in a single file is a column you read to
+     the bottom to be sure of; the same six in two are read at a glance, and
+     the run stays half the height of the box.
+
+     Its own columns, not the outer grid's: nesting is what keeps a kind inside
+     the run it belongs to. Ticks flowing in the OUTER grid is what banded the
+     runs across the box and put unrelated kinds side by side. */
+  .cks .evrun{
+    display:grid;grid-template-columns:1fr 1fr;gap:2px 14px;
+    align-content:start;min-width:0;
+  }
+  /* The heading caps the whole run, so it spans the run's own columns — the
+     one thing in here that is not a tick and the only thing that stretches. */
+  .cks .evrun .rulehead{grid-column:1/-1;margin:2px 0 5px}
   /* the key, shown once and never again — it must look like a thing to copy
      rather than a line of prose to skim past */
   #em_key{
@@ -4331,13 +4368,31 @@ every event written here goes to the collector as it happens — not only the
 ones that cross an alert threshold. Unticking a kind therefore stops it in both
 places at once, which is the point of one catalog.
 
+<b>The runs are what you would do about each kind.</b> <b>Speech</b> and <b>the
+assistant</b> are faults a screen reports — one about hearing and speaking, one
+about the thing answering it. <b>Signing in</b> and <b>the register</b> are not
+faults at all: they are a record of something somebody did deliberately, which
+is why the server keeps them at <b>info</b> and why a sink set to warnings and
+errors does not carry them.
+
 <b>How much of it the collector gets is set by level</b>, in the syslog box
 below, because the reader at that end is an aggregator and every one of them is
 pointed at a severity rather than at this product's own words.</div>
   <!-- `.cks`, the same two-column tick grid the group members and the endpoint
-       grants use. It was a `.setuprow`, which is a wrapping line — nine ticks
+       grants use. It was a `.setuprow`, which is a wrapping line — the ticks
        in it read as one long sentence with boxes in it rather than as a list
-       of nine things. -->
+       of things.
+
+       DIVIDED INTO RUNS, because fifteen ticks in one grid is a wall you read
+       start to finish to find the one you came for. Each run is a COLUMN of
+       this grid — its `.rulehead` and its ticks together are what gets placed,
+       so the box still has its two columns and a kind never leaves the run it
+       belongs to. Inside a run the ticks stand in two columns of their own,
+       which is a nested grid rather than this one: ticks flowing in the OUTER
+       grid is what banded the runs across the box and stood unrelated kinds
+       beside each other.
+       The runs and their order are EV_GROUPS; they follow the server's own
+       order, so this added headings and moved nothing. -->
   <div class="cks" id="ev_kinds"></div>
   <div class="note" id="evkindnote"></div>
   <div class="seg actrow">
@@ -7957,7 +8012,21 @@ function paintEventKinds(cfg){
   const kinds = (EVENTS && EVENTS.kinds) || Object.keys(EV_WORDS);
   const off = new Set((cfg && cfg.event_off) || []);
   box.innerHTML = '';
-  kinds.forEach(k=>{
+  /* BUILT FROM WHAT THE SERVER SENT, filtered through EV_GROUPS rather than
+     the other way about. A heading this build knows about but the server no
+     longer sends is dropped with its run, instead of being drawn over an empty
+     stretch of grid — and a kind the server sends that no run claims still
+     lands under the last heading rather than vanishing. */
+  const claimed = new Set();
+  const runs = [];
+  EV_GROUPS.forEach(g=>{
+    const mine = g.kinds.filter(k=> kinds.includes(k));
+    mine.forEach(k=> claimed.add(k));
+    if (mine.length) runs.push({name: g.name, kinds: mine});
+  });
+  const rest = kinds.filter(k=> !claimed.has(k));
+  if (rest.length) runs.push({name: EV_GROUP_REST, kinds: rest});
+  const tick = (k)=>{
     const lab = document.createElement('label');
     const cb = document.createElement('input');
     cb.type = 'checkbox';
@@ -7965,7 +8034,28 @@ function paintEventKinds(cfg){
     cb.checked = !off.has(k);
     lab.appendChild(cb);
     lab.appendChild(document.createTextNode(' ' + (EV_WORDS[k] || k)));
-    box.appendChild(lab);
+    return lab;
+  };
+  /* ONE RUN, ONE GRID CELL. The run is the thing placed in a column, so the
+     ticks inside it never leave that column and the grid is still the two it
+     always was — it is holding runs now instead of ticks. */
+  box.classList.toggle('runs', runs.length > 1);
+  runs.forEach(g=>{
+    /* One heading is not a grouping, it is a label on the whole list — and a
+       divider that divides nothing from nothing is noise. Draw the ticks
+       straight into the grid, which is exactly what this did before. */
+    if (runs.length === 1){
+      g.kinds.forEach(k=> box.appendChild(tick(k)));
+      return;
+    }
+    const run = document.createElement('div');
+    run.className = 'evrun';
+    const head = document.createElement('div');
+    head.className = 'rulehead';
+    head.textContent = g.name;
+    run.appendChild(head);
+    g.kinds.forEach(k=> run.appendChild(tick(k)));
+    box.appendChild(run);
   });
 }
 
@@ -8111,6 +8201,40 @@ if (backall) backall.addEventListener('click', async ()=>{
 let EVENTS = null;
 
 const evWhen = (ts)=> ts ? new Date(ts * 1000).toLocaleString() : '';
+/* WHICH RUN OF THE CATALOG A KIND SITS IN, and the order the runs are drawn.
+   Beside EV_WORDS and for the same reason: what a kind is CALLED and which
+   heading it belongs under are both this page's business, where the server
+   stays the authority on which kinds exist at all.
+
+   THE RUNS FOLLOW EVENT_KINDS' OWN ORDER, so this inserts headings and moves
+   no tick. Somebody who knew where one was before still finds it there.
+
+   The split is by what you would do about it, which is the only grouping that
+   earns its space here: the first two runs are FAULTS a screen reports — one
+   about hearing and speaking, one about the thing answering it — and the last
+   two are RECORDS of something deliberate, kept at `info` on the server for
+   exactly that reason. An admin turning the catalog down to errors is deciding
+   between those two halves, and until now had to know which of fifteen ticks
+   belonged to which. */
+/* Kinds that read as one — errored and ran long, created and deleted — are
+   simply adjacent here. A run is one column, so next in the list is the line
+   underneath, and nothing has to be pinned to keep the two of them together. */
+const EV_GROUPS = [
+  {name: 'Speech',        kinds: ['mic_denied', 'no_recorder',
+                                  'stt_slow', 'stt_error',
+                                  'tts_fallback', 'wake_fuzzy']},
+  {name: 'The assistant', kinds: ['no_intent',
+                                  'backend_error', 'backend_slow']},
+  {name: 'Signing in',    kinds: ['login_ok', 'login_fail']},
+  {name: 'The register',  kinds: ['user_added', 'user_removed',
+                                  'device_added', 'device_removed']},
+];
+/* Where a kind this build has no heading for goes. It is NOT dropped, which is
+   the same promise the raw-name fallback makes when EV_WORDS has no words for
+   one: a tick nobody can see is a setting nobody can turn off, and a kind
+   added by a later server would otherwise be recorded with no way to stop it. */
+const EV_GROUP_REST = 'Anything else';
+
 const EV_WORDS = {
   mic_denied:    'microphone refused',
   no_recorder:   'no recorder in this browser',
