@@ -991,10 +991,12 @@ function paintSignOut(){
   const on = typeof Person !== 'undefined' && Person.is();
   b.hidden = !on;
   if (!on) return;
+  /* JUST THE WORDS. The name went on the label to say who was about to be
+     signed out, and it made the one button in this bar twice the width of the
+     three beside it and a different width per person. The question asked on
+     the press names them, which is where it matters — nobody is signed out by
+     reading a label. */
   const who = Person.name || Person.email || '';
-  const lbl = b.querySelector('.lbl');
-  if (lbl) lbl.textContent = who ? 'SIGN OUT ' + who.split(' ')[0].toUpperCase()
-                                 : 'SIGN OUT';
   b.title = who ? 'end ' + who + '\u2019s session on this screen'
                 : 'end this session on this screen';
 }
