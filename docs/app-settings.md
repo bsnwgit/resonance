@@ -314,6 +314,43 @@ The reasoning, what a screen actually does when it loses this server, and the
 two things no setting here can reach — a tablet that reboots, and a scheduled
 restart of this server — are in **Administration → Staying up unattended**.
 
+## Time format
+
+How a clock reads on the screens that show one. **Nothing here turns a clock
+on** — that is a property of the place, ticked per layout as *Date and time
+across the top* under SETTINGS ▸ LAYOUT. This is what it says once a layout has
+asked for it.
+
+It is set once for the whole deployment on purpose. A building where one
+hallway screen said 13:45 and the next said 1:45 PM would be a building with
+two answers to one question, and the tablets in it are rarely configured by the
+same person on the same day.
+
+| | |
+|---|---|
+| **The device's own** | the browser's locale decides — the 24-hour convention, the order of day and month, and the language the month is named in |
+| **24-hour** | 13:45, military time, whatever the device's region says |
+| **12-hour** | 1:45 PM |
+
+The date offers the same choice, plus *Thursday 20 August*, the three numeric
+orders — `20/08/2026`, `08/20/2026`, `2026-08-20` — and **no date at all**,
+which leaves the hour on its own.
+
+**The device's own is the default and it is right almost everywhere:** the
+region a tablet is set to already carries all of this. Reach for the others
+where the deployment and the devices disagree — a screen whose region is not
+yours, or one you want on military time regardless.
+
+**It reads the device's clock, not this server's.** Everything a screen has to
+agree with the server about — how long a token lives, whether a check-in was
+late — is taken from the server. The time in the room is the opposite: it is
+read by somebody standing in the room, and a tablet whose clock is wrong is a
+tablet whose owner should find out.
+
+**It is committed by the tab's own SAVE**, at the foot of ADMIN with everything
+else on that tab — this box has no button of its own. A screen picks the new
+format up on its next check-in, the way every other published change arrives.
+
 ## Accounts
 
 ### Roles

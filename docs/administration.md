@@ -140,9 +140,11 @@ edge:
 
 - **LAYOUTS** — **APPEARANCE / GEOMETRY / SPEECH / SCREENSAVER / LAYOUT**.
   What a screen is. LAYOUT reads last because it is the one that *names* the
-  four before it rather than describing anything itself, and it carries the
-  wake word: the face, the voice and the word it answers to are one answer to
-  "what is this assistant".
+  four before it rather than describing anything itself. **The wake word and
+  the sleep word are on SPEECH**, with the voice — what an assistant is called
+  is part of how it sounds — so a layout points at them rather than carrying
+  them, and changing the word once reaches every endpoint wearing that
+  profile.
 - **PERMISSIONS** — **AUTHENTICATE / AUTHORIZE / PERMISSION**. Who may use an
   endpoint. AUTHENTICATE is whether a caller must be known and how long being
   known lasts; AUTHORIZE is which callers are allowed; PERMISSION is one of
@@ -312,18 +314,16 @@ through.** A person opens the display page and asks; a device is named here
 and takes a code to the screen. They have almost nothing in common except
 that both end up connected, so neither has to read the other's queue.
 
-**PERSON** (under ENROLLMENTS) — people, and only people:
+**PERSON** (under ENROLLMENTS) — people, and only people. One list:
+**People**, under a PENDING divider, holding the ones you have minted a link
+for who have not used it yet.
 
-| | |
-|---|---|
-| **People** | the ones you have minted a link for who have not used it yet |
-| **Waiting for approval** | everybody who has asked and not been decided about |
+**Requests are not listed there.** Somebody asking from a display still
+reaches the server and is still recorded, but the queue that decided them —
+*Waiting for approval* — is no longer on that tab, so there is nowhere in the
+panel to approve or refuse one.
 
-What a request *asks* is **SETTINGS ▸ ADMIN ▸ Enrollment Request Form**. It
-sat here, above the queue it feeds, which reads well and put a thing written
-once in your own words on the page you open to decide about the people who
-have already answered it. Those are different jobs at different moments: one
-is configuration, the other is work.
+What a request *asks* is still **SETTINGS ▸ ADMIN ▸ Enrollment Request Form**.
 
 ### A person, as against a device
 
@@ -635,6 +635,18 @@ thing is rather than being two more boxes to find:
 TALK and AUDIO stay. A browser will not open a microphone unless somebody asks
 it to, so TALK is pressed once when the screen is commissioned and the wake word
 carries it from there.
+
+**Date and time across the top** is a tick of its own, off by default. A screen
+people walk past wants the time on it; a browser tab has one in the corner
+already, which is why this is the layout's decision rather than something every
+display gets. It sits at the two ends of the top edge, dim, and **goes while the
+screensaver drifts** — a line that never moves is the exact thing the drift
+exists to prevent.
+
+What it *says* — 24-hour or 12-hour, and which of the date formats — is set once
+for the deployment under **SETTINGS ▸ ADMIN ▸ Time format**, not here. A
+building whose screens disagreed about how to write the time would be a building
+with two answers to one question.
 
 **And it goes full screen on the first touch**, unless the profile says otherwise. An address bar, a tab strip and
 somebody's bookmarks across the top of a hallway screen is a browser that

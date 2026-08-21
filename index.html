@@ -160,6 +160,21 @@
      low, so it never lands on top of the invitation — and dimmer than a
      warning would be on a workstation, because this hangs on a wall in a
      house and the failure it reports is usually a router. */
+  /* Sized off the shorter side like everything else in this frame, so it is
+     legible across a hallway on a portrait screen and on a landscape one
+     without either being tuned by hand. The time is the half anybody actually
+     reads at a distance, so it carries the size and the date sits under the
+     same rule one step down. */
+  #clockline{
+    display:none;align-items:flex-start;justify-content:space-between;
+    padding:3.2% 6% 0;z-index:5;
+    font-size:clamp(11px, 2.2vmin, 22px);letter-spacing:.18em;
+    color:rgba(var(--paper),.42);
+    text-shadow:0 0 18px rgba(0,0,0,.7);
+    font-variant-numeric:tabular-nums;
+  }
+  #cktime{font-size:1.35em;letter-spacing:.14em;color:rgba(var(--paper),.62)}
+  #ckdate{padding-top:.45em}
   #offline{
     display:none;align-items:flex-start;justify-content:center;
     padding:6% 6% 0;z-index:6;
@@ -624,6 +639,13 @@
      into the canvas for the duration, because an outage lasts hours and a
      stationary line held that long on a screen whose whole purpose at that
      moment is that nothing stays still is the one thing left to burn in. */
+  /* NOT WHILE IT DRIFTS — as a BAR. The time itself does not go: it is
+     painted into the canvas for the duration, where it travels with the figure
+     instead of holding still. A line that never moves is the exact thing the
+     screensaver exists to drift away from, and a wall clock that disappears
+     the moment the hallway goes quiet is a wall clock nobody can use. See
+     render(). */
+  body[data-clock]:not([data-saver]) #clockline{display:flex}
   body[data-offline]:not([data-saver]) #offline{display:flex}
 </style>
 </head>
@@ -639,6 +661,16 @@
          voice-only display there is no transcript, no composer and no hint of
          any kind. Only ever drawn on a wall: a browser tab was opened
          deliberately by somebody who already knows what it is. -->
+    <!-- THE TIME, on the screens whose layout asks for one. Across the top and
+         at the two ends, out of the figure's way and out of the invitation's:
+         the frame is read from the middle outwards, so the corners are where
+         something you glance at rather than look at belongs. Dim, for the same
+         reason the invitation is — the brightest thing on a wall should stay
+         the thing the wall is for. -->
+    <div class="ov" id="clockline">
+      <span id="ckdate"></span>
+      <span id="cktime"></span>
+    </div>
     <div class="ov" id="prompt"></div>
     <!-- The screen has lost the server and has said so once. High in the
          frame, where the invitation is low, so the two never argue over the
@@ -968,11 +1000,11 @@ function paintGate(){
   const invite = GATE === 'invite';
   const spent = GATE === 'spent';
   const signing = (GATE === 'login' || setup) && !invite && !spent;
-  /* The two failures a link can have. Said here rather than nowhere: the
+  /* The one failure a link can have. Said here rather than nowhere: the
      server answers a redirect with one word, and somebody who followed a link
      that did not work should be told, not left looking at a page behaving as
      though they never clicked it. */
-  const failed = PERSON_ARRIVED === 'bad' || PERSON_ARRIVED === 'isdevice';
+  const failed = PERSON_ARRIVED === 'bad';
   const head = $('gatehead'), note = $('gatenote');
   const fields = $('gatefields'), links = $('gatelinks');
   const user = $('gateuser'), pass = $('gatepass'), pass2 = $('gatepass2');
@@ -990,16 +1022,19 @@ function paintGate(){
   if (pass) pass.placeholder = setup ? 'choose a password' : 'password';
 
   if (head){
+    /* A REFUSED LINK IS ASKED ABOUT FIRST. It used to be asked about last,
+       and `invite` is set for everything that is not a spent link — so a
+       refusal painted "open the link you were sent" at somebody who had just
+       opened the link they were sent, and the two messages written for the
+       two failures could never appear. */
     head.textContent =
         done    ? 'You are set up'
+      : failed             ? 'That link did not work'
       : invite  ? 'Invitations are accepted here'
       : spent   ? 'That link has been used'
       : setup   ? 'Choose a password'
       : GATE === 'code'    ? 'Setting this screen up?'
       : GATE === 'request' ? 'Ask to be let in'
-      : failed && PERSON_ARRIVED === 'isdevice'
-                           ? 'This screen belongs to the building'
-      : failed             ? 'That link did not work'
       : 'Sign in';
   }
   /* Only where nothing else has written a reason into it. A failed sign-in
@@ -1011,6 +1046,8 @@ function paintGate(){
                       + 'just chose, at whichever of these you want:'
                     : 'Nothing has been granted to this account yet — an '
                       + 'administrator has to say which assistant you may use.')
+      : failed             ? 'It may have been replaced since it was sent to '
+                             + 'you. Ask an administrator for a new one.'
       : invite  ? 'Open the link you were sent. It is the only way in from '
                   + 'this address, and it works nowhere else.'
       : spent   ? 'A password was already chosen with it. Sign in where your '
@@ -1019,12 +1056,6 @@ function paintGate(){
                   + 'works once. Choose something long.'
       : GATE === 'code'    ? ''
       : GATE === 'request' ? ''
-      : failed && PERSON_ARRIVED === 'isdevice'
-                           ? 'It is set up as a display, so a personal link '
-                             + 'cannot be opened on it. Use your own device, '
-                             + 'or ask an administrator.'
-      : failed             ? 'It may have been replaced since it was sent to '
-                             + 'you. Ask an administrator for a new one.'
       : '';
   }
 
@@ -1190,10 +1221,9 @@ async function gateArrived(j){
   applyPrefs();
 }
 
-/* Said even where hello never reports a person, which is both failure cases:
-   a link that means nothing leaves no cookie, and a display's browser is a
-   display. */
-if (PERSON_ARRIVED === 'bad' || PERSON_ARRIVED === 'isdevice')
+/* Said even where hello never reports a person, which is what a failure is:
+   a link that means nothing leaves no cookie to report. */
+if (PERSON_ARRIVED === 'bad')
   window.addEventListener('DOMContentLoaded', paintGate);
 /* The forced state. Nothing else can be done on this page until there is a
    password, so it is set before anything paints rather than switched to. */
@@ -1379,6 +1409,73 @@ const Display = {
    stays in localStorage untouched, so a display taken off the wall and turned
    back into an ordinary tab gets that person's own choice back rather than
    the policy's. */
+/* THE WALL CLOCK. Whether it appears is the layout's (`clock`); what it says
+   is the deployment's, under SETTINGS ▸ ADMIN ▸ Time format, and arrives in
+   the shared settings as `clock_time` and `clock_date`.
+
+   THE DEVICE'S OWN CLOCK, deliberately. The server's time is what a screen is
+   told for anything it has to agree with the server about — a token's life, a
+   check-in window — and this is the opposite: it is the time in the room, read
+   by somebody standing in it, and a tablet whose clock is wrong is a tablet
+   whose owner wants to know. */
+const Clock = {
+  timer: 0,
+  start(){ this.paint(); this.arm(); },
+  stop(){ clearTimeout(this.timer); this.timer = 0; },
+  /* ON THE MINUTE, not every sixty seconds from whenever this happened to
+     start: a clock that turns over at seventeen seconds past is one people
+     notice, and two screens in a corridor disagreeing by half a minute is
+     worse than either being a second late. */
+  arm(){
+    clearTimeout(this.timer);
+    const now = new Date();
+    const ms = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+    this.timer = setTimeout(()=>{ this.paint(); this.arm(); },
+                            Math.max(1000, ms));
+  },
+  two(n){ return String(n).padStart(2, '0'); },
+  time(d){
+    const f = S.clock_time || 'locale';
+    if (f === '24')
+      return d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit',
+                                       hour12: false});
+    if (f === '12')
+      return d.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit',
+                                       hour12: true});
+    /* The device's own, and the two-digit hour is not forced: a region that
+       writes 9:05 should write 9:05 here too. */
+    return d.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
+  },
+  date(d){
+    const f = S.clock_date || 'locale';
+    if (f === 'none')    return '';
+    if (f === 'weekday')
+      return d.toLocaleDateString([], {weekday: 'long', day: 'numeric',
+                                       month: 'long'});
+    if (f === 'dmy') return this.two(d.getDate()) + '/'
+                          + this.two(d.getMonth() + 1) + '/' + d.getFullYear();
+    if (f === 'mdy') return this.two(d.getMonth() + 1) + '/'
+                          + this.two(d.getDate()) + '/' + d.getFullYear();
+    if (f === 'iso') return d.getFullYear() + '-' + this.two(d.getMonth() + 1)
+                          + '-' + this.two(d.getDate());
+    return d.toLocaleDateString();
+  },
+  /* THE LAST STRINGS, kept. The screensaver paints this into the canvas and
+     that runs every frame — formatting a date sixty times a second to draw
+     the same two words is work a wall screen does for a year. They change
+     once a minute and are read from here in between. */
+  tstr: '', dstr: '',
+  paint(){
+    const now = new Date();
+    this.tstr = this.time(now);
+    this.dstr = this.date(now);
+    const t = $('cktime'), dl = $('ckdate');
+    if (!t || !dl) return;
+    t.textContent = this.tstr;
+    dl.textContent = this.dstr;
+  },
+};
+
 const Kiosk = {
   on: false,
   voiceOnly: false,
@@ -1425,6 +1522,10 @@ const Kiosk = {
     this.listen = !!w.listen;
     this.prompt = w.prompt !== false;
     this.promptText = w.prompt_text || '';
+    /* OFF where the server said nothing, like `listen` and unlike the two
+       above it: those are conveniences a preview should show anyway, and a
+       clock is a decision about a place. */
+    this.clock = !!w.clock;
     Saver.configure(w.saver);
     this.apply();
   },
@@ -1449,6 +1550,11 @@ const Kiosk = {
   apply(){
     document.body.toggleAttribute('data-kiosk', this.on);
     document.body.toggleAttribute('data-voiceonly', this.voiceOnly);
+    /* NOT IN AN EMBED. A host page composes what it wants from the parts it
+       was granted, and a clock arriving because the endpoint's layout happens
+       to have one ticked is this product decorating somebody else's page. */
+    document.body.toggleAttribute('data-clock', this.clock && !EMBED);
+    if (this.clock && !EMBED) Clock.start(); else Clock.stop();
     this.applyLook();
 
     /* SPEAK ONLY, and it follows from being on a wall rather than being a
@@ -2067,6 +2173,12 @@ Prefs.load();
 /* ---------------------------------------------------------------- state */
 const S = {
   mode:'ridge', palette:'blue', layout:'hero',
+  /* HOW THE CLOCK READS, from SETTINGS ▸ ADMIN ▸ Time format. Declared here
+     with the shipped default and not merely read off the document, because a
+     settings load takes only the keys this page already has — see the merge in
+     loadSettings — so a key with no default here is a setting the server sends
+     and the display silently drops. */
+  clock_time:'locale', clock_date:'locale',
   /* WHAT THE SCREEN SAYS ALOUD WHEN SOMEBODY SIGNS IN, and when somebody
      fails to. BOTH EMPTY BY DEFAULT, which means silent — and that is the
      right default rather than a timid one. A wall in a shared space
@@ -2968,6 +3080,38 @@ function render(){
              + getComputedStyle(document.body).fontFamily;
     ctx.fillStyle = '#e0716b';
     ctx.fillText(OFFLINE, cx, cy - short * 0.22 * Saver.scale);
+    ctx.restore();
+  }
+
+  /* --- and the clock, which is the one thing here worth reading while it
+         drifts ---
+     The DOM bar is hidden for the duration like every other overlay, and this
+     is what replaces it: the same two lines, travelling with the figure and
+     easing with it, so a hallway can be glanced at at two in the morning
+     without the time being the one shape burnt into the panel.
+
+     ABOVE the figure and further out than the outage line, so the two never
+     land on each other; the invitation is below. The time carries the size —
+     it is what somebody crossing a room is reading — and the date sits under
+     it at the scale the rest of this frame uses. */
+  if (typeof Kiosk !== 'undefined' && Kiosk.clock
+      && Clock.tstr && Saver.amount > 0.01){
+    const short = Math.min(W, H);
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgb(' + pal.glass + ')';
+    ctx.globalAlpha = 0.52 * Saver.amount;
+    ctx.font = Math.round(Math.max(14*DPR, short*0.050*Saver.scale)) + 'px '
+             + getComputedStyle(document.body).fontFamily;
+    ctx.fillText(Clock.tstr, cx, cy - short * 0.33 * Saver.scale);
+    if (Clock.dstr){
+      ctx.globalAlpha = 0.34 * Saver.amount;
+      ctx.font = Math.round(Math.max(10*DPR, short*0.022*Saver.scale)) + 'px '
+               + getComputedStyle(document.body).fontFamily;
+      ctx.fillText(Clock.dstr, cx, cy - short * 0.275 * Saver.scale);
+    }
     ctx.restore();
   }
 
@@ -5613,6 +5757,10 @@ function repaintNames(){
 
 /* Rebuild every control from S — used after settings load. */
 function repaintAll(){
+  /* The format lives in the shared settings, so a change to it arrives the
+     same way an appearance change does — and waiting until the next minute to
+     honour it would make the panel's picker look broken for up to a minute. */
+  if (typeof Clock !== 'undefined') Clock.paint();
   SLIDERS.forEach(f=>f());
   FIELDS.forEach(f=>f());
   ['mode','palette','layout','tmode','src','ptt','wake','micdsp','sttmodel','byeontimeout','ttsengine','face','fs']

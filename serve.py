@@ -1242,21 +1242,24 @@ def public_routes(doc, disp=None, ident=None):
             # what wakes it, what else to accept for it, and how close a match
             # has to be. A route keeps its stored copy only so that unpicking
             # this later does not lose what somebody typed.
-            # …AND THE WORDS COME FROM THE LAYOUT, which is what an endpoint
-            # IS: a port carries one endpoint, an endpoint names one layout, so
-            # a layout is one assistant's face — how it looks, how it sounds,
-            # and what it is called. They were on the speech profile, which
-            # meant a profile that could not be shared between two endpoints
-            # for a reason nothing on it explained.
+            # …AND THE WORDS COME FROM THE SPEECH PROFILE THE LAYOUT NAMES.
+            # What an assistant is called is part of how it sounds, so it sits
+            # with the voice rather than beside the appearance: one place to
+            # edit, and a layout that is purely a face again.
             #
-            # A route keeps its stored copy only so that unpicking this later
-            # does not lose what somebody typed.
+            # TWO FALLBACKS BEHIND IT, and both are for continuity rather than
+            # choice: the layout's own copy, for a layout that names no speech
+            # profile and would otherwise answer to nothing, and then the
+            # route's, which is older still. Neither is editable any more —
+            # they are what an upgrade leaves behind, and migrate_words_to_
+            # speech lifts them onto the profile wherever there is one.
             lay = route_layout(rec)
-            if lay.get("wakeword"):
-                row["wakeword"] = str(lay["wakeword"])
-            if lay.get("wakealiases"):
-                row["aliases"] = [a.strip() for a
-                                  in str(lay["wakealiases"]).splitlines()
+            word = str(prof.get("wakeword") or lay.get("wakeword") or "").strip()
+            if word:
+                row["wakeword"] = word
+            alias = str(prof.get("wakealiases") or lay.get("wakealiases") or "")
+            if alias.strip():
+                row["aliases"] = [a.strip() for a in alias.splitlines()
                                   if a.strip()]
             if "wakestrict" in prof:
                 row["strict"] = bool(prof.get("wakestrict"))
@@ -2124,11 +2127,22 @@ DISPLAY_SETTINGS = {
     "quiet_on": 0,
     "quiet_from": 22,
     "quiet_to": 7,
+    # NO CLOCK FORMAT HERE. It was, for an afternoon, and it was the wrong
+    # document: this one is kept beside the displays and is deliberately not
+    # world readable, so a display never receives it — the format would have
+    # been stored where the screen that has to render it cannot read it.
+    #
+    # It lives in the INTERFACE document instead (`clock_time`, `clock_date`),
+    # which is what /settings hands every screen, and its defaults are declared
+    # by the display page the way every other interface setting's are. The
+    # layout's `clock` tick stays here, because whether a place shows a clock is
+    # a fact about the place.
     # Kept so an existing document round-trips rather than losing a key on the
     # first save. `user` was the second DISPLAY kind and folded into `device`;
     # nothing reads this now, and nothing writes it either.
     "user_group": "",
 }
+
 MAX_FORM_FIELDS = 5
 #: (low, high) for each number the panel can set
 DISPLAY_LIMITS = {"event_days": EVENT_DAYS_LIMITS,
@@ -2361,7 +2375,12 @@ KIOSK_OFF = {"voice_only": True, "look": "", "motion": "", "speech": "",
              # a speech profile that could not be shared for a reason nothing
              # on it explained.
              "wakeword": "", "wakealiases": "",
-             "sleepword": "", "sleepaliases": ""}
+             "sleepword": "", "sleepaliases": "",
+             # OFF, and off is the answer for most screens. A clock earns its
+             # place on a wall somebody walks past and reads without stopping;
+             # on a laptop it is a worse copy of the one in the corner of the
+             # screen already.
+             "clock": False}
 
 #: One dim line at the foot of a screen, read in passing. Anything longer is a
 #: paragraph nobody standing up will finish.
@@ -2399,6 +2418,7 @@ def clean_kiosks(raw):
                     "wakealiases": str(k.get("wakealiases") or "")[:200],
                     "sleepword": str(k.get("sleepword") or "").strip()[:40],
                     "sleepaliases": str(k.get("sleepaliases") or "")[:200],
+                    "clock": bool(k.get("clock", KIOSK_OFF["clock"])),
                     "prompt_text": str(k.get("prompt_text") or "")
                                    .strip()[:MAX_PROMPT_TEXT]})
     return out
@@ -3198,91 +3218,53 @@ def migrate_model_limits():
          % (len(clashed), ", ".join(clashed))) if clashed else ""), flush=True)
 
 
-def migrate_wake_words():
-    """Move each endpoint's wake word onto the layout it names, and the shared
-    sleep word onto every layout that has none.
+def migrate_words_to_speech():
+    """Move each layout's wake and sleep words onto the speech profile it names.
 
-    The words were in two other places — the wake word on the SPEECH profile
-    an endpoint named, the sleep word in the settings document, one for the
-    whole server. Without this, every assistant loses its name on upgrade and
-    answers to nothing, which is the loudest possible failure.
+    They spent an afternoon on the layout — a previous migration put them there
+    — and a layout is what an assistant LOOKS like. What it is called is part of
+    how it sounds, so the words belong with the voice, on the profile the layout
+    names, where one edit reaches every endpoint wearing it.
 
-    WHERE THE LAYOUT ALREADY SAYS SOMETHING, IT WINS and nothing is touched.
-    This fills blanks; it does not overwrite an answer somebody gave.
+    Without this every assistant loses its name on upgrade and answers to
+    nothing, which is the loudest possible failure.
 
-    An endpoint naming no layout has nowhere to put its word and keeps it on
-    its own record, where public_route still falls back to it."""
-    doc = read_routes()
-    routes = doc.get("routes") or {}
-    if not routes:
-        return
+    WHERE THE PROFILE ALREADY SAYS SOMETHING IT WINS. This fills blanks; it does
+    not overwrite an answer somebody gave.
+
+    A layout naming no speech profile has nowhere to put its words and keeps
+    them, where public_route still falls back to them — so nothing goes quiet
+    because of a profile that was never chosen."""
     ddoc = read_displays_doc()
     cfg = ddoc.get("settings")
     cfg = dict(cfg) if isinstance(cfg, dict) else {}
     kiosks = clean_kiosks(cfg.get("kiosks"))
-    if not kiosks:
-        return
     speeches = clean_profiles(cfg.get("speeches"), "p", MAX_LOOKS)
-    by_id = {k["id"]: k for k in kiosks}
-    # WHICH LAYOUT IS SPOKEN FOR. Two endpoints sharing one was legal until the
-    # words moved onto it, and it is the ordinary case: a pair of assistants
-    # dressed the same. Moving a word onto a shared layout would give both of
-    # them the FIRST one's name and silently take the second's away, so a
-    # sharer gets a copy of its own instead — same look, its own name.
-    claimed = {}
-    # The one word the whole server used to say goodbye with.
-    shared_sleep = str(cfg.get("sleepword") or "").strip()
-    shared_alias = str(cfg.get("sleepaliases") or "")
-    moved, split = 0, []
-    for rid in route_order(doc):
-        rec = routes[rid]
-        kid = str(rec.get("kiosk_profile") or "")
-        lay = by_id.get(kid)
-        if not lay:
-            continue
-        if claimed.get(kid) and claimed[kid] != rid:
-            if len(kiosks) >= MAX_KIOSKS:
-                print("wake words: no room to give %s a layout of its own — "
-                      "it shares one and will answer to the other's name"
-                      % (rec.get("name") or rid), flush=True)
-                continue
-            copy = dict(lay)
-            copy["id"] = "k" + secrets.token_hex(4)
-            copy["name"] = (rec.get("name") or "endpoint")[:40]
-            copy["wakeword"] = ""
-            copy["wakealiases"] = ""
-            kiosks.append(copy)
-            by_id[copy["id"]] = copy
-            rec["kiosk_profile"] = copy["id"]
-            kid, lay = copy["id"], copy
-            split.append(copy["name"])
-        claimed[kid] = rid
-        if not lay.get("wakeword"):
-            # The speech profile's word first — that is where it was being read
-            # from — and the route's own only if that says nothing.
-            sp = find_look(str(rec.get("speech") or ""), speeches) or {}
-            word = str(sp.get("wakeword") or rec.get("wakeword") or "").strip()
-            if word:
-                lay["wakeword"] = word
-                lay["wakealiases"] = str(sp.get("wakealiases") or "") \
-                    or "\n".join(rec.get("aliases") or [])
-                moved += 1
-        if not lay.get("sleepword") and shared_sleep:
-            lay["sleepword"] = shared_sleep
-            lay["sleepaliases"] = shared_alias
-    if not (moved or split or shared_sleep):
+    if not (kiosks and speeches):
         return
-    cfg["kiosks"] = kiosks
+    by_id = {s["id"]: s for s in speeches}
+    moved = []
+    for lay in kiosks:
+        sp = by_id.get(str(lay.get("speech") or ""))
+        if not sp:
+            continue
+        vals = dict(sp.get("values") or {})
+        took = 0
+        for k in ("wakeword", "wakealiases", "sleepword", "sleepaliases"):
+            if str(lay.get(k) or "").strip() and not str(vals.get(k) or "").strip():
+                vals[k] = lay[k]
+                took += 1
+        if took:
+            sp["values"] = vals
+            moved.append("%s → %s" % (lay.get("name") or lay["id"],
+                                      sp.get("name") or sp["id"]))
+    if not moved:
+        return
+    cfg["speeches"] = speeches
     ddoc["settings"] = cfg
     _write_displays_doc(ddoc)
-    if split:
-        write_routes(doc)
-    print("wake words: %d moved onto layouts%s, sleep word %s"
-          % (moved,
-             (" — %d given a layout of its own so they keep their names: %s"
-              % (len(split), ", ".join(split))) if split else "",
-             ("copied onto every layout" if shared_sleep else "not set")),
-          flush=True)
+    print("wake words: moved onto the speech profile each layout names — %s"
+          % ", ".join(moved), flush=True)
 
 
 def migrate_connections():
@@ -3603,13 +3585,15 @@ def kiosk_of(rec, savers=None, looks=None, kiosks=None,
         got = find_look(str(prof.get(key) or ""), pools[key] or [])
         if got:
             merged.update(got)
-    # …AND THE SLEEP WORD, which is the layout's own rather than one of the
-    # three it names. It was a shared setting, so every assistant on the server
-    # said goodbye to the same word — and a hallway that answers to one name
-    # ought to stop answering to its own. Overlaid after the merge because it
-    # belongs to this profile and nothing under it can contradict it.
+    # …AND THE SLEEP WORD COMES WITH THE VOICE, in the speech profile merged
+    # above, for the same reason the wake word does: what ends a conversation
+    # with an assistant is part of how it sounds, not part of how it looks.
+    #
+    # The layout's own is a fallback and nothing more — filled in only where
+    # the profile said nothing, so a layout naming no speech profile still says
+    # goodbye to whatever it was saying goodbye to before this moved.
     for k in ("sleepword", "sleepaliases"):
-        if prof.get(k):
+        if prof.get(k) and not merged.get(k):
             merged[k] = prof[k]
     return {"kiosk": True,
             "voice_only": bool(prof.get("voice_only", KIOSK_OFF["voice_only"])),
@@ -3619,6 +3603,12 @@ def kiosk_of(rec, savers=None, looks=None, kiosks=None,
             "keep_awake": bool(prof.get("keep_awake", KIOSK_OFF["keep_awake"])),
             "listen": bool(prof.get("listen", KIOSK_OFF["listen"])),
             "prompt": bool(prof.get("prompt", KIOSK_OFF["prompt"])),
+            # THE FOURTH PLACE a profile's fields are written out one by one:
+            # clean_kiosks stores them, paintKiosks copies them for the editor,
+            # the panel's SAVE posts them, and this hands them to the screen. A
+            # field added to three of the four saves, shows a tick, and does
+            # nothing — which is exactly how this one arrived.
+            "clock": bool(prof.get("clock", KIOSK_OFF["clock"])),
             # The admin's words where there are any, and the empty string where
             # there are not — the display builds the automatic line itself,
             # because only the browser knows which wake words it is currently
@@ -5716,13 +5706,17 @@ def wake_words_in_use(skip_pid=""):
     doc = read_routes()
     for rid in route_order(doc):
         rec = doc["routes"][rid]
-        # THE LAYOUT, not the speech profile: that is where the words live
-        # now. A route's own copy is still the fallback, so an endpoint whose
-        # layout says nothing keeps whatever it was called.
+        # THE SAME ORDER public_route READS IN — the speech profile the layout
+        # names, then the layout's own leftover, then the route's. A collision
+        # check looking at a different field from the matcher is a check that
+        # clears a word the server will then refuse to wake on.
         lay = route_layout(rec)
-        alias = [a.strip() for a in str(lay.get("wakealiases") or "").splitlines()
-                 if a.strip()] or list(rec.get("aliases") or [])
-        for w in [lay.get("wakeword") or rec.get("wakeword") or ""] + alias:
+        prof = find_look(route_speech(rec), _speech_pool()) or {}
+        raw = str(prof.get("wakealiases") or lay.get("wakealiases") or "")
+        alias = [a.strip() for a in raw.splitlines() if a.strip()] \
+                or list(rec.get("aliases") or [])
+        for w in [prof.get("wakeword") or lay.get("wakeword")
+                  or rec.get("wakeword") or ""] + alias:
             if w:
                 out.append((w, rec.get("name") or rid))
     for pid, rec in read_identities().items():
@@ -8104,20 +8098,19 @@ class Handler(SimpleHTTPRequestHandler):
             # both directions are one rule rather than a check here and an
             # assumption everywhere else.
             token = path[len(PERSON_PREFIX):]
-            here = self._display()
-            if here and here.get("approved"):
-                # A DEVICE IS A DEVICE. Signing a person into a screen several
-                # people share is the middle ground this phase deliberately
-                # leaves for later, and a kiosk is the case it is explicitly
-                # NOT for — so it is refused where it was attempted, visibly,
-                # rather than accepted here and quietly ignored on some later
-                # request. The URL is not spent by this: it still works
-                # everywhere it should.
-                self.send_response(303)
-                self.send_header("Location", "/?person=isdevice")
-                self.send_header("Content-Length", "0")
-                self.end_headers()
-                return
+            # A DISPLAY TOKEN IN THE JAR MEANS NOTHING HERE. This used to
+            # refuse a link outright on any browser holding one — "a device is
+            # a device" — and what it actually refused was the machine an
+            # administrator works from, because a cookie is scoped to a host
+            # and not to a port: the token handed out on an assistant's
+            # listener is sent to this one as well. So the one browser certain
+            # to be carrying it was the one that had just minted the link.
+            #
+            # It was not buying what it looked like it was buying either. This
+            # prefix answers on the enrolment listener and 404s everywhere
+            # else, so it never stood between a wall screen and an assistant;
+            # what a person may reach once they are signed in is decided by
+            # their grants, on the listener they reach it from.
             rec = find_identity(token)
             # THREE ANSWERS, because the link means two different things now.
             # An account with no password is somebody arriving for the first
@@ -10728,7 +10721,7 @@ def main():
     # before anything tries to name a pair of them.
     migrate_connections()
     # After the layouts exist and before anything reads a wake word.
-    migrate_wake_words()
+    migrate_words_to_speech()
     # After the connections, because it resolves a route's model through one.
     migrate_model_limits()
     # Last of them, and it reads five fields the others do not touch.
