@@ -1,0 +1,81 @@
+# Security model
+
+What a browser can obtain from this server, what it cannot, and the exact
+limits of both. For how to operate the admin interface see
+[Administration](administration.md); for how the pieces fit together see
+[Architecture](architecture.md).
+
+## What reaches a browser, and what never does
+
+Three tiers, and the boundary between them is the whole of the model:
+
+| tier | contents | who can read it |
+| --- | --- | --- |
+| **never leaves the server** | API keys, the Home Assistant token, adapter base URLs, password hashes | nobody, through any browser |
+| **served to the display** | the settings document: appearance. The routes document: names, greetings, voices, wake words and how strictly each matches | today, anyone who can reach the port |
+| **held by the browser, unreadable by it** | the device token, in an `HttpOnly` cookie | the server, on presentation |
+
+The first row is the one that matters and it is absolute: no credential and no
+upstream address is in any response the display listeners produce. Reading
+everything a browser can obtain gets you no closer to reaching Home Assistant
+or a paid API than reading nothing.
+
+**You cannot keep a secret in a page you serve to somebody.** A token
+embedded in `index.html` can be read out of it by whoever received the file,
+so it is obfuscation rather than access control — the same reason the identity
+design refuses to encrypt anything in the browser and keeps the secrecy in the
+server-side mapping.
+
+So the boundary is not *which fields are hidden*. It is **which devices may
+ask at all**, and there are two mechanisms for that:
+
+- **The network.** Bind to one address, firewall the port, and put the wall
+  displays on their own isolated VLAN. An unapproved device cannot open a
+  connection, so there is nothing to authorise. This is available now and is
+  the strongest of the two.
+- **The device token** — built. Server-issued on the first visit, `HttpOnly` so
+  page script genuinely cannot read it, and an admin approves the device.
+  `curl` does not have the cookie. A guest's phone is issued a token of its own
+  and refused, because nobody approved that one.
+
+### The limitations, stated exactly
+
+**A person using an approved device can read what that device reads.** This is
+not fixable — the page runs on hardware they hold — and it is worth being
+clear about how little it costs:
+
+- On a **wall display**, that person is standing in your hallway, and they can
+  already operate the house by talking to it. Reading the wake words they
+  would have to say anyway is not the exposure in that room.
+- On a **personal device**, that person is its owner, who says those wake
+  words daily. The document tells them nothing they did not already have.
+- In **neither case** does it yield a credential, an endpoint, or anything
+  that would let them reach Home Assistant except by asking this server —
+  which is the thing they were already allowed to do.
+
+**Two people sharing one approved device cannot be told apart.** Approval is
+per device. Telling the people using it apart means each of them signing in
+with their own account, which is what an endpoint set to REQUIRED insists on —
+and a shared wall screen is exactly the case that cannot satisfy it.
+
+**A display learns the wake word of a route it may not use, and that is
+deliberate.** It has to: recognising the house's name is the only way it can
+*drop* an utterance addressed to the house instead of passing it into whatever
+conversation it was already having. Withholding the word would not make the
+phone in the room safer — it would make it answer on the house's behalf. What
+the word buys whoever reads it is nothing: saying it into an unapproved device
+is refused at `/ask`, by this server, on every request.
+
+**What is exposed today:**
+
+| | to | |
+| --- | --- | --- |
+| the settings document | anything that can reach the port | appearance values |
+| a route's name, greeting and voice | anything that can reach the port | what makes a newly hung display look right before anybody approves it |
+| a route's wake words and strictness | any browser that has said hello, approved or not | the gate rule above |
+| a route's adapter, address and key | nobody, through any browser | not published at any tier |
+
+The network is still the stronger of the two boundaries, and the VLAN is still
+the right answer for wall displays. What the token changes is that reaching the
+port is no longer the same as being able to *use* what is on it.
+

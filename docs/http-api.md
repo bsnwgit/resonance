@@ -1,0 +1,101 @@
+# HTTP API
+
+Every endpoint this server exposes, and which listener it exists on.
+
+On every listener:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/stt` | audio in, `{"text": …}` out. `?model=`, `?hint=` |
+| `GET` | `/stt/status` | which transcription models are resident, and which this server will accept |
+| `POST` | `/tts` | text in, WAV out. `?voice=`, `?rate=` |
+| `GET` | `/tts/voices` | installed neural voices |
+| `GET` | `/settings` | the shared interface configuration |
+| `GET` | `/routes` | the routes: presentation to anyone, the routing half only to a caller holding a display token, and `allowed` per route for that caller |
+| `POST` | `/ask` | a question — `{"route": …}` picks one, absent means the default. `{"conversation_id": …}` continues one the endpoint is keeping, and the reply carries that id back. `403 {"refused": "display"}` where this display may not use that route |
+| `POST` | `/display/hello` | a display announcing itself: declared name in, its identity out, and a token in an `HttpOnly` cookie if it had none. Same-origin only |
+| `POST` | `/display/request` | a device asking for access, answering the form the admin built — or `{"renew": true}`, which asks again on the answers already held. Same-origin only |
+| `POST` | `/display/poll` | a display saying it is still here and asking whether anything has moved: the stamp of ITS OWN configuration, whether an admin has asked it to reload, this server's clock, and the numbers it keeps itself up with. Same-origin only |
+| `POST` | `/display/enrol` | an enrolment code redeemed in place, from the box the display page offers. Spends the code and sets the cookie, without sending anybody back to the address bar. Same-origin only, same back-off as the URL form |
+| `GET` | `/e/<code>` | the same code, typed as a URL instead — the right shape for a television with a remote and no browser open yet. Spends the code, sets the cookie, and redirects to the display with `?enrol=` saying how it went. Display listeners only |
+
+Display listeners only — the embed does not exist on the admin port:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/embed/session` | an embed key in, a short-lived session token out |
+| `GET` | `/embed?t=` | the display, framed, drawing only what the key grants |
+| `GET` | `/embed/session` | what this session was granted — bearer token |
+
+Admin listener only — everything below returns 404 on the public ports:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/auth/login` | username and password in, session cookie out |
+| `POST` | `/auth/logout` | end the session |
+| `GET` | `/auth/me` | who am I, and with what role |
+| `POST` | `/auth/password` | change a password; your own needs the current one |
+| `POST` | `/settings` | write the configuration — `admin` role. A bare object replaces it; `{settings, merge}` writes only the keys it carries |
+| `GET` | `/app` | ports and session length, plus what is actually running |
+| `POST` | `/app` | change them — `admin` role, restart to apply |
+| `GET` | `/users` | list accounts — `admin` role |
+| `POST` | `/users` | create an account — `admin` role |
+| `POST` | `/users/role` | change a role — `admin` role |
+| `POST` | `/users/delete` | remove an account — `admin` role |
+| `GET` | `/routes/all` | every route in full, less the keys — `admin` role |
+| `POST` | `/routes/new` | create one — `admin` role |
+| `POST` | `/routes/save` | change one — `admin` role |
+| `POST` | `/routes/default` | choose which answers the unaddressed — `admin` role |
+| `POST` | `/routes/enable` | enable or disable one — `admin` role |
+| `POST` | `/routes/delete` | remove one, and its key — `admin` role |
+| `POST` | `/routes/test` | one real round trip against that route — `admin` role |
+| `GET` | `/displays` | every display, plus the address an enrolment code is typed into — `admin` role |
+| `POST` | `/displays/new` | create a row before its device exists, and issue its code — `admin` role |
+| `POST` | `/displays/reissue` | kill the row's live token now and issue a new code; name and permissions kept — `admin` role |
+| `POST` | `/displays/decide` | approve — with the endpoints it may use, in the same call — or refuse, with a message for them, a note for you, and whether it may ask again — `admin` role |
+| `POST` | `/displays/settings` | whether guests may ask, how long a grant lasts, the two limits, and the request form — `admin` role |
+| `GET` | `/groups` | every group, plus the two populations one can be drawn from — `admin` role |
+| `POST` | `/groups/save` | create one, rename it, or set its membership — `admin` role |
+| `POST` | `/groups/delete` | remove one, and take it off every endpoint that named it — `admin` role |
+| `POST` | `/displays/approve` | approve one, or withdraw it; may name it in the same call — `admin` role |
+| `POST` | `/displays/rename` | change what it is listed as; blank hands the row back to the name the device declares — `admin` role |
+| `POST` | `/displays/delete` | revoke: its token stops matching, and it is removed from every route's allow-list — `admin` role |
+| `GET` | `/embeds` | list embed keys — `admin` role |
+| `POST` | `/embeds` | create one; the key is returned once — `admin` role |
+| `POST` | `/embeds/enable` | enable or disable one — `admin` role |
+| `POST` | `/embeds/delete` | revoke one — `admin` role |
+
+**Everything else 404s, including files that are not secret.** The server
+hands out four files — `index.html`, `admin.html`, `icon.svg`, `lockup.svg` —
+and refuses every other path. An allow-list rather than a list of things to
+hide, because the directory `serve.py` runs from is a deployment: the base
+class serves whatever is sitting in it, and what was sitting in it was the TLS
+private key, the account hashes and one API key per route. Deny-by-default
+also answers traversal and percent-encoding without either needing a rule.
+
+The last admin account cannot be deleted or demoted; an interface nobody can
+administer is a brick. The last route cannot be deleted or switched off for
+the same reason: a server with nowhere to send a question is a composer wired
+to nothing, recoverable only by editing JSON on the box.
+
+`/routes` is the one path with a public half and a private half, and every
+privileged operation sits under `/routes/…` precisely so the admin-only list
+can stay a list of paths rather than a list of paths and methods.
+
+`/display/hello` and `/displays` are one letter and a whole boundary apart, for
+the same reason. A display has to be able to reach the first from the listener
+it is served on; everything an *admin* does to a display is the second, and is
+absent from that listener entirely.
+
+## Driving the visualiser directly
+
+The geometry only ever reads two things, so any source can drive it:
+
+```js
+Drive.hit(weight);   // an impulse — a token, a syllable, an event
+Drive.level;         // 0..1, current energy
+```
+
+Wire an analyser to those and the visualiser follows, whatever is making the
+sound. This is the seam that will become the public API when this is packaged.
+
