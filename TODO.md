@@ -135,39 +135,7 @@ assistant's, and the enrolment name together.
 
 ---
 
-## 4 · A session that is ENDED when a browser goes, not merely forgotten
-
-**The browser half is done.** The sign-in cookie is a session cookie now — no
-Max-Age — so closing the browser forgets it and reopening asks for a password.
-The hours are enforced on the server, in `_user_sessions`, where a browser
-cannot edit them.
-
-**What is left is the server half.** The token is forgotten; the session it
-named is still live until its absolute or idle deadline. That is enough for
-somebody closing a laptop and it is not enough for the case this was written
-for: a wall screen that crashed, was switched off at the socket, or lost the
-network. Nothing tells the server those ended, so the session sits open for
-its full life.
-
-Two mechanisms are left, and only one covers that case:
-
-1. **A beacon on the way out** — `pagehide` with `sendBeacon('/user/logout')`.
-   Genuinely ends it, and **it cannot tell a close from a reload**: pagehide
-   fires on both, so a beacon would sign somebody out every time they pressed
-   F5. That is why the cookie change was made on its own. Any use of this needs
-   a way to distinguish leaving from moving, and there is not an honest one.
-2. **A heartbeat and an idle sweep** — the page already polls; a session not
-   seen for N seconds is closed server-side. The only one that covers a crashed
-   browser or a yanked power cable, and the only one where *ended* means ended.
-
-**To decide first:** what N is, and whether it is the deployment's or the
-person's. A wall screen polls constantly and would never trip it; a laptop
-shut at 5pm should. Note `_user_sessions` is in memory, so **a server restart
-already ends every session**, and nothing anywhere says so.
-
----
-
-## 5 · An approved request lands the person on a JSON error
+## 4 · An approved request lands the person on a JSON error
 
 **A regression, and a recent one.** Somebody asks for access on a display, an
 admin approves, and their screen shows `{"error": "not found"}`. The admin sees
