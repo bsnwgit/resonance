@@ -957,6 +957,19 @@
      having run out, so no rule is needed and a rule against the box would be
      a line drawn beside a line. */
   #navlinks .navgap{width:34px}
+  /* …AND A DIVIDER WITH A LINE IN IT, for a tab that is its own subject and
+     has no boxed title to say so. The gap above cannot do that job: it is
+     34px of nothing, and the thing that stops 34px of nothing reading as the
+     end of the row is the box that follows it. Put before a bare button it
+     looks like the bar broke, which is exactly how it looked.
+
+     Same geometry as every other pair in this row — the buttons' own padding
+     either side, one pixel between — so the rhythm does not change. What
+     changes is the WEIGHT: .55 is the strength the panel draws between
+     subjects, against .28 between links inside one. Same idiom as `.rule`. */
+  #navlinks .navrule{
+    width:1px;margin:0;background:rgba(var(--glass),.55);
+  }
   #navlinks .navtitle{display:flex;align-items:center}
   /* ---- the two titles ----
      Neither is a place you can go: SETTINGS names the page you are on, and
@@ -2397,9 +2410,11 @@
 
            Divided but NOT titled. A boxed label makes a group, and a group of
            one in a row of three reads as two tabs missing rather than as one
-           tab that is its own subject. The gap says the same thing and says
-           it quietly. -->
-      <span class="navgap"></span>
+           tab that is its own subject. A rule says the same thing and says it
+           quietly — and it is a rule rather than the wide gap the titled
+           groups use, because that gap is held open by the box that follows
+           it and there is no box here. -->
+      <span class="navrule"></span>
       <button id="tab_embeds" data-tab="embeds">EMBED</button>
       <!-- The second gap, and the last subject. Everything left of it is who
            is here and how they got in; everything right of it is the server
@@ -2429,8 +2444,12 @@
            It reads last on this run and next to nothing else on purpose. The
            QUEUES those settings feed are up the bar under ENROLLMENTS; this is
            where the shape of the door is decided, which is a thing you do once
-           and then leave alone. -->
-      <span class="navgap"></span>
+           and then leave alone.
+
+           A rule and not the wide gap, for the same reason as EMBED above: the
+           gap is held open by the boxed title that follows it, and this has
+           none. -->
+      <span class="navrule"></span>
       <button id="tab_enrolcfg" data-tab="enrolcfg">ENROLL</button>
     </span>
     <span class="right" id="whobox">
