@@ -1099,7 +1099,16 @@
      row on the page — the block that used to style them here said almost the
      same thing in slightly different numbers, which is how two rows that are
      meant to look alike stop looking alike. */
-  #navlinks{display:flex;align-items:flex-start;gap:10px;min-width:0;flex-wrap:wrap}
+  /* SPREAD ACROSS THE ROW, not bunched at the left. Three boxes with a 10px
+     gap between them left the whole right half of a wide panel empty, which
+     read as a row that had run out rather than as three subjects. The gap
+     stays as the FLOOR — `space-between` distributes what is spare, and on a
+     narrow panel there is none to distribute, so the boxes must still have
+     something between them before they wrap. */
+  #navlinks{
+    display:flex;align-items:flex-start;flex-wrap:wrap;
+    justify-content:space-between;gap:10px;min-width:0;
+  }
   /* Selected is painted with the tab rows' rule, further down — one gradient,
      one place. What stays here is the transparent border it paints into. */
   /* `.navgap` is gone with the run it divided: the boxes divide themselves
