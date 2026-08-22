@@ -63,12 +63,6 @@ Still open, each of which is a different product:
 - **Roles gate nothing.** They are recorded and otherwise inert. Gating an
   endpoint on a role is the obvious next thing and was deliberately left.
 
-- **A restricted endpoint refuses every embed.** An allow-list names screens
-  and people; an embed is neither, so it is never on one. Naming which keys
-  may reach which assistants is the missing list — and until it exists, any
-  key reaches any endpoint that is not restricted, so six applications share
-  one door.
-
 - **Appearance is the deployment's, not the embed's.** An embed renders what
   the shared settings and profiles say. Whether a host should be able to hand
   over a palette or name an appearance profile is undecided, and it is the

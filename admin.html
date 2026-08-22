@@ -6676,13 +6676,13 @@ function blockPaint(blk, r){
    arrived a minute ago is there to tick. */
 function blockFillWho(blk, r){
   const box = R(blk, 'displays'), gbox = R(blk, 'groups'),
-        pbox = R(blk, 'identities');
+        pbox = R(blk, 'identities'), ebox = R(blk, 'embeds');
   // Groups are filled here as well, so this must not give up when the
   // per-display box is absent — it is, now that restricting one device at a
   // time has gone and a grant is made to a group.
-  if (!box && !gbox && !pbox) return;
+  if (!box && !gbox && !pbox && !ebox) return;
   const want = r.displays || [], wantG = r.groups || [],
-        wantP = r.identities || [];
+        wantP = r.identities || [], wantE = r.embeds || [];
   // Never rebuilt under somebody's cursor — replacing the nodes would drop
   // the tick they were in the middle of making.
   // Both guarded. `box` is gone now that a grant is made to groups rather than
@@ -6691,7 +6691,32 @@ function blockFillWho(blk, r){
   // and the block was never hidden when you left the tab.
   if (!(box && box.contains(document.activeElement))
       && !(gbox && gbox.contains(document.activeElement))
-      && !(pbox && pbox.contains(document.activeElement))){
+      && !(pbox && pbox.contains(document.activeElement))
+      && !(ebox && ebox.contains(document.activeElement))){
+    if (ebox){
+      ebox.innerHTML = '';
+      /* A DISABLED KEY IS STILL SHOWN, and still tickable. Disabling one is
+         how an admin takes an application offline for an afternoon; making
+         the grant vanish while it is off would quietly withdraw it, and
+         switching the key back on would leave them wondering why it now
+         reaches nothing. Same rule as a screen that is not approved yet. */
+      EMBEDKEYS.forEach(e=>{
+        const lab = document.createElement('label');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.dataset.e = e.id;
+        cb.checked = wantE.indexOf(e.id) >= 0;
+        lab.appendChild(cb);
+        lab.appendChild(document.createTextNode(
+          ' ' + (e.name || e.id) + (e.enabled === false ? ' — disabled' : '')));
+        ebox.appendChild(lab);
+      });
+      if (!EMBEDKEYS.length){
+        const em = document.createElement('span');
+        em.textContent = 'no embed keys yet — they are created under EMBEDS, '
+                       + 'and appear here once they exist';
+        ebox.appendChild(em);
+      }
+    }
     if (pbox){
       pbox.innerHTML = '';
       /* ONLY THE ONES WHO HAVE ARRIVED. A person with a setup link still
@@ -6976,12 +7001,13 @@ function blockSyncWho(blk){
                         : !!(blk._who && blk._who.restricted);
   const sIn = blk.querySelector('[data-f="needs_signin"] button.on');
   const needsIn = !!sIn && sIn.dataset.v === '1';
-  ['groups', 'grouplab', 'identities', 'peoplelab'].forEach(n=>{
+  ['groups', 'grouplab', 'identities', 'peoplelab', 'embeds'].forEach(n=>{
     const el = R(blk, n);
     if (el) el.style.display = restricted ? '' : 'none';
   });
   const box = R(blk, 'displays'), gbox = R(blk, 'groups'),
-        pbox = R(blk, 'identities');
+        pbox = R(blk, 'identities'), ebox = R(blk, 'embeds');
+  const tickedE = ebox ? [...ebox.querySelectorAll('input:checked')] : [];
   const tickedP = pbox ? [...pbox.querySelectorAll('input:checked')] : [];
   const tickedG = gbox ? [...gbox.querySelectorAll('input:checked')] : [];
   const ticked = box ? [...box.querySelectorAll('input:checked')] : [];
@@ -6995,7 +7021,8 @@ function blockSyncWho(blk){
     if (!restricted){
       msg = 'Any display, approved or not — the same as every endpoint before '
           + 'displays existed.';
-    }else if (!ticked.length && !tickedG.length && !tickedP.length){
+    }else if (!ticked.length && !tickedG.length && !tickedP.length
+              && !tickedE.length){
       // Allowed rather than refused: restricting one before the tablet that
       // will use it has been hung is a legitimate order to do things in.
       msg = 'Nobody and nothing may use this endpoint — it is reached only '
@@ -7014,6 +7041,11 @@ function blockSyncWho(blk){
          that answers neither question. */
       if (tickedP.length)
         bits.push(tickedP.length + (tickedP.length === 1 ? ' person' : ' people'));
+      /* Counted apart again, and for the same reason: an embed is an
+         application, not a machine and not a person, and rolling it into
+         either number answers neither question. */
+      if (tickedE.length)
+        bits.push(tickedE.length + (tickedE.length === 1 ? ' embed' : ' embeds'));
       msg = bits.join(' · ');
       if (live.length !== ticked.length)
         msg += ' — ' + (ticked.length - live.length) + ' of those not approved '
@@ -7406,6 +7438,19 @@ let IDENTITIES = [], IDBASE = '', OPENPID = '', IDPWMIN = 10;
    read off the boxes because the list is rebuilt on every refresh — a
    selection living in the DOM would be lost every time the timer fired. */
 const IDPICKED = new Set();
+/* THE EMBED KEYS, for the fourth tick list on an authorize profile. Its own
+   loader rather than refreshEmbeds(), which paints the EMBEDS tab: that tab is
+   not on screen when a profile is being edited, and building its list into a
+   hidden box is work nobody sees. */
+let EMBEDKEYS = [];
+async function loadEmbedKeys(){
+  try{
+    const j = await api('/embeds');
+    EMBEDKEYS = j.embeds || [];
+  }catch(e){ EMBEDKEYS = []; }
+  return EMBEDKEYS;
+}
+
 async function loadIdentities(){
   try{
     const j = await api('/identities');
@@ -9339,7 +9384,7 @@ function paintAuthzs(list){
   DPAUTHZS.forEach((a, i)=>{
     const v = a.values;
     const count = ()=> (v.groups||[]).length + (v.displays||[]).length
-                     + (v.identities||[]).length;
+                     + (v.identities||[]).length + (v.embeds||[]).length;
     const sh = profShell(box, DPAUTHZS, i, a, OPENAZ, x=>{OPENAZ=x;},
       ()=> !v.restricted ? 'any display'
          : (count() ? count() + ' named' : 'nobody'),
@@ -9372,6 +9417,10 @@ function paintAuthzs(list){
       mk('Groups', 'groups', 'groups');
       mk('Screens', 'displays', 'displays');
       mk('People', 'identities', 'identities');
+      /* AND THE EMBEDS. A key is granted an endpoint exactly the way a screen
+         is, and for the same reason: six applications on one server should be
+         six separately grantable doors, not one shared one. */
+      mk('Embeds', 'embeds', 'embeds');
       /* The same line the endpoint used to carry under its list — how many are
          ticked, and which of them are not approved yet and so refused. It is
          about this list, so it belongs where the list is now. */
@@ -9387,13 +9436,14 @@ function paintAuthzs(list){
          sends rather than the DOM being asked at the last moment. */
       sh.row.querySelectorAll('[data-r] input').forEach(cb=>{
         cb.addEventListener('change', ()=>{
-          ['groups','displays','identities'].forEach(k=>{
+          ['groups','displays','identities','embeds'].forEach(k=>{
             const b = sh.row.querySelector('[data-r="' + k + '"]');
             /* The keys blockFillWho actually writes — d, g and p. Reading a
                dataset.id it never set collected a list of undefineds, which
                saved as a grant to nobody. */
             if (b) v[k] = [...b.querySelectorAll('input:checked')]
-                            .map(x=> x.dataset.d || x.dataset.g || x.dataset.p);
+                            .map(x=> x.dataset.d || x.dataset.g || x.dataset.p
+                                  || x.dataset.e);
           });
           blockSyncWho(sh.row);
           sh.retitle();
@@ -9407,7 +9457,8 @@ function paintAuthzs(list){
                                restricted:x.values.restricted,
                                displays:x.values.displays,
                                identities:x.values.identities,
-                               groups:x.values.groups}))}, 'authznote'), true);
+                               groups:x.values.groups,
+                               embeds:x.values.embeds}))}, 'authznote'), true);
   });
   const btn = $('b_addauthz');
   if (btn){
@@ -13039,7 +13090,14 @@ function panelNav(){
     /* AUTHORIZE ticks displays, people and groups, and those are three
        documents this tab has never fetched. Without them every box is drawn
        empty and a grant somebody made reads as nothing ticked. */
-    if (tab === 'authz'){ refreshDisplays(); refreshIdentities(); refreshGroups(); }
+    if (tab === 'authz'){
+      refreshDisplays(); refreshIdentities(); refreshGroups();
+      /* …and the embed keys, repainting once they land. Drawn before they
+         arrive, the fourth list is empty and a grant somebody made reads as
+         nothing ticked — the same failure the three above are loaded here to
+         avoid. */
+      loadEmbedKeys().then(()=> paintAuthzs(DPAUTHZS));
+    }
     /* NETWORK says which endpoint answers on each port, and that is read off
        the endpoints — which this tab has never fetched. Repainted once they
        arrive rather than left saying "no endpoint" about every port. */

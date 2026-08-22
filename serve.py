@@ -2916,7 +2916,16 @@ def validate_display_settings(obj, current):
                              "identities": [str(x)[:32] for x in
                                             (a.get("identities") or [])][:MAX_ALLOW],
                              "groups": [str(x)[:32] for x in
-                                        (a.get("groups") or [])][:MAX_ALLOW]}})
+                                        (a.get("groups") or [])][:MAX_ALLOW],
+                             # …and the fourth: which EMBED KEYS may use an
+                             # endpoint this profile guards. Without it a
+                             # restricted endpoint refuses every embed, because
+                             # an allow-list held only screens and people and
+                             # an embed is neither — which on a deployment
+                             # where every endpoint is restricted means the
+                             # embeds reach nothing at all.
+                             "embeds": [str(x)[:32] for x in
+                                        (a.get("embeds") or [])][:MAX_ALLOW]}})
         cfg["authzs"] = rows
     if "connections" in obj:
         if not isinstance(obj["connections"], (list, tuple)):
@@ -3151,7 +3160,8 @@ def migrate_permissions():
         return (bool(v.get("restricted")),
                 tuple(sorted(v.get("displays") or [])),
                 tuple(sorted(v.get("identities") or [])),
-                tuple(sorted(v.get("groups") or [])))
+                tuple(sorted(v.get("groups") or [])),
+                tuple(sorted(v.get("embeds") or [])))
     z_by = {zkey(a.get("values") or {}): a["id"] for a in authzs}
     p_by = {(str((p.get("values") or {}).get("authn") or ""),
              str((p.get("values") or {}).get("authz") or "")): p["id"]
@@ -3178,7 +3188,11 @@ def migrate_permissions():
         zv = {"restricted": bool(rec.get("restricted")),
               "displays": list(rec.get("displays") or []),
               "identities": list(rec.get("identities") or []),
-              "groups": list(rec.get("groups") or [])}
+              "groups": list(rec.get("groups") or []),
+              # EMPTY, and that is the faithful migration: embeds could not be
+              # granted anything before this existed, so inventing a grant here
+              # would open endpoints nobody opened.
+              "embeds": []}
         zk = zkey(zv)
         if zk not in z_by:
             if len(authzs) >= MAX_LOOKS:
@@ -4281,12 +4295,14 @@ def route_perm(rec, cfg=None):
             "restricted": bool(zv.get("restricted")),
             "displays": list(zv.get("displays") or []),
             "identities": list(zv.get("identities") or []),
-            "groups": list(zv.get("groups") or [])}
+            "groups": list(zv.get("groups") or []),
+            "embeds": list(zv.get("embeds") or [])}
 
 
-#: The two allow-lists a row can be named in, and the two names the panel uses
-#: for them. `groups` is the third, and is never set from a row's own page.
-GRANT_KEYS = ("displays", "identities", "groups")
+#: The allow-lists a row can be named in. `groups` is never set from a row's
+#: own page, and `embeds` is set only on the profile — an embed key is not a
+#: row in the register and has no page of its own to be granted from.
+GRANT_KEYS = ("displays", "identities", "groups", "embeds")
 
 
 def route_authz_id(rec, cfg):
@@ -4552,14 +4568,19 @@ def subject_may(route, disp=None, ident=None, emb=None):
         return ident["id"] in group_members(route.get("groups"),
                                             kinds=IDENTITY_GROUP_KINDS)
     if emb:
-        # An allow-list names screens and people. An embed is neither, so it is
-        # never on one, so a restricted endpoint refuses it — and that is the
-        # honest answer rather than an oversight. Naming which embeds may reach
-        # which endpoints is a real thing to want and a list that does not
-        # exist yet; letting a key through every restricted endpoint because it
-        # is not the kind of thing the list holds would be the wrong way to not
-        # have built it.
-        return False
+        # NAMED, OR NOT AT ALL. An embed is granted exactly the way a screen
+        # is: by an admin ticking it onto the profile that guards an endpoint.
+        #
+        # It was refused outright until this list existed, which read as a
+        # deliberate limitation and was one — right up until the first real
+        # deployment, where every endpoint was restricted and the embeds
+        # therefore reached nothing whatever. A key that can be created,
+        # rate-limited and audited but cannot be granted anything is not a
+        # limitation, it is a feature with no door.
+        #
+        # No group membership to add up: groups hold screens and people, both
+        # of which are rows in a register, and an embed key is in neither.
+        return emb["id"] in (route.get("embeds") or [])
     if not disp:
         return False
     # Expiry is checked here rather than at the door, which is what makes a
@@ -9768,8 +9789,16 @@ class Handler(SimpleHTTPRequestHandler):
             name = embeds.pop(eid).get("name")
             write_embeds(embeds)
             drop_embed_sessions(eid)
-            print("embed key %s (%s) deleted by %s" % (eid, name, s["user"]),
-                  flush=True)
+            # …AND EVERY ENDPOINT IT WAS TICKED ONTO. A grant held by a key
+            # that no longer exists is a permission nobody can see and nobody
+            # can withdraw — and the next key to be minted must not inherit it,
+            # which is exactly what would happen if an id were ever reissued.
+            # The same reasoning, and the same function, as a deleted screen.
+            dropped = drop_member_grants(eid)
+            print("embed key %s (%s) deleted by %s%s"
+                  % (eid, name, s["user"],
+                     " — removed from %d permission(s)" % dropped
+                     if dropped else ""), flush=True)
             return self._json(200, {"ok": True})
 
         if parsed.path == "/embeds/enable":
