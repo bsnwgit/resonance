@@ -916,13 +916,65 @@
   /* The panel's own bar, matching #stagebar across the window so the two
      read as one line rather than as a header on one side and a heading on
      the other. */
+  /* TWO ROWS. What does not change sits on the first — the mark, what this
+     is, and who you are — and the only part that moves is underneath it.
+
+     THE TITLE SPANS THE WHOLE ROW and centres itself in it, sitting over the
+     empty middle rather than in a column of its own. Two arrangements were
+     tried first and both are wrong. A column between its neighbours centres
+     it between THEM, and the logo is 90px against the identity's 230, so it
+     lands a hundred pixels left of the middle and looks like a mistake.
+     Equal `1fr` columns either side do centre it truly — and force the left
+     column as wide as the identity on the right, so the pair costs twice the
+     identity whatever the logo needs, which overflowed the panel at every
+     width this one actually gets. Spanning costs nothing and is exact. */
   #panelbar{
-    flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:8px 14px;
+    flex:0 0 auto;padding:8px 14px;
+    display:grid;
+    grid-template-columns:auto minmax(0,1fr) auto;
+    align-items:center;column-gap:12px;row-gap:9px;
     /* NO RULE UNDER IT. There was a hairline here closing the bar off, and it
        landed a few pixels above the PROFILES rule — two lines across the panel
        with nothing between them, the second of which says what it is dividing.
        The bar is told apart by what is in it, not by an edge. */
     font-size:calc(9px * var(--fs));letter-spacing:.16em;color:rgba(var(--paper),.75);
+  }
+  /* Row one, left to right. */
+  #barmark{grid-column:1;grid-row:1;justify-self:start;
+           display:block;height:26px;width:auto}
+  /* The name of the thing, not a heading for the page under it — so it is set
+     in the bar's own type at the bar's own size, a shade brighter than the
+     links either side of it and no larger. A title that shouted would be
+     competing with the tab you are actually on.
+
+     `pointer-events:none` because it lies ACROSS the row: without it the
+     transparent half of a full-width span sits over the identity's buttons
+     and swallows the clicks. */
+  #barwhat{
+    grid-column:1 / -1;grid-row:1;justify-self:center;
+    white-space:nowrap;pointer-events:none;
+    color:rgba(var(--paper),.92);
+  }
+  /* Row one, hard right. `justify-self` rather than the margin trick the flex
+     layout used: in a grid a margin of auto and a 1fr column would fight. */
+  #panelbar > #whobox{grid-column:3;grid-row:1;justify-self:end}
+  /* Row two, the whole width. */
+  #navlinks{grid-column:1 / -1;grid-row:2}
+  /* AND IT GOES WHEN THE ROW GETS TOO NARROW TO HOLD IT. Lying across the
+     row, the title cannot push anything — so what it does instead of
+     overflowing is run into the logo on one side and the identity on the
+     other. Better absent than overlapping: the mark still says what this is.
+
+     Keyed to the viewport because the panel is the window less the preview
+     beside it, and its width is therefore known from one. The band is the one
+     where --stage still takes 480px and the panel is left with 520 to 800:
+     measured, the title runs into the identity from about 1224px down, and
+     1280 is where --stage steps anyway, so the boundary is put on the step
+     rather than a few pixels below it where nothing else changes. Not a container query, which is
+     what this wants: the container is #panelscroll, and the bar sits outside
+     it deliberately so that it does not scroll away. */
+  @media (max-width:1279px) and (min-width:1001px){
+    #barwhat{display:none}
   }
   /* The way around the panel, as LINKS rather than as buttons. They sit in a
      bar whose other occupants are a title, a help mark and your name, and a
@@ -1114,37 +1166,32 @@
      places you can go; these are about YOU, and they sit apart from the row
      rather than at the end of it. */
   #whostack{
-    display:grid;
-    grid-template-columns:auto auto;
-    grid-template-rows:auto auto auto;
-    gap:4px 8px;align-items:center;
+    display:flex;align-items:center;gap:10px;
     border:1px solid rgba(var(--glass),.34);
-    padding:6px 8px;
+    padding:4px 8px;
   }
-  /* Column two, top to bottom, in the order they are reached for: back to the
+  /* IN A ROW, in the order they are reached for: who you are, back to the
      start, what the screens are doing, and the way out last — a control that
-     ENDS something belongs at the bottom. */
-  #whostack #b_home    {grid-column:2;grid-row:1}
-  #whostack #tab_status{grid-column:2;grid-row:2}
-  /* Bottom of the column, where a control that ENDS something belongs, and
-     spanning both so it reads as the box's own foot rather than as a fourth
-     item in a list of three. */
-  #whostack #b_signout {grid-column:1 / -1;grid-row:3;width:100%}
-  #whostack button{width:100%;text-align:center}
+     ENDS something belongs at the end.
+
+     It was a two-column, three-row grid, which made the bar three
+     button-rows tall for the sake of four items. On one line it is one row
+     tall and the bar has room for the links underneath it. */
+  #whostack button{width:auto;text-align:center;white-space:nowrap}
   /* Who you are, boxed. Spans the two rows it sits beside so the border is
      one rectangle rather than two, and the pair inside it is spread across
      that height so the name lines up with HOME and the role with STATUS. */
+  /* SIDE BY SIDE, and no border of its own. Stacked, the pair needed a box to
+     say the two lines were one answer; on one line they read as one already,
+     and a second border inside the box around all four is the box-inside-a-box
+     this panel keeps taking out. The dash does the joining. */
   #whoid{
-    grid-column:1;grid-row:1 / span 2;
-    display:flex;flex-direction:column;justify-content:space-around;
-    /* CENTRED, both of them. Ragged-right read as two values in a column of a
-       table; the box is one object and its contents should sit in the middle
-       of it. */
-    align-items:center;gap:2px;padding:3px 10px;min-width:0;
-    border:1px solid rgba(var(--glass),.3);
+    display:flex;align-items:baseline;gap:6px;min-width:0;
   }
-  #whoid #whorole{text-align:center;width:100%}
-  #whoid #whoname{text-align:center;width:100%}
+  #whoid #whorole{white-space:nowrap}
+  #whoid #whorole:not(:empty)::before{
+    content:"\2014";margin-right:6px;color:rgba(var(--paper),.45);
+  }
   /* Double the row's own gap, and it is doing a job: the manual is not a third
      thing you do to your session, so it should not sit in the run of them as
      though SIGN OUT and it were a pair. */
@@ -2358,6 +2405,79 @@
        you are signed in as, and the way out, should not scroll away under a
        tab's worth of settings. -->
   <div id="panelbar">
+    <!-- ROW ONE: the mark, what this is, and who you are. Three things that
+         do not change as you work, laid out so each is where the eye already
+         looks for it — a logo top left, a title in the middle, an identity
+         top right. The row below is the only part that moves.
+
+         The title is CENTRED ON THE BAR rather than between its neighbours:
+         it sits in the middle column of a grid whose outer columns are equal,
+         so a long username on the right cannot shove it off centre. -->
+      <img id="barmark" src="lockup.svg" alt="Resonance">
+      <span id="barwhat">AI Voice Interface</span>
+    <span class="right" id="whobox">
+      <!-- What the screens are DOING, as opposed to how they are configured —
+           health, the alerts they raised, and the server's own log. It sits
+           here rather than in #navlinks because it is not a subject you
+           administer: those three are the same page under different names,
+           and every one of them is read rather than set.
+
+           Beside HOME on purpose, and BEFORE it. Both are whole-panel moves
+           and neither is a setting, which is what the left of the bar is for;
+           and this is the one you want from wherever you happen to be standing
+           when something has gone wrong. HOME sits between it and your name
+           because going back to the start is the neighbour of signing out —
+           both end what you were doing — where this one starts something.
+
+           It IS a tab for all that: see #tab_status in the stylesheet, which
+           has to draw a selected state a filled control cannot get by
+           brightening. -->
+      <!-- The three whole-panel controls, stacked rather than strung along
+           the row. They are the same KIND of thing — none of them is a
+           setting, and each one leaves wherever you are standing — so a
+           column reads as one group of three where a row read as three more
+           items in a bar that already had six.
+
+           The stack starts where SIGN OUT used to sit, at the right, so the
+           thing your hand already knows the position of has not moved. HOME
+           is on top because it is the one you reach for most and the one
+           furthest from doing any harm; SIGN OUT is at the bottom, where a
+           control that ENDS something belongs.
+
+           TWO COLUMNS, THREE ROWS. Each button has the thing it belongs
+           beside on its left: who you are next to the way home, what you are
+           next to what the screens are doing, and the way into the manual
+           next to the way out. Nothing here is positioned by hand — it is one
+           grid, so a long name or a long role widens a column instead of
+           landing on top of a button, which is exactly what it did when this
+           was an absolutely-placed column and a spacer guessing at its
+           width. -->
+      <span id="whostack">
+      <!-- Your name and your role, boxed as one thing: they are two halves of
+           a single answer to "who am I signed in as", and the border is what
+           says so without a label. It spans both rows so the box has one edge
+           rather than following either button's height. -->
+      <span id="whoid">
+        <button id="whoname" title="your account">—</button>
+        <span id="whorole"></span>
+      </span>
+      <!-- It reloads rather than just putting the mark back up: "like it was
+           when I opened it" means the lists refetched and every half-finished
+           edit gone as well as the page cleared, and a button that restored
+           the look while leaving yesterday's state behind it would be the
+           more confusing of the two. -->
+      <button id="b_home" title="back to the start — reloads the panel">HOME</button>
+      <button id="tab_status" data-tab="status"
+              title="what the screens are reporting — health, alerts and the log">STATUS</button>
+      <!-- BACK IN THE STACK. It sat below the rule on a strip of its own,
+           on the reasoning that a control which ENDS what you are doing should
+           not read as a third destination beside the way home and the way to
+           STATUS. The box around the four does that job now, and does it
+           better: what is inside the border is who you are and what you can do
+           about it, which is one subject and reads as one. -->
+      <button id="b_signout" title="end this session">SIGN OUT</button>
+      </span>
+    </span>
     <!-- Administering the server, as links in the bar rather than as a row of
          tabs at the foot. They were never the same kind of thing as the tabs
          above the settings: those switch which set of controls you are
@@ -2451,69 +2571,6 @@
            none. -->
       <span class="navrule"></span>
       <button id="tab_enrolcfg" data-tab="enrolcfg">ENROLL</button>
-    </span>
-    <span class="right" id="whobox">
-      <!-- What the screens are DOING, as opposed to how they are configured —
-           health, the alerts they raised, and the server's own log. It sits
-           here rather than in #navlinks because it is not a subject you
-           administer: those three are the same page under different names,
-           and every one of them is read rather than set.
-
-           Beside HOME on purpose, and BEFORE it. Both are whole-panel moves
-           and neither is a setting, which is what the left of the bar is for;
-           and this is the one you want from wherever you happen to be standing
-           when something has gone wrong. HOME sits between it and your name
-           because going back to the start is the neighbour of signing out —
-           both end what you were doing — where this one starts something.
-
-           It IS a tab for all that: see #tab_status in the stylesheet, which
-           has to draw a selected state a filled control cannot get by
-           brightening. -->
-      <!-- The three whole-panel controls, stacked rather than strung along
-           the row. They are the same KIND of thing — none of them is a
-           setting, and each one leaves wherever you are standing — so a
-           column reads as one group of three where a row read as three more
-           items in a bar that already had six.
-
-           The stack starts where SIGN OUT used to sit, at the right, so the
-           thing your hand already knows the position of has not moved. HOME
-           is on top because it is the one you reach for most and the one
-           furthest from doing any harm; SIGN OUT is at the bottom, where a
-           control that ENDS something belongs.
-
-           TWO COLUMNS, THREE ROWS. Each button has the thing it belongs
-           beside on its left: who you are next to the way home, what you are
-           next to what the screens are doing, and the way into the manual
-           next to the way out. Nothing here is positioned by hand — it is one
-           grid, so a long name or a long role widens a column instead of
-           landing on top of a button, which is exactly what it did when this
-           was an absolutely-placed column and a spacer guessing at its
-           width. -->
-      <span id="whostack">
-      <!-- Your name and your role, boxed as one thing: they are two halves of
-           a single answer to "who am I signed in as", and the border is what
-           says so without a label. It spans both rows so the box has one edge
-           rather than following either button's height. -->
-      <span id="whoid">
-        <button id="whoname" title="your account">—</button>
-        <span id="whorole"></span>
-      </span>
-      <!-- It reloads rather than just putting the mark back up: "like it was
-           when I opened it" means the lists refetched and every half-finished
-           edit gone as well as the page cleared, and a button that restored
-           the look while leaving yesterday's state behind it would be the
-           more confusing of the two. -->
-      <button id="b_home" title="back to the start — reloads the panel">HOME</button>
-      <button id="tab_status" data-tab="status"
-              title="what the screens are reporting — health, alerts and the log">STATUS</button>
-      <!-- BACK IN THE STACK. It sat below the rule on a strip of its own,
-           on the reasoning that a control which ENDS what you are doing should
-           not read as a third destination beside the way home and the way to
-           STATUS. The box around the four does that job now, and does it
-           better: what is inside the border is who you are and what you can do
-           about it, which is one subject and reads as one. -->
-      <button id="b_signout" title="end this session">SIGN OUT</button>
-      </span>
     </span>
   </div>
   <div id="panelscroll">
