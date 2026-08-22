@@ -952,28 +952,24 @@
     display:grid;
     grid-template-columns:auto minmax(0,1fr) auto;
     align-items:center;column-gap:12px;row-gap:9px;
-    /* AND A RULE UNDER IT, closing the header off from the settings.
-
-       There was one, and it came off: it landed a few pixels above the
-       PROFILES rule and made two lines across the panel with nothing between
-       them, the second of which said what it was dividing. PROFILES is gone —
-       every box below says what it is in its own top edge now — so the clash
-       it was avoiding no longer exists, and what is left is a header and a
-       page under it with nothing saying where one ends.
-
-       Same weight as `.rule`, which is what this panel draws between subjects,
-       and the padding below it is the bar's own so the line sits clear of the
-       boxes rather than against them. */
-    border-bottom:1px solid rgba(var(--glass),.55);
+    /* The rule that divides this is on #navlinks, between the two rows —
+       not under the bar. See there. */
     font-size:calc(9px * var(--fs));letter-spacing:.16em;color:rgba(var(--paper),.75);
   }
-  /* Row one, left to right. The mark is sized against the title beside it
-     rather than against the row: the row's height is now whatever those two
-     agree on, and a logo left at the old 26px would have read as a footnote
-     under a headline. The lockup is 248x73, so height is the only dimension
-     worth stating — width follows and the aspect stays exact. */
+  /* Row one, left to right. The mark FILLS THE ROW: the row is 53px because
+     that is how tall the identity box is, and a logo shorter than it left a
+     band of empty above and below the only thing on that side.
+
+     The lockup is 248x73, so height is the only dimension worth stating and
+     the width follows — 179px at this height. THAT NUMBER MATTERS: the title
+     is centred, so it costs twice whichever side is wider, and all of the
+     arithmetic in the media queries below is measured against the identity's
+     192. While the mark stays under 192 it is free; past it, it becomes the
+     wider side and every one of those thresholds is quietly wrong. The
+     max-width is the guard, and it is why growing this is not simply a
+     matter of picking a bigger number. */
   #barmark{grid-column:1;grid-row:1;justify-self:start;
-           display:block;height:46px;width:auto}
+           display:block;height:53px;width:auto;max-width:190px}
   /* The name of the thing, not a heading for the page under it — so it is set
      in the bar's own type at the bar's own size, a shade brighter than the
      links either side of it and no larger. A title that shouted would be
@@ -1008,8 +1004,24 @@
   /* Row one, hard right. `justify-self` rather than the margin trick the flex
      layout used: in a grid a margin of auto and a 1fr column would fight. */
   #panelbar > #whobox{grid-column:3;grid-row:1;justify-self:end}
-  /* Row two, the whole width. */
-  #navlinks{grid-column:1 / -1;grid-row:2}
+  /* Row two, the whole width, and the rule that divides the header from
+     everything below it sits on TOP of this rather than under the bar.
+
+     Which is the difference between separating the mark, the title and the
+     identity from the places you can go — and separating the whole bar from
+     the settings. It is the first: what is above the line does not change as
+     you work, and everything under it is somewhere to be.
+
+     There was a rule under the bar once and it came off, because it landed a
+     few pixels above the PROFILES rule and made two lines across the panel
+     with nothing between them. PROFILES is gone, so nothing clashes with this
+     one — and it is drawn at .55, the weight this panel uses between
+     subjects, with air either side so the boxes do not sit against it. */
+  #navlinks{
+    grid-column:1 / -1;grid-row:2;
+    border-top:1px solid rgba(var(--glass),.55);
+    padding-top:10px;
+  }
   /* AND IT IS NOT DRAWN WHERE IT WOULD NOT FIT WHOLE. Lying across the row
      the title cannot push anything, so what it would do instead of
      overflowing is run into the identity beside it — and "AI Voice Interf…"
