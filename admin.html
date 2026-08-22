@@ -2387,6 +2387,20 @@
            while doing it. -->
       <button id="tab_displays" data-tab="displays">USER</button>
       <button id="tab_enrol" data-tab="enrol">DEVICE</button>
+      <!-- THE THIRD THING THAT ENROLS, and it is divided from the two beside
+           it because it is neither of them: what arrives here is an
+           APPLICATION, admitted by a key its server holds rather than by a
+           link somebody opens or a code somebody types. It belongs in this
+           run because the question is the same one — what is allowed to turn
+           up — and because a key is issued and revoked exactly the way an
+           invitation and a code are.
+
+           Divided but NOT titled. A boxed label makes a group, and a group of
+           one in a row of three reads as two tabs missing rather than as one
+           tab that is its own subject. The gap says the same thing and says
+           it quietly. -->
+      <span class="navgap"></span>
+      <button id="tab_embeds" data-tab="embeds">EMBED</button>
       <!-- The second gap, and the last subject. Everything left of it is who
            is here and how they got in; everything right of it is the server
            itself — which is the thing you configure once and then leave
@@ -2406,6 +2420,18 @@
            One is configured, the other is watched, and a page that did both
            would be a page you cannot safely leave open. -->
       <button id="tab_alerts" data-tab="alerts">ALERT</button>
+      <!-- HOW PEOPLE AND SCREENS GET IN, as opposed to who is already in.
+           Divided from the three beside it because those configure the server
+           itself — its portal, its mail, its maintenance — and this configures
+           a door: which port invitations are accepted on, what name the link
+           carries, and what somebody is asked when they request access.
+
+           It reads last on this run and next to nothing else on purpose. The
+           QUEUES those settings feed are up the bar under ENROLLMENTS; this is
+           where the shape of the door is decided, which is a thing you do once
+           and then leave alone. -->
+      <span class="navgap"></span>
+      <button id="tab_enrolcfg" data-tab="enrolcfg">ENROLL</button>
     </span>
     <span class="right" id="whobox">
       <!-- What the screens are DOING, as opposed to how they are configured —
@@ -3002,7 +3028,11 @@ nothing crosses a network. Start it, open localhost, talk to it.</div>
        it answers on, and what to call that interface in the link — and an
        admin setting this is answering one question, not three unrelated
        ones. -->
-  <section class="grp wide" data-tab="app">
+  <section class="grp bare titleonly" data-tab="enrolcfg">
+    <div class="barehead"><span class="listtitle">Enrolment settings</span></div>
+  </section>
+
+  <section class="grp wide" data-tab="enrolcfg">
     <h4>Enrolment</h4>
     <div class="grpbody">
   <!-- WHICH INTERFACE, THEN WHICH PORT, then what to call the interface —
@@ -3044,6 +3074,12 @@ certificate has to carry it or every browser will complain: run
 
 Changing the port or the interface needs a restart. The name does not — it is
 read when a link is minted.</div>
+
+  <div class="seg actrow">
+    <button id="b_enrolsave" class="act-save">SAVE</button>
+  </div>
+  <div class="note" id="enrolsavenote"></div>
+  <div class="note" id="enrolpending" hidden></div>
     </div>
   </section>
 
@@ -3054,7 +3090,7 @@ read when a link is minted.</div>
        for strangers — on the page you open to decide about the people who
        have already answered it. Those are different jobs at different
        moments: this is configuration, the queue is work. -->
-  <section class="grp wide" data-tab="app">
+  <section class="grp wide" data-tab="enrolcfg">
     <h4>Enrollment Request Form</h4>
     <div class="grpbody">
   <div id="dp_form"></div>
@@ -4989,11 +5025,12 @@ key inside an example sends you to a line that cannot answer you.</div>
              SETTINGS_TABS — like AI, nothing here writes the shared settings
              document. -->
         <button id="tab_devices" data-tab="devices">NODES</button>
-        <!-- An embed is another application connecting to this one, which is
-             the same question the two beside it answer — what this server is
-             wired to — rather than something you administer about the server
-             itself. -->
-        <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
+        <!-- EMBED was here, on the reasoning that an embed is another
+             application this server is wired to. True, and it filed the tab
+             under what an embed IS rather than under what an admin does with
+             it — which is issue a credential to something that wants in, and
+             then revoke it. That is enrolment, and it is in the bar at the
+             top with the other two. -->
       </div>
       </fieldset>
     </div>
@@ -5795,8 +5832,13 @@ window.addEventListener('beforeunload', e=>{
 /* How the server is wired, as opposed to how the interface looks. None of it
    can take effect while the process is running, so the page's real job is to
    be honest about what is configured versus what is actually bound. */
+/* ENROLMENT IS NOT IN HERE ANY MORE. Its three fields moved to their own
+   tab, and a SAVE that reaches across to a tab you are not looking at is the
+   thing this panel refuses everywhere else — "pressing SAVE under Sign in
+   must not publish a session length somebody was halfway through changing
+   under it". The fields are still in the document, so leaving them here would
+   have kept working and kept being wrong. See b_enrolsave. */
 const APP_FIELDS = {ap_admin:'admin_port',
-                    ap_enrolport:'enrol_port',
                     ap_session:'session_idle_minutes',
                     ap_poll:'poll_seconds',
                     ap_retries:'retry_attempts',
@@ -5809,7 +5851,8 @@ const APP_FIELDS = {ap_admin:'admin_port',
 const APP_TEXT = {ap_refresh:'refresh_at', ap_restart:'restart_at',
                   /* Sent even when empty, which is how the name is taken back
                      off and the link goes to naming the address again. */
-                  ap_enrolhost:'enrol_host'};
+                  /* enrol_host went with the rest of enrolment. */
+                  };
 
 /* WHAT A LINK WILL ACTUALLY SAY, under the three fields that decide it. The
    pieces are on screen separately and the thing an admin is trying to get
@@ -6026,6 +6069,24 @@ $('b_sesssave').addEventListener('click', ()=>{
              'sessnote', 'sesspending');
 });
 
+/* THE ENROLMENT LISTENER, committed from the tab it is now on. All three
+   together because they are one answer — an interface, a port, and what to
+   call the interface — and two of them need a restart while the third does
+   not, which is what the pending line under it is for. */
+$('b_enrolsave').addEventListener('click', ()=>{
+  const port = $('ap_enrolport');
+  const body = {
+    /* Always sent, empty included: empty is EVERY address, which is a real
+       answer and one somebody has to be able to come back to. */
+    enrol_address: $('ap_enroladdr') ? ($('ap_enroladdr').value || '') : '',
+    /* …and empty here is how the name is taken back off, so the link goes to
+       naming the address again. */
+    enrol_host: ($('ap_enrolhost').value || '').trim(),
+  };
+  if (port && port.value !== '') body.enrol_port = parseInt(port.value, 10);
+  saveAppBit(body, 'enrolsavenote', 'enrolpending');
+});
+
 $('b_appsave').addEventListener('click', async ()=>{
   const note = $('appnote');
   note.className = 'note';
@@ -6044,9 +6105,6 @@ $('b_appsave').addEventListener('click', async ()=>{
   });
   body.bind = segValue('ap_bind');
   body.bind_address = body.bind === 'address' ? ($('ap_bindaddr').value || '') : '';
-  /* Always sent, empty included: empty is EVERY address, which is a real
-     answer and one somebody has to be able to come back to. */
-  body.enrol_address = $('ap_enroladdr') ? ($('ap_enroladdr').value || '') : '';
   try{
     const j = await api('/app', {method:'POST', body: JSON.stringify(body)});
     /* This tab holds two topics — the time format and the login message —
@@ -6712,8 +6770,8 @@ function blockFillWho(blk, r){
       });
       if (!EMBEDKEYS.length){
         const em = document.createElement('span');
-        em.textContent = 'no embed keys yet — they are created under EMBEDS, '
-                       + 'and appear here once they exist';
+        em.textContent = 'no embed keys yet — they are created under '
+                       + 'ENROLLMENTS \u25b8 EMBED, and appear here once they exist';
         ebox.appendChild(em);
       }
     }
@@ -7439,7 +7497,7 @@ let IDENTITIES = [], IDBASE = '', OPENPID = '', IDPWMIN = 10;
    selection living in the DOM would be lost every time the timer fired. */
 const IDPICKED = new Set();
 /* THE EMBED KEYS, for the fourth tick list on an authorize profile. Its own
-   loader rather than refreshEmbeds(), which paints the EMBEDS tab: that tab is
+   loader rather than refreshEmbeds(), which paints the EMBED tab: that tab is
    not on screen when a profile is being edited, and building its list into a
    hidden box is work nobody sees. */
 let EMBEDKEYS = [];
@@ -13110,6 +13168,11 @@ function panelNav(){
        failure ALERT already documents: a form that only looks loaded, saved
        over a working one. */
     if (tab === 'app'){ loadApp(); refreshProfiles(); }
+    /* THE SAME TWO. The listener's fields come from app.json and the request
+       form from the displays document, and this tab draws both — so it has to
+       fetch both, or it is the failure ALERT already documents: a form that
+       only looks loaded, saved over a working one. */
+    if (tab === 'enrolcfg'){ loadApp(); refreshProfiles(); }
     if (tab === 'ai'){
       /* The endpoint blocks list SPEECH PROFILES, and those live in the
          displays document — which this tab never fetched. Painted before it
@@ -13228,6 +13291,10 @@ function start(){
   // and be left wondering. Don't offer it. Same for the embed keys, which
   // are credentials rather than configuration.
   $('tab_app').style.display = admin ? '' : 'none';
+  // …and the enrolment settings with it: they write app.json through the same
+  // admin-only route, so a viewer opening that tab would meet three fields
+  // that look editable and a SAVE that 403s.
+  $('tab_enrolcfg').style.display = admin ? '' : 'none';
   // Approving a device is granting it something, which is not a thing a
   // read-only account does — and the server refuses the routes anyway.
   $('tab_displays').style.display = admin ? '' : 'none';
