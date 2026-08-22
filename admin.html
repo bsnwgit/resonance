@@ -580,8 +580,14 @@
   .tabbox .tabs{margin:0}
   /* The two groups at opposite ends of the row, the same way they were inside
      one box. `wrap` so a narrow panel stacks them instead of shrinking both
-     past reading. */
-  .profrow{flex-wrap:wrap;align-items:flex-start}
+     past reading.
+
+     SPREAD, like the three in the bar above them — the boxes take the row
+     rather than bunching at its left with the remainder empty. The gap below
+     stays as the floor: space-between hands out what is spare and there is
+     nothing spare on a narrow panel, so without it these would touch before
+     they wrapped. */
+  .profrow{flex-wrap:wrap;align-items:flex-start;justify-content:space-between}
   /* NO LONGER PUSHED TO THE RIGHT EDGE. CONNECTIONS held the far end of the
      row on the reasoning that it is the third subject and should read as one —
      and what that actually bought was a stretch of nothing between it and
