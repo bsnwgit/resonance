@@ -59,7 +59,7 @@ ticked.
 
 ## What an embed key is
 
-An admin creates a key on the **EMBEDS** tab. It fixes four things.
+An admin creates a key under **ENROLLMENTS ▸ EMBED** — beside the two other things that enrol, a person and a screen. It fixes four things.
 
 ### Capability — what the application may do
 
@@ -156,7 +156,7 @@ exactly what each one draws.
 
 ## What you hand over
 
-Set **Address integrators reach this on** at the top of the EMBEDS tab first —
+Set **Address integrators reach this on** at the top of that tab first —
 the name a stranger's browser reaches this server by, which is not necessarily
 the name your own screens use. Then create the key.
 

@@ -50,6 +50,25 @@
        "the live thing", which is what a page of health, alerts and log is. */
     --green:122,201,160;
 
+    /* THE HEADER TITLE, and the only three numbers that decide it. It is
+       sized to fit the row rather than set outright — see #barwhat — so a
+       change here moves the floor, the ceiling and the rate together instead
+       of leaving eight derived figures scattered through the media queries to
+       be found one at a time.
+
+       --title-rate is the floor over 317, which is what "AI Voice Interface"
+       measures at 27px: how many pixels of type one pixel of room buys.
+       Unitless on purpose — CSS multiplies a number by a length and refuses
+       to multiply two lengths.
+
+       Plain px, not scaled by --fs like most type here. The whole arrangement
+       is measured against a 192px identity and a 317px title, and --fs moves
+       both of those too — scaling one side of the sum and not the other would
+       be worse than leaving it alone. */
+    --title-min: 23px;
+    --title-max: 46px;
+    --title-rate: .0726;
+
     /* Typography — the same three faces and three sizes the display has,
        kept identical to the block in index.html on purpose: the panel is
        setting this FOR the display, so the two must mean the same thing by
@@ -561,8 +580,14 @@
   .tabbox .tabs{margin:0}
   /* The two groups at opposite ends of the row, the same way they were inside
      one box. `wrap` so a narrow panel stacks them instead of shrinking both
-     past reading. */
-  .profrow{flex-wrap:wrap;align-items:flex-start}
+     past reading.
+
+     SPREAD, like the three in the bar above them — the boxes take the row
+     rather than bunching at its left with the remainder empty. The gap below
+     stays as the floor: space-between hands out what is spare and there is
+     nothing spare on a narrow panel, so without it these would touch before
+     they wrapped. */
+  .profrow{flex-wrap:wrap;align-items:flex-start;justify-content:space-between}
   /* NO LONGER PUSHED TO THE RIGHT EDGE. CONNECTIONS held the far end of the
      row on the reasoning that it is the third subject and should read as one —
      and what that actually bought was a stretch of nothing between it and
@@ -916,13 +941,153 @@
   /* The panel's own bar, matching #stagebar across the window so the two
      read as one line rather than as a header on one side and a heading on
      the other. */
+  /* TWO ROWS. What does not change sits on the first — the mark, what this
+     is, and who you are — and the only part that moves is underneath it.
+
+     THE TITLE SPANS THE WHOLE ROW and centres itself in it, sitting over the
+     empty middle rather than in a column of its own. Two arrangements were
+     tried first and both are wrong. A column between its neighbours centres
+     it between THEM, and the logo is 90px against the identity's 230, so it
+     lands a hundred pixels left of the middle and looks like a mistake.
+     Equal `1fr` columns either side do centre it truly — and force the left
+     column as wide as the identity on the right, so the pair costs twice the
+     identity whatever the logo needs, which overflowed the panel at every
+     width this one actually gets. Spanning costs nothing and is exact. */
   #panelbar{
-    flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:8px 14px;
-    /* NO RULE UNDER IT. There was a hairline here closing the bar off, and it
-       landed a few pixels above the PROFILES rule — two lines across the panel
-       with nothing between them, the second of which says what it is dividing.
-       The bar is told apart by what is in it, not by an edge. */
+    flex:0 0 auto;padding:8px 14px 10px;
+    display:grid;
+    grid-template-columns:auto minmax(0,1fr) auto;
+    align-items:center;column-gap:12px;row-gap:9px;
+    /* The rule that divides this is on #navlinks, between the two rows —
+       not under the bar. See there. */
     font-size:calc(9px * var(--fs));letter-spacing:.16em;color:rgba(var(--paper),.75);
+  }
+  /* Row one, left to right. The mark FILLS THE ROW: the row is 53px because
+     that is how tall the identity box is, and a logo shorter than it left a
+     band of empty above and below the only thing on that side.
+
+     The lockup is 248x73, so height is the only dimension worth stating and
+     the width follows — 179px at this height. THAT NUMBER MATTERS: the title
+     is centred, so it costs twice whichever side is wider, and all of the
+     arithmetic in the media queries below is measured against the identity's
+     192. While the mark stays under 192 it is free; past it, it becomes the
+     wider side and every one of those thresholds is quietly wrong. The
+     max-width is the guard, and it is why growing this is not simply a
+     matter of picking a bigger number. */
+  #barmark{grid-column:1;grid-row:1;justify-self:start;
+           display:block;height:53px;width:auto;max-width:190px}
+  /* The name of the thing, not a heading for the page under it — so it is set
+     in the bar's own type at the bar's own size, a shade brighter than the
+     links either side of it and no larger. A title that shouted would be
+     competing with the tab you are actually on.
+
+     `pointer-events:none` because it lies ACROSS the row: without it the
+     transparent half of a full-width span sits over the identity's buttons
+     and swallows the clicks. */
+  #barwhat{
+    grid-column:1 / -1;grid-row:1;justify-self:center;
+    white-space:nowrap;pointer-events:none;
+    color:rgba(var(--paper),.92);
+    /* AS BIG AS THE ROW WILL HOLD, between three times the bar's type and
+       six. 27px is where this started and is the floor; 54 is double it and
+       is the ceiling, because past that the title stops being a title and
+       starts being the page.
+
+       It cannot be a constant. Doubled outright it is 634px wide and wants
+       1042px of panel to sit centred in — more than a 1440 window gives,
+       which would have meant a title that simply was not there on a common
+       laptop. So it grows with the window instead: 27px per 317px of room,
+       which is the ratio it was measured at. The three offsets below are the
+       three widths --stage takes.
+
+       The tracking comes DOWN as the size goes up: .16em is what makes a 9px
+       label read as a label, and the same .16em at 40px is a title with holes
+       in it — letter-spacing is a correction for small type, not a style to
+       carry up. */
+    font-size:var(--title-min);
+    letter-spacing:.05em;
+  }
+  /* Row one, hard right. `justify-self` rather than the margin trick the flex
+     layout used: in a grid a margin of auto and a 1fr column would fight. */
+  #panelbar > #whobox{grid-column:3;grid-row:1;justify-self:end}
+  /* Row two, the whole width, and the rule that divides the header from
+     everything below it sits on TOP of this rather than under the bar.
+
+     Which is the difference between separating the mark, the title and the
+     identity from the places you can go — and separating the whole bar from
+     the settings. It is the first: what is above the line does not change as
+     you work, and everything under it is somewhere to be.
+
+     There was a rule under the bar once and it came off, because it landed a
+     few pixels above the PROFILES rule and made two lines across the panel
+     with nothing between them. PROFILES is gone, so nothing clashes with this
+     one — and it is drawn at .55, the weight this panel uses between
+     subjects, with air either side so the boxes do not sit against it. */
+  #navlinks{
+    grid-column:1 / -1;grid-row:2;
+    border-top:1px solid rgba(var(--glass),.55);
+    padding-top:10px;
+  }
+  /* AND IT IS NOT DRAWN WHERE IT WOULD NOT FIT WHOLE. Lying across the row
+     the title cannot push anything, so what it would do instead of
+     overflowing is run into the identity beside it — and "AI Voice Interf…"
+     is not a title, it is a defect. So it is all there or not there.
+
+     THIS USED TO BE TWO LAYOUTS. Spanning was exact but wanted a wide panel,
+     so below a threshold the title dropped into the middle column and
+     centred between its neighbours instead — 70px off true, with an ellipsis
+     behind it. Stacking the identity took it from 296px wide to 192, and the
+     two thresholds collapsed into each other: centring truly now needs 725px
+     of panel against the column layout's 716. Nine pixels is not worth a
+     second code path, so there is one, and it is the exact one.
+
+     The arithmetic, since the numbers are otherwise mysterious. Centred at
+     --title-min it measures 317 × 23/27 = 270, and the sides cost
+     2 × (identity 192 + panel padding 15 + clearance 20) = 454. So it wants
+     724px of panel. The panel is the window less --stage, and --stage steps
+     twice:
+
+        window ≤ 1000    panel = window          fits from 724
+        1001 … 1280      panel = window − 480    fits from 1204
+        window ≥ 1281    panel = window − 600    fits from 1324
+
+     Which is the three bands below — the third is narrow because --stage
+     jumping 480 → 600 at 1281 takes 120px of panel away just as the window
+     gets wider. The mark at the left still says what this is. */
+  @media (max-width:723px){ #barwhat{display:none} }
+  @media (min-width:1001px) and (max-width:1203px){ #barwhat{display:none} }
+  @media (min-width:1281px) and (max-width:1323px){ #barwhat{display:none} }
+
+  /* …AND AS LARGE AS THE ROOM ALLOWS IN THE BANDS WHERE IT IS DRAWN.
+     `available = panel - 2 x (identity + panel padding + clearance)`
+     = panel - 2 x (192 + 15 + 20) = panel - 454, and the title wants 317px at
+     27, so the size is 27 x available / 317 — 8.517vw, less 8.517% of
+     whatever --stage takes plus that 454. Clamped to the 27 it starts at and
+     the 54 that is double.
+
+     The 15 is the panel's own padding and border, and leaving it out is not
+     hypothetical: the first version of this counted the identity and a 12px
+     gap and nothing else, and produced a title exactly 3px into the identity
+     at 1440. The 20 is clearance, so the next thing to be a pixel out is not
+     a collision.
+
+     Three rules because --stage takes three widths and each gives the panel a
+     different share of the window. They cannot be one: a single vw expression
+     would be right in one band and wrong by 120px in the next. */
+  @media (min-width:1324px){
+    #barwhat{font-size:clamp(var(--title-min),
+                             calc(var(--title-rate) * (100vw - 1054px)),
+                             var(--title-max))}
+  }
+  @media (min-width:1204px) and (max-width:1280px){
+    #barwhat{font-size:clamp(var(--title-min),
+                             calc(var(--title-rate) * (100vw - 934px)),
+                             var(--title-max))}
+  }
+  @media (min-width:724px) and (max-width:1000px){
+    #barwhat{font-size:clamp(var(--title-min),
+                             calc(var(--title-rate) * (100vw - 454px)),
+                             var(--title-max))}
   }
   /* The way around the panel, as LINKS rather than as buttons. They sit in a
      bar whose other occupants are a title, a help mark and your name, and a
@@ -935,29 +1100,38 @@
   /* Stretched rather than centred, so the dividers below run the full height
      of the row and read as one rule broken by words rather than as ticks
      floating between them. */
-  #navlinks{display:flex;align-items:stretch;gap:0;min-width:0;flex-wrap:wrap}
-  #navlinks button{
-    display:flex;align-items:center;
-    font:inherit;font-size:inherit;letter-spacing:inherit;
-    padding:2px 14px;background:none;border:0;cursor:pointer;
-    color:rgba(var(--paper),.62);
-    border-bottom:1px solid transparent;
+  /* THREE BOXES IN A ROW, wrapping when the panel cannot hold them side by
+     side. The links inside are styled by `.tabs button` like every other tab
+     row on the page — the block that used to style them here said almost the
+     same thing in slightly different numbers, which is how two rows that are
+     meant to look alike stop looking alike. */
+  /* SPREAD ACROSS THE ROW, not bunched at the left. Three boxes with a 10px
+     gap between them left the whole right half of a wide panel empty, which
+     read as a row that had run out rather than as three subjects. The gap
+     stays as the FLOOR — `space-between` distributes what is spare, and on a
+     narrow panel there is none to distribute, so the boxes must still have
+     something between them before they wrap. */
+  #navlinks{
+    display:flex;align-items:flex-start;flex-wrap:wrap;
+    justify-content:space-between;gap:10px;min-width:0;
   }
-  #navlinks button:hover{color:rgba(var(--paper),.95)}
   /* Selected is painted with the tab rows' rule, further down — one gradient,
      one place. What stays here is the transparent border it paints into. */
-  /* One between each pair, and only between a pair. There used to be one
-     before the first link as well, separating the places you can go from the
-     title of the page you are on — and it came off when that title moved into
-     this row: the bar now opens on a boxed label, and a hairline drawn against
-     the left edge of a box is a line beside a line. */
-  #navlinks button + button{border-left:1px solid rgba(var(--glass),.28)}
-  /* A large space, and nothing in it. It is what separates the two subjects;
-     the boxed title after it is what stops the space reading as the bar
-     having run out, so no rule is needed and a rule against the box would be
-     a line drawn beside a line. */
-  #navlinks .navgap{width:34px}
-  #navlinks .navtitle{display:flex;align-items:center}
+  /* `.navgap` is gone with the run it divided: the boxes divide themselves
+     now, and the space between them is the row's own gap. */
+  /* …AND A DIVIDER WITH A LINE IN IT, for a tab that is its own subject and
+     has no boxed title to say so. The gap above cannot do that job: it is
+     34px of nothing, and the thing that stops 34px of nothing reading as the
+     end of the row is the box that follows it. Put before a bare button it
+     looks like the bar broke, which is exactly how it looked.
+
+     Same geometry as every other pair in this row — the buttons' own padding
+     either side, one pixel between — so the rhythm does not change. What
+     changes is the WEIGHT: .55 is the strength the panel draws between
+     subjects, against .28 between links inside one. Same idiom as `.rule`. */
+  .tabs .navrule{
+    width:1px;margin:0;background:rgba(var(--glass),.55);
+  }
   /* ---- the two titles ----
      Neither is a place you can go: SETTINGS names the page you are on, and
      ENROLLMENTS names the pair beside it. Sitting in a row of links in the
@@ -1100,38 +1274,53 @@
      border is what says so without a heading. The bar's other occupants are
      places you can go; these are about YOU, and they sit apart from the row
      rather than at the end of it. */
+  /* WHO OVER WHAT YOU CAN DO. Two rows inside the one border: the name and
+     role across the top, the three controls under them.
+
+     It is narrower than the same four in a line, and the width is the point.
+     The title next to it is centred, so it costs twice whichever side is
+     wider — every pixel off this box is two pixels back for the title, and on
+     a panel that is often 840 that is the difference between a title and no
+     title. Height is the cheaper of the two here: the bar has a second row
+     already and one more line of it costs nothing that was being used. */
   #whostack{
     display:grid;
-    grid-template-columns:auto auto;
-    grid-template-rows:auto auto auto;
-    gap:4px 8px;align-items:center;
+    grid-template-columns:repeat(3, auto);
+    gap:5px 8px;align-items:center;
     border:1px solid rgba(var(--glass),.34);
-    padding:6px 8px;
+    padding:5px 8px;
   }
-  /* Column two, top to bottom, in the order they are reached for: back to the
+  /* Across the top, centred over the three under it. */
+  #whostack > #whoid{grid-column:1 / -1;justify-self:center}
+  /* THE THREE, left to right in the order they are reached for: back to the
      start, what the screens are doing, and the way out last — a control that
-     ENDS something belongs at the bottom. */
-  #whostack #b_home    {grid-column:2;grid-row:1}
-  #whostack #tab_status{grid-column:2;grid-row:2}
-  /* Bottom of the column, where a control that ENDS something belongs, and
-     spanning both so it reads as the box's own foot rather than as a fourth
-     item in a list of three. */
-  #whostack #b_signout {grid-column:1 / -1;grid-row:3;width:100%}
-  #whostack button{width:100%;text-align:center}
+     ENDS something belongs at the end. They fall into row two on their own;
+     nothing places them, because three items after a full-width one is
+     already three columns of a three-column grid. */
+  #whostack button{width:auto;text-align:center;white-space:nowrap}
   /* Who you are, boxed. Spans the two rows it sits beside so the border is
      one rectangle rather than two, and the pair inside it is spread across
      that height so the name lines up with HOME and the role with STATUS. */
+  /* SIDE BY SIDE, and no border of its own. Stacked, the pair needed a box to
+     say the two lines were one answer; on one line they read as one already,
+     and a second border inside the box around all four is the box-inside-a-box
+     this panel keeps taking out. The dash does the joining. */
+  /* BOUNDED, because everything above is measured against a 192px identity.
+     A long account name would widen this box, and the title is centred — so
+     it would cost twice, and the pixel arithmetic in the media queries would
+     quietly stop being true for exactly the person whose name broke it. The
+     name ellipsises instead; the whole of it is in the title attribute and in
+     ACCOUNTS. */
   #whoid{
-    grid-column:1;grid-row:1 / span 2;
-    display:flex;flex-direction:column;justify-content:space-around;
-    /* CENTRED, both of them. Ragged-right read as two values in a column of a
-       table; the box is one object and its contents should sit in the middle
-       of it. */
-    align-items:center;gap:2px;padding:3px 10px;min-width:0;
-    border:1px solid rgba(var(--glass),.3);
+    display:flex;align-items:baseline;gap:6px;min-width:0;max-width:20ch;
   }
-  #whoid #whorole{text-align:center;width:100%}
-  #whoid #whoname{text-align:center;width:100%}
+  #whoid #whoname{
+    min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  #whoid #whorole{white-space:nowrap}
+  #whoid #whorole:not(:empty)::before{
+    content:"\2014";margin-right:6px;color:rgba(var(--paper),.45);
+  }
   /* Double the row's own gap, and it is doing a job: the manual is not a third
      thing you do to your session, so it should not sit in the run of them as
      though SIGN OUT and it were a pair. */
@@ -2345,68 +2534,16 @@
        you are signed in as, and the way out, should not scroll away under a
        tab's worth of settings. -->
   <div id="panelbar">
-    <!-- Administering the server, as links in the bar rather than as a row of
-         tabs at the foot. They were never the same kind of thing as the tabs
-         above the settings: those switch which set of controls you are
-         editing, these take you somewhere else entirely — who may sign in, who
-         may connect, what the server itself is. A row that looks like the
-         settings tabs said they were more of them.
+    <!-- ROW ONE: the mark, what this is, and who you are. Three things that
+         do not change as you work, laid out so each is where the eye already
+         looks for it — a logo top left, a title in the middle, an identity
+         top right. The row below is the only part that moves.
 
-         Left, beside the title, because that is where you look for the way
-         around a page. Your name and the way out stay right, where they were:
-         one side is where you are going, the other is who you are.
-
-         THREE subjects now, each behind its own boxed label with a large space
-         between them, and they read in the order the work happens: who the
-         server knows about, how something comes to be here, and only then how
-         the server itself is run. ENROLLMENTS sits in the middle because it is
-         the thing an admin is here to DO — a screen is waiting on the far side
-         of it — where SETTINGS is what you come back to afterwards and rarely
-         twice. SETTINGS used to sit outside this row as the title of the page,
-         which worked while it was the only label and read as a fourth kind of
-         thing the moment there were three. -->
-    <span id="navlinks">
-      <!-- Who the server knows about, split by which side of the product they
-           exist on: ADMIN is an account that reaches THIS panel, USER is a
-           person the display side knows about. They are not the same
-           population and never have been — one signs in with a password to
-           configure the server, the other picks up a minted URL and talks to
-           it — so they are two places rather than one list with a column
-           saying which. -->
-      <span class="navtitle bartitle">IDENTITY</span>
-      <button id="tab_accounts" data-tab="accounts">ADMIN</button>
-      <button id="tab_users" data-tab="users">USER</button>
-      <!-- The gap is what says these are a different subject. Left of it is
-           who the server already knows about; right of it is how something
-           comes to be here at all. -->
-      <span class="navgap"></span>
-      <span class="navtitle bartitle">ENROLLMENTS</span>
-      <!-- PERSON and DEVICE, in the same words the rest of the product uses
-           for the two populations: they arrive by different routes with
-           different buttons, and neither wants to read the other's queue
-           while doing it. -->
-      <button id="tab_displays" data-tab="displays">USER</button>
-      <button id="tab_enrol" data-tab="enrol">DEVICE</button>
-      <!-- The second gap, and the last subject. Everything left of it is who
-           is here and how they got in; everything right of it is the server
-           itself — which is the thing you configure once and then leave
-           alone, so it reads last rather than standing between an admin and
-           the queue somebody is waiting in. -->
-      <span class="navgap"></span>
-      <span class="navtitle bartitle">SETTINGS</span>
-      <button id="tab_app" data-tab="app">ADMIN</button>
-      <!-- How the server itself is defended, which is administration rather
-           than a connection: who gets in, on what terms, and into which
-           group. -->
-      <button id="tab_security" data-tab="security">SECURITY</button>
-      <!-- What the server does when a screen goes wrong: where alerts are
-           sent, how much log is kept back, and how long what screens report
-           is held. All three are settings, which is what puts them here and
-           not on STATUS — that is where the same three subjects are READ.
-           One is configured, the other is watched, and a page that did both
-           would be a page you cannot safely leave open. -->
-      <button id="tab_alerts" data-tab="alerts">ALERT</button>
-    </span>
+         The title is CENTRED ON THE BAR rather than between its neighbours:
+         it sits in the middle column of a grid whose outer columns are equal,
+         so a long username on the right cannot shove it off centre. -->
+      <img id="barmark" src="lockup.svg" alt="Resonance">
+      <span id="barwhat">AI Voice Interface</span>
     <span class="right" id="whobox">
       <!-- What the screens are DOING, as opposed to how they are configured —
            health, the alerts they raised, and the server's own log. It sits
@@ -2470,6 +2607,104 @@
       <button id="b_signout" title="end this session">SIGN OUT</button>
       </span>
     </span>
+    <!-- Administering the server, as links in the bar rather than as a row of
+         tabs at the foot. They were never the same kind of thing as the tabs
+         above the settings: those switch which set of controls you are
+         editing, these take you somewhere else entirely — who may sign in, who
+         may connect, what the server itself is. A row that looks like the
+         settings tabs said they were more of them.
+
+         Left, beside the title, because that is where you look for the way
+         around a page. Your name and the way out stay right, where they were:
+         one side is where you are going, the other is who you are.
+
+         THREE subjects now, each behind its own boxed label with a large space
+         between them, and they read in the order the work happens: who the
+         server knows about, how something comes to be here, and only then how
+         the server itself is run. ENROLLMENTS sits in the middle because it is
+         the thing an admin is here to DO — a screen is waiting on the far side
+         of it — where SETTINGS is what you come back to afterwards and rarely
+         twice. SETTINGS used to sit outside this row as the title of the page,
+         which worked while it was the only label and read as a fourth kind of
+         thing the moment there were three. -->
+    <span id="navlinks">
+      <!-- THE THREE SUBJECTS, each in a box that says its own name in its top
+           edge — the same fieldset-and-legend the profile rows use. They were
+           a boxed label followed by a run of links with a wide gap before the
+           next one, which asked the gap to do the dividing and left the label
+           looking like a link that did nothing. A border does it properly:
+           what is inside the box is what the label names, and there is nothing
+           to infer from spacing.
+
+           They read in the order the work happens: who the server knows about,
+           how something comes to be here, and only then how the server itself
+           is run. -->
+      <fieldset class="tabbox">
+        <!-- Who the server knows about, split by which side of the product
+             they exist on: ADMIN is an account that reaches THIS panel, USER
+             is a person the display side knows about. They are not the same
+             population and never have been — one signs in with a password to
+             configure the server, the other picks up a minted URL and talks to
+             it — so they are two places rather than one list with a column
+             saying which. -->
+        <legend><span class="tablabel">IDENTITY</span></legend>
+        <div class="tabs">
+          <button id="tab_accounts" data-tab="accounts">ADMIN</button>
+          <button id="tab_users" data-tab="users">USER</button>
+        </div>
+      </fieldset>
+
+      <fieldset class="tabbox">
+        <!-- USER and DEVICE, in the same words the rest of the product uses
+             for the two populations: they arrive by different routes with
+             different buttons, and neither wants to read the other's queue
+             while doing it. -->
+        <legend><span class="tablabel">ENROLLMENTS</span></legend>
+        <div class="tabs">
+          <button id="tab_displays" data-tab="displays">USER</button>
+          <button id="tab_enrol" data-tab="enrol">DEVICE</button>
+          <!-- THE THIRD THING THAT ENROLS, and it is divided from the two
+               beside it because it is neither of them: what arrives here is an
+               APPLICATION, admitted by a key its server holds rather than by a
+               link somebody opens or a code somebody types. It belongs in this
+               box because the question is the same one — what is allowed to
+               turn up — and because a key is issued and revoked exactly the
+               way an invitation and a code are. -->
+          <span class="navrule"></span>
+          <button id="tab_embeds" data-tab="embeds">EMBED</button>
+        </div>
+      </fieldset>
+
+      <fieldset class="tabbox">
+        <!-- The server itself — the thing you configure once and then leave
+             alone, which is why it reads last rather than standing between an
+             admin and the queue somebody is waiting in. -->
+        <legend><span class="tablabel">SETTINGS</span></legend>
+        <div class="tabs">
+          <button id="tab_app" data-tab="app">ADMIN</button>
+          <!-- How the server itself is defended, which is administration
+               rather than a connection: who gets in, on what terms, and into
+               which group. -->
+          <button id="tab_security" data-tab="security">SECURITY</button>
+          <!-- What the server does when a screen goes wrong: where alerts are
+               sent, how much log is kept back, and how long what screens
+               report is held. All three are settings, which is what puts them
+               here and not on STATUS — that is where the same three subjects
+               are READ. One is configured, the other is watched, and a page
+               that did both would be a page you cannot safely leave open. -->
+          <button id="tab_alerts" data-tab="alerts">ALERT</button>
+          <!-- HOW PEOPLE AND SCREENS GET IN, as opposed to who is already in.
+               Divided from the three beside it because those configure the
+               server itself — its portal, its mail, its maintenance — and this
+               configures a door: which port invitations are accepted on, what
+               name the link carries, and what somebody is asked when they
+               request access. The QUEUES those settings feed are in the box to
+               the left; this is where the shape of the door is decided. -->
+          <span class="navrule"></span>
+          <button id="tab_enrolcfg" data-tab="enrolcfg">ENROLL</button>
+        </div>
+      </fieldset>
+    </span>
   </div>
   <div id="panelscroll">
   <!-- Wrapped so the header keeps a readable measure while the topics below
@@ -2496,7 +2731,10 @@
        border: the panel's ground is translucent, so a patch of "background"
        laid over the line would be a slightly different colour than the thing
        behind it. A legend cuts a real gap. -->
-  <div class="rulehead profhead"><span class="tablabel">PROFILES</span></div>
+  <!-- PROFILES came off the rule above this row. Every box under it already
+       says what it is in its own top edge, and the three boxes in the bar do
+       now as well — a heading over labelled boxes is a label for a group of
+       labels, which is the box-inside-a-box this panel keeps taking out. -->
   <div class="tabrow profrow">
     <fieldset class="tabbox">
       <legend><span class="tablabel">LAYOUTS</span></legend>
@@ -3002,7 +3240,11 @@ nothing crosses a network. Start it, open localhost, talk to it.</div>
        it answers on, and what to call that interface in the link — and an
        admin setting this is answering one question, not three unrelated
        ones. -->
-  <section class="grp wide" data-tab="app">
+  <section class="grp bare titleonly" data-tab="enrolcfg">
+    <div class="barehead"><span class="listtitle">Enrolment settings</span></div>
+  </section>
+
+  <section class="grp wide" data-tab="enrolcfg">
     <h4>Enrolment</h4>
     <div class="grpbody">
   <!-- WHICH INTERFACE, THEN WHICH PORT, then what to call the interface —
@@ -3044,6 +3286,12 @@ certificate has to carry it or every browser will complain: run
 
 Changing the port or the interface needs a restart. The name does not — it is
 read when a link is minted.</div>
+
+  <div class="seg actrow">
+    <button id="b_enrolsave" class="act-save">SAVE</button>
+  </div>
+  <div class="note" id="enrolsavenote"></div>
+  <div class="note" id="enrolpending" hidden></div>
     </div>
   </section>
 
@@ -3054,7 +3302,7 @@ read when a link is minted.</div>
        for strangers — on the page you open to decide about the people who
        have already answered it. Those are different jobs at different
        moments: this is configuration, the queue is work. -->
-  <section class="grp wide" data-tab="app">
+  <section class="grp wide" data-tab="enrolcfg">
     <h4>Enrollment Request Form</h4>
     <div class="grpbody">
   <div id="dp_form"></div>
@@ -4989,11 +5237,12 @@ key inside an example sends you to a line that cannot answer you.</div>
              SETTINGS_TABS — like AI, nothing here writes the shared settings
              document. -->
         <button id="tab_devices" data-tab="devices">NODES</button>
-        <!-- An embed is another application connecting to this one, which is
-             the same question the two beside it answer — what this server is
-             wired to — rather than something you administer about the server
-             itself. -->
-        <button id="tab_embeds" data-tab="embeds">EMBEDS</button>
+        <!-- EMBED was here, on the reasoning that an embed is another
+             application this server is wired to. True, and it filed the tab
+             under what an embed IS rather than under what an admin does with
+             it — which is issue a credential to something that wants in, and
+             then revoke it. That is enrolment, and it is in the bar at the
+             top with the other two. -->
       </div>
       </fieldset>
     </div>
@@ -5795,8 +6044,13 @@ window.addEventListener('beforeunload', e=>{
 /* How the server is wired, as opposed to how the interface looks. None of it
    can take effect while the process is running, so the page's real job is to
    be honest about what is configured versus what is actually bound. */
+/* ENROLMENT IS NOT IN HERE ANY MORE. Its three fields moved to their own
+   tab, and a SAVE that reaches across to a tab you are not looking at is the
+   thing this panel refuses everywhere else — "pressing SAVE under Sign in
+   must not publish a session length somebody was halfway through changing
+   under it". The fields are still in the document, so leaving them here would
+   have kept working and kept being wrong. See b_enrolsave. */
 const APP_FIELDS = {ap_admin:'admin_port',
-                    ap_enrolport:'enrol_port',
                     ap_session:'session_idle_minutes',
                     ap_poll:'poll_seconds',
                     ap_retries:'retry_attempts',
@@ -5809,7 +6063,8 @@ const APP_FIELDS = {ap_admin:'admin_port',
 const APP_TEXT = {ap_refresh:'refresh_at', ap_restart:'restart_at',
                   /* Sent even when empty, which is how the name is taken back
                      off and the link goes to naming the address again. */
-                  ap_enrolhost:'enrol_host'};
+                  /* enrol_host went with the rest of enrolment. */
+                  };
 
 /* WHAT A LINK WILL ACTUALLY SAY, under the three fields that decide it. The
    pieces are on screen separately and the thing an admin is trying to get
@@ -6026,6 +6281,24 @@ $('b_sesssave').addEventListener('click', ()=>{
              'sessnote', 'sesspending');
 });
 
+/* THE ENROLMENT LISTENER, committed from the tab it is now on. All three
+   together because they are one answer — an interface, a port, and what to
+   call the interface — and two of them need a restart while the third does
+   not, which is what the pending line under it is for. */
+$('b_enrolsave').addEventListener('click', ()=>{
+  const port = $('ap_enrolport');
+  const body = {
+    /* Always sent, empty included: empty is EVERY address, which is a real
+       answer and one somebody has to be able to come back to. */
+    enrol_address: $('ap_enroladdr') ? ($('ap_enroladdr').value || '') : '',
+    /* …and empty here is how the name is taken back off, so the link goes to
+       naming the address again. */
+    enrol_host: ($('ap_enrolhost').value || '').trim(),
+  };
+  if (port && port.value !== '') body.enrol_port = parseInt(port.value, 10);
+  saveAppBit(body, 'enrolsavenote', 'enrolpending');
+});
+
 $('b_appsave').addEventListener('click', async ()=>{
   const note = $('appnote');
   note.className = 'note';
@@ -6044,9 +6317,6 @@ $('b_appsave').addEventListener('click', async ()=>{
   });
   body.bind = segValue('ap_bind');
   body.bind_address = body.bind === 'address' ? ($('ap_bindaddr').value || '') : '';
-  /* Always sent, empty included: empty is EVERY address, which is a real
-     answer and one somebody has to be able to come back to. */
-  body.enrol_address = $('ap_enroladdr') ? ($('ap_enroladdr').value || '') : '';
   try{
     const j = await api('/app', {method:'POST', body: JSON.stringify(body)});
     /* This tab holds two topics — the time format and the login message —
@@ -6712,8 +6982,8 @@ function blockFillWho(blk, r){
       });
       if (!EMBEDKEYS.length){
         const em = document.createElement('span');
-        em.textContent = 'no embed keys yet — they are created under EMBEDS, '
-                       + 'and appear here once they exist';
+        em.textContent = 'no embed keys yet — they are created under '
+                       + 'ENROLLMENTS \u25b8 EMBED, and appear here once they exist';
         ebox.appendChild(em);
       }
     }
@@ -7439,7 +7709,7 @@ let IDENTITIES = [], IDBASE = '', OPENPID = '', IDPWMIN = 10;
    selection living in the DOM would be lost every time the timer fired. */
 const IDPICKED = new Set();
 /* THE EMBED KEYS, for the fourth tick list on an authorize profile. Its own
-   loader rather than refreshEmbeds(), which paints the EMBEDS tab: that tab is
+   loader rather than refreshEmbeds(), which paints the EMBED tab: that tab is
    not on screen when a profile is being edited, and building its list into a
    hidden box is work nobody sees. */
 let EMBEDKEYS = [];
@@ -13110,6 +13380,11 @@ function panelNav(){
        failure ALERT already documents: a form that only looks loaded, saved
        over a working one. */
     if (tab === 'app'){ loadApp(); refreshProfiles(); }
+    /* THE SAME TWO. The listener's fields come from app.json and the request
+       form from the displays document, and this tab draws both — so it has to
+       fetch both, or it is the failure ALERT already documents: a form that
+       only looks loaded, saved over a working one. */
+    if (tab === 'enrolcfg'){ loadApp(); refreshProfiles(); }
     if (tab === 'ai'){
       /* The endpoint blocks list SPEECH PROFILES, and those live in the
          displays document — which this tab never fetched. Painted before it
@@ -13228,6 +13503,10 @@ function start(){
   // and be left wondering. Don't offer it. Same for the embed keys, which
   // are credentials rather than configuration.
   $('tab_app').style.display = admin ? '' : 'none';
+  // …and the enrolment settings with it: they write app.json through the same
+  // admin-only route, so a viewer opening that tab would meet three fields
+  // that look editable and a SAVE that 403s.
+  $('tab_enrolcfg').style.display = admin ? '' : 'none';
   // Approving a device is granting it something, which is not a thing a
   // read-only account does — and the server refuses the routes anyway.
   $('tab_displays').style.display = admin ? '' : 'none';
