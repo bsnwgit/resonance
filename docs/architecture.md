@@ -552,11 +552,17 @@ anonymous callers" on the same reasoning a code-enrolled screen does: an admin
 made the key, named it, chose what it may do, and can revoke it. Without that
 the setting was unusable on the one deployment it matters most for — a server
 an embed necessarily exposes to every visitor's browser — because ticking it
-would have taken the embeds down along with the strangers it was aimed at. A
-*restricted* endpoint still refuses an embed: an allow-list names screens and
-people, an embed is neither, and quietly letting keys past every allow-list
-because they are not the kind of thing it holds would be the wrong way to not
-have built that list.
+would have taken the embeds down along with the strangers it was aimed at.
+
+**And it is granted the way a screen is.** An authorize profile's allow-list
+holds a fourth kind of member: the embed keys that may use the endpoints it
+guards. This shipped a round late and the gap was not academic — the first
+deployment it met had every endpoint restricted, so a feature that was
+complete, correct and tested reached exactly nothing. A key that can be
+created, rate-limited and audited but cannot be granted anything is not a
+limitation, it is a feature with no door. No group membership to add up:
+groups hold screens and people, both of which are rows in a register, and an
+embed key is in neither.
 
 **Two rate windows, not one.** The key's budget is the application's total and
 the bill; a second, smaller window is one browser's share of it. One number

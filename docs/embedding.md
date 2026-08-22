@@ -41,11 +41,19 @@ microphone in an iframe needs — the other two are the host page on HTTPS and
 the permission granted on their origin.
 
 **The assistants closed to anonymous callers.** Set an assistant's permission
-to require a sign-in, under PROFILES ▸ PERMISSIONS. **An embed session counts
-as a signed-in caller** — that is the whole point of it — so your embeds keep
+to require a sign-in, under PROFILES ▸ AUTHORIZE. **An embed session counts as
+a signed-in caller** — that is the whole point of it — so your embeds keep
 working while everybody who merely found the port stops. Leave them open and
 the key buys you nothing at all: `/ask` is reachable by anyone who can reach
 the server, embed or no embed.
+
+**And the key ticked onto the assistants it may use.** Where a profile says
+ONLY THESE, it lists groups, screens, people — and embeds. A key that is not
+on the list is refused, exactly as an unnamed screen is, so six applications
+on one server are six separately grantable doors rather than one shared one.
+This is the step that is easy to miss: everything else can be right and the
+embed still answers *this embed may not use that endpoint* until it is
+ticked.
 
 ---
 
