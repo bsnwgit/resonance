@@ -971,54 +971,34 @@
   #panelbar > #whobox{grid-column:3;grid-row:1;justify-self:end}
   /* Row two, the whole width. */
   #navlinks{grid-column:1 / -1;grid-row:2}
-  /* AND IT STOPS SPANNING WHEN THE ROW IS TOO NARROW TO CENTRE IT. Lying
-     across the row the title cannot push anything, so what it does instead of
-     overflowing is run into the identity beside it.
+  /* AND IT IS NOT DRAWN WHERE IT WOULD NOT FIT WHOLE. Lying across the row
+     the title cannot push anything, so what it would do instead of
+     overflowing is run into the identity beside it — and "AI Voice Interf…"
+     is not a title, it is a defect. So it is all there or not there.
 
-     True centring costs twice the WIDER side plus the title itself: the
-     identity is 296px and the title 317, so it wants about 950px of panel
-     before it fits — and this panel is 520 to 840 on most screens. Above that
-     it spans and is exact. Below it, it goes back into the middle column and
-     centres in what is left between the mark and the identity: about 70px off
-     true, which is half the difference between the two sides. That is the
-     right trade — a title 70px off centre is still a title, and one that
-     collides or vanishes is neither.
+     THIS USED TO BE TWO LAYOUTS. Spanning was exact but wanted a wide panel,
+     so below a threshold the title dropped into the middle column and
+     centred between its neighbours instead — 70px off true, with an ellipsis
+     behind it. Stacking the identity took it from 296px wide to 192, and the
+     two thresholds collapsed into each other: centring truly now needs 725px
+     of panel against the column layout's 716. Nine pixels is not worth a
+     second code path, so there is one, and it is the exact one.
 
-     Keyed to the viewport because the panel is the window less the preview
-     beside it, and its width is therefore known from one: at 1540 a 600px
-     stage still leaves the ~950 this needs. Not a container query, which is
-     what this wants — the container is #panelscroll, and the bar sits outside
-     it deliberately so that it does not scroll away. */
-  @media (max-width:1540px){
-    #barwhat{
-      grid-column:2;
-      /* STRETCHED, NOT CENTRED, and this is the whole of why it clips. A
-         `justify-self:center` box is sized to its own content, so it sits
-         317px wide in a 117px cell and overflow has nothing to bite on — it
-         simply lay across the identity either side. Filling the cell and
-         centring the TEXT inside it is what makes the ellipsis mean
-         something. */
-      justify-self:stretch;text-align:center;
-      min-width:0;overflow:hidden;text-overflow:ellipsis;
-    }
-  }
-  /* …AND GONE ENTIRELY WHERE IT WOULD NOT FIT WHOLE. "AI Voice Interf…" is
-     not a title, it is a defect — so the rule is that this is either all
-     there or not there, and the ellipsis above is only the safety net for a
-     machine whose fonts measure wider than the ones this was set against.
+     The arithmetic, since the numbers are otherwise mysterious. Centred, the
+     title needs twice the wider side plus itself: 2 × (192 + 12) + 317 = 725,
+     and 740 is that with a little room for a machine whose fonts measure
+     wider. The panel is the window less --stage, and --stage steps twice:
 
-     The arithmetic, since the numbers are otherwise mysterious. The row needs
-     the mark (155) + the identity (296) + the gaps and padding (52) + the
-     title itself (317) = 820px of PANEL. The panel is the window less
-     --stage, and --stage steps twice:
+        window ≤ 1000    panel = window          fits from 740
+        1001 … 1280      panel = window − 480    fits from 1220
+        window ≥ 1281    panel = window − 600    fits from 1340
 
-        window ≤ 1000    panel = window          → fits from 820
-        1001 … 1280      panel = window − 480    → 800 at best, never fits
-        window ≥ 1281    panel = window − 600    → fits from 1420
-
-     Which is these two bands. The mark at the left still says what this is. */
-  @media (max-width:819px){ #barwhat{display:none} }
-  @media (min-width:1001px) and (max-width:1419px){ #barwhat{display:none} }
+     Which is the three bands below — the third is narrow because --stage
+     jumping 480 → 600 at 1281 takes 120px of panel away just as the window
+     gets wider. The mark at the left still says what this is. */
+  @media (max-width:739px){ #barwhat{display:none} }
+  @media (min-width:1001px) and (max-width:1219px){ #barwhat{display:none} }
+  @media (min-width:1281px) and (max-width:1339px){ #barwhat{display:none} }
   /* The way around the panel, as LINKS rather than as buttons. They sit in a
      bar whose other occupants are a title, a help mark and your name, and a
      row of bordered buttons in among those would read as four controls that
@@ -1208,18 +1188,29 @@
      border is what says so without a heading. The bar's other occupants are
      places you can go; these are about YOU, and they sit apart from the row
      rather than at the end of it. */
-  #whostack{
-    display:flex;align-items:center;gap:10px;
-    border:1px solid rgba(var(--glass),.34);
-    padding:4px 8px;
-  }
-  /* IN A ROW, in the order they are reached for: who you are, back to the
-     start, what the screens are doing, and the way out last — a control that
-     ENDS something belongs at the end.
+  /* WHO OVER WHAT YOU CAN DO. Two rows inside the one border: the name and
+     role across the top, the three controls under them.
 
-     It was a two-column, three-row grid, which made the bar three
-     button-rows tall for the sake of four items. On one line it is one row
-     tall and the bar has room for the links underneath it. */
+     It is narrower than the same four in a line, and the width is the point.
+     The title next to it is centred, so it costs twice whichever side is
+     wider — every pixel off this box is two pixels back for the title, and on
+     a panel that is often 840 that is the difference between a title and no
+     title. Height is the cheaper of the two here: the bar has a second row
+     already and one more line of it costs nothing that was being used. */
+  #whostack{
+    display:grid;
+    grid-template-columns:repeat(3, auto);
+    gap:5px 8px;align-items:center;
+    border:1px solid rgba(var(--glass),.34);
+    padding:5px 8px;
+  }
+  /* Across the top, centred over the three under it. */
+  #whostack > #whoid{grid-column:1 / -1;justify-self:center}
+  /* THE THREE, left to right in the order they are reached for: back to the
+     start, what the screens are doing, and the way out last — a control that
+     ENDS something belongs at the end. They fall into row two on their own;
+     nothing places them, because three items after a full-width one is
+     already three columns of a three-column grid. */
   #whostack button{width:auto;text-align:center;white-space:nowrap}
   /* Who you are, boxed. Spans the two rows it sits beside so the border is
      one rectangle rather than two, and the pair inside it is spread across
