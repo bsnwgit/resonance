@@ -50,6 +50,25 @@
        "the live thing", which is what a page of health, alerts and log is. */
     --green:122,201,160;
 
+    /* THE HEADER TITLE, and the only three numbers that decide it. It is
+       sized to fit the row rather than set outright — see #barwhat — so a
+       change here moves the floor, the ceiling and the rate together instead
+       of leaving eight derived figures scattered through the media queries to
+       be found one at a time.
+
+       --title-rate is the floor over 317, which is what "AI Voice Interface"
+       measures at 27px: how many pixels of type one pixel of room buys.
+       Unitless on purpose — CSS multiplies a number by a length and refuses
+       to multiply two lengths.
+
+       Plain px, not scaled by --fs like most type here. The whole arrangement
+       is measured against a 192px identity and a 317px title, and --fs moves
+       both of those too — scaling one side of the sum and not the other would
+       be worse than leaving it alone. */
+    --title-min: 23px;
+    --title-max: 46px;
+    --title-rate: .0726;
+
     /* Typography — the same three faces and three sizes the display has,
        kept identical to the block in index.html on purpose: the panel is
        setting this FOR the display, so the two must mean the same thing by
@@ -929,14 +948,23 @@
      identity whatever the logo needs, which overflowed the panel at every
      width this one actually gets. Spanning costs nothing and is exact. */
   #panelbar{
-    flex:0 0 auto;padding:8px 14px;
+    flex:0 0 auto;padding:8px 14px 10px;
     display:grid;
     grid-template-columns:auto minmax(0,1fr) auto;
     align-items:center;column-gap:12px;row-gap:9px;
-    /* NO RULE UNDER IT. There was a hairline here closing the bar off, and it
-       landed a few pixels above the PROFILES rule — two lines across the panel
-       with nothing between them, the second of which says what it is dividing.
-       The bar is told apart by what is in it, not by an edge. */
+    /* AND A RULE UNDER IT, closing the header off from the settings.
+
+       There was one, and it came off: it landed a few pixels above the
+       PROFILES rule and made two lines across the panel with nothing between
+       them, the second of which said what it was dividing. PROFILES is gone —
+       every box below says what it is in its own top edge now — so the clash
+       it was avoiding no longer exists, and what is left is a header and a
+       page under it with nothing saying where one ends.
+
+       Same weight as `.rule`, which is what this panel draws between subjects,
+       and the padding below it is the bar's own so the line sits clear of the
+       boxes rather than against them. */
+    border-bottom:1px solid rgba(var(--glass),.55);
     font-size:calc(9px * var(--fs));letter-spacing:.16em;color:rgba(var(--paper),.75);
   }
   /* Row one, left to right. The mark is sized against the title beside it
@@ -974,7 +1002,7 @@
        label read as a label, and the same .16em at 40px is a title with holes
        in it — letter-spacing is a correction for small type, not a style to
        carry up. */
-    font-size:calc(27px * var(--fs));
+    font-size:var(--title-min);
     letter-spacing:.05em;
   }
   /* Row one, hard right. `justify-self` rather than the margin trick the flex
@@ -996,20 +1024,21 @@
      second code path, so there is one, and it is the exact one.
 
      The arithmetic, since the numbers are otherwise mysterious. Centred at
-     its smallest, the title needs twice the side cost plus itself:
-     2 × (192 + 15 + 20) + 317 = 771. The panel is the window less --stage,
-     and --stage steps twice:
+     --title-min it measures 317 × 23/27 = 270, and the sides cost
+     2 × (identity 192 + panel padding 15 + clearance 20) = 454. So it wants
+     724px of panel. The panel is the window less --stage, and --stage steps
+     twice:
 
-        window ≤ 1000    panel = window          fits from 771
-        1001 … 1280      panel = window − 480    fits from 1251
-        window ≥ 1281    panel = window − 600    fits from 1371
+        window ≤ 1000    panel = window          fits from 724
+        1001 … 1280      panel = window − 480    fits from 1204
+        window ≥ 1281    panel = window − 600    fits from 1324
 
      Which is the three bands below — the third is narrow because --stage
      jumping 480 → 600 at 1281 takes 120px of panel away just as the window
      gets wider. The mark at the left still says what this is. */
-  @media (max-width:770px){ #barwhat{display:none} }
-  @media (min-width:1001px) and (max-width:1250px){ #barwhat{display:none} }
-  @media (min-width:1281px) and (max-width:1370px){ #barwhat{display:none} }
+  @media (max-width:723px){ #barwhat{display:none} }
+  @media (min-width:1001px) and (max-width:1203px){ #barwhat{display:none} }
+  @media (min-width:1281px) and (max-width:1323px){ #barwhat{display:none} }
 
   /* …AND AS LARGE AS THE ROOM ALLOWS IN THE BANDS WHERE IT IS DRAWN.
      `available = panel - 2 x (identity + panel padding + clearance)`
@@ -1027,20 +1056,20 @@
      Three rules because --stage takes three widths and each gives the panel a
      different share of the window. They cannot be one: a single vw expression
      would be right in one band and wrong by 120px in the next. */
-  @media (min-width:1371px){
-    #barwhat{font-size:clamp(calc(27px * var(--fs)),
-                             calc(8.517vw - 89.8px),
-                             calc(54px * var(--fs)))}
+  @media (min-width:1324px){
+    #barwhat{font-size:clamp(var(--title-min),
+                             calc(var(--title-rate) * (100vw - 1054px)),
+                             var(--title-max))}
   }
-  @media (min-width:1251px) and (max-width:1280px){
-    #barwhat{font-size:clamp(calc(27px * var(--fs)),
-                             calc(8.517vw - 79.5px),
-                             calc(54px * var(--fs)))}
+  @media (min-width:1204px) and (max-width:1280px){
+    #barwhat{font-size:clamp(var(--title-min),
+                             calc(var(--title-rate) * (100vw - 934px)),
+                             var(--title-max))}
   }
-  @media (min-width:771px) and (max-width:1000px){
-    #barwhat{font-size:clamp(calc(27px * var(--fs)),
-                             calc(8.517vw - 38.7px),
-                             calc(54px * var(--fs)))}
+  @media (min-width:724px) and (max-width:1000px){
+    #barwhat{font-size:clamp(var(--title-min),
+                             calc(var(--title-rate) * (100vw - 454px)),
+                             var(--title-max))}
   }
   /* The way around the panel, as LINKS rather than as buttons. They sit in a
      bar whose other occupants are a title, a help mark and your name, and a
