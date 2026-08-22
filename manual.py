@@ -66,8 +66,10 @@ DOCS = [
     {"id": "embed",   "file": "embedding.md",
      "category": "Assistants & integration",
      "title": "Embedding it elsewhere", "audience": "admin",
-     "summary": "Embed keys, the two axes an integrator has to keep apart, "
-                "and the three steps a host application takes."},
+     "summary": "Putting the assistant on somebody else's web page, inline "
+                "or as a bubble: embed keys, the four things one fixes, the "
+                "code you hand their developer, and what has to be true of "
+                "the server first."},
 ]
 DOC_BY_ID = {d["id"]: d for d in DOCS}
 

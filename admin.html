@@ -1913,6 +1913,19 @@
   }
   #em_key.on{display:block}
 
+  /* The code an admin is about to copy. Monospaced and scrollable rather than
+     wrapped: a wrapped line of somebody else's source reads as two lines of
+     it, and the first thing anybody does with this is paste it somewhere the
+     indentation matters. */
+  .snip{
+    margin:6px 0 2px;padding:10px;overflow-x:auto;cursor:pointer;
+    font-family:var(--face-mono);font-size:calc(9.5px * var(--fs));
+    line-height:1.65;letter-spacing:0;white-space:pre;
+    color:var(--ui-bright);background:rgba(0,0,0,.55);
+    border:1px solid rgba(var(--glass),.16);border-radius:3px;
+  }
+  .snip:hover{border-color:var(--hue-dim)}
+
   /* ---- rig: tabs > collapsible sections ---- */
   /* Built like the bar at the top, because they are doing the bar's job: a
      boxed label and the places it leads to. They were boxed buttons in a row
@@ -4631,6 +4644,31 @@ recorded, and nothing at all until somebody says a wake word.</div>
        is the only row with fields in it. -->
   <section class="grp bare proflist" data-tab="embeds">
     <div class="grpbody">
+  <!-- WHERE INTEGRATORS REACH THIS, and it is at the top of this tab because
+       every snippet below is written against it. Set nothing and the generated
+       code says YOUR-RESONANCE-HOST, which an admin then edits by hand in three
+       places — two of which they will get right. -->
+  <label class="bklab" style="margin-top:2px" for="ap_embedhost">Address
+integrators reach this on</label>
+  <input id="ap_embedhost" type="text" spellcheck="false" autocomplete="off"
+         autocapitalize="none" placeholder="ai.example.com">
+  <div class="seg addrow">
+    <button id="b_embedhost" class="act-save">SAVE ADDRESS</button>
+  </div>
+  <div class="note" id="ehnote"></div>
+  <div class="note help">The name a host application's server and its visitors
+both reach this server by — <b>not</b> the address enrolment uses. Screens are
+yours on a network you control; an embed is a stranger's browser on somebody
+else's website, and the two arrive by different names as often as not.
+
+A name, with no <b>https://</b> in front and no port after. The HTTPS display
+port is added for you, because a microphone in an iframe will not open over
+plain HTTP and a snippet naming the wrong port produces an assistant that
+cannot listen for a reason nobody can see.
+
+It changes nothing that is running. It is the address written into the code on
+this tab, and nothing else reads it.</div>
+
   <div id="emblist"></div>
 
   <!-- Kept in the document rather than built on demand: everything below is
@@ -4717,6 +4755,28 @@ useless anywhere you did not name.</div>
   </div>
 
   <div class="subgrp">
+    <h5>Who is asking<span class="subsum"></span></h5>
+    <div class="subbody">
+  <div class="cks">
+    <label><input id="em_needsuser" type="checkbox"> The host must name the
+person</label>
+  </div>
+  <div class="note help">Their server sends whoever is signed in to their
+application along with the key, and this server records the question against
+that person. <b>Their server, never the browser</b> — it is the only party that
+actually authenticated them, and a browser saying who it is would be a text
+field anybody could type in.
+
+Ticked, a code request that names nobody is <b>refused</b>, so a host that
+forgets finds out on the afternoon they wire it up rather than months later
+through an audit trail full of nobody.
+
+Leave it off for a public site. There are no logins there to report, and an
+embed that collected anyway would be collecting for its own sake.</div>
+    </div>
+  </div>
+
+  <div class="subgrp">
     <h5>Session<span class="subsum"></span></h5>
     <div class="subbody">
   <label class="bklab" style="margin-top:2px">Length, minutes</label>
@@ -4724,6 +4784,17 @@ useless anywhere you did not name.</div>
   <div class="note help">How long one exchanged session lasts before the host's
 server has to ask for another. The key itself does not expire; this is the
 window a browser holds.</div>
+
+  <label class="bklab">Questions a minute · the whole key</label>
+  <input id="em_rate" type="number" min="1" max="600" value="20">
+  <div class="note help">Everything this application asks, added up across
+every visitor it has. This is the ceiling and the bill.</div>
+
+  <label class="bklab">…and one visitor's share of that</label>
+  <input id="em_vrate" type="number" min="1" max="600" value="10">
+  <div class="note help">One browser, one page load. It has to be the smaller
+of the two, and comfortably above what a person actually does — a few a minute
+— so it catches a page stuck in a loop rather than somebody in a hurry.</div>
     </div>
   </div>
 
@@ -4757,6 +4828,35 @@ Worked examples in DOCUMENTATION → Embedding it elsewhere.</div>
 
   <div class="note" id="embnote"></div>
   <div id="em_key"></div>
+  <!-- THE HANDOVER. Shown once, beside the key, because this is the only
+       moment everything needed to write it exists in one place — after this
+       the key is a hash and the code could not be generated again. -->
+  <div id="em_hand" hidden>
+    <div class="note help" style="margin-top:10px"><b>Send both of these to
+whoever runs the application.</b> The key is not in them: it goes in that
+server's environment as <b>RESONANCE_KEY</b>, so the code can be pasted into a
+chat or a repository and the credential cannot.</div>
+
+    <label class="bklab">1 · their server — one endpoint, behind their login</label>
+    <div class="seg" id="em_lang">
+      <button data-v="node" class="on">NODE</button>
+      <button data-v="python">PYTHON</button>
+      <button data-v="php">PHP</button>
+    </div>
+    <pre class="snip" id="em_snip_be"></pre>
+
+    <label class="bklab">2 · their page — once, in the template</label>
+    <pre class="snip" id="em_snip_pg"></pre>
+
+    <div class="note help"><b>Then three things to check with them.</b>
+Their pages are on HTTPS, or no microphone will open. The origin they serve
+from is exactly one of the ones on this key, or the browser refuses to frame
+it. And that endpoint is behind their login — it hands out sessions, so an
+open one hands out this assistant.
+
+<b>data-style="inline"</b> puts it in the page instead of in a bubble; add
+<b>data-target="#some-element"</b> to say where.</div>
+  </div>
   <div class="seg addrow">
     <button id="b_newembed" class="act-add">ADD AN EMBED KEY</button>
   </div>
@@ -5863,6 +5963,7 @@ async function loadApp(){
       esel.value = j.app.enrol_address || '';
     }
     if ($('ap_enrolhost')) $('ap_enrolhost').value = j.app.enrol_host || '';
+    if ($('ap_embedhost')) $('ap_embedhost').value = j.app.embed_host || '';
     enrolNow(j);
     segSet('ap_bind', j.app.bind);
     postureSync();
@@ -12023,6 +12124,12 @@ const emParts = ()=> [...document.querySelectorAll('#em_parts input:checked')]
 const emCap = ()=>{
   const c = {};
   document.querySelectorAll('#em_cap input').forEach(i=> c[i.dataset.c] = i.checked);
+  /* The rates are under Session rather than in the tick list — they are
+     numbers and the rest are permissions — but they are the same envelope and
+     the server reads them off `cap`. Kept out of #em_cap deliberately: the
+     preset logic walks that container and would have to learn to skip them. */
+  c.rate_per_min     = Number($('em_rate').value)  || 20;
+  c.rate_per_visitor = Number($('em_vrate').value) || 10;
   return c;
 };
 
@@ -12055,6 +12162,8 @@ function emIncoherent(parts, cap){
     return "'input' types into a void: nothing here reads the answer out and there is no transcript to read it in";
   if (!parts.length && !cap.speak)
     return 'this draws nothing and says nothing';
+  if (cap.rate_per_visitor > cap.rate_per_min)
+    return "one visitor is allowed more a minute than the whole key is — raise the key's rate or lower the visitor's";
   return null;
 }
 
@@ -12138,7 +12247,11 @@ async function refreshEmbeds(){
         ['Draws', (e.parts || []).join(', ') || 'nothing'],
         ['Frames', (e.origins || []).join('  ')],
         ['Session', e.ttl_minutes + ' min · ' + (e.cap && e.cap.rate_per_min)
-                    + '/min · id ' + e.id],
+                    + '/min, ' + (e.cap && e.cap.rate_per_visitor)
+                    + ' a visitor · id ' + e.id],
+        ['Asking', e.needs_user
+          ? 'the host names the person, and questions are recorded against them'
+          : 'anonymous — nothing about who is asking is collected'],
         ['Last used', e.last_used
           ? new Date(e.last_used * 1000).toLocaleString() : 'never'],
       ];
@@ -12201,8 +12314,11 @@ function emDraft(on){
   if (on){
     /* Nothing else open while you are making one: the draft is the thing you
        are looking at, and a saved row open underneath it is a second subject
-       on screen. */
+       on screen. And the LAST key's code goes with it — two keys' worth of
+       snippets on one screen is a way to send somebody the wrong one. */
     OPENEM = '';
+    const k = $('em_key'); if (k){ k.textContent = ''; k.classList.remove('on'); }
+    emShowSnippets(null);
     const box = $('emblist');
     if (box) box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
     const nm = $('em_name');
@@ -12246,7 +12362,7 @@ document.querySelector('#em_preset').addEventListener('click', e=>{
 /* Editing a box after choosing a preset does not stop it being that
    arrangement in spirit, but it does stop the name being true — so the
    preset lights out and the key is recorded as custom. */
-['#em_parts', '#em_cap'].forEach(sel=>
+['#em_parts', '#em_cap', '#em_rate', '#em_vrate'].forEach(sel=>
   document.querySelector(sel).addEventListener('change', ()=>{
     const lit = document.querySelector('#em_preset button.on');
     if (lit){
@@ -12269,6 +12385,67 @@ $('em_key').addEventListener('click', function(){
     .catch(()=>{});
 });
 
+/* ---- the handover ----
+   What CREATE produced, held so the language buttons can re-render without
+   asking the server again — which they could not do anyway: the key is a hash
+   from the moment it is written, and these were generated in the one response
+   that ever had it in plain text. */
+let EM_SNIP = null;
+
+function emShowSnippets(s){
+  EM_SNIP = s || null;
+  const wrap = $('em_hand');
+  if (!wrap) return;
+  wrap.hidden = !EM_SNIP;
+  if (!EM_SNIP) return;
+  const lit = document.querySelector('#em_lang button.on');
+  $('em_snip_be').textContent = EM_SNIP[(lit && lit.dataset.v) || 'node'] || '';
+  $('em_snip_pg').textContent = EM_SNIP.page || '';
+}
+
+document.querySelector('#em_lang').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#em_lang button')
+          .forEach(x=> x.classList.toggle('on', x === b));
+  emShowSnippets(EM_SNIP);
+});
+
+/* Same gesture as the key: one click takes the whole block. Copying source out
+   of a scrollable box by dragging is how half a snippet ends up pasted. */
+document.querySelectorAll('.snip').forEach(el=>{
+  el.addEventListener('click', function(){
+    const r = document.createRange();
+    r.selectNodeContents(this);
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    if (navigator.clipboard) navigator.clipboard.writeText(this.textContent)
+      .then(()=>{ $('embnote').className = 'note';
+                  $('embnote').textContent = 'copied to the clipboard'; })
+      .catch(()=>{});
+  });
+});
+
+/* ---- the address the snippets are written against ----
+   Its own save rather than saveAppBit, because that one reports on the whole
+   document's pending restarts — and this field owes none. An admin who has a
+   port change waiting would otherwise be told a restart is needed for typing
+   in a hostname, which is both untrue and the kind of untrue that gets a
+   server bounced in the middle of the afternoon. */
+$('b_embedhost').addEventListener('click', async ()=>{
+  const note = $('ehnote');
+  note.className = 'note';
+  note.textContent = 'saving…';
+  try{
+    /* Sent even when empty, which is how the name is taken back off — the
+       same rule the enrolment host follows. */
+    await api('/app', {method:'POST', body: JSON.stringify(
+      {embed_host: $('ap_embedhost').value.trim()})});
+    note.textContent = $('ap_embedhost').value.trim()
+      ? 'saved — new keys will be written against this address'
+      : 'cleared — the code below will say YOUR-RESONANCE-HOST';
+    loadApp();
+  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+});
+
 $('b_addembed').addEventListener('click', async ()=>{
   if (!emCheck()) return;
   const note = $('embnote'), out = $('em_key');
@@ -12283,11 +12460,18 @@ $('b_addembed').addEventListener('click', async ()=>{
       cap: emCap(),
       origins: $('em_origins').value.split('\n').map(s=> s.trim()).filter(Boolean),
       ttl_minutes: Number($('em_ttl').value) || 60,
+      needs_user: $('em_needsuser').checked,
     })});
     out.textContent = j.key;
     out.classList.add('on');
+    emShowSnippets(j.snippets);
     note.textContent = 'Created. Copy the key now — it is stored hashed and '
-                     + 'this server cannot show it again.';
+                     + 'this server cannot show it again.'
+                     + ((j.snippets && !j.snippets.base)
+                        ? ' No address is set above, so the code below says '
+                          + 'YOUR-RESONANCE-HOST — set one and make another key '
+                          + 'rather than editing it in by hand.'
+                        : '');
     $('em_name').value = ''; $('em_origins').value = '';
     /* The draft has done its job and goes away, the way a saved endpoint's
        draft block does. The key itself stays on screen underneath: it is the

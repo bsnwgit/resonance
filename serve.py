@@ -150,6 +150,16 @@ APP_DEFAULTS = {
     # It is not a second binding. The listener answers on `enrol_address`
     # whatever this says; this is the word that goes in front of the port.
     "enrol_host": "",
+    # …AND THE ADDRESS AN EMBED IS REACHED AT, which is a different question
+    # with a different answer. Enrolment is this organisation's own screens on
+    # a network it controls; an embed is a stranger's browser on somebody
+    # else's website, and the two arrive over different names as often as not.
+    # One field could not say both, and guessing from the other would put a
+    # private name into a snippet handed to an outside developer.
+    #
+    # Only the generated snippets read it — it is not a binding and not a
+    # check. Empty means the panel writes no address rather than a wrong one.
+    "embed_host": "",
     # Minutes, and a short default on purpose. An admin session is a window
     # onto a configuration everyone else is looking at the results of; it
     # should last a piece of work, not a working day. The panel signs you
@@ -1189,7 +1199,7 @@ def _speech_pool():
         return []
 
 
-def public_routes(doc, disp=None, ident=None):
+def public_routes(doc, disp=None, ident=None, emb=None):
     """The two halves a browser may see. The connection half is not omitted
     from the serialisation by accident — it is enumerated the other way
     round, so a field added to a route later is private until somebody
@@ -1229,13 +1239,17 @@ def public_routes(doc, disp=None, ident=None):
             row["greeting"] = prof["greetings"]
         if not row.get("voice") and prof.get("ttsvoice"):
             row["voice"] = prof["ttsvoice"]
-        row.update(id=rid, allowed=subject_may(rec, disp, ident))
+        row.update(id=rid, allowed=subject_may(rec, disp, ident, emb))
         # A PERSON gets the routing half on the same terms a display does. The
         # wake gate runs in the browser, so a session that is handed no wake
         # words cannot drop an utterance it should drop — it simply never
         # recognises one, which is the fault this half exists to prevent,
         # arriving through the door marked "we only thought about devices".
-        if disp or ident:
+        # …and an embed, for the reason in the docstring above: the wake gate
+        # runs in the browser, so a frame handed no wake words cannot DROP the
+        # utterance addressed to an endpoint it may not use. It would carry it
+        # into whatever conversation it was already having instead.
+        if disp or ident or emb:
             row.update({k: rec[k] for k in ROUTE_ROUTING})
             # …and the words come from the speech profile now, not from the
             # route's own record. An endpoint names a profile; the profile says
@@ -1608,6 +1622,12 @@ def validate_app(obj, current):
             return None, ("this machine has no address %s — enrolment would "
                           "fail to start on it" % v)
         cfg["enrol_address"] = v
+    if "embed_host" in obj:
+        v = str(obj["embed_host"] or "").strip().lower()[:120]
+        if v and not re.match(r"^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$", v):
+            return None, ("that reads as a URL rather than a name — just the "
+                          "host, with no https:// in front and no port after")
+        cfg["embed_host"] = v
     if "enrol_host" in obj:
         v = str(obj["enrol_host"] or "").strip().lower()[:120]
         # A HOSTNAME, not a URL. Somebody pasting https://name/ or name:9703
@@ -4449,11 +4469,14 @@ def route_model(rec, cfg=None):
     return str(route_conn(rec, cfg).get("model") or "")
 
 
-def subject_may(route, disp=None, ident=None):
+def subject_may(route, disp=None, ident=None, emb=None):
     """May this caller use this endpoint?
 
-    The caller is a DEVICE or a PERSON, never both — see `_subject`, which is
-    where that is decided — so this takes one of the two and answers about it.
+    The caller is a DEVICE, a PERSON or an EMBED, never more than one. The
+    first two come from `_subject`, which is where that precedence is decided.
+    The third arrives separately and deliberately: an embed session is a
+    bearer token on the request, so it owes nothing to whatever happens to be
+    in the cookie jar beside it and cannot be confused with it.
     A person's grant is their own and does not depend on what the machine they
     are sitting at was approved for; a device's is the machine's and owes
     nothing to whoever happens to be standing in front of it.
@@ -4503,7 +4526,19 @@ def subject_may(route, disp=None, ident=None):
     # question. A code-enrolled screen satisfies it, so whoever walks up to
     # that screen uses it with no person attached — which is the trade being
     # made deliberately: a wall is a place somebody vetted, not a stranger.
-    if route.get("needs_signin") and not ident and not vouched(disp):
+    # AN EMBED SESSION IS VOUCHING TOO, on the same reasoning a code-enrolled
+    # screen is: an admin made the key, named it, chose what it may do, and can
+    # revoke it — and the host holding it proved it server to server before a
+    # browser was involved at all. It is a stranger's page, and it is not an
+    # anonymous caller.
+    #
+    # Without this line the setting is unusable on the one deployment it
+    # matters most for. An embed means the server is reachable by every
+    # visitor's browser, which for a public site means the internet; "no
+    # anonymous callers" is then the only thing between the assistant and
+    # anybody who finds the port — and ticking it would take every embed down
+    # along with the anonymous callers it was aimed at.
+    if route.get("needs_signin") and not ident and not vouched(disp) and not emb:
         return False
     if not route.get("restricted"):
         return True
@@ -4516,6 +4551,15 @@ def subject_may(route, disp=None, ident=None):
             return True
         return ident["id"] in group_members(route.get("groups"),
                                             kinds=IDENTITY_GROUP_KINDS)
+    if emb:
+        # An allow-list names screens and people. An embed is neither, so it is
+        # never on one, so a restricted endpoint refuses it — and that is the
+        # honest answer rather than an oversight. Naming which embeds may reach
+        # which endpoints is a real thing to want and a list that does not
+        # exist yet; letting a key through every restricted endpoint because it
+        # is not the kind of thing the list holds would be the wrong way to not
+        # have built it.
+        return False
     if not disp:
         return False
     # Expiry is checked here rather than at the door, which is what makes a
@@ -4920,19 +4964,32 @@ def write_turns(rows):
 
 
 def note_turn(did, route, heard, sent, reply, trail=None, ms=0, error="",
-              fell_to=""):
+              fell_to="", emb=None):
     """One turn, with the trail that explains it. Only ever called where an
-    utterance has already been decided to be this screen's business."""
-    if not did:
-        # A turn with no screen to attach it to is a turn nobody can act on,
-        # and the embed is not a screen. Recording it would be collecting for
-        # its own sake.
+    utterance has already been decided to be this screen's business.
+
+    OR AN EMBED'S, where the key was set to know who is asking. An embed is
+    not a screen and has no row in the register, so it is recorded by the key
+    that minted the session and the person the host named — which is exactly
+    the pair somebody asking "who said that" needs, and neither half of it
+    exists on a key that was not set to collect it."""
+    who = (emb or {}).get("user") or None
+    if not did and not who:
+        # A turn with nobody to attach it to is a turn nobody can act on.
+        # Recording it would be collecting for its own sake — which is what
+        # every anonymous embed turn would be, and there are a lot of them.
         return
     t = trail if isinstance(trail, dict) else {}
     with _turns_lock:
         rows = read_turns()
         rows.append({
             "did": str(did)[:32], "route": str(route or "")[:60],
+            # Empty on a screen's turn, and the pair on an embed's. Two fields
+            # rather than one: the key is revocable and the person is not, and
+            # an admin reads the ledger for both reasons.
+            "emb": str((emb or {}).get("id") or "")[:32],
+            "user": str((who or {}).get("id") or "")[:64],
+            "user_name": str((who or {}).get("name") or "")[:64],
             # BEFORE the wake word came off, which is the whole point: it is
             # the only field that can show a near miss.
             "heard": str(heard or "")[:400],
@@ -4946,6 +5003,20 @@ def note_turn(did, route, heard, sent, reply, trail=None, ms=0, error="",
             "at": int(time.time()),
         })
         write_turns(rows)
+
+
+def turn_embed_label(row, names):
+    """How an embed's turn reads in the ledger: the key, then the person.
+
+    The key by NAME where it still exists and by id where it does not — a
+    deleted key must not erase the rows it left behind, and "e0a1b2c3d4e5"
+    beside a question somebody asked is still an answer to which application
+    it came from."""
+    eid = row.get("emb") or ""
+    if not eid:
+        return ""
+    who = row.get("user_name") or row.get("user") or ""
+    return (names.get(eid) or eid) + (" · " + who if who else "")
 
 
 def prune_turns():
@@ -7226,13 +7297,36 @@ PRESETS = {
     "signage": {"parts": ["visual"],
                 "cap": {"ask": False, "mic": False, "speak": True}},
 }
-CAP_DEFAULTS = {"ask": True, "mic": False, "speak": True, "rate_per_min": 20}
+#: `rate_per_min` is the WHOLE KEY's budget; `rate_per_visitor` is one
+#: browser's share of it. Two numbers because one cannot say the thing that
+#: matters on a public site: a key sized for a busy application is a key one
+#: visitor could spend on their own, and a key sized for one visitor is a key
+#: the second visitor finds empty.
+CAP_DEFAULTS = {"ask": True, "mic": False, "speak": True,
+                "rate_per_min": 20, "rate_per_visitor": 10}
 EMBED_TTL_MIN, EMBED_TTL_MAX = 5, 1440       # minutes a session token lives
 EMBED_TTL_DEFAULT = 60
 
 _embed_sessions = {}             # token -> {"id","parts","cap","origins","expires"}
 _embed_sessions_lock = threading.Lock()
+#: HANDOVER CODES, and the reason they exist rather than the session token
+#: going straight into the frame's URL.
+#:
+#: A session token is a bearer credential — whoever holds it IS the embed — and
+#: a URL inside somebody else's page is the worst place to keep one. The host's
+#: own script can read the iframe's src, and so can their analytics, their
+#: error reporter, the browser's history, a referrer and a screenshot in a
+#: support ticket. The origin allow-list does not help: it stops another site
+#: FRAMING this, and does nothing at all against curl with the token.
+#:
+#: So the URL carries a code that is good once and for about a minute. The
+#: frame trades it for the real token, which then exists only in that page's
+#: memory and never appears in an address anywhere.
+_embed_codes = {}                # code -> {"id","rec","expires"}
+_embed_codes_lock = threading.Lock()
+EMBED_CODE_TTL = 60              # seconds — long enough to load a frame
 _embed_hits = {}                 # embed id -> [timestamps], its own rate window
+_embed_visitor_hits = {}         # session sid (or person) -> [timestamps]
 _embed_fails = {}                # client ip -> [count, blocked_until]
 
 
@@ -7324,13 +7418,17 @@ def validate_embed(obj):
         for k in ("ask", "mic", "speak"):
             if k in given:
                 cap[k] = bool(given[k])
-        if "rate_per_min" in given:
-            try:
-                cap["rate_per_min"] = int(given["rate_per_min"])
-            except (TypeError, ValueError):
-                return None, "the rate limit must be a whole number"
+        for k in ("rate_per_min", "rate_per_visitor"):
+            if k in given:
+                try:
+                    cap[k] = int(given[k])
+                except (TypeError, ValueError):
+                    return None, "the rate limits must be whole numbers"
     if not (1 <= cap["rate_per_min"] <= 600):
         return None, "the rate limit must be between 1 and 600 a minute"
+    if not (1 <= cap["rate_per_visitor"] <= 600):
+        return None, ("the per-visitor rate limit must be between 1 and 600 "
+                      "a minute")
 
     err = incoherent(parts, cap)
     if err:
@@ -7356,8 +7454,14 @@ def validate_embed(obj):
         return None, ("the session length must be between %d and %d minutes"
                       % (EMBED_TTL_MIN, EMBED_TTL_MAX))
 
+    # WHETHER THIS KEY IS ALLOWED TO KNOW WHO IS ASKING, and it is off unless
+    # an admin says otherwise. A public site's embed has no logins to report
+    # and must not start collecting; an internal tool's has, and an audit line
+    # naming nobody is not much of an audit line. It is a property of the
+    # application rather than of this server, so it lives on the key.
     return {"name": name, "preset": preset, "parts": parts, "cap": cap,
-            "origins": origins, "ttl_minutes": ttl}, None
+            "origins": origins, "ttl_minutes": ttl,
+            "needs_user": bool(obj.get("needs_user"))}, None
 
 
 def incoherent(parts, cap):
@@ -7385,7 +7489,178 @@ def incoherent(parts, cap):
                 "and there is no transcript to read it in")
     if not parts and not cap["speak"]:
         return "this draws nothing and says nothing"
+    if cap.get("rate_per_visitor", 0) > cap["rate_per_min"]:
+        return ("one visitor is allowed more a minute than the whole key is — "
+                "raise the key's rate or lower the visitor's")
     return None
+
+
+def embed_base(cfg=None):
+    """The address a host application's server and its visitors both reach.
+
+    HTTPS and the full display port, always. Not because this server insists
+    on it but because a microphone in an iframe does — a snippet naming the
+    plain port produces an assistant that cannot listen, and the integrator
+    has no way to know that is why. Empty when no address has been set, so the
+    panel can say so rather than writing a guess into somebody else's source."""
+    cfg = cfg if cfg is not None else read_app()
+    host = str(cfg.get("embed_host") or "").strip()
+    if not host:
+        return ""
+    return "https://%s:%d" % (host, int(cfg.get("https_port") or 9701))
+
+
+#: The one endpoint a host adds to their own application. Named here because it
+#: appears in three snippets and a page tag, and four copies of a string is
+#: three chances for one to be edited and the others not.
+EMBED_CODE_PATH = "/api/resonance-code"
+
+#: The three backends, as templates. `%(user)s` is empty on a key that does not
+#: require a person: a snippet carrying a field the server will ignore teaches
+#: the wrong thing on the first day, and the first day is when it is read.
+#:
+#: THE KEY IS NOT IN ANY OF THEM. It is read from the environment and shown
+#: beside them to be put there. A snippet with a live credential inside goes
+#: wherever the snippet goes — a chat message, a ticket, a repository — and the
+#: whole of this design is that the key stays on the host's own server.
+EMBED_SNIPPETS = {
+    "node": """// %(path)s — behind your existing login. Anyone who can
+// reach this endpoint gets a session, so it must not be public.
+const RESONANCE = '%(base)s';
+const KEY = process.env.RESONANCE_KEY;
+
+app.get('%(path)s', requireLogin, async (req, res) => {
+  const r = await fetch(RESONANCE + '/embed/session', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      key: KEY,%(user)s
+    })
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) return res.status(502).json({error: j.error || 'no code'});
+  res.json({code: j.code});
+});""",
+
+    "python": """# %(path)s — behind your existing login. Anyone who can
+# reach this endpoint gets a session, so it must not be public.
+import os, requests
+
+RESONANCE = "%(base)s"
+KEY = os.environ["RESONANCE_KEY"]
+
+@app.get("%(path)s")
+@login_required
+def resonance_code():
+    r = requests.post(RESONANCE + "/embed/session", timeout=10, json={
+        "key": KEY,%(user)s
+    })
+    if not r.ok:
+        return jsonify(error=r.json().get("error", "no code")), 502
+    return jsonify(code=r.json()["code"])""",
+
+    "php": """<?php
+// %(path)s — behind your existing login. Anyone who can
+// reach this endpoint gets a session, so it must not be public.
+require_login();
+
+$RESONANCE = '%(base)s';
+$body = json_encode([
+  'key' => getenv('RESONANCE_KEY'),%(user)s
+]);
+
+$ch = curl_init($RESONANCE . '/embed/session');
+curl_setopt_array($ch, [
+  CURLOPT_POST => true,
+  CURLOPT_POSTFIELDS => $body,
+  CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+  CURLOPT_RETURNTRANSFER => true,
+]);
+$out = curl_exec($ch);
+$ok = curl_getinfo($ch, CURLINFO_HTTP_CODE) === 200;
+curl_close($ch);
+
+header('Content-Type: application/json');
+if (!$ok) { http_response_code(502); echo '{"error":"no code"}'; exit; }
+echo json_encode(['code' => json_decode($out, true)['code']]);""",
+}
+
+#: …and the user block each of them grows when the key requires a person. Kept
+#: beside the templates rather than inside them so the three stay readable as
+#: the code somebody is about to paste.
+EMBED_SNIPPET_USER = {
+    "node":   "\n      user: {id: req.user.id, name: req.user.name,"
+              "\n             roles: req.user.roles},",
+    "python": '\n        "user": {"id": user.id, "name": user.name,'
+              '\n                 "roles": list(user.roles)},',
+    "php":    "\n  'user' => ['id' => $user->id, 'name' => $user->name,"
+              "\n             'roles' => $user->roles],",
+}
+
+
+def embed_snippets(rec, base):
+    """The working code an admin hands to whoever runs the host application.
+
+    Built at the one moment the key exists in plain text, and shaped by the key
+    itself — what it requires is what the snippet sends."""
+    fields = {"base": base or "https://YOUR-RESONANCE-HOST:9701",
+              "path": EMBED_CODE_PATH}
+    named = bool(rec.get("needs_user"))
+    out = {k: t % dict(fields, user=EMBED_SNIPPET_USER[k] if named else "")
+           for k, t in EMBED_SNIPPETS.items()}
+    out["page"] = ('<script src="%(base)s/embed.js"\n'
+                   '        data-code-url="%(path)s"\n'
+                   '        data-style="bubble"></script>') % fields
+    out.update(base=base, needs_user=named)
+    return out
+
+
+def embed_user(raw):
+    """The person a host's server says this session is for, or None.
+
+    ASSERTED BY THE BACKEND AND NEVER BY THE BROWSER, which is the whole of why
+    it can be believed at all: the host application authenticated them, holds
+    the key, and makes this call server to server. A browser saying who it is
+    would be a text field.
+
+    Lenient about the CONTENTS and strict about there being any. An id is the
+    thing an audit line is worth keeping against and the thing a rate window
+    can hang on; a name and roles are decoration on top, and refusing a host
+    that has an id but no roles would fail an integration over nothing."""
+    if not isinstance(raw, dict):
+        return None
+    uid = str(raw.get("id") or "").strip()[:64]
+    if not uid:
+        return None
+    roles = [str(r).strip()[:32] for r in (raw.get("roles") or [])
+             if str(r).strip()][:16]
+    return {"id": uid, "name": str(raw.get("name") or "").strip()[:64],
+            "roles": roles}
+
+
+def embed_visitor_allowed(sid, per_min):
+    """One BROWSER's share of the key's budget.
+
+    Be clear about what this does and does not stop. It stops a page in a
+    render loop, a visitor holding down a key, and the ordinary case of one
+    person on one machine asking far more than a person asks. It does not stop
+    somebody determined: a session lasts one page load, so re-minting gives a
+    fresh bucket — and the thing that actually caps that is the key's own
+    budget, which is why both numbers exist rather than only this one.
+
+    Where the key requires an identity, the bucket keys on the PERSON instead
+    and re-minting buys nothing — see the caller."""
+    if not sid:
+        return True
+    now_ = time.time()
+    with _ask_lock:
+        hits = [t for t in _embed_visitor_hits.get(sid, []) if now_ - t < 60]
+        if len(hits) >= per_min:
+            _embed_visitor_hits[sid] = hits
+            return False
+        hits.append(now_)
+        _embed_visitor_hits[sid] = hits
+        return True
 
 
 def embed_allowed(embed_id, per_min):
@@ -7402,7 +7677,58 @@ def embed_allowed(embed_id, per_min):
         return True
 
 
-def new_embed_session(embed_id, rec):
+def new_embed_code(embed_id, rec, user=None):
+    """A one-use handover code. The GRANT IS SNAPSHOT HERE, not looked up again
+    when the code is claimed: an admin editing the key in the seconds between a
+    host minting a code and a browser spending it must not decide what that
+    browser gets, in either direction."""
+    code = secrets.token_urlsafe(24)
+    with _embed_codes_lock:
+        now_ = time.time()
+        for c in [c for c, v in _embed_codes.items() if v["expires"] < now_]:
+            _embed_codes.pop(c, None)            # sweep, so it cannot grow
+        _embed_codes[code] = {
+            "id": embed_id,
+            "rec": {"name": rec["name"], "parts": list(rec["parts"]),
+                    "cap": dict(rec["cap"]), "origins": list(rec["origins"]),
+                    "ttl_minutes": rec["ttl_minutes"]},
+            "user": user,
+            "expires": now_ + EMBED_CODE_TTL,
+        }
+    return code
+
+
+def peek_embed_code(code):
+    """The code's record WITHOUT spending it. One caller: the /embed route,
+    which needs the allow-list to set frame-ancestors on the page carrying the
+    script that will spend it. Burning it there would mean the page could never
+    claim the token it was served to claim."""
+    if not code:
+        return None
+    with _embed_codes_lock:
+        v = _embed_codes.get(code)
+        if not v:
+            return None
+        if v["expires"] < time.time():
+            _embed_codes.pop(code, None)
+            return None
+        return v
+
+
+def claim_embed_code(code):
+    """Spend it. Removed under the lock and returned to exactly one caller, so
+    two browsers racing on the same code cannot both come away with a session
+    — which is the whole of what "one use" has to mean."""
+    if not code:
+        return None
+    with _embed_codes_lock:
+        v = _embed_codes.pop(code, None)
+    if not v or v["expires"] < time.time():
+        return None
+    return v
+
+
+def new_embed_session(embed_id, rec, user=None):
     """The grant is COPIED into the session, so editing or deleting the token
     cannot retroactively widen a session already running — and a narrowing
     takes effect on the next mint rather than mid-conversation."""
@@ -7410,8 +7736,22 @@ def new_embed_session(embed_id, rec):
     with _embed_sessions_lock:
         now_ = time.time()
         for t in [t for t, s in _embed_sessions.items() if s["expires"] < now_]:
-            _embed_sessions.pop(t, None)         # sweep, so it cannot grow forever
+            # …and the visitor's bucket with it, or the dict grows by one entry
+            # per page load anybody anywhere ever made and is never emptied.
+            dead = _embed_sessions.pop(t, {})
+            _embed_visitor_hits.pop(dead.get("who") or dead.get("sid"), None)
         _embed_sessions[token] = {
+            # An id for the SESSION as distinct from the key: the per-visitor
+            # bucket keys on it, and it is not the token — a rate-limit dict is
+            # no place for a live credential, and this one is dumped into logs
+            # and admin listings without anybody thinking about it.
+            "sid": secrets.token_hex(8),
+            # WHAT THE RATE WINDOW HANGS ON. The session where nobody is named,
+            # and the PERSON where somebody is — which is the difference
+            # between a limit a reload resets and one it does not. A session
+            # lasts one page load; Jane does not.
+            "who": ("u:%s:%s" % (embed_id, user["id"])) if user else "",
+            "user": user,
             "id": embed_id, "name": rec["name"],
             "parts": list(rec["parts"]), "cap": dict(rec["cap"]),
             "origins": list(rec["origins"]),
@@ -7441,6 +7781,13 @@ def drop_embed_sessions(embed_id):
     with _embed_sessions_lock:
         for t in [t for t, s in _embed_sessions.items() if s["id"] == embed_id]:
             _embed_sessions.pop(t, None)
+    # AND ITS UNSPENT CODES. A code is a session that has not happened yet, and
+    # a key disabled in the second between a host minting one and a browser
+    # spending it would otherwise start one more conversation after the admin
+    # had stopped it.
+    with _embed_codes_lock:
+        for c in [c for c, v in _embed_codes.items() if v["id"] == embed_id]:
+            _embed_codes.pop(c, None)
 
 
 #: What the assistant's transcript label used to ship as. An install that
@@ -7734,7 +8081,7 @@ ENROL_GET = ("/", "/index.html", "/lockup.svg", "/icon.svg", "/favicon.ico",
 ENROL_POST = ("/user/setup",)
 #: the other half of the embed API: reachable from the display listeners,
 #: because that is where a host server and a host browser can actually get to
-EMBED_ROUTES = ("/embed", "/embed/session")
+EMBED_ROUTES = ("/embed", "/embed/session", "/embed/claim")
 
 
 #: Every file this server will hand out, and there are four of them. An
@@ -7752,7 +8099,13 @@ EMBED_ROUTES = ("/embed", "/embed/session")
 #:
 #: admin.html is here because the admin listener serves it; the earlier
 #: ADMIN_ONLY_FILES check has already made it absent everywhere else.
-SERVABLE = frozenset(("/index.html", "/admin.html", "/icon.svg", "/lockup.svg"))
+#: embed.js is public by nature — it is loaded by <script src> from pages
+#: this deployment has never heard of, so there is no allow-list that could
+#: gate it and nothing in it worth gating. It carries no address but this
+#: server's own and no credential at all: the code it uses comes from the
+#: HOST's server, at an address the host puts in their own tag.
+SERVABLE = frozenset(("/index.html", "/admin.html", "/icon.svg", "/lockup.svg",
+                      "/embed.js"))
 
 
 def servable(path):
@@ -8419,17 +8772,21 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         if path == "/embed":
-            token = (parse_qs(urlparse(self.path).query).get("t") or [""])[0]
-            s = get_embed_session(token)
-            if not s:
+            code = (parse_qs(urlparse(self.path).query).get("c") or [""])[0]
+            # PEEKED, NOT SPENT. This response is the page that will spend it,
+            # one request later; burning it here would serve a frame that could
+            # never claim the session it was served to claim.
+            v = peek_embed_code(code)
+            if not v:
                 # 403 rather than 404: the route is real, and an integrator
                 # staring at a 404 goes looking for a deployment problem
-                # instead of at the token they minted twenty minutes ago.
-                return self._json(403, {"error": "this embed token is expired "
-                                                 "or was never issued"})
+                # instead of at a code that expired a minute after it was made.
+                return self._json(403, {"error": "this embed code is expired, "
+                                                 "already used, or was never "
+                                                 "issued"})
             # The allow-list, enforced by the browser at the only moment it
             # can be: refusing to render inside a page nobody authorised.
-            self._csp = "frame-ancestors " + " ".join(s["origins"])
+            self._csp = "frame-ancestors " + " ".join(v["rec"]["origins"])
             self.path = "/index.html"
             return super().do_GET()
 
@@ -8493,7 +8850,13 @@ class Handler(SimpleHTTPRequestHandler):
             # page that draws correctly and answers to nothing. The connection
             # half is not here at all, at any tier.
             doc = read_routes()
-            rows = public_routes(doc, *self._subject())
+            # An embed is the third kind of caller and does not come out
+            # of _subject: its session is a bearer token on the request, not
+            # anything in the cookie jar. Left out, a framed page is told it
+            # may use nothing — the server would let the question through and
+            # the browser would already have dropped it at the wake gate,
+            # which is the worst of both and unfindable from either end.
+            rows = public_routes(doc, *self._subject(), emb=self._embed())
             if self.pinned_net:
                 # This port carries its own endpoints and no others. They are
                 # not filtered out of a list the browser then ignores — they
@@ -8680,6 +9043,11 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             rows = read_events()
             displays = read_displays()
+            # Names for the keys, so an embed's turn reads as the application
+            # it came from rather than as a hex id. Read once for the whole
+            # response rather than per row.
+            _emb_names = {eid: rec.get("name") or ""
+                          for eid, rec in read_embeds().items()}
             now_ = int(time.time())
             health = []
             for did in sorted(displays, key=lambda d: display_label(displays[d]).lower()):
@@ -8695,8 +9063,14 @@ class Handler(SimpleHTTPRequestHandler):
                            for r in sorted(rows, key=lambda r: -r["at"])[:200]],
                 # The conversation record, newest first. Bounded the same way
                 # the events are: a tail to read, not a dataset to page.
-                "turns": [dict(r, label=display_label(displays[r["did"]])
-                               if r.get("did") in displays else "")
+                # A row is a SCREEN's or an EMBED's. A screen is labelled by
+                # the register; an embed by the key that minted the session and
+                # the person the host named, because neither on its own answers
+                # "who said this" — the key is which application, the person is
+                # who was sitting in front of it.
+                "turns": [dict(r, label=(
+                    display_label(displays[r["did"]]) if r.get("did") in displays
+                    else turn_embed_label(r, _emb_names)))
                           for r in sorted(read_turns(), key=lambda r: -r["at"])[:120]],
                 "days": event_window_days(),
                 # The sink's settings ride with the data it reports on, so the
@@ -8790,7 +9164,7 @@ class Handler(SimpleHTTPRequestHandler):
                 row = {k: rec.get(k) for k in
                        ("name", "preset", "parts", "cap", "origins",
                         "ttl_minutes", "created", "created_by",
-                        "last_used", "enabled")}
+                        "last_used", "enabled", "needs_user")}
                 row.update(id=eid, sessions=live.get(eid, 0))
                 out.append(row)
             return self._json(200, {"embeds": out, "parts": list(PARTS),
@@ -9251,6 +9625,38 @@ class Handler(SimpleHTTPRequestHandler):
                         % alt["name"])
             return self._json(200, res)
 
+        if parsed.path == "/embed/claim":
+            # THE FRAME SPENDING ITS CODE, one request after being served. It
+            # comes back with the session token, which from here lives in that
+            # page's memory and is sent as a bearer header — it is never
+            # written into a URL, a cookie or storage, so there is nothing left
+            # behind for the host page, its analytics or its error reporter to
+            # read, and nothing for a back button to resurrect.
+            #
+            # No back-off ledger on this one, deliberately. A code is 24 bytes
+            # from the system generator and lives a minute; there is nothing to
+            # guess. Sharing the KEY's ledger would have been worse than
+            # nothing — a host server and its visitors can sit behind one
+            # address, and a browser fumbling claims would then lock that
+            # server out of minting codes at all.
+            if self.admin_port:
+                return self._json(404, {"error": "not found"})
+            obj = self._json_body()
+            if obj is None:
+                return
+            v = claim_embed_code(str(obj.get("code") or "").strip())
+            if not v:
+                return self._json(403, {"error": "this embed code is expired, "
+                                                 "already used, or was never "
+                                                 "issued"})
+            token = new_embed_session(v["id"], v["rec"], v.get("user"))
+            s = get_embed_session(token)
+            return self._json(200, {"token": token, "embed": {
+                "name": s["name"], "parts": s["parts"], "cap": s["cap"],
+                "origins": s["origins"],
+                "expires_in": max(0, int(s["expires"] - time.time())),
+            }})
+
         if parsed.path == "/embed/session":
             # A host application's SERVER calling this one. No cookie, no
             # origin check: this is not a browser and there is nothing
@@ -9280,17 +9686,35 @@ class Handler(SimpleHTTPRequestHandler):
             if not rec.get("enabled", True):
                 return self._json(403, {"error": "this embed key is disabled"})
             _embed_fails.pop(ip, None)
-            token = new_embed_session(eid, rec)
+            user = embed_user(obj.get("user"))
+            # REFUSED LOUDLY, on the first call the integration ever makes. A
+            # key set to know who is asking and quietly given nobody would
+            # answer every question anyway and keep an audit trail of
+            # anonymous rows — a failure invisible from both ends and found
+            # months later by whoever went looking for who said something.
+            # This way it is found on the afternoon somebody wires it up.
+            if rec.get("needs_user") and not user:
+                return self._json(400, {"error":
+                    "this key requires the person asking to be named — send "
+                    "user.id with the key, taken from whoever is signed in to "
+                    "your application"})
+            code = new_embed_code(eid, rec, user)
             rec["last_used"] = int(time.time())
             embeds = read_embeds()
             if eid in embeds:                     # re-read: another thread may have written
                 embeds[eid]["last_used"] = rec["last_used"]
                 write_embeds(embeds)
-            print("embed session for %s (%s) — %d min" % (eid, rec["name"],
-                  rec["ttl_minutes"]), flush=True)
+            print("embed code for %s (%s) — session will run %d min"
+                  % (eid, rec["name"], rec["ttl_minutes"]), flush=True)
+            # A CODE, NOT THE SESSION TOKEN. The caller is a server and could
+            # be trusted with the token; the place it is about to put it
+            # cannot. See _embed_codes. `expires_in` is the SESSION's length,
+            # which is what a host schedules a refresh against — the code's own
+            # minute is its business and named separately.
             return self._json(200, {
-                "token": token,
-                "src": "/embed?t=" + token,
+                "code": code,
+                "src": "/embed?c=" + code,
+                "code_expires_in": EMBED_CODE_TTL,
                 "expires_in": rec["ttl_minutes"] * 60,
                 "parts": rec["parts"], "cap": rec["cap"],
             })
@@ -9320,8 +9744,15 @@ class Handler(SimpleHTTPRequestHandler):
             # The only time the secret exists anywhere but in the caller's
             # hands. Nothing on this server can show it again, which is the
             # point of storing a hash — say so in the panel, loudly.
+            #
+            # AND THE CODE THAT USES IT, generated here for the same reason it
+            # is shown here: this is the one moment everything needed to write
+            # it is in one place. An admin copies working code rather than
+            # sending a specification, and six applications integrating the
+            # same way get the same integration instead of six readings of it.
             return self._json(200, {"ok": True, "id": eid,
-                                    "key": eid + "." + secret})
+                                    "key": eid + "." + secret,
+                                    "snippets": embed_snippets(rec, embed_base())})
 
         if parsed.path == "/embeds/delete":
             s = self._require("admin")
@@ -10757,6 +11188,21 @@ class Handler(SimpleHTTPRequestHandler):
             if refused:
                 return
             if emb:
+                # THE VISITOR FIRST, then the key. Both are checked, and the
+                # order decides which message somebody gets when both would
+                # fire — and "you are asking too fast" is actionable by the
+                # person who can act on it, where "the application is busy"
+                # sends them to a support desk about a limit they are the whole
+                # of. It also stops one browser burning the key's window and
+                # putting everybody else on the wrong error.
+                if not embed_visitor_allowed(
+                        emb.get("who") or emb.get("sid"),
+                        emb["cap"].get("rate_per_visitor")
+                        or emb["cap"]["rate_per_min"]):
+                    return self._json(429, {"error": "you are asking faster "
+                                                     "than this is set up to "
+                                                     "answer — give it a "
+                                                     "moment"})
                 if not embed_allowed(emb["id"], emb["cap"]["rate_per_min"]):
                     return self._json(429, {"error": "this embed is over its "
                                                      "rate limit — slow down"})
@@ -10808,21 +11254,28 @@ class Handler(SimpleHTTPRequestHandler):
             # requiring a sign-in sat on such a port and quietly required
             # nothing. What a port is FOR is now said on the endpoint that owns
             # it, where it can be read.
-            if not subject_may(cfg, disp, ident):
+            if not subject_may(cfg, disp, ident, emb):
                 note_display_refused(disp, cfg["name"])
                 print("refused: %s may not use %s (%s)"
                       % (disp["id"] if disp else
                          ("identity " + ident["id"] if ident else
-                          "a caller with no token"),
+                          ("embed " + emb["id"] if emb else
+                           "a caller with no token")),
                          cfg["name"], rid), flush=True)
                 # The DISPLAY says nothing about this: that utterance was
                 # addressed to a different device, and one nobody was talking
                 # to announcing that it cannot help is noise laid over the
                 # answer somebody is waiting for. Which is why the reason is
                 # here, in a field, rather than in anything speakable.
-                return self._json(403, dict(about, refused="display",
-                                            error="this display may not use "
-                                                  "that endpoint"))
+                # WHICH KIND OF CALLER WAS REFUSED, because the two are
+                # read by different people. "This display may not" sends an
+                # admin to the screen's grants; an embed has no grants and no
+                # screen, and sending an integrator looking for one is an
+                # afternoon lost to a page that does not exist.
+                return self._json(403, dict(
+                    about, refused="embed" if emb else "display",
+                    error=("this embed may not use that endpoint" if emb
+                           else "this display may not use that endpoint")))
 
             # THE IDLE CLOCK, RESET. Past the gate is a conversation starting,
             # which is the event the authenticate profile's limit measures the
@@ -10860,7 +11313,7 @@ class Handler(SimpleHTTPRequestHandler):
                 bad_trail = obj.get("trail") if isinstance(obj.get("trail"), dict) else None
                 note_turn(disp["id"] if disp else "", cfg.get("name") or rid,
                           (bad_trail or {}).get("heard"), text, "", bad_trail,
-                          failed_ms, error=str(exc))
+                          failed_ms, error=str(exc), emb=emb)
                 # The message names the route rather than the adapter. A
                 # display says this out loud, and "openai returned 401" tells
                 # the person standing in front of it nothing they can act on
@@ -10934,7 +11387,7 @@ class Handler(SimpleHTTPRequestHandler):
             if not reply:
                 note_turn(disp["id"] if disp else "", cfg.get("name") or rid,
                           (trail or {}).get("heard"), text, "", trail, ms,
-                          error="that route returned nothing")
+                          error="that route returned nothing", emb=emb)
                 return self._json(502, dict(about, ms=ms,
                                             error="that route returned nothing"))
             print("ask ok (%s %s) %dms%s"
@@ -10947,7 +11400,7 @@ class Handler(SimpleHTTPRequestHandler):
             # ask_homeassistant about the flag that used to.
             note_turn(disp["id"] if disp else "", cfg.get("name") or rid,
                       (trail or {}).get("heard"), text, reply, trail, ms,
-                      fell_to=fell_to)
+                      fell_to=fell_to, emb=emb)
             return self._json(200, dict(about, reply=reply, ms=ms,
                                         conversation_id=out.get("conversation_id") or ""))
 

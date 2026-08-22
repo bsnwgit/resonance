@@ -9,100 +9,129 @@ again.
 
 ## 1 · Building up embeds
 
-**Scope this before building any of it** — the list below is what is there and
-what is plainly missing, not a decision about which of it is wanted.
+**Putting it on somebody else's web page is built** — see
+`docs/embedding.md`. What is here is what that round deliberately did not do,
+and one correction to what this section used to claim.
 
-What exists already, and works:
+**The correction.** This section previously said the embed had "a message API
+in both directions — out: `ready`, `status`, `learned`; in: `settings`,
+`routes`, `hello`, and `cmd` over six commands". That was never the embed
+channel. It is the PREVIEW channel, which is the admin panel driving the
+display in its own iframe, and no embed can reach any of it. Anybody scoping
+this from that paragraph was starting from an inventory of things that do not
+exist — which is worth remembering next time a list like it is written from
+memory rather than from the code.
 
-- **Seven parts** — `visual`, `transcript`, `input`, `mode`, `talk`, `audio`,
-  `text` — composed rather than enumerated, so seven parts cover 128
-  arrangements instead of a layout list that needs extending for the 129th.
-- **Six presets** over them (`full`, `console`, `voice`, `chat`, `kiosk`,
-  `signage`), as starting points an admin edits rather than separate kinds of
-  token.
-- **A capability envelope kept separate from the chrome** — `ask`, `mic`,
-  `speak`, `rate_per_min` — fixed when the key is made and never widenable
-  afterwards. `kiosk` and `signage` are the proof the two axes cannot be one
-  field: identical chrome, opposite permissions.
-- **An origins allow-list, session tokens with a TTL** (5–1440 minutes),
-  per-embed rate limiting and a per-IP failure back-off.
-- **A message API in both directions.** Out: `ready`, `status`, `learned`. In:
-  `settings`, `routes`, `hello`, and `cmd` over six commands — `reorient`,
-  `idle`, `thinking`, `speak`, `kiosk`, `drift`.
-- **`docs/embedding.md`**, which describes all of the above.
+What the host channel actually carries, now: out `ready`, `narrowed`,
+`renewed`, each with the grant and when the session ends; in `narrow` and
+`renew`. `embed.js` handles the second of those, so a host only writes one if
+they are doing without the loader.
 
-Directions worth weighing, each of which is a different product:
+Still open, each of which is a different product:
 
-- **The host API is thin where it matters.** A host can push a phrase to be
-  spoken and drive the figure, but cannot ask a question and receive the
-  answer, cannot read the transcript, and cannot be told a turn finished. A
-  signage page can therefore narrate but an application cannot integrate.
-- **No events reach the host.** `ready`, `status` and `learned` are the whole
-  of it — nothing for a turn starting, a wake word firing, an error, or the
-  microphone being refused, all of which the page already knows and records
-  against `EVENT_KINDS`.
+- **A host cannot ask a question and get the answer back.** It can frame the
+  interface and narrow it, and that is all. It cannot put a question in, read
+  the transcript, or be told a turn finished — so a page can host the
+  assistant but an application cannot integrate with it.
+
+  Worth being clear about what such an API would be FOR before building it.
+  The host's server can already `POST /ask` itself. What it cannot do is join
+  the conversation the frame is having — the history, the endpoint's own
+  conversation id, the route the wake word bound, the voice, the transcript —
+  all of which live in that page. So the feature is "ask into this
+  conversation", not "reach the model", and if it is documented as the second
+  every integrator will build the wrong thing.
+
+- **No events reach the host.** Nothing for a turn starting, a wake word
+  firing, an error, or the microphone being refused — all of which the page
+  already knows and records against `EVENT_KINDS`.
+
+- **Reading the transcript wants its own capability.** Everything on the cap
+  axis today is what a host may DO — ask, mic, speak. Reading is what it may
+  KNOW, and on a `kiosk` key that is whatever was said near a hands-free
+  microphone in a lobby. It should be a fourth bit rather than folded into
+  `ask`, and the same question applies more quietly to events: `wake_fuzzy`
+  carries the near-miss word that was heard in the room.
+
+- **The model is not told who is asking.** A key can now require the host to
+  name the person, and it reaches the session, the rate window and the ledger
+  — but not the assistant. Forwarding it means putting a real name into a
+  system prompt, and on a hosted provider that means sending it off the box,
+  which for a product whose first constraint is "nothing goes to a third
+  party" is its own switch and its own decision. Not an oversight.
+
+- **Roles gate nothing.** They are recorded and otherwise inert. Gating an
+  endpoint on a role is the obvious next thing and was deliberately left.
+
+- **A restricted endpoint refuses every embed.** An allow-list names screens
+  and people; an embed is neither, so it is never on one. Naming which keys
+  may reach which assistants is the missing list — and until it exists, any
+  key reaches any endpoint that is not restricted, so six applications share
+  one door.
+
 - **Appearance is the deployment's, not the embed's.** An embed renders what
   the shared settings and profiles say. Whether a host should be able to hand
-  over a palette or a look — or name an appearance profile — is undecided, and
-  it is the difference between an embed being *this* assistant on somebody
-  else's page and being a component.
-- **One key, one arrangement.** There is no way to issue a key that a host can
-  reconfigure within its envelope, which is what an application with two
-  surfaces on one page would need.
-- **Nothing is versioned.** The message API has no version field, so the day a
-  `cmd` changes shape there is no way for a host to know which it is talking
-  to.
+  over a palette or name an appearance profile is undecided, and it is the
+  difference between an embed being *this* assistant on somebody else's page
+  and being a component.
+
+- **Nothing is versioned.** `rsn: 1` is a marker, not a negotiation: nothing
+  advertises which kinds this server understands, so the day one changes shape
+  a host has no way to tell which it is talking to. Cheapest to fix on the
+  `ready` message, and cheaper still before there are integrations in the
+  wild.
 
 ---
 
-## 2 · A real certificate on the server
+## 2 · The certificate, and what it still does not cover
 
-**Self-signed, and it is the reason for most of what looks broken.** What is on
-the box today:
+**Done, for the internal network.** An internal CA now issues it, and browsers
+with the root installed reach every listener with no warning at all.
 
 ```
-subject / issuer  CN = <the server's IP>      (its own issuer — self-signed)
-valid             13 Aug 2026 → 13 Aug 2027
-SAN               IP:<server>, IP:127.0.0.1, DNS:localhost
+subject   CN = *.server.example.internal
+issuer    CN = <your internal CA>            (an internal CA, not self-signed)
+valid     21 Aug 2026 → 21 Aug 2027
+SAN       DNS:*.server.example.internal         — and nothing else
 ```
 
-Every browser warns before every listener, on the panel and on each assistant,
-and it has to be clicked past on each new machine and after each profile wipe.
-Worse than the noise: a warning people are trained to click past is a warning
-that stops meaning anything on the day it matters.
+`https://ai.server.example.internal:9701` loads clean. The panel, the assistants and
+the enrolment page can all be opened, driven and screenshotted, so the tooling
+gap that made the enrolment gate ship with two attributes unset is closed.
 
-What it also blocks, concretely:
+**Three things the SAN does not carry**, each verified against a browser rather
+than reasoned about:
 
-- **The FQDN under ADMIN ▸ Enrolment cannot be used honestly.** Set
-  *Address in the link* to a name and every invitation opens on a certificate
-  that does not carry it, so the first thing anybody sees when accepting is a
-  security warning about the link they were sent. That is indistinguishable
-  from phishing and it is the one page where it matters most.
-- **Tooling cannot reach it.** The in-app browser refuses the cert outright, so
-  the acceptance page and the panel cannot be driven or screenshotted for
-  verification — which is why the enrolment gate shipped with its two body
-  attributes unset and was found by hand instead.
-- **A name is barely usable at all.** `make-cert.sh` writes the SAN from the
-  one host it is given, so every name and address wanted has to be decided in
-  advance and the script re-run to change any of them.
+- **The IP.** `https://10.1.153.21:9701` still warns — there is no IP in the
+  SAN. Every bookmark, every *Address in the link*, and the embed address must
+  be a name. Anybody still using the IP sees exactly the warning this work was
+  meant to remove, and will reasonably conclude nothing changed.
+- **The bare domain.** `*.server.example.internal` does not match `server.example.internal` —
+  a wildcard matches one label, never its own parent. `ai.server.example.internal`
+  works; `server.example.internal` warns.
+- **A second level.** `a.b.server.example.internal` is two labels down and is not
+  covered either.
 
-**To decide first:** where the certificate comes from, and it is a different
-job for each answer.
+**And it is a private CA on a `.lan` domain**, which decides what an embed can
+be. A host application whose users' machines carry <your internal CA> gets an embed
+that simply works. Anything outside that — a public website, a contractor's
+laptop, somebody's phone off the VPN — gets a blank iframe with nothing in the
+console naming the cause, because `.lan` does not resolve on the internet and
+nothing out there trusts this root. That is the right answer for six internal
+tools and not an answer at all for a public one, and the two are worth not
+confusing when the next application is added.
 
-- **An internal CA**, with its root installed on the machines that use this —
-  covers every name and address at once and is the only answer that scales past
-  a handful of browsers.
-- **A public certificate** for a real domain, which needs that domain to resolve
-  to the server and a renewal path that does not involve remembering.
-- **Keep self-signing but do it properly** — every name and IP in the SAN,
-  including whatever goes in *Address in the link*, and the root trusted on the
-  machines that matter. Cheapest, and it does not fix the acceptance page for
-  anybody outside those machines.
+**What is left:**
 
-Whichever it is, two things go with it: **a renewal that is not a diary entry**
-(this one expires 13 Aug 2027 and nothing will say so), and `make-cert.sh`
-taking more than one host so the SAN can carry the panel's address, each
-assistant's, and the enrolment name together.
+- **A public certificate**, if any embed is ever to sit on a public site. A
+  real domain that resolves to this server, and a renewal path.
+- **A renewal that is not a diary entry.** This one expires 21 Aug 2027 and
+  nothing will say so. It is a year of not thinking about it followed by every
+  listener failing at once.
+- **`make-cert.sh` is now beside the point** for this deployment and still
+  takes one host, so anybody falling back to it lands in the old situation
+  without noticing. Worth either teaching it several names or saying plainly
+  at the top that the CA is where certificates come from here.
 
 ---
 

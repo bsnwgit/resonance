@@ -842,14 +842,23 @@ function relay(slot, text, live){
    key. Same page again rather than a cut-down copy, for the reason the
    preview is: a second implementation is a second thing to keep correct.
 
-   The token rides in the URL and goes back out as a bearer header. Not a
-   cookie — a cookie set by an iframe is a third-party cookie, and browsers
-   block or partition those, so an embed authenticated that way works in one
-   browser and silently fails in the next. Nothing ambient also means nothing
-   to forge. */
+   THE URL CARRIES A ONE-USE CODE, NOT THE SESSION TOKEN. The token is a
+   bearer credential — whoever holds it is this embed — and a URL inside
+   somebody else's page is the worst place to keep one: their scripts set it,
+   their analytics and error reporters see it, and it survives in history and
+   in any screenshot of the frame. So this page trades the code for the token
+   once, at load, and the token then exists only in the closure below.
+
+   Not a cookie either — a cookie set by an iframe is a third-party cookie, and
+   browsers block or partition those, so an embed authenticated that way works
+   in one browser and silently fails in the next. Nothing ambient also means
+   nothing to forge. */
 const EMBED = (()=>{
-  const t = new URLSearchParams(location.search).get('t');
-  return (t && /\/embed\/?$/.test(location.pathname)) ? t : null;
+  const c = new URLSearchParams(location.search).get('c');
+  /* An OBJECT, not the code. What this page authenticates with is the token,
+     and that arrives a round trip after this line runs — everything else here
+     only asks "am I an embed?", which the truthiness still answers. */
+  return (c && /\/embed\/?$/.test(location.pathname)) ? {code: c, token: ''} : null;
 })();
 
 if (EMBED){
@@ -864,18 +873,87 @@ if (EMBED){
      fetch once cannot send the token anywhere but back here. The
      alternative — threading a header through eight call sites — is eight
      places for the next one to be forgotten. */
+  /* AND EVERYTHING WAITS FOR IT.
+
+     The token now arrives a round trip after this page starts, and the page
+     does not wait to be asked: settings, routes and voices all go out while
+     the claim is still in flight. Sent without the header they come back as
+     the answers given to a passer-by — and `/routes` in particular then says
+     the assistant may not be used, so the page drops every utterance at the
+     wake gate for the rest of the session. Nothing throws and nothing is
+     logged. It simply does not work, in a way that looks like the key.
+
+     This cost an afternoon of looking at the server. The URL used to carry
+     the token itself, so it was there synchronously and no call could outrun
+     it; making it a code to be traded introduced the gap, and the gap is
+     invisible from every end except the network panel.
+
+     So same-origin calls wait here, once. The claim is the exception — it is
+     the request that PRODUCES the credential — and a claim that FAILS
+     releases them too, so a dead session surfaces as refusals rather than as
+     a page that hangs forever with nothing drawn on it. */
+  EMBED.ready = new Promise(go => { EMBED.claimed = go; });
   const rawFetch = window.fetch.bind(window);
-  window.fetch = (input, init)=>{
+  window.fetch = async (input, init)=>{
     const url = new URL(typeof input === 'string' ? input : input.url,
                         location.href);
     if (url.origin !== location.origin) return rawFetch(input, init);
+    if (!EMBED.token && !/\/embed\/claim$/.test(url.pathname))
+      await EMBED.ready;
     const opts = Object.assign({}, init);
     const h = new Headers((init && init.headers) ||
                           (typeof input === 'object' && input.headers) || {});
-    h.set('Authorization', 'Bearer ' + EMBED);
+    /* Read NOW rather than closed over: the claim below is itself a fetch,
+       and it has to go out unauthenticated because the thing it is fetching
+       is the credential. An empty header is not sent at all — "Bearer " with
+       nothing after it would be a malformed claim to hold a session, which
+       reads as tampering rather than as not having one yet. */
+    if (EMBED.token) h.set('Authorization', 'Bearer ' + EMBED.token);
     opts.headers = h;
     return rawFetch(input, opts);
   };
+
+  /* SPENT HERE, NOW, AND NOT IN THE STARTUP SEQUENCE.
+
+     It lived in loadEmbed(), which runs after the settings and the endpoints
+     have loaded — sensible when the only question was when to APPLY the
+     grant, and a deadlock the moment those same calls started waiting for
+     the token: the claim was queued behind the requests that were queued
+     behind the claim, and the frame simply never finished loading.
+
+     Two things at two times, so both can be right. Getting the credential is
+     the first thing this page does. Applying the grant stays where it was —
+     after the preferences, because the grant decides what this surface is and
+     a preference stored against another page on the same site does not get to
+     argue with it. loadEmbed() waits on this. */
+  EMBED.session = (async ()=>{
+    try{
+      const r = await fetch('embed/claim', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({code: EMBED.code}), cache:'no-store'});
+      const j = await r.json();
+      if (!r.ok || !j.token || !j.embed)
+        throw new Error(j.error || ('HTTP ' + r.status));
+      EMBED.token = j.token;
+      EMBED.code  = '';
+      /* Out of the address bar. It is already dead — one use, just spent — so
+         this is tidiness rather than a control: a frame left open for an hour
+         should not still be showing something shaped like a credential. The
+         control is that the token never goes into a URL at all. */
+      try{ history.replaceState(null, '', location.pathname); }catch(e){}
+      return j;
+    }finally{
+      /* Whatever happened. Everything queued in the wrapper above is released
+         here — with a token if there is one and without if the claim failed,
+         because a refusal somebody can read beats a frame that hangs forever
+         with nothing drawn on it and nothing said about why. */
+      EMBED.claimed();
+    }
+  })();
+  /* Observed once here so a failure is not an unhandled rejection in the
+     host's console before loadEmbed() gets to it. The real handling is
+     there, on the same promise. */
+  EMBED.session.catch(()=>{});
 }
 
 /* What this embed was granted, and what the host has narrowed it to. Two
@@ -4671,7 +4749,8 @@ async function askBackend(text, bare, rid){
        silence. Not spoken, not in the transcript, and NOT the "I could not
        reach it" line below: this did reach it, and was refused. */
     if (j && j.refused){
-      note('refused: this display may not use ' + (who || 'that endpoint'), true);
+      note('refused: this ' + (j.refused === 'embed' ? 'embed' : 'display') +
+           ' may not use ' + (who || 'that endpoint'), true);
       return {reply: '', refused: true};
     }
     // the route still being on demo is not an error, just not wired up yet
@@ -6029,17 +6108,58 @@ function hostOrigin(){
 function tellHost(kind){
   const target = hostOrigin();
   if (!target || window.parent === window) return;
+  /* WHEN THIS SESSION STOPS, so the loader can ask for another before it
+     does. Without it a host can only find out by having a question refused,
+     which is one lost question and a person wondering what they did. */
   window.parent.postMessage({rsn:1, kind, name: Embed.grant.name,
-                             parts: Embed.live.parts, cap: Embed.live.cap},
+                             parts: Embed.live.parts, cap: Embed.live.cap,
+                             expires_in: Embed.grant.expires_in || 0},
                             target);
+}
+
+/* A fresh code from the host, spent for a fresh token WITHOUT RELOADING. The
+   obvious implementation of renewal — point the frame at a new /embed?c= —
+   is correct and throws away the conversation, which from the other side of
+   the screen is the assistant forgetting the last ten minutes for no reason
+   anybody can see. The token is a variable; replacing it is a variable
+   changing.
+
+   The grant is re-read from the new session rather than kept, because a
+   renewal IS the next session and the next session is where an admin's edit
+   to the key takes effect. Any narrowing the host had applied is laid back
+   over the top: they asked for less, and a renewal is not them changing
+   their mind. */
+async function renewEmbed(code){
+  if (!EMBED || !code) return;
+  try{
+    const r = await fetch('embed/claim', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({code}), cache:'no-store'});
+    const j = await r.json();
+    if (!r.ok || !j.token || !j.embed) throw new Error(j.error || ('HTTP ' + r.status));
+    const was = {parts: Embed.live.parts.slice(), cap: Object.assign({}, Embed.live.cap)};
+    EMBED.token = j.token;
+    Embed.grant = j.embed;
+    Embed.live  = {parts: j.embed.parts.slice(), cap: Object.assign({}, j.embed.cap)};
+    narrowEmbed(was);            // re-intersects, and tells the host itself
+    tellHost('renewed');
+  }catch(e){
+    /* Not spoken and not in the transcript. The session on the table is still
+       good — the loader renews a minute early precisely so this can be
+       retried — and announcing plumbing to whoever is mid-question is noise
+       laid over the answer they are waiting for. */
+    note('embed session could not be renewed: ' + e.message, true);
+  }
 }
 
 async function loadEmbed(){
   if (!EMBED) return;
   try{
-    const r = await fetch('embed/session', {cache:'no-store'});
-    const j = await r.json();
-    if (!r.ok || !j.embed) throw new Error(j.error || ('HTTP ' + r.status));
+    /* Already in flight since the top of this file — see EMBED.session. The
+       grant rides back on the claim rather than needing a second call: two
+       round trips to answer "what am I" is two chances to draw a frame that
+       does not know yet. */
+    const j = await EMBED.session;
     Embed.grant = j.embed;
     Embed.live = {parts: j.embed.parts.slice(), cap: Object.assign({}, j.embed.cap)};
     applyEmbed();
@@ -6057,7 +6177,9 @@ async function loadEmbed(){
       if (e.source !== window.parent) return;
       if ((Embed.grant.origins || []).indexOf(e.origin) < 0) return;
       const m = e.data;
-      if (m && m.rsn === 1 && m.kind === 'narrow') narrowEmbed(m);
+      if (!m || m.rsn !== 1) return;
+      if (m.kind === 'narrow') narrowEmbed(m);
+      else if (m.kind === 'renew') renewEmbed(m.code);
     });
     tellHost('ready');
   }catch(e){

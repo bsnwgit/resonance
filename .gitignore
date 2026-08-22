@@ -15,6 +15,14 @@ embeds.json
 embeds.json.tmp
 displays.json
 displays.json.tmp
+identities.json
+identities.json.tmp
+turns.json
+turns.json.tmp
+events.json
+events.json.tmp
+alerts.json
+alerts.json.tmp
 groups.json
 groups.json.tmp
 server.log

@@ -205,7 +205,7 @@ button. Readable by any signed-in account, not just admins.
 | **[Assistants](docs/assistant.md)** | One display, several assistants: the four providers, routes, and Home Assistant |
 | **[Administration](docs/administration.md)** | The panel, the live preview, approving displays, and keeping an untouched screen working |
 | **[Admin settings & accounts](docs/app-settings.md)** | Ports, restarts, session lifetime, and the two roles |
-| **[Embedding it elsewhere](docs/embedding.md)** | Embed keys, and the three steps a host application takes |
+| **[Embedding it elsewhere](docs/embedding.md)** | Putting it on somebody else's web page, inline or as a bubble: keys, the code you hand their developer, and what the server needs first |
 
 **Project reference.** In the repository, not in the panel.
 
