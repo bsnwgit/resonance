@@ -55,9 +55,10 @@ Parse first, deploy second:
 ```
 
 There is no build step here, so nothing reads these files between saving them
-and a browser running them. `check.sh` puts both pages' inline scripts through
-node's parser and both Python modules through Python's, and reports the line
-number of the **HTML file** rather than of the extracted script. It ends a
+and a browser running them. `check.sh` puts both pages' inline scripts and
+`embed.js` through node's parser, and both Python modules through Python's,
+and reports the line number of the **HTML file** rather than of the extracted
+script. It ends a
 script where a browser ends it — at the first `</script`, wherever that falls —
 so a page it passes is the page a browser will actually run. It only parses: a
 page that parses can still be wrong, but a page that does not parse is one
@@ -101,6 +102,11 @@ these are generated on the server and are either secret or large:
 | `settings.json` | the shared interface configuration — deployment state, not source |
 | `app.json` | ports and session length — deployment state, not source |
 | `server.pid` | whichever process happens to be running |
+| `embeds.json` | embed key hashes |
+| `identities.json` | the people who can sign in |
+| `turns.json` | **what was actually said** — questions, answers, and who asked where a key names them |
+| `events.json` | faults, and who signed in or was refused |
+| `alerts.json` | what has been raised against which screen |
 | `voices/` | Piper models, 60–120 MB each, downloadable |
 | `stt-venv/` | virtualenv |
 | `server.log`, `*.wav` | runtime noise |
@@ -122,9 +128,10 @@ Deliberately flat — this is a single page plus a single server file.
 | `admin.html` | the configuration interface, served only on the admin port |
 | `serve.py` | static serving, `/stt`, `/tts`, `/settings`, `/app`, accounts and sessions |
 | `manual.py` | the in-app manual's registry, and its dependency-free PDF writer |
+| `embed.js` | the loader a host page drops in — the only file served to somebody else's origin |
 | `serve.sh` | start/stop, resolving the PID from the port |
 | `make-cert.sh` | self-signed certificate for the HTTPS listener |
-| `check.sh` | parses both pages and both modules; run it before a deploy |
+| `check.sh` | parses both pages, `embed.js` and both modules; run it before a deploy |
 
 Resist splitting `index.html` until the visualiser is extracted as a package —
 at that point the split should be *core vs demo shell*, not an arbitrary

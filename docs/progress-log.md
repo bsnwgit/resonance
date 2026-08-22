@@ -5,6 +5,88 @@ rediscovered. For what is planned rather than done, see [Roadmap](roadmap.md).
 
 Newest first.
 
+## 2026-08-21 — the assistant on somebody else's web page
+
+Embeds existed as a way to frame this interface. This is the round that makes
+one droppable into a running web application: one endpoint on their server,
+one tag in their template, and a bubble in the corner of every page.
+
+The shape was settled first, out loud, against one stated principle — *assume
+it is always facing an insecure network* — and most of the work below follows
+from that rather than from the feature request.
+
+- **An embed session is a vetted caller.** It satisfies an assistant's "no
+  anonymous callers" on the same reasoning a code-enrolled screen does: an
+  admin made the key, named it, chose what it may do, and can revoke it. This
+  is the one that matters. An embed means the server is reachable by every
+  visitor's browser, which for a public site means the internet — and
+  `/ask` was open to anyone who found the port, key or no key. Requiring a
+  sign-in was the existing answer and it could not be used, because ticking it
+  took every embed down along with the strangers it was aimed at. Now it does
+  not, so the door can actually be shut.
+- **A one-use code in the URL, never the session token.** The token is a
+  bearer credential and it was sitting in an iframe's `src` inside somebody
+  else's page — readable by their scripts, their analytics, their error
+  reporter, the history and any screenshot. The allow-list does not help: it
+  stops another site *framing* this and does nothing against `curl`. The URL
+  now carries a code good once and for a minute; the frame trades it at load
+  and the token exists only in that page's memory.
+- **One session per visitor, with its own rate window.** The key's number is
+  the application's total and the bill; a second, smaller one is a browser's
+  share. One number could not say both — sized for a busy application it is a
+  number one visitor can spend alone. Where the key names the person the
+  window follows *them*, so reloading buys nothing. Neither number was
+  settable from the panel before; both are now.
+- **A key can require the host to name who is asking**, off by default. Their
+  server asserts it, never their browser — they authenticated the person and
+  hold the key, and a browser saying who it is would be a text field. Required
+  means the code request is *refused* without it, so a host that forgets finds
+  out on the afternoon they wire it up rather than months later through an
+  audit trail full of nobody. Those turns are recorded against the key and the
+  person; where a key does not name people, nothing is recorded at all.
+- **`embed.js`** — the loader, served from here and running in their page.
+  Fetches a code from their own endpoint, frames this with
+  `allow="microphone"` set for them, draws the launcher and panel, and renews
+  the session. Six applications hand-writing the same forty lines is six
+  chances to get the microphone attribute, the message-origin check or the
+  renewal subtly wrong, and five of those fail silently. Shadow DOM, closed,
+  because this markup lands in pages whose CSS nobody here has seen.
+- **Renewal does not reload.** The loader posts a fresh code in and the frame
+  swaps its token behind the scenes. Pointing the frame at a new URL would
+  have been correct and would have thrown away the conversation, which from
+  the other side of the screen is the assistant forgetting the last ten
+  minutes for no reason anybody can see.
+- **The panel writes the integration.** Creating a key produces working Node,
+  Python and PHP for their endpoint and the tag for their page, against an
+  address an admin sets — and shaped by the key, so a token that does not
+  require a person has no user block in its snippet. The key is *not* in the
+  generated code: it is read from `RESONANCE_KEY`, so the snippet can go in a
+  chat message and the credential cannot.
+
+Two things found on the way that were not part of the job:
+
+- **`turns.json`, `events.json`, `identities.json` and `alerts.json` were not
+  in `.gitignore`.** They hold verbatim conversation text, sign-in records and
+  the people who can sign in. Nothing had committed them yet; one `git add -A`
+  on a machine where they existed would have. Added, and listed in
+  CONTRIBUTING beside the credentials.
+- **TODO §1's inventory of the embed message API was describing the preview
+  channel** — the admin panel driving the display in its own iframe — which no
+  embed can reach. Anybody scoping from it was starting from a list of things
+  that do not exist. Corrected in place, with the correction left visible.
+
+**What this does not do**, and none of it by accident: a host still cannot ask
+a question and receive the answer, no events reach it, roles are recorded but
+gate nothing, the model is not told who is asking, and a *restricted* endpoint
+refuses every embed because an allow-list names screens and people. Each is
+argued in TODO §1.
+
+**And it cannot be deployed off this machine until the certificate is real.**
+A browser will not quietly load an iframe from a certificate it does not
+trust, and inside an iframe there is no warning to click past — the frame is
+blank for every visitor, with nothing in the console that names the cause. See
+TODO §2.
+
 ## 2026-08-20 — the door, the clock, and one queue for everybody waiting
 
 A session's worth of work on the two ends of a deployment: who gets in, and

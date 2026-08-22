@@ -23,9 +23,11 @@ Display listeners only — the embed does not exist on the admin port:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `POST` | `/embed/session` | an embed key in, a short-lived session token out |
-| `GET` | `/embed?t=` | the display, framed, drawing only what the key grants |
+| `POST` | `/embed/session` | an embed key in, a one-use handover code out. Where the key requires it, `user.id` must come with the key or the call is refused. Never returns a session token: see [Embedding](embedding.md) |
+| `GET` | `/embed?c=` | the display, framed, drawing only what the key grants. The code is read for the `frame-ancestors` line and **not** spent |
+| `POST` | `/embed/claim` | the code, spent once, for the session token and the grant. The token is a bearer credential and lives only in that page's memory |
 | `GET` | `/embed/session` | what this session was granted — bearer token |
+| `GET` | `/embed.js` | the loader a host page drops in: fetches a code from *their* endpoint, frames this, draws the bubble, renews the session |
 
 Admin listener only — everything below returns 404 on the public ports:
 

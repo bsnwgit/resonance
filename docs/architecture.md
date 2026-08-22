@@ -495,9 +495,9 @@ Measured round-trips on the reference box, cold then warm:
 ## Embedding it in another application
 
 An admin creates an **embed key** on the EMBEDS tab. The host application's
-*server* exchanges it for a short-lived session; the host's page frames the
-result. Server to server, so the layout it asked for and its right to ask are
-settled in one call, before a browser is involved.
+*server* exchanges it for a one-use code; the host's page frames the result
+and trades the code for a session. Server to server, so the layout it asked
+for and its right to ask are settled before a browser is involved.
 
 `docs/embedding.md` — also in the panel, and downloadable as a PDF — is the
 integration guide. What is worth having here is the reasoning.
@@ -537,6 +537,47 @@ developer reading it out of a 400 three weeks later.
 phone voice-only is a breakpoint problem, and the narrow-viewport rules key
 off the *frame's* width rather than the device's. Solving it by issuing a
 different key after sniffing a user agent would be the wrong layer.
+
+**A code in the URL, never the token.** A session token is a bearer
+credential and the obvious design puts it in the iframe's `src`, which is the
+worst place available for one: the host's own scripts set it and can read it
+back, and so can their analytics, their error reporter, the history, a
+referrer and a screenshot in a ticket. The origin allow-list does not help —
+it stops another site *framing* this and does nothing against `curl`. So the
+URL carries a code good once and for a minute, and the token it buys exists
+only in that page's memory.
+
+**An embed session is a vetted caller.** It satisfies an assistant's "no
+anonymous callers" on the same reasoning a code-enrolled screen does: an admin
+made the key, named it, chose what it may do, and can revoke it. Without that
+the setting was unusable on the one deployment it matters most for — a server
+an embed necessarily exposes to every visitor's browser — because ticking it
+would have taken the embeds down along with the strangers it was aimed at. A
+*restricted* endpoint still refuses an embed: an allow-list names screens and
+people, an embed is neither, and quietly letting keys past every allow-list
+because they are not the kind of thing it holds would be the wrong way to not
+have built that list.
+
+**Two rate windows, not one.** The key's budget is the application's total and
+the bill; a second, smaller window is one browser's share of it. One number
+could not say both — sized for a busy application it is a number one visitor
+can spend alone, sized for one visitor the second visitor finds it empty.
+Where the key names the person the window follows *them*, so a reload buys
+nothing; where it does not, it follows the session, and the key's own total is
+what actually bounds the damage.
+
+**Identity is asserted by the host's server or not at all.** A key can require
+the person to be named; their application authenticated them and holds the
+key, and a browser saying who it is would be a text field. Required means the
+code request is *refused* without it, so the mistake surfaces on the first
+call of the integration rather than months later as an audit trail full of
+nobody.
+
+**The loader ships from here** — `embed.js`. Six applications hand-writing the
+same forty lines is six chances to get the microphone attribute, the
+message-origin check or the renewal subtly wrong, and five of those fail
+silently. It renews without reloading, so a session ending mid-conversation
+does not read as the assistant forgetting the last ten minutes.
 
 **The embed is memoryless**, and that is the sequencing rather than an
 omission — see the roadmap.

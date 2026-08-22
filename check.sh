@@ -9,10 +9,10 @@
 # rather than like a syntax error. That happened once, from a statement added
 # under a brace-less `if`, and the first thing to notice was a browser.
 #
-# So: both pages' inline scripts through node's parser, both Python modules
-# through Python's. Line numbers come back pointing at the HTML file rather
-# than at the extracted script, because a number that needs arithmetic done to
-# it is a number somebody reads wrong.
+# So: both pages' inline scripts and embed.js through node's parser, both
+# Python modules through Python's. Line numbers come back pointing at the HTML
+# file rather than at the extracted script, because a number that needs
+# arithmetic done to it is a number somebody reads wrong.
 #
 # It parses. It does not run, and it cannot tell you the page works.
 set -u
@@ -195,6 +195,22 @@ PY
 for page in index.html admin.html; do
   check_page "$page" || fail=1
 done
+# A STANDALONE SCRIPT NEEDS THE SAME FLOOR. embed.js is not inline in a page
+# this checks, and it runs in somebody ELSE'S page — so a syntax error in it is
+# a fault that never shows up here, only in an application this project cannot
+# see, reported by somebody who cannot read the source.
+check_js() {
+  if node --check "$DIR/$1" 2>/tmp/rsn-check-js.$$; then
+    printf '%-12s parses (%d lines)\n' "$1" "$(wc -l < "$DIR/$1" | tr -d ' ')"
+    rm -f /tmp/rsn-check-js.$$
+    return 0
+  fi
+  echo "$1: does NOT parse" >&2
+  grep -v -e '^    at ' -e '^Node.js v' /tmp/rsn-check-js.$$ >&2
+  rm -f /tmp/rsn-check-js.$$
+  return 1
+}
+check_js embed.js || fail=1
 # …and that nothing called at LOAD is missing. Parsing proves the script is
 # well formed; this proves it gets past its first line. See check_calls.py.
 python3 "$DIR/check_calls.py" "$DIR/index.html" "$DIR/admin.html" || fail=1
