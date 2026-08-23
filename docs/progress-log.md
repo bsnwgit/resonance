@@ -5,6 +5,156 @@ rediscovered. For what is planned rather than done, see [Roadmap](roadmap.md).
 
 Newest first.
 
+## 2026-08-23 — the panel answers about the application it is sitting in
+
+An embed put this interface on somebody else's page and left it able to talk
+about anything except the thing the person was looking at. Now it reaches
+their data — but the design question was never "how do we fetch it", it was
+**who makes the request**.
+
+- **The browser does, not this server.** Calling their API from here would need
+  a service credential on every application (one account for everybody,
+  necessarily holding more than any single visitor should see), network reach
+  into places that have never accepted an inbound connection, and a schema per
+  customer forever. The panel is already framed inside a page authenticated as
+  that person, so the call is made there, same-origin, with their own session.
+  This server holds no secret of theirs and reaches nothing. The cost is that
+  the loop runs *through* a request rather than inside one — `/ask` answers
+  with `tool_call` instead of `reply`, the frame performs it through the host
+  page, and the same question comes back with `tool_results`.
+- **Three authorities, narrowest wins.** The application declares a ceiling in
+  a grant file it serves itself; the admin ticks within it; the visitor's own
+  login caps whatever survives. The data's owner sets the outer bound and only
+  they can raise it, which is what makes this safe to embed in an application
+  somebody else runs. **No grant file means reads only** — silence never grants
+  a write.
+- **Writing is declared, never inferred.** Applications change things behind a
+  `GET` and run searches over `POST`; the verb is a hint about neither. The one
+  place a verb is trusted is the absence of a grant file, and it is trusted in
+  the safe direction.
+- **Nothing app-specific is in this server.** It reads an OpenAPI document and
+  grants against `operationId` — the one identifier meant to be stable. A grant
+  naming a path would follow the next refactor onto a different operation and
+  keep working, which is the worst way for a permission to fail.
+- **The spec must sit on a registered origin.** Not tidiness: a URL an admin
+  can type is a URL this server will fetch, and without the check the field
+  reaches every address on this machine's network.
+- **The model's output is untrusted input.** An invented operation, a renamed
+  parameter, a path segment stuffed with a slash — ordinary failure modes of a
+  model, all of which would otherwise arrive at somebody's API as a request
+  their page made in their name. Every proposed call is resolved and checked
+  here, and `embed.js` checks again at the far end against the operations the
+  session declared, so a tampered frame still reaches only the declared paths.
+- **A write stops and asks, per action.** The confirmation is drawn by the
+  frame rather than the host page — a confirmation rendered by the party that
+  wants the action is not one — and names the real values, because a voice
+  interface has no address bar to check. There is no session-wide "allow
+  writes": that is the same hole with one more click in front of it.
+- **Four laps, then it stops.** A model that has misread its tools will call
+  the same one for ever, and every lap is a request through somebody's page.
+
+Verified end to end in a browser against a stand-in application: a question
+about data not on screen, answered from that application's own search
+endpoint; and a write held at a confirmation, taken by voice, and then
+performed.
+
+## 2026-08-23 — the sink carries the whole log, not a tenth of it
+
+Syslog was an alert destination. A collector watching this server saw a
+screen's microphone fail and could not see the restart before it, the migration
+that ran, the failed sign-in, or the request that threw a traceback a second
+earlier. Half a picture in the one place an operator actually watches is worse
+than none, because it reads as the whole of it.
+
+- **Everything the process prints goes to the sink while it is on.** The
+  startup banner, the migrations, the request log, every `print` in the file
+  and Python's own tracebacks.
+- **Done at the stream, not at the call sites.** `sys.stdout` and `sys.stderr`
+  are wrapped in a tee that writes through and mirrors whole lines. There are
+  over a hundred `print` calls here, each one a sentence written for a person
+  reading `server.log`; routing them through a logging framework would mean
+  editing every one, and the first one anybody forgot would be invisible in
+  exactly the way this exists to fix. Wrapping the stream makes "all of it"
+  true by construction, including whatever is added next.
+- **Stdout is `info` and stderr is `err`**, which is what makes the severity
+  worth anything at the far end — and why the request log moved to stdout. It
+  was the one thing on stderr that is not a fault, and left there it would have
+  filed every 200 OK under error. Same file on disk either way: `serve.sh`
+  redirects both.
+- **The settings are read once a second rather than once a line.**
+  `display_settings()` reads and parses `displays.json` every time it is asked,
+  which is fine at one call per alert and is a file read per request now. A
+  second is short enough that switching the sink on in the panel takes effect
+  while you are still looking at it.
+- **`Send` governs both.** The severity floor was already there for alerts and
+  now decides how much of the log travels too — `everything` ships by default,
+  and `errors only` is the answer to a noisy collector rather than switching
+  the sink off and losing the alerts as well.
+- **Never a second fault.** The mirror is inside the existing fire-and-forget
+  sender, which swallows every failure, and it carries a per-thread re-entry
+  guard: a mirror that can recurse into itself is one bad edit away from taking
+  the server down.
+
+## 2026-08-23 — the panel's controls moved under its field
+
+An embed panel is 400 points wide by default. The composer is one row —
+caret, field, buttons — which is right on a display, where it is a line across
+the bottom of a whole screen and the field has more width than anybody types
+into. In the panel that same row left the field about ninety points: four
+buttons and a caret took the rest, and a text field you cannot read your own
+sentence in is not a text field. It is also the part of a panel people
+actually use.
+
+- **The buttons take a line of their own beneath the field**, in an embed
+  only — a display and a wall screen are untouched. `flex-basis:100%` on the
+  button group is the whole of it: the caret and the field are earlier in the
+  row and keep the first line, so the field gets the width back with no
+  wrapper element and no second markup for the embed to drift out of step
+  with.
+- **Right-aligned, where they already were.** The row grew a line; it did not
+  move. Said on the group rather than on the bar, because a full-width line
+  ignores its parent's justification — which also keeps it true for a key
+  granted no input part, where the buttons are the only thing in the composer
+  and the row stays a single line.
+
+## 2026-08-23 — a site is something you maintain, not something you reissue
+
+An embed key's settings were fixed at creation. The stated reason was sound —
+somebody's page is already framing it, and widening a key from the panel
+changes what that page can do without anybody at that end knowing — but the
+only remedy it left was *make another key and delete this one*, and that is a
+**new id**. Every authorize profile that had ticked the old one silently stops
+naming anything, the far end is sent a credential and wires it in again, and
+all of it to correct a hostname somebody typed wrong. The risk was named
+correctly and charged to the wrong party.
+
+- **A row under ACCESS ▸ SITES is an editing surface**, carrying the same six
+  sections the key was made in. `POST /embeds/update` rewrites the record in
+  place: same id, same secret, same grants. Nothing at the far end is sent
+  anything and no permission stops naming it.
+- **A narrowed key takes its live sessions with it.** This is what the old rule
+  was actually asking for. A session token carries the parts, the capability
+  and the origins it was minted with, so a key narrowed while its sessions ran
+  would be narrower on paper only, for up to a day. Move any of those, the
+  session length, or whether the host must name the person, and every session
+  that key holds is dropped — the pages framing it mount again within a moment,
+  inside the new envelope. A rename drops nothing, because taking somebody's
+  page dark to correct a spelling is not a trade worth making.
+- **One validator for create and edit.** An edit cannot reach a record a create
+  could not have produced — the same coherence rules, the same origin parsing,
+  the same ranges, in the same words. What an edit may not touch is the secret
+  (REISSUE KEY is the button for that), the audit fields, and `enabled`, which
+  has a button of its own: a form carrying it would put a site back on the air
+  as a side effect of saving a rename.
+- **The row stopped printing what it can now set.** May, Draws, Frames, Session
+  and Asking were read out as text because they could not be anything else.
+  They are fields now; printing them twice on one row would leave an admin
+  editing one copy and reading the other. What stays is the three an edit
+  cannot reach — Reaches, Last used, Made.
+- **REVERT and SAVE beside DELETE**, on the right of the action bar with the
+  spacer between, the way an endpoint's block already splits *what operates it*
+  from *what writes to it*. Both dark until the fields have been touched.
+
 ## 2026-08-21 — the assistant on somebody else's web page
 
 Embeds existed as a way to frame this interface. This is the round that makes

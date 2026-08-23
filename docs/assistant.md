@@ -707,7 +707,20 @@ explicitly asks for. A model that answers those questions confidently is
 giving you stale training data dressed as fact, which is worse than a refusal.
 
 If you need live information, that is a search or tool integration, not a
-setting. It does not exist yet.
+setting. There is no web search and there is no plan for one.
+
+**One exception, and only inside an embed.** An assistant embedded in another
+application can be granted operations on *that* application and does reach its
+live data — see [Reaching an application's data](host-data.md). It is not a
+general answer to recency: it reaches that application and nothing else, and a
+display on a wall is inside no application at all.
+
+**If you are choosing an assistant for a site that uses it, choose for tool
+calling.** Only OPENAI-COMPATIBLE and ANTHROPIC carry tool definitions;
+HOME ASSISTANT does its own on its own side, and DEMO cannot. A small local
+model is exactly where tool calling is least reliable — a 3b will invent
+parameter names a hosted model would not — so an endpoint chosen for
+conversation is not automatically the right one here.
 
 **Local knowledge varies enormously with model size.** A 1.5b will get
 straightforward facts wrong in ways a 7b will not. If answers are thin rather

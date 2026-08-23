@@ -187,24 +187,74 @@ needed for the pair above:
 - **SITES** — every application holding a key to frame this interface. The
   register, not the form: a key is issued under ENROLLMENTS ▸ EMBED and appears
   here the moment it exists, the same move a screen makes from ▸ DEVICE to
-  NODES. A row opens read-only, because what a key may do and what it draws are
-  fixed at creation — somebody's page is already framing it, and widening it
-  from here would change what that page can do without anybody at that end
-  knowing. **DISABLE** takes a site off the air and keeps the row; **DELETE**
-  is final. **REISSUE KEY** mints a new secret on the same site — same id,
-  same grants — for a key that has been lost; it is not the same as deleting
-  and remaking, which would give the site a new id and silently drop every
-  grant made to the old one.
+  NODES. This is also where a site is *maintained* — a row opens on the key's
+  own settings, in the same six sections the key was made in: name, preset,
+  what it may do, what it draws, which origins may frame it, whether the host
+  must name the person, and the session and rate numbers.
+
+  **SAVE** rewrites the key in place. Same id, same secret, same grants — so
+  nobody at the far end is sent anything, and no authorize profile stops naming
+  it. Changing a key used to mean issuing a second one and deleting the first,
+  which is a new id: every profile that had ticked the old one silently named
+  nothing, and somebody's integration had to be re-done, to correct a hostname.
+
+  **Narrow one and its live sessions go.** A session token carries the
+  permissions and the origins it was minted with, so a key narrowed while its
+  sessions ran would be narrower on paper only, for as long as a session lasts.
+  Change what it may do, what it draws, the origins, the session length or
+  whether the host must name the person, and every session that key is holding
+  is dropped — the pages framing it ask for another within a moment and come
+  back inside the new envelope. A rename drops nothing. **The host must name
+  the person** is the one edit the far end has to follow: their own endpoint
+  must send it from the moment you save, so send them the code on the row
+  again.
+
+  **What it may ask its own application for** is the third block on the row,
+  and it is a separate decision with a separate SAVE — a permission over
+  somebody else's data rather than over this server, edited on a different
+  clock from the envelope above it. Type the address of the application's
+  OpenAPI document and press **READ SPEC**: it is read, along with the
+  `/.well-known/resonance.json` **they** publish saying what they permit, and
+  the operations appear with a tick each. Anything that changes something is
+  marked **WRITES**.
+
+  **Everything starts off.** Ticking is what grants, and **SAVE OPERATIONS**
+  is what commits it — and you can never tick past what their grant file
+  allows. An application serving no grant file at all offers its read
+  operations and no writes, which is the safe reading of silence rather than a
+  limitation to work around: writes become available when its owner publishes
+  the file saying so.
+
+  Both documents have to sit on an origin the site is already registered
+  under, so a spec address pointing anywhere else is refused when you press
+  the button rather than fetched. **Withdrawing an operation drops the site's
+  live sessions**, the same way narrowing its chrome does, so the change is
+  true at once. The row says when the spec was last read, whether a grant file
+  was found, and names anything that has since disappeared from their document
+  and been un-ticked because of it — usually a rename at the far end, which
+  has already quietly withdrawn something somebody depended on.
+
+  Nothing here reaches their data from this server: every call is made by
+  their own page carrying that visitor's login, so nobody can be shown
+  anything they could not already open for themselves, and a write stops and
+  asks the person by voice or by button with the real values read back. See
+  [Reaching an application's data](host-data.md).
+
+  **DISABLE** takes a site off the air and keeps the row; **DELETE** is final.
+  **REISSUE KEY** mints a new secret on the same site — same id, same settings,
+  same grants — for a key that has been lost or leaked; it is not the same as
+  deleting and remaking, which would give the site a new id and silently drop
+  every grant made to the old one.
 
   Open a row for the rest. **Reaches** is the line to read first, and the one
   you cannot work out anywhere else: which assistants that key may actually
-  talk to. What a key may *do* is fixed on the key; what it may talk *to* is
-  decided on the far side, in an authorize profile under PERMISSIONS ▸
+  talk to. What a key may *do* is set on the key, here; what it may talk *to*
+  is decided on the far side, in an authorize profile under PERMISSIONS ▸
   AUTHORIZE — so a site that draws everything and reaches nothing looks
   perfectly configured while answering 403 to every question it is asked. An
   endpoint with no permission, or half a one, is refused to everybody and is
   not listed. **Made** is the audit line: when it was issued, by which admin,
-  and the preset it started from.
+  and the id every log line and every authorize profile names it by.
 
 **SEARCH** shares that bottom row, on the right third of it. Type to search
 across every topic in every tab at once — the fastest way to find a control
@@ -1308,7 +1358,10 @@ the catalog governs both the local ledger and the sink, and unticking a kind
 stops it in both at once.
 
 **How much of it the collector gets is set by level**, beside the host and
-facility: everything, warnings and errors, or errors only. The reader at that
+facility: everything, warnings and errors, or errors only. It governs the
+server's own log as well as the events — on `everything`, which is how it
+ships, the collector gets the lot; on `errors only` it gets tracebacks and
+error alerts and none of the running commentary. The reader at that
 end is an aggregator and every one of them is pointed at a severity rather than
 at this product's own words.
 
@@ -1317,9 +1370,12 @@ crossed — five slow transcriptions from one screen in an hour — where an eve
 is the fact itself. A collector receiving both sees the fault and then the
 judgement about it.
 
-**`server.log` is not part of this.** That is the process's own output — every
-HTTP request, saves, restarts — written beside the program and forwarded
-nowhere.
+**`server.log` is a different stream, and it travels too.** That is the
+process's own output — every HTTP request, saves, restarts, tracebacks —
+written beside the program, and mirrored to syslog line by line whenever the
+sink is on. It is not filtered by the event catalog above, which governs the
+ledger: the catalog decides which *events* are recorded and forwarded, while
+the log is simply everything this process writes.
 
 ## Groups
 
@@ -1653,8 +1709,13 @@ The list is the baseline and is not optional, because acknowledgement has to
 live somewhere. Everything else is in addition to it, cheapest reach first.
 
 - **Syslog** — the standard library speaks it and every operator already has
-  somewhere it goes. One socket, no credentials. Errors as `err`, warnings as
-  `warning`, recoveries as `info`.
+  somewhere it goes. One socket, no credentials. **It carries the whole log,
+  not only the alerts**: the startup banner, what a migration did, every
+  request answered, every failed sign-in, and any traceback — the same stream
+  that lands in `server.log`, mirrored line by line as it is written. Severity
+  is where the line came from: the ordinary log is `info`, anything on the
+  error stream is `err`. An alert carries its own instead — errors as `err`,
+  warnings as `warning`, recoveries as `info`.
 - **A webhook** — one JSON POST, which reaches ntfy, Slack, Discord, Gotify and
   whatever else you run.
 - **Home Assistant** — the strongest here, because it can speak: a screen that

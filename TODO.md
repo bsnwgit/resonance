@@ -23,9 +23,12 @@ exist — which is worth remembering next time a list like it is written from
 memory rather than from the code.
 
 What the host channel actually carries, now: out `ready`, `narrowed`,
-`renewed`, each with the grant and when the session ends; in `narrow` and
-`renew`. `embed.js` handles the second of those, so a host only writes one if
-they are doing without the loader.
+`renewed`, each with the grant and when the session ends, and `call` where the
+site has been granted operations on the host's own application; in `narrow`,
+`renew`, and `result` answering a `call`. `embed.js` handles renewal and
+performs calls itself, so a host only writes either if they are doing without
+the loader — or, for `call`, if they authenticate with a bearer token and set
+`Resonance.onCall`.
 
 **Found by the first outside integration.** A team wiring this into their own
 application arrived with eight questions before they could start, and every one
@@ -50,6 +53,13 @@ were not documentation:
   Until it exists the answer is the loader-free mount, written out in
   `docs/integrating.md` — which works, and is forty lines of exactly what the
   loader exists to stop people writing.
+
+  **It now has a sibling with the same shape.** Reaching the host's own data
+  needs the same escape hatch for the same population — `Resonance.onCall`,
+  which a bearer-token application sets so the fetch carries its header. That
+  is a second convention beside a decision nobody has taken, and whatever
+  settles `getCode` should settle both rather than leaving an integrator to
+  learn two answers to one question.
 
 - **The loader does not retry, so a renewal failure is permanent.** One failed
   fetch in the renewal window writes a `console.warn` and never schedules

@@ -10,6 +10,11 @@ The other half of this is [Embedding](embedding.md), which is written for the
 admin who makes the key. Read that one if you want to know *why* it is shaped
 this way. Read this one to build against it.
 
+If what you actually want is the panel answering questions about **your**
+application's records rather than sitting beside them, that is built too —
+see [Reaching the host application's data](host-data.md), and the section at
+the end of this document for the two files and one message it costs you.
+
 ---
 
 ## What you should have been handed
@@ -350,20 +355,28 @@ nothing advertises which message kinds a given server understands.
 **Out, from the frame to you** — always to your origin, never to `*`:
 
 ```js
-{rsn: 1, kind: 'ready',    name, parts, cap, expires_in}
+{rsn: 1, kind: 'ready',    name, parts, cap, expires_in, tools}
 {rsn: 1, kind: 'narrowed', name, parts, cap, expires_in}
-{rsn: 1, kind: 'renewed',  name, parts, cap, expires_in}
+{rsn: 1, kind: 'renewed',  name, parts, cap, expires_in, tools}
+{rsn: 1, kind: 'call',     id, op, method, path, query, body, writes}
 ```
+
+`tools` is the list of operations this session may ask **your** application
+for, and `call` is it asking. Both are empty and silent unless somebody has
+granted operations on the site — see [Answering about your own
+data](#answering-about-your-own-data) at the end of this document.
 
 **In, from you to the frame** — post to the address, never to `*`:
 
 ```js
 {rsn: 1, kind: 'renew', code}
 {rsn: 1, kind: 'narrow', parts: ['visual', 'transcript'], cap: {mic: false}}
+{rsn: 1, kind: 'result', id, status, body}
 ```
 
 **There is no other API.** You cannot put a question in, read the transcript,
-or be told a turn finished. Your server can `POST /ask` itself, but that
+or be told a turn finished. `result` is not an exception: it answers a `call`
+the panel made and cannot start anything. Your server can `POST /ask` itself, but that
 starts a separate conversation — it does not join the one the frame is having.
 If you are scoping work that depends on reading or driving the conversation,
 that does not exist yet; say so early.
@@ -408,15 +421,27 @@ Renewal is a fresh code posted into the frame, which swaps its token in place.
 The conversation survives. Reloading the frame would also have worked and would
 have thrown away the last ten minutes for no reason the person could see.
 
-**A renewal is the next session**, which means an admin's edit to the key takes
-effect there — a capability withdrawn at 11:00 is gone at the next renewal, not
-mid-sentence. It cannot widen a conversation already running.
+**A session carries the envelope it was minted with.** What the key allowed and
+what it drew at the moment your server asked for it, not what it allows now —
+so a running conversation is never widened or narrowed mid-sentence.
 
 **These end sessions immediately, not at expiry:** the key being disabled, the
-key being deleted, the key being reissued after a leak, and the server
+key being deleted, the key being reissued after a leak, the admin **changing
+what the key may do, what it draws, which origins may frame it, how long a
+session lasts, or whether you must name the person**, and the server
 restarting. Sessions are held in memory. In every case your server simply mints
-another code and your page mounts again — so treat "the frame says it could not
-start its session" as ordinary, not as an incident.
+another code and your page mounts again inside whatever the key now says — so
+treat "the frame says it could not start its session" as ordinary, not as an
+incident.
+
+That is why an edit is dropped on you rather than waiting: a key narrowed at
+11:00 with sessions left running would be narrower on paper and not in fact
+until the last of them expired. Renaming a key drops nothing.
+
+**One edit you have to follow.** If the admin turns on *the host must name the
+person*, `/embed/session` starts requiring a `user` from that moment and
+answers `400` without one. Nothing else about the key needs anything from your
+side — the id does not change, and neither does `RESONANCE_KEY`.
 
 ---
 
@@ -527,3 +552,112 @@ If you get a blank frame with a clean console, this is where to look first.
 | The microphone never opens | `allow="microphone"`, your page on HTTPS, and the permission granted — all three |
 | It works, then stops after an hour | A renewal failed and the loader did not retry. See [what it does not do](#what-it-does-not-do--read-this-before-you-ship) |
 | Refused with *this embed is over its rate limit* | The whole key's budget, spent by everybody. Ask for a bigger number, or find the loop |
+
+
+---
+
+## Answering about your own data
+
+Everything above puts the panel *beside* your application. This puts it
+*inside* it: somebody asks the panel a question whose answer is in your
+database, and it goes and gets it — through your page, with their login.
+
+**No server of ours ever contacts yours, and we hold no credential of yours.**
+The panel is on another origin and cannot reach your API. Your page can, so
+your page is what makes the request. It follows that the panel can only ever
+see what the person looking at it could already have seen.
+
+### What you provide
+
+**1 — an OpenAPI document**, on the same origin, at a stable path. Every
+operation you want reachable needs a unique `operationId` — that is the only
+name we grant against, because paths get rewritten and a permission that
+followed a rename to a different operation is the worst way for one to fail.
+Give each a `summary` and a `description` written for somebody who does not
+know your application: a model chooses between operations on those sentences
+and nothing else. Put an `enum` on every parameter with a fixed set of values,
+or it will guess `firewall` where your data says `fw-edge` and collect a 400.
+Anything that can return many rows needs a `limit` with a default and a
+maximum.
+
+**YAML cannot be read** — there is no parser for it in the standard library
+and none is worth adding. Point us at the JSON your framework serves from the
+same document.
+
+**2 — a grant file** at `/.well-known/resonance.json`, same origin, no login
+required to read it. This is where **you** say what may be touched at all:
+
+```json
+{
+  "resonance": 1,
+  "spec": "/openapi.json",
+  "allow": [
+    {"op": "searchLogs"},
+    {"op": "getLogEntry"},
+    {"op": "acknowledgeAlert", "writes": true}
+  ]
+}
+```
+
+Nothing in your spec is reachable unless it is named here, and the admin at
+the other end can narrow this and can never widen it. `writes: true` goes on
+anything that changes state **whatever its verb** — we do not infer it from
+`GET` versus `POST`, because both get used both ways. An operation marked that
+way is never executed until the person confirms it, out loud or on screen,
+with the real values read back to them.
+
+**Serve no grant file and you get read operations only** — `GET` and `HEAD`,
+never a write. An application that has never heard of any of this can still be
+embedded and be useful, and cannot be written to by accident.
+
+### What arrives, and what goes back
+
+If you use the loader, **nothing** — `embed.js` performs the call itself,
+same-origin, with `credentials: 'include'`, and refuses anything the session
+did not declare. Your endpoints behave normally: your own authorization still
+applies per request, return JSON with proper status codes, and bound your
+results — a page plus a total, never the whole table.
+
+Doing it without the loader, or authenticating with a bearer token in memory,
+the exchange on the existing channel is:
+
+```js
+// frame → your page
+{rsn: 1, kind: 'call', id: 'h1', op: 'searchLogs', method: 'get',
+ path: '/api/logs/search', query: {source: 'fw-edge', limit: '50'},
+ body: null, writes: false}
+
+// your page → frame, within twenty seconds
+{rsn: 1, kind: 'result', id: 'h1', status: 200, body: {…}}
+```
+
+The method, the path and the query are already resolved from **your** spec, so
+there is nothing to assemble and nothing to guess. Answer within twenty
+seconds or the panel treats it as unanswered and says so.
+
+With a bearer token, keep the loader and give it the fetch:
+
+```js
+Resonance.onCall = function (call) {
+  return fetch(call.url, {
+      method: call.method,
+      headers: {Authorization: 'Bearer ' + myToken,
+                'Content-Type': 'application/json'},
+      body: call.body ? JSON.stringify(call.body) : undefined})
+    .then(function (r) {
+      return r.json().then(function (b) { return {status: r.status, body: b}; });
+    });
+};
+```
+
+It is called only for operations the session declared — that check happens
+before your handler is reached.
+
+### What you should expect to see fail
+
+- **A 400 naming a parameter.** Almost always a missing `enum`: the model
+  guessed a value your API does not use.
+- **The panel saying it could not read a result in full.** A result over 20KB
+  is truncated and the model is told it was. Bound your list operations.
+- **Nothing happening at all.** The operation is in your spec and your grant
+  file, and nobody has ticked it at the other end. Everything starts off.

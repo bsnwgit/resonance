@@ -152,9 +152,127 @@
     if (!m || m.rsn !== 1) return;
     if (m.kind === 'ready' || m.kind === 'renewed') {
       ready = true;
+      TOOLS = Array.isArray(m.tools) ? m.tools : [];
       scheduleRenew(m.expires_in);
+    } else if (m.kind === 'call') {
+      perform(m);
     }
   });
+
+  /* ------------------------------------------- reaching YOUR application */
+
+  /* THE PART THAT MAKES THIS ANSWER ABOUT YOUR DATA. The panel cannot reach
+     your API and is not meant to: it is on another origin and holds no
+     credential of yours. This page can — it is already signed in as whoever
+     is looking at it — so the panel asks, and this performs the request with
+     that person's own session.
+
+     Which means the panel can never see anything they could not have seen
+     themselves, and no server of ours ever contacts yours. What arrives here
+     is a method, a path and a query the far end resolved from YOUR OWN
+     OpenAPI document; what goes back is your server's status and body. */
+
+  var TOOLS = [];           // the operations this session may ask for
+
+  /* Even so, not whatever arrives. The operation has to be one this session
+     was told about, the method has to be that operation's method, and the
+     path has to match that operation's template — so a frame that has been
+     tampered with can still only reach the handful of paths your own spec
+     declared and an admin enabled. */
+  function permitted(m) {
+    for (var i = 0; i < TOOLS.length; i++) {
+      var t = TOOLS[i];
+      if (t.op !== m.op) continue;
+      if (String(t.method).toLowerCase() !== String(m.method).toLowerCase()) return null;
+      var rx = new RegExp('^' + String(t.path)
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/\\\{[^}]*\\\}/g, '[^/]+') + '$');
+      return rx.test(String(m.path || '')) ? t : null;
+    }
+    return null;
+  }
+
+  function answer(m, status, body) {
+    if (!frame || !frame.contentWindow) return;
+    frame.contentWindow.postMessage(
+      { rsn: 1, kind: 'result', id: m.id, status: status, body: body }, ORIGIN);
+  }
+
+  function perform(m) {
+    var tool = permitted(m);
+    if (!tool) {
+      /* Not thrown and not silent. The panel is waiting on this id and would
+         otherwise sit there until its own timeout, which reads to the person
+         as an assistant that stopped rather than one that was refused. */
+      console.warn('[resonance] refused a call the session did not declare: ' +
+                   m.op + ' ' + m.method + ' ' + m.path);
+      return answer(m, 0, { error: 'this page does not perform that operation' });
+    }
+    var url = m.path;
+    var q = [];
+    Object.keys(m.query || {}).forEach(function (k) {
+      q.push(encodeURIComponent(k) + '=' + encodeURIComponent(m.query[k]));
+    });
+    if (q.length) url += (url.indexOf('?') >= 0 ? '&' : '?') + q.join('&');
+
+    /* YOUR OWN HANDLER, where your front end authenticates with a token held
+       in memory rather than a cookie. `fetch` below can carry a cookie and
+       has nowhere to put an Authorization header — the same fault line as the
+       code endpoint, splitting the same population the same way. Set
+       Resonance.onCall and it is called instead of the fetch:
+
+         Resonance.onCall = function (call) {
+           return fetch(call.url, {method: call.method, body: call.body,
+                                   headers: {Authorization: 'Bearer ' + myToken}})
+             .then(function (r) { return r.json().then(function (b) {
+               return {status: r.status, body: b}; }); });
+         };
+
+       It is handed the resolved url and method and is trusted with neither:
+       what it may be called for was checked above. */
+    var call = { op: m.op, method: m.method, url: url, path: m.path,
+                 query: m.query || {}, body: m.body, writes: !!m.writes };
+    if (typeof api.onCall === 'function') {
+      Promise.resolve()
+        .then(function () { return api.onCall(call); })
+        .then(function (out) {
+          out = out || {};
+          answer(m, Number(out.status) || 0, out.body === undefined ? null : out.body);
+        })
+        .catch(function (e) {
+          answer(m, 0, { error: String((e && e.message) || e) });
+        });
+      return;
+    }
+
+    var init = { method: String(m.method || 'get').toUpperCase(),
+                 /* THEIR SESSION, WHICH IS THE ENTIRE POINT. `include` rather
+                    than `same-origin` so an application whose API sits on a
+                    sibling host still works — it is their fetch to their own
+                    server either way. */
+                 credentials: 'include', cache: 'no-store',
+                 headers: { Accept: 'application/json' } };
+    if (m.body !== null && m.body !== undefined && init.method !== 'GET' &&
+        init.method !== 'HEAD') {
+      init.headers['Content-Type'] = 'application/json';
+      init.body = JSON.stringify(m.body);
+    }
+    fetch(url, init).then(function (r) {
+      return r.text().then(function (raw) {
+        /* Capped before it goes back. A page that answers a search with
+           forty thousand rows should be told to answer with fewer, and the
+           far end says so — but it should not have to receive them first. */
+        if (raw.length > 200000) raw = raw.slice(0, 200000);
+        var body;
+        try { body = JSON.parse(raw); }
+        catch (e) { body = { error: 'that endpoint did not return JSON',
+                             text: raw.slice(0, 2000) }; }
+        answer(m, r.status, body);
+      });
+    }).catch(function (e) {
+      answer(m, 0, { error: String((e && e.message) || e) });
+    });
+  }
 
   /* ------------------------------------------------------------- mounting */
 

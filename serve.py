@@ -789,7 +789,8 @@ def effective_system(cfg, tz=None):
     return (base + "\n\n" + tail) if base else tail
 
 
-def ask_backend(text, history, cfg, tz=None, conversation_id=""):
+def ask_backend(text, history, cfg, tz=None, conversation_id="",
+                tools=None, rounds=None):
     """One turn against whichever assistant is configured.
 
     `openai` is the dialect, not the vendor: Ollama, OpenClaw, LM Studio and
@@ -800,7 +801,16 @@ def ask_backend(text, history, cfg, tz=None, conversation_id=""):
     says three things about the conversation itself — whether to hang up,
     which conversation this was, and why it could not answer — and each of
     them changes what the display does next. A second return channel bolted
-    on beside the string would have been the same data with a worse name."""
+    on beside the string would have been the same data with a worse name.
+
+    `tools` and `rounds` are the embed reaching its host application. A turn
+    that needs the application's own data does not return a reply at all: it
+    returns {"tool_call": …}, which travels down to the browser, is performed
+    BY THE HOST PAGE with that person's own login, and comes back as another
+    entry in `rounds` on the next call. The loop therefore runs through a
+    request rather than inside one — which is not a compromise but the whole
+    design, because the only place the visitor's session exists is their
+    browser. See the host-data section."""
     turns = [m for m in history if isinstance(m, dict)
              and m.get("role") in ("user", "assistant") and m.get("content")]
     keep = max(0, min(int(cfg.get("history_turns") or 0), MAX_HISTORY))
@@ -812,10 +822,23 @@ def ask_backend(text, history, cfg, tz=None, conversation_id=""):
         base = (cfg.get("base_url") or "").rstrip("/")
         url = base if base.endswith("/chat/completions") else base + "/chat/completions"
         msgs = [{"role": "system",
-                 "content": effective_system(cfg, tz)}] + msgs
+                 "content": effective_system(cfg, tz) + tool_prompt(tools)}] + msgs
+        # WHAT ALREADY HAPPENED THIS TURN, replayed. The model has to see its
+        # own call and the answer that came back or it will make the same call
+        # again — this is one conversation to it, and the round trip through
+        # somebody's browser is invisible from where it sits.
+        for r in (rounds or []):
+            msgs.append({"role": "assistant", "tool_calls": [{
+                "id": r["id"], "type": "function",
+                "function": {"name": r["op"],
+                             "arguments": json.dumps(r.get("args") or {})}}]})
+            msgs.append({"role": "tool", "tool_call_id": r["id"],
+                         "content": r["content"]})
         body = {"model": cfg["model"], "messages": msgs, "stream": False,
                 "max_tokens": int(cfg.get("max_tokens") or 400),
                 "temperature": float(cfg.get("temperature") or 0)}
+        if tools:
+            body["tools"] = [{"type": "function", "function": t} for t in tools]
         if cfg.get("keep_alive"):
             body["keep_alive"] = cfg["keep_alive"]
         key = (cfg.get("api_key") or "").strip()
@@ -824,8 +847,23 @@ def ask_backend(text, history, cfg, tz=None, conversation_id=""):
         choices = j.get("choices") or []
         if not choices:
             raise RuntimeError("the model returned no choices")
-        return {"reply": ((choices[0].get("message") or {}).get("content")
-                          or "").strip()}
+        message = choices[0].get("message") or {}
+        calls = message.get("tool_calls") or []
+        if calls and tools:
+            # ONE AT A TIME, and the rest discarded. A model may ask for
+            # several; each has to go out through a page and, where it writes,
+            # past a person — and a confirmation dialog listing three
+            # unrelated actions is one nobody reads. The next lap picks up
+            # whatever is still needed.
+            fn = (calls[0].get("function") or {})
+            try:
+                args = json.loads(fn.get("arguments") or "{}")
+            except ValueError:
+                args = {}
+            return {"tool_call": {"id": str(calls[0].get("id") or "call_1")[:64],
+                                  "op": str(fn.get("name") or ""),
+                                  "args": args if isinstance(args, dict) else {}}}
+        return {"reply": (message.get("content") or "").strip()}
 
     if cfg["provider"] == "anthropic":
         base = (cfg.get("base_url") or ANTHROPIC_BASE).rstrip("/")
@@ -833,10 +871,22 @@ def ask_backend(text, history, cfg, tz=None, conversation_id=""):
             url = base
         else:
             url = re.sub(r"/v1$", "", base) + "/v1/messages"
+        for r in (rounds or []):
+            msgs.append({"role": "assistant", "content": [
+                {"type": "tool_use", "id": r["id"], "name": r["op"],
+                 "input": r.get("args") or {}}]})
+            msgs.append({"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": r["id"],
+                 "content": r["content"]}]})
         body = {"model": cfg["model"], "messages": msgs,
                 # required here, unlike the OpenAI shape where it is optional
                 "max_tokens": int(cfg.get("max_tokens") or 400)}
-        body["system"] = effective_system(cfg, tz)   # top-level, not a message
+        body["system"] = effective_system(cfg, tz) + tool_prompt(tools)
+        if tools:
+            # The same definitions, one field name apart: `input_schema` here,
+            # `parameters` there, and the rest identical.
+            body["tools"] = [{"name": t["name"], "description": t["description"],
+                              "input_schema": t["parameters"]} for t in tools]
         # No temperature. The current Claude models reject the sampling
         # parameters outright with a 400, and older ones cap at 1.0 where this
         # panel's slider goes to 1.5 — sending it would be a field that works
@@ -849,8 +899,14 @@ def ask_backend(text, history, cfg, tz=None, conversation_id=""):
         # A reply is a list of content blocks, and only the text ones are ours
         # to speak. Joining rather than taking the first keeps a reply that
         # arrives in several pieces intact.
-        parts = [b.get("text") or "" for b in (j.get("content") or [])
-                 if isinstance(b, dict) and b.get("type") == "text"]
+        blocks = [b for b in (j.get("content") or []) if isinstance(b, dict)]
+        use = next((b for b in blocks if b.get("type") == "tool_use"), None)
+        if use and tools:
+            return {"tool_call": {"id": str(use.get("id") or "call_1")[:64],
+                                  "op": str(use.get("name") or ""),
+                                  "args": use.get("input")
+                                          if isinstance(use.get("input"), dict) else {}}}
+        parts = [b.get("text") or "" for b in blocks if b.get("type") == "text"]
         reply = "\n".join(p for p in parts if p).strip()
         if not reply and j.get("stop_reason") == "refusal":
             raise RuntimeError("the model declined to answer that")
@@ -5291,10 +5347,41 @@ SYSLOG_FACILITIES = ("user", "local0", "local1", "local2", "local3",
 SYSLOG_SEVERITY = {"error": 3, "warn": 4, "info": 6}   # err, warning, info
 
 
+#: THE SINK'S SETTINGS, READ AT MOST ONCE A SECOND.
+#:
+#: syslog_send used to call display_settings() per line, which reads and parses
+#: displays.json every time it is asked — fine at one call per alert, and not
+#: fine now that the whole log goes through here: that is a file read and a
+#: JSON parse for every request this server answers.
+#:
+#: A second is short enough that switching the sink on in the panel takes
+#: effect while you are still looking at it, and long enough that a busy
+#: deployment reads the file once rather than a thousand times.
+_syslog_view = [0.0, None]                       # [read at, the six fields]
+_syslog_view_lock = threading.Lock()
+SYSLOG_VIEW_TTL = 1.0
+
+SYSLOG_KEYS = ("syslog_on", "syslog_min", "syslog_host", "syslog_port",
+               "syslog_facility", "syslog_name")
+
+
+def syslog_view():
+    now_ = time.time()
+    with _syslog_view_lock:
+        if _syslog_view[1] is None or now_ - _syslog_view[0] > SYSLOG_VIEW_TTL:
+            try:
+                cfg = display_settings()
+            except Exception:                    # noqa: BLE001
+                return _syslog_view[1] or {"syslog_on": 0}
+            _syslog_view[0] = now_
+            _syslog_view[1] = {k: cfg.get(k) for k in SYSLOG_KEYS}
+        return _syslog_view[1]
+
+
 def syslog_send(level, text):
     """One line, to wherever an admin pointed it. Silent on every failure: this
     is called from the path that IS the fault being reported."""
-    cfg = display_settings()
+    cfg = syslog_view()
     if not cfg.get("syslog_on") or not level_wanted(level, cfg):
         return
     host = str(cfg.get("syslog_host") or "").strip()
@@ -5346,6 +5433,87 @@ def syslog_send(level, text):
                     sock.close()
     except Exception:                            # noqa: BLE001
         pass
+
+
+# ------------------------------------------------------------- the log tee
+# EVERYTHING THIS PROCESS PRINTS, MIRRORED TO THE SINK.
+#
+# The sink carried alerts and nothing else: a collector saw a screen's
+# microphone fail and could not see the restart, the migration, the failed
+# sign-in, or the request that 500'd a second earlier. Half a picture in the
+# one place an operator actually watches is worse than none, because it reads
+# as the whole of it.
+#
+# DONE AT THE STREAM rather than at the call sites. There are over a hundred
+# print() calls in this file and each one is a sentence written for a person
+# reading server.log; routing them through a logging framework would mean
+# editing every one of them, and the first one anybody forgot would be
+# invisible in exactly the way this exists to fix. Wrapping the stream means
+# "all of it" is true by construction, including anything added later and
+# including Python's own tracebacks.
+#
+# STDOUT IS INFO AND STDERR IS ERROR, which is what makes the severity worth
+# anything at the far end — and why the request log moved to stdout. It is the
+# one thing on stderr that is not a fault, and left there it would have filed
+# every 200 OK under error.
+class LogTee:
+    """A file-like wrapper: writes through, and mirrors whole lines."""
+
+    def __init__(self, stream, level):
+        self._stream = stream
+        self._level = level
+        self._buf = ""
+        self._lock = threading.Lock()
+        # RE-ENTRY GUARD, per thread. syslog_send swallows its own failures and
+        # prints nothing, so this should never fire — but a mirror that can
+        # recurse into itself is one bad edit away from a stack overflow that
+        # takes the server with it, and the guard costs a thread-local read.
+        self._busy = threading.local()
+
+    def write(self, text):
+        with self._lock:
+            n = self._stream.write(text)
+            lines = None
+            self._buf += text
+            if "\n" in self._buf:
+                parts = self._buf.split("\n")
+                self._buf = parts.pop()
+                lines = parts
+            elif len(self._buf) > 8192:          # a line nobody is going to end
+                lines, self._buf = [self._buf], ""
+        # OUTSIDE THE LOCK. A UDP send with a one-second timeout is not
+        # something to hold the whole process's logging behind.
+        if lines and not getattr(self._busy, "on", False):
+            self._busy.on = True
+            try:
+                for line in lines:
+                    if line.strip():
+                        syslog_send(self._level, line)
+            except Exception:                    # noqa: BLE001
+                pass
+            finally:
+                self._busy.on = False
+        return n
+
+    def flush(self):
+        self._stream.flush()
+
+    def isatty(self):
+        return self._stream.isatty()
+
+    def fileno(self):
+        return self._stream.fileno()
+
+    def __getattr__(self, name):                 # anything else is the stream's
+        return getattr(self._stream, name)
+
+
+def install_log_tee():
+    """Once, at startup, and before the migrations print anything."""
+    if not isinstance(sys.stdout, LogTee):
+        sys.stdout = LogTee(sys.stdout, "info")
+    if not isinstance(sys.stderr, LogTee):
+        sys.stderr = LogTee(sys.stderr, "error")
 
 
 def in_quiet_hours(now_=None):
@@ -7319,14 +7487,24 @@ def clear_login_failures(ip):
 # right to ask and what it may draw are settled in one call, before a browser
 # is involved at all.
 #
-# Two things are fixed when the admin creates the key and can never be widened
-# afterwards: the CAPABILITY envelope — may this application ask at all, open a
-# microphone, speak, and how often — and the CHROME it renders. They are
-# separate axes on purpose. Hiding the TALK button is not the same as denying
-# the microphone: hide the control while the capability stands and a host page
-# can open a microphone with nothing on screen to say so. The proof that one
-# field cannot serve both is `kiosk` and `signage` — identical chrome, the
-# figure alone, and opposite permissions.
+# Two things are settled on the key: the CAPABILITY envelope — may this
+# application ask at all, open a microphone, speak, and how often — and the
+# CHROME it renders. They are separate axes on purpose. Hiding the TALK button
+# is not the same as denying the microphone: hide the control while the
+# capability stands and a host page can open a microphone with nothing on
+# screen to say so. The proof that one field cannot serve both is `kiosk` and
+# `signage` — identical chrome, the figure alone, and opposite permissions.
+#
+# BOTH ARE THE ADMIN'S TO CHANGE afterwards, through /embeds/update, and only
+# the admin's: the host may narrow either at runtime over postMessage and can
+# never widen one. They were immutable once, on the reasoning that a page is
+# already framing this — which described the risk correctly and then charged
+# it to the wrong party. Changing a key meant deleting it and issuing another,
+# so a new id, an integration re-done at the far end, and every authorize
+# profile that had ticked the old one quietly naming nothing. An admin editing
+# a hostname does not intend any of that. What the risk actually asks for is
+# that a narrowed key take its live sessions with it, which is what the edit
+# does.
 EMBEDS_PATH = os.path.join(ROOT, "embeds.json")
 _embeds_lock = threading.Lock()
 
@@ -7765,7 +7943,13 @@ def new_embed_code(embed_id, rec, user=None):
             "id": embed_id,
             "rec": {"name": rec["name"], "parts": list(rec["parts"]),
                     "cap": dict(rec["cap"]), "origins": list(rec["origins"]),
-                    "ttl_minutes": rec["ttl_minutes"]},
+                    "ttl_minutes": rec["ttl_minutes"],
+                    # WHAT IT MAY ASK THEIR APPLICATION FOR, snapshot with
+                    # everything else and for the same reason: an admin
+                    # unticking an operation in the seconds between a host
+                    # minting a code and a browser spending it must not decide
+                    # what that browser gets, in either direction.
+                    "ops": enabled_ops(rec)},
             "user": user,
             "expires": now_ + EMBED_CODE_TTL,
         }
@@ -7829,6 +8013,7 @@ def new_embed_session(embed_id, rec, user=None):
             "id": embed_id, "name": rec["name"],
             "parts": list(rec["parts"]), "cap": dict(rec["cap"]),
             "origins": list(rec["origins"]),
+            "ops": list(rec.get("ops") or []),
             "expires": now_ + rec["ttl_minutes"] * 60,
         }
     return token
@@ -7992,6 +8177,500 @@ def get_model(name=None):
 
 _SUPPORTS_HOTWORDS = None
 
+# ------------------------------------------------------------- host data
+# THE PANEL ANSWERING ABOUT THE APPLICATION IT IS SITTING IN. An embed puts
+# this interface on somebody else's page; without what follows it can talk
+# about anything except the thing the person is looking at.
+#
+# The whole of the design is in where the request is made from. This server
+# never calls theirs — it would need a credential on their application (one
+# account for everybody, necessarily holding more than any single visitor
+# should see), network reach into places that have never accepted an inbound
+# connection, and a schema per customer. The BROWSER has none of those
+# problems: the panel is framed inside a page that is already authenticated as
+# that person, so the call is made there, same-origin, carrying their own
+# session. This server holds no secret of theirs and reaches nothing.
+#
+# What this side holds is the description. Three documents, and an admin's
+# ticks over the top:
+#
+#   their spec        an OpenAPI document, on their origin, saying what their
+#                     application can do — operationId, description, parameters
+#   their grant       /.well-known/resonance.json, on the same origin, saying
+#                     which of those operations they permit at all. Theirs to
+#                     write because the data is theirs; nothing here can widen
+#                     it, and its absence means reads only
+#   the admin's ticks on the site's row, within that ceiling, all off to start
+#
+# The narrowest of the three wins, and the visitor's own login caps whatever
+# survives — a call they could not have made themselves is a call their own
+# application refuses.
+SPEC_MAX = 2 * 1024 * 1024       # an OpenAPI document, not a data transfer
+SPEC_TIMEOUT = 15
+GRANT_PATH = "/.well-known/resonance.json"
+#: How many times one question may go round the model → host → model loop.
+#: Not a performance limit: a model that has misread its tools will call the
+#: same one for ever, and every lap is a request through somebody's page.
+MAX_TOOL_ROUNDS = 4
+#: How much of one result a model is shown. A log search is the shape this was
+#: built for and forty thousand rows is the shape it must not forward.
+TOOL_RESULT_MAX = 20000
+#: Only the verbs a description can be trusted about. Everything else has to
+#: be declared as a write in the grant file — see site_ceiling.
+READ_METHODS = ("get", "head")
+
+
+def _get_json(url, timeout=SPEC_TIMEOUT, cap=SPEC_MAX):
+    """A GET of a public document. No credential is sent and none is
+    accepted: a spec and a grant file are readable by anybody who can reach
+    them, and one that needs a login is one this cannot use."""
+    import urllib.error, urllib.request
+    req = urllib.request.Request(url, method="GET", headers={
+        "Accept": "application/json", "User-Agent": "resonance"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read(cap + 1)
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError("%s %s from %s" % (exc.code, exc.reason, url))
+    except urllib.error.URLError as exc:
+        raise RuntimeError("cannot reach %s (%s)" % (url, exc.reason))
+    except TimeoutError:
+        raise RuntimeError("timed out fetching %s" % url)
+    if len(raw) > cap:
+        raise RuntimeError("that document is larger than %dMB, which is not a "
+                           "spec any more" % (SPEC_MAX // (1024 * 1024)))
+    try:
+        return json.loads(raw.decode("utf-8", "replace"))
+    except ValueError:
+        # YAML is the other half of what OpenAPI is written in and there is no
+        # parser for it in the standard library. Saying so beats a JSON error
+        # about a character somebody never typed — and every framework that
+        # emits YAML emits JSON from the same document.
+        raise RuntimeError("that is not JSON. OpenAPI in YAML cannot be read "
+                           "here — point this at the JSON your framework "
+                           "serves, usually the same path ending .json")
+
+
+def spec_url_for(rec, raw=""):
+    """The absolute URL of a site's spec, or (None, reason).
+
+    IT MUST LIVE ON AN ORIGIN THE SITE IS ALREADY REGISTERED UNDER. Two
+    reasons, and the second is the one that matters. It is where the design
+    says it is — the spec describes the application the panel is embedded in,
+    and the grant beside it is only worth anything because it came from the
+    party that owns the data. And it stops this field being a hole: a URL an
+    admin can type is a URL this server will fetch, and without the check that
+    is every address on this machine's network, reachable through a text box.
+    """
+    raw = str(raw or rec.get("spec_url") or "").strip()
+    if not raw:
+        return None, "no spec address is set on this site"
+    origins = rec.get("origins") or []
+    if raw.startswith("/"):
+        if not origins:
+            return None, "this site has no origin to resolve that path against"
+        return origins[0] + raw, None
+    from urllib.parse import urlsplit
+    u = urlsplit(raw)
+    if u.scheme not in ("http", "https") or not u.netloc:
+        return None, ("that is not a URL — give a full https:// address, or a "
+                      "path beginning with / to resolve against this site's "
+                      "own origin")
+    o = normalise_origin("%s://%s" % (u.scheme, u.netloc))
+    if not o or o not in origins:
+        return None, ("a spec has to sit on an origin this site is registered "
+                      "under — %s is not one of them" % (o or raw))
+    return raw, None
+
+
+def _schema(node, depth=0):
+    """The subset of JSON Schema worth passing to a model, copied rather than
+    forwarded. A spec is a document from somebody else's server: handing it to
+    a provider verbatim would forward whatever else is in it, and `$ref` in
+    particular would arrive as a pointer into a document the model does not
+    have."""
+    if not isinstance(node, dict) or depth > 6:
+        return {"type": "string"}
+    out = {}
+    for k in ("type", "description", "format", "default", "pattern"):
+        if isinstance(node.get(k), (str, int, float, bool)):
+            out[k] = node[k]
+    if isinstance(node.get("enum"), list):
+        out["enum"] = [e for e in node["enum"]
+                       if isinstance(e, (str, int, float, bool))][:64]
+    if node.get("type") == "array" and isinstance(node.get("items"), dict):
+        out["items"] = _schema(node["items"], depth + 1)
+    if isinstance(node.get("properties"), dict):
+        out["properties"] = {str(k)[:64]: _schema(v, depth + 1)
+                             for k, v in list(node["properties"].items())[:40]
+                             if isinstance(v, dict)}
+        if isinstance(node.get("required"), list):
+            out["required"] = [str(r)[:64] for r in node["required"]][:40]
+    out.setdefault("type", "object" if "properties" in out else "string")
+    return out
+
+
+def _deref(doc, node, depth=0):
+    """`$ref` into the same document, which is how every generator writes a
+    shared schema. Only local refs and only downwards: a ref out to another
+    URL is a second fetch this does not make."""
+    seen = 0
+    while isinstance(node, dict) and isinstance(node.get("$ref"), str) and seen < 8:
+        ref = node["$ref"]
+        if not ref.startswith("#/"):
+            return {}
+        cur = doc
+        for step in ref[2:].split("/"):
+            step = step.replace("~1", "/").replace("~0", "~")
+            cur = cur.get(step) if isinstance(cur, dict) else None
+            if cur is None:
+                return {}
+        node, seen = cur, seen + 1
+    return node if isinstance(node, dict) else {}
+
+
+def parse_openapi(doc):
+    """An OpenAPI document distilled to the operations a model could choose
+    between. Returns (ops, note).
+
+    NAMED BY operationId AND BY NOTHING ELSE. It is the one identifier in the
+    document meant to be stable and unique; a grant naming a path would follow
+    the next refactor to a different operation and keep working, which is the
+    worst way for a permission to fail."""
+    if not isinstance(doc, dict):
+        return [], "that document is not an object"
+    if not (doc.get("openapi") or doc.get("swagger")):
+        return [], ("that is JSON but not an OpenAPI document — no `openapi` "
+                    "version field")
+    paths = doc.get("paths")
+    if not isinstance(paths, dict):
+        return [], "that document declares no paths"
+    ops, unnamed = [], 0
+    for path, item in list(paths.items())[:400]:
+        if not isinstance(item, dict):
+            continue
+        shared = item.get("parameters") if isinstance(item.get("parameters"), list) else []
+        for method in ("get", "post", "put", "patch", "delete", "head"):
+            spec = item.get(method)
+            if not isinstance(spec, dict):
+                continue
+            op = str(spec.get("operationId") or "").strip()[:64]
+            if not op:
+                unnamed += 1
+                continue
+            params = []
+            for p in (shared + (spec.get("parameters") or []))[:40]:
+                p = _deref(doc, p)
+                if not isinstance(p, dict) or p.get("in") not in ("query", "path"):
+                    continue
+                nm = str(p.get("name") or "").strip()[:64]
+                if not nm:
+                    continue
+                sch = _schema(_deref(doc, p.get("schema") or {}))
+                if p.get("description"):
+                    sch["description"] = str(p["description"])[:400]
+                params.append({"name": nm, "in": p["in"],
+                               "required": bool(p.get("required")) or p["in"] == "path",
+                               "schema": sch})
+            body = None
+            content = (_deref(doc, spec.get("requestBody") or {}) or {}).get("content")
+            if isinstance(content, dict) and isinstance(content.get("application/json"), dict):
+                body = _schema(_deref(doc, content["application/json"].get("schema") or {}))
+            ops.append({
+                "op": op, "method": method, "path": str(path)[:200],
+                "summary": str(spec.get("summary") or "")[:200],
+                "description": str(spec.get("description") or "")[:1000],
+                "params": params, "body": body,
+            })
+    if not ops:
+        return [], ("no operation in that document has an operationId, and it "
+                    "is the only name this can grant against")
+    seen, out = set(), []
+    for o in ops:                       # a duplicate id is the generator's bug
+        if o["op"] not in seen:
+            seen.add(o["op"])
+            out.append(o)
+    note = ("%d operations have no operationId and are not listed" % unnamed
+            if unnamed else "")
+    return out[:400], note
+
+
+def parse_grant(doc):
+    """Their /.well-known/resonance.json. Returns (allow, spec_hint, error).
+
+    `allow` maps operationId to whether they declared it as writing. WRITING IS
+    DECLARED AND NEVER INFERRED: plenty of applications change things behind a
+    GET and plenty of POSTs are searches with a body too long for a query
+    string, so the verb is a hint about neither. What the verb IS trusted for
+    is the absence of this file — see site_ceiling."""
+    if not isinstance(doc, dict):
+        return None, "", "that grant file is not an object"
+    if int(doc.get("resonance") or 0) != 1:
+        return None, "", ("that grant file does not say `\"resonance\": 1`, so "
+                          "it is not one this version can read")
+    allow, raw = {}, doc.get("allow")
+    if not isinstance(raw, list):
+        return None, "", "the grant file's `allow` must be a list"
+    for entry in raw[:400]:
+        if isinstance(entry, str):
+            allow[entry[:64]] = False
+        elif isinstance(entry, dict) and entry.get("op"):
+            allow[str(entry["op"])[:64]] = bool(entry.get("writes"))
+    return allow, str(doc.get("spec") or "")[:400], ""
+
+
+def site_ceiling(ops, allow):
+    """What the application permits, before an admin has ticked anything.
+
+    With a grant file, exactly what it names, marked as they marked it.
+
+    WITHOUT ONE, read verbs only, and no writes at all. This is the one place
+    a verb is trusted, and it is trusted in the safe direction: an application
+    that has never heard of any of this can still be embedded and be useful,
+    and can never be written to because silence never grants a write. A GET
+    that changes something would slip through, which is a fair statement of
+    the residual risk and the reason the grant file exists at all."""
+    out = []
+    for o in ops:
+        if allow is None:
+            if o["method"] not in READ_METHODS:
+                continue
+            writes = False
+        else:
+            if o["op"] not in allow:
+                continue
+            writes = allow[o["op"]]
+        out.append(dict(o, writes=writes))
+    return out
+
+
+def refresh_site_spec(rec, url=None, doc=None):
+    """Read a site's spec and its grant file and write both onto the record.
+
+    Returns (record, error). The distilled operations are cached here rather
+    than fetched per question: a model that had to wait on somebody else's
+    document before it could answer would be answering at the speed of their
+    slowest morning."""
+    if doc is None:
+        target, why = spec_url_for(rec, url)
+        if not target:
+            return None, why
+        doc = _get_json(target)
+    else:
+        target = str(url or rec.get("spec_url") or "")
+    ops, note = parse_openapi(doc)
+    if not ops:
+        return None, note
+    allow, hint, gerr = None, "", ""
+    origins = rec.get("origins") or []
+    if origins:
+        try:
+            allow, hint, gerr = parse_grant(_get_json(origins[0] + GRANT_PATH))
+        except RuntimeError as exc:
+            # NOT AN ERROR. Most applications will never serve one, and the
+            # absence is a meaningful answer rather than a failure: reads only.
+            gerr = str(exc)
+    ceiling = site_ceiling(ops, allow)
+    rec["spec_url"] = target
+    rec["spec_ops"] = ceiling
+    rec["spec_fetched"] = int(time.time())
+    rec["spec_note"] = note
+    rec["grant_seen"] = allow is not None
+    rec["grant_note"] = "" if allow is not None else gerr
+    # AN OPERATION AN ADMIN HAD ENABLED THAT IS NO LONGER IN THE CEILING is
+    # dropped here rather than carried as a tick against nothing. The usual
+    # cause is a rename at the far end, which has already silently withdrawn a
+    # capability somebody depends on; the count is reported on the row.
+    live = {o["op"] for o in ceiling}
+    kept = [op for op in (rec.get("ops") or []) if op in live]
+    rec["ops_dropped"] = [op for op in (rec.get("ops") or []) if op not in live]
+    rec["ops"] = kept
+    return rec, None
+
+
+def embed_op_list(rec):
+    """A site's operations as the panel draws them: everything the
+    application permits, each saying whether it writes and whether an admin
+    has enabled it.
+
+    THE CEILING IS SHOWN WHOLE rather than filtered to what is on. An admin
+    deciding what to grant is deciding against the list of what could be
+    granted, and a panel that showed only the ticks would be a permission
+    screen you cannot use to change a permission."""
+    on = set(rec.get("ops") or [])
+    return [{"op": o["op"], "method": o["method"], "path": o["path"],
+             "summary": o.get("summary") or "",
+             "description": (o.get("description") or "")[:300],
+             "params": [p["name"] for p in o.get("params") or []],
+             "writes": bool(o.get("writes")), "on": o["op"] in on}
+            for o in (rec.get("spec_ops") or [])]
+
+
+def enabled_ops(rec):
+    """The operations this site may actually call: ticked, and still inside
+    the ceiling. Both halves every time — a stored tick is not a permission,
+    it is a record of one an admin gave against a description that may since
+    have changed."""
+    want = set(rec.get("ops") or [])
+    return [o for o in (rec.get("spec_ops") or []) if o["op"] in want]
+
+
+def tool_defs(ops):
+    """The operations as a model is told about them: a name, a sentence, and a
+    parameter schema. Provider-neutral — the two dialects differ in the
+    envelope and agree on this much."""
+    out = []
+    for o in ops:
+        props, required = {}, []
+        for p in o["params"]:
+            props[p["name"]] = p["schema"]
+            if p["required"]:
+                required.append(p["name"])
+        if o.get("body"):
+            # Never required, whatever the spec says. A model that omits it
+            # should reach the far end and be told what is missing by the
+            # application, rather than be refused here by a schema this
+            # rebuilt from theirs.
+            props["body"] = dict(o["body"], description="the JSON request body")
+        # Both sentences, and a break between them: a summary that does not
+        # end in a full stop runs into the description and the model reads one
+        # mangled sentence where the spec had two.
+        desc = "\n".join(x for x in (o.get("summary"), o.get("description")) if x)
+        out.append({
+            "name": o["op"],
+            "description": (desc or o["op"])[:1000],
+            "parameters": {"type": "object", "properties": props,
+                           "required": required},
+        })
+    return out
+
+
+def tool_prompt(ops):
+    """One paragraph appended to the system prompt, because a list of tools
+    does not say what they are FOR. A model given four operations and no
+    context uses them to answer questions nobody asked; told that they read
+    the application the person is looking at, it uses them when the answer is
+    not otherwise available and leaves them alone when it is."""
+    if not ops:
+        return ""
+    return ("\n\nYou are embedded in an application, and the tools listed are "
+            "that application's own API, called on behalf of the person "
+            "asking with their own login. Use them whenever the answer "
+            "depends on that application's data rather than on general "
+            "knowledge, and say what you found rather than describing the "
+            "call you made. Ask for a narrower search rather than requesting "
+            "large amounts of data. If a call is refused, say plainly that "
+            "their account could not do that; do not retry it.")
+
+
+def embed_tool_context(emb, obj):
+    """(tools, rounds, error) for one question from an embed.
+
+    `rounds` is what the browser has already been round to fetch for THIS
+    question — the model's own call and what the host's application answered.
+    It arrives from the page rather than being held here on purpose: the
+    conversation is client-held everywhere else in this server, a session is a
+    variable in a frame, and a half-finished question parked in server memory
+    would be state to expire, to sweep, and to lose on a restart.
+
+    What it costs is that the page could lie about what its own application
+    said. It could — and it could equally lie about the question. The host
+    page is untrusted by definition and has always been able to say anything
+    it likes to the model; what it cannot do is reach an operation this site
+    was not granted, which is checked here and again on the way out."""
+    ops = (emb or {}).get("ops") or []
+    if not ops:
+        return None, [], None
+    raw = obj.get("tool_results")
+    if raw is not None and not isinstance(raw, list):
+        return None, [], "tool_results must be a list"
+    rounds = []
+    for r in (raw or []):
+        if not isinstance(r, dict):
+            continue
+        op = str(r.get("op") or "")[:64]
+        if not any(o["op"] == op for o in ops):
+            # Not a mistake worth being polite about: something is replaying a
+            # result for an operation this site cannot call.
+            return None, [], ("'%s' is not an operation this site may call"
+                              % op)
+        payload = {"status": int(r.get("status") or 0), "body": r.get("body")}
+        try:
+            content = json.dumps(payload)
+        except (TypeError, ValueError):
+            content = json.dumps({"status": payload["status"],
+                                  "body": str(r.get("body"))[:TOOL_RESULT_MAX]})
+        if len(content) > TOOL_RESULT_MAX:
+            # TRUNCATED, AND SAID SO. Silently cutting a result leaves a model
+            # answering confidently off half a page — and the answer to a
+            # result this big is a narrower question, which it can only ask if
+            # it knows it got one.
+            content = json.dumps({
+                "status": payload["status"],
+                "truncated": True,
+                "body": content[:TOOL_RESULT_MAX],
+                "note": "this result was too large to read in full — ask for "
+                        "fewer rows or a narrower range"})
+        rounds.append({"id": str(r.get("id") or "call_1")[:64], "op": op,
+                       "args": r.get("args") if isinstance(r.get("args"), dict)
+                               else {},
+                       "content": content})
+    if len(rounds) > MAX_TOOL_ROUNDS:
+        # The loop's end, and it is a real one: a model that has misread its
+        # tools will call the same one until something stops it, and every lap
+        # is a request through somebody else's page in their name.
+        return None, [], ("this question has been round its application %d "
+                          "times without an answer" % len(rounds))
+    return tool_defs(ops), rounds, None
+
+
+def validate_tool_call(rec_ops, name, args):
+    """A call the model has proposed, checked against what this site may
+    actually do. Returns (call, error).
+
+    THE MODEL'S OUTPUT IS UNTRUSTED INPUT. It is the one part of this loop
+    nobody wrote: an operation it invented, a parameter it renamed, a path
+    segment it filled with a slash, are all ordinary failure modes of a model
+    rather than attacks, and every one of them would otherwise arrive at
+    somebody else's API as a request their page made in their name."""
+    from urllib.parse import quote
+    op = next((o for o in rec_ops if o["op"] == name), None)
+    if not op:
+        return None, "no operation called '%s' is available here" % str(name)[:64]
+    if not isinstance(args, dict):
+        args = {}
+    path, query = op["path"], {}
+    for p in op["params"]:
+        if p["name"] not in args:
+            if p["required"]:
+                return None, "'%s' needs %s" % (op["op"], p["name"])
+            continue
+        v = args[p["name"]]
+        if isinstance(v, bool):
+            v = "true" if v else "false"
+        elif isinstance(v, (int, float)):
+            v = str(v)
+        elif isinstance(v, (list, tuple)):
+            v = ",".join(str(x) for x in v)[:500]
+        elif not isinstance(v, str):
+            continue
+        v = v[:500]
+        if p["in"] == "path":
+            # Quoted, and the separator withheld: a path parameter carrying a
+            # slash is how one operation becomes a request to another.
+            path = path.replace("{%s}" % p["name"], quote(v, safe=""))
+        else:
+            query[p["name"]] = v
+    if "{" in path:
+        return None, "'%s' is missing a path parameter" % op["op"]
+    body = args.get("body") if op.get("body") else None
+    if body is not None and not isinstance(body, (dict, list)):
+        body = None
+    return {"op": op["op"], "method": op["method"], "path": path,
+            "query": query, "body": body, "writes": bool(op.get("writes")),
+            "summary": op.get("summary") or op["op"]}, None
+
+
 # ---------------------------------------------------------------- neural TTS
 VOICE_DIR = os.path.join(ROOT, "voices")
 _voices = {}
@@ -8115,8 +8794,9 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/routes/ack",
                      "/routes/delete", "/routes/enable", "/routes/default",
                      "/routes/test",
-                     "/embeds", "/embeds/delete", "/embeds/enable",
-                     "/embeds/reissue",
+                     "/embeds", "/embeds/update", "/embeds/delete",
+                     "/embeds/enable", "/embeds/reissue",
+                     "/embeds/spec", "/embeds/ops",
                      # …and note what is NOT here either: /display/hello, which
                      # is how a display gets its token and therefore has to be
                      # reachable from the listener a display is served on.
@@ -8274,7 +8954,12 @@ class Handler(SimpleHTTPRequestHandler):
         # URL. Anything with read access to the log would otherwise be able to
         # take over a live embed session by pasting one line of it.
         line = re.sub(r"([?&]t=)[^&\s\"]+", r"\1…", line)
-        sys.stderr.write("%s %s\n" % (self.address_string(), line))
+        # STDOUT, WHERE THE REST OF THE LOG IS. The base class writes this to
+        # stderr, which was harmless while both ended up in the same file and
+        # is not now that stderr means "error" to a collector: every answered
+        # request would arrive at the severity reserved for the ones that were
+        # not. Same file on disk either way — serve.sh redirects both.
+        sys.stdout.write("%s %s\n" % (self.address_string(), line))
 
     # ---------- json helper ----------
     def _json(self, code, payload):
@@ -9261,7 +9946,19 @@ class Handler(SimpleHTTPRequestHandler):
                         "ttl_minutes", "created", "created_by",
                         "last_used", "enabled", "needs_user")}
                 row.update(id=eid, sessions=live.get(eid, 0),
-                           snippets=embed_snippets(rec, base))
+                           snippets=embed_snippets(rec, base),
+                           # WHAT THIS SITE MAY ASK ITS OWN APPLICATION FOR.
+                           # Absent on a site nobody has pointed at a spec,
+                           # which is every site until somebody does — the
+                           # panel draws the control either way and the empty
+                           # list is the honest state, not a missing feature.
+                           spec_url=rec.get("spec_url") or "",
+                           spec_fetched=rec.get("spec_fetched") or 0,
+                           spec_note=rec.get("spec_note") or "",
+                           grant_seen=bool(rec.get("grant_seen")),
+                           grant_note=rec.get("grant_note") or "",
+                           ops_dropped=rec.get("ops_dropped") or [],
+                           ops=embed_op_list(rec))
                 out.append(row)
             return self._json(200, {"embeds": out, "parts": list(PARTS),
                                     "presets": PRESETS, "base": base,
@@ -9750,6 +10447,15 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"token": token, "embed": {
                 "name": s["name"], "parts": s["parts"], "cap": s["cap"],
                 "origins": s["origins"],
+                # THE OPERATIONS, AS THE FRAME NEEDS THEM: enough to build a
+                # request out of, and never more than the host's own page
+                # already publishes about itself. The descriptions and schemas
+                # the model reads stay on this side — they are prompt material,
+                # and a host page has no use for them.
+                "tools": [{"op": o["op"], "method": o["method"],
+                           "path": o["path"], "writes": bool(o.get("writes")),
+                           "summary": o.get("summary") or o["op"]}
+                          for o in (s.get("ops") or [])],
                 "expires_in": max(0, int(s["expires"] - time.time())),
             }})
 
@@ -9849,6 +10555,178 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"ok": True, "id": eid,
                                     "key": eid + "." + secret,
                                     "snippets": embed_snippets(rec, embed_base())})
+
+        if parsed.path == "/embeds/update":
+            # A SITE IS A THING AN ADMIN MAINTAINS, not a thing they re-issue.
+            # What a key drew and what it was allowed to do were fixed at
+            # creation, so one more origin — or one permission fewer — meant a
+            # new key and a deletion. That is a new id: every authorize profile
+            # that had ticked the old one silently stops naming anything, and
+            # the far end has to be sent a credential and wire it in again,
+            # all to correct a hostname. The same reasoning as /embeds/reissue,
+            # arriving from the other side: there, the secret changes and the
+            # row survives; here, the row changes and the secret survives.
+            #
+            # THROUGH THE SAME VALIDATOR THAT WROTE IT. An edit cannot reach a
+            # record a create could not have produced — incoherent chrome, an
+            # unparseable origin, a visitor allowed more than the whole key —
+            # because it is the one function that decides what a key may be.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            eid = str(obj.get("id") or "")
+            embeds = read_embeds()
+            old = embeds.get(eid)
+            if old is None:
+                return self._json(404, {"error": "no such embed"})
+            rec, err = validate_embed(obj)
+            if err:
+                return self._json(400, {"error": err})
+            # WHAT AN EDIT DOES NOT TOUCH. The secret, because this is not the
+            # button that rotates it; the audit line, because it records the
+            # creation and not this; and `enabled`, because it has a button of
+            # its own — a form carrying it would put a site back on the air as
+            # a side effect of saving a rename.
+            rec.update(salt=old.get("salt"), hash=old.get("hash"),
+                       created=old.get("created"),
+                       created_by=old.get("created_by"),
+                       last_used=old.get("last_used"),
+                       enabled=old.get("enabled", True))
+            # THE SPEC CACHE RIDES ALONG, because it is not on this form —
+            # it is read from the application's own server and ticked on its
+            # own control, and an admin correcting a hostname must not silently
+            # withdraw what the panel may ask that application for.
+            #
+            # UNLESS THE ORIGINS MOVED, in which case it must not ride along:
+            # the cached operations and the ceiling over them were read from
+            # the old origin, and carrying them would leave one application's
+            # permissions attached to another's address. Re-read on the row.
+            if old.get("origins") == rec["origins"]:
+                for k in ("spec_url", "spec_ops", "spec_fetched", "spec_note",
+                          "grant_seen", "grant_note", "ops", "ops_dropped"):
+                    if k in old:
+                        rec[k] = old[k]
+            # THE ENVELOPE, AS THE LIVE SESSIONS ARE STILL HOLDING IT. A
+            # session token carries the parts, the capability and the origins
+            # it was minted with, so a narrowed key whose sessions kept running
+            # would be narrower on paper only, for as long as a day. They go
+            # when any of that moves — and stay when it does not, because
+            # renaming a site must not take somebody's page dark.
+            moved = [k for k in ("parts", "cap", "origins", "ttl_minutes",
+                                 "needs_user") if old.get(k) != rec[k]]
+            embeds[eid] = rec
+            write_embeds(embeds)
+            dropped = 0
+            if moved:
+                with _embed_sessions_lock:
+                    now_ = time.time()
+                    dropped = sum(1 for v in _embed_sessions.values()
+                                  if v["id"] == eid and v["expires"] > now_)
+                drop_embed_sessions(eid)
+            print("embed key %s (%s) edited by %s: %s%s"
+                  % (eid, rec["name"], s["user"],
+                     ", ".join(moved) if moved else "name/preset only",
+                     " \u2014 %d session(s) dropped" % dropped if dropped else ""),
+                  flush=True)
+            # THE CODE AGAIN, because an edit can change it: needs_user decides
+            # whether the host's endpoint has to send a person, and an admin
+            # who has just ticked it needs the line that ticking it requires.
+            return self._json(200, {"ok": True, "id": eid, "changed": moved,
+                                    "dropped": dropped,
+                                    "snippets": embed_snippets(rec, embed_base())})
+
+        if parsed.path == "/embeds/spec":
+            # READ THIS SITE'S APPLICATION, and it is a read of two documents:
+            # the OpenAPI description of what that application can do, and the
+            # grant file beside it saying which of those it permits at all.
+            # Both come from an origin the site is already registered under —
+            # see spec_url_for, where that is a boundary rather than a
+            # convention.
+            #
+            # A DOCUMENT MAY BE PASTED INSTEAD. An application on a private
+            # network is the ordinary case for this feature and is exactly the
+            # case this server cannot fetch from, so an admin who can reach it
+            # in a browser is not stopped by a server that cannot. What is
+            # pasted goes through the same parser and the same ceiling; the
+            # grant file is still fetched from the origin, because its whole
+            # value is that it came from there.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            eid = str(obj.get("id") or "")
+            embeds = read_embeds()
+            rec = embeds.get(eid)
+            if rec is None:
+                return self._json(404, {"error": "no such embed"})
+            doc = obj.get("doc") if isinstance(obj.get("doc"), dict) else None
+            try:
+                rec, err = refresh_site_spec(rec, obj.get("url"), doc)
+            except RuntimeError as exc:
+                return self._json(502, {"error": str(exc)})
+            if err:
+                return self._json(400, {"error": err})
+            embeds[eid] = rec
+            write_embeds(embeds)
+            print("embed key %s (%s) read a spec: %d operations, grant file %s"
+                  % (eid, rec["name"], len(rec["spec_ops"]),
+                     "read" if rec["grant_seen"] else "absent — reads only"),
+                  flush=True)
+            return self._json(200, {"ok": True, "id": eid,
+                                    "spec_url": rec["spec_url"],
+                                    "ops": embed_op_list(rec),
+                                    "grant_seen": rec["grant_seen"],
+                                    "grant_note": rec["grant_note"],
+                                    "note": rec["spec_note"],
+                                    "dropped": rec.get("ops_dropped") or []})
+
+        if parsed.path == "/embeds/ops":
+            # THE TICKS. Everything is off until an admin does this, and what
+            # they may tick is bounded by the ceiling the application declared
+            # — an operation absent from it is not refused with an explanation
+            # here, it is simply not in the set, because the alternative is a
+            # panel arguing with a permission that was never this server's to
+            # give.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            eid = str(obj.get("id") or "")
+            embeds = read_embeds()
+            rec = embeds.get(eid)
+            if rec is None:
+                return self._json(404, {"error": "no such embed"})
+            want = {str(x)[:64] for x in (obj.get("ops") or [])}
+            ceiling = {o["op"] for o in (rec.get("spec_ops") or [])}
+            rec["ops"] = [o["op"] for o in (rec.get("spec_ops") or [])
+                          if o["op"] in want]
+            outside = sorted(want - ceiling)
+            embeds[eid] = rec
+            write_embeds(embeds)
+            # LIVE SESSIONS GO. The operations are snapshot into a session the
+            # same way the chrome and the capability are, so a withdrawal that
+            # left them running would be a withdrawal on paper for as long as a
+            # day — and the reason to withdraw one is rarely that it can wait.
+            dropped = 0
+            with _embed_sessions_lock:
+                now_ = time.time()
+                dropped = sum(1 for v in _embed_sessions.values()
+                              if v["id"] == eid and v["expires"] > now_)
+            if dropped:
+                drop_embed_sessions(eid)
+            print("embed key %s (%s): %d operation(s) enabled by %s%s"
+                  % (eid, rec["name"], len(rec["ops"]), s["user"],
+                     " \u2014 %d session(s) dropped" % dropped if dropped else ""),
+                  flush=True)
+            return self._json(200, {"ok": True, "ops": rec["ops"],
+                                    "dropped": dropped, "outside": outside})
 
         if parsed.path == "/embeds/delete":
             s = self._require("admin")
@@ -11435,15 +12313,48 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(200, dict(about, reply="", demo=True))
             history = obj.get("history") or []
             tz = str(obj.get("tz") or "")[:64]
+            # WHAT THIS EMBED MAY ASK ITS OWN APPLICATION FOR, and what it has
+            # already been round to fetch for this question. Empty for a
+            # display: a screen on a wall is not sitting inside anybody's
+            # application and has no page to make a request from.
+            tools, rounds, tool_err = embed_tool_context(emb, obj)
+            if tool_err:
+                return self._json(400, dict(about, error=tool_err))
+            pending = None
             t0 = time.time()
             try:
                 out = ask_backend(text, history, cfg, tz=tz,
+                                  tools=tools, rounds=rounds,
                                   # Held by the display for exactly as long as
                                   # the route binding, and handed back on every
                                   # turn: it is what makes "which room?" →
                                   # "the kitchen" work.
                                   conversation_id=str(obj.get("conversation_id")
                                                       or "")[:64])
+                # A CALL THIS SITE CANNOT MAKE, answered to the model rather
+                # than to the person. An invented operation and a renamed
+                # parameter are ordinary failure modes of a model, not attacks,
+                # and both are recoverable in one lap — where telling somebody
+                # standing in front of a screen that the assistant asked for
+                # something that does not exist is not recoverable at all.
+                misses = 0
+                while out.get("tool_call") and misses < 2:
+                    tc = out["tool_call"]
+                    pending, why = validate_tool_call(
+                        (emb or {}).get("ops") or [], tc.get("op"), tc.get("args"))
+                    if pending:
+                        break
+                    misses += 1
+                    rounds = rounds + [{"id": tc.get("id") or "call_1",
+                                        "op": str(tc.get("op") or "?")[:64],
+                                        "args": tc.get("args") or {},
+                                        "content": json.dumps({"error": why})}]
+                    out = ask_backend(text, history, cfg, tz=tz,
+                                      tools=tools, rounds=rounds,
+                                      conversation_id=str(obj.get("conversation_id")
+                                                          or "")[:64])
+                if out.get("tool_call") and not pending:
+                    out = {"reply": ""}       # it never found one; say nothing
             except Exception as exc:                       # noqa: BLE001
                 print("ask failed (%s %s): %s"
                       % (rid, route_dest(cfg), exc), flush=True)
@@ -11463,6 +12374,24 @@ class Handler(SimpleHTTPRequestHandler):
                 # the person standing in front of it nothing they can act on
                 # while telling anyone in earshot what this box is wired to.
                 return self._json(502, dict(about, error=str(exc)))
+
+            if pending:
+                # NOT AN ANSWER — a request for one, addressed to the page this
+                # frame is sitting in. It goes down as method, path and query
+                # already resolved: the parameters were described in the
+                # application's own spec, which is on this side, and a browser
+                # left to assemble them from a name and a bag of values is a
+                # browser reimplementing the half of this that has to be right.
+                #
+                # `writes` rides with it because the frame is what asks the
+                # person before it goes, and it must not have to work that out
+                # for itself.
+                tc = out["tool_call"]
+                return self._json(200, dict(
+                    about, tool_call=dict(pending, id=tc["id"],
+                                          args=tc.get("args") or {}),
+                    round=len(rounds) + 1,
+                    ms=int((time.time() - t0) * 1000)))
 
             # Nobody remembers which name owns which capability. Asked
             # something it has no intent for, a house hands the question to
@@ -12037,6 +12966,11 @@ def start_tls(port, cert, key, admin_port=False, host="0.0.0.0", pinned_net="",
 
 def main():
     global SESSION_IDLE
+    # FIRST, so the migrations below are in the collector too. They are the
+    # lines that say what an upgrade did to somebody's data, which is exactly
+    # what an operator goes looking for afterwards and exactly what a tee
+    # installed later would have missed.
+    install_log_tee()
     # Before anything can read a display. read_displays keeps only the keys in
     # DISPLAY_DEFAULTS, so the first write after an upgrade would drop the old
     # wall settings silently — see migrate_kiosks.

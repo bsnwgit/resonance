@@ -462,8 +462,12 @@ An unrecognised zone falls back to the server clock.
 
 Recency is a different matter and is not fixable this way: the model has no
 internet, so the prompt asks it to say it does not know rather than guess.
-Live information would need a search or tool integration, which does not
-exist yet.
+
+**There is now one exception, and it is narrow.** An embed can be granted
+operations on the application it is embedded in — see below — and within that
+grant the model does reach live data. It reaches nothing else: there is no
+web search, and a display on a wall is inside no application and has no page
+to make a request from.
 
 ### The system prompt
 
@@ -516,12 +520,26 @@ control on screen and no way for the person in front of it to know. The proof
 that one field could not serve is `kiosk` and `signage` — identical chrome,
 the figure alone, and opposite permissions.
 
-**Both are fixed when the key is created.** One key is one surface: a lobby
-kiosk and a support widget are two keys, separately revocable and separately
-rate-limited, and the admin list says exactly what each one draws. Fixing the
-chrome also means it is signed into the key rather than riding in query
-parameters — plain parameters mean any user appends `&talk=1` and grants
-themselves a microphone the host never authorised.
+**Both are settled on the key, and both are the admin's to change.** One key
+is one surface: a lobby kiosk and a support widget are two keys, separately
+revocable and separately rate-limited, and the admin list says exactly what
+each one draws. Holding the chrome on the key means it is signed into the key
+rather than riding in query parameters — plain parameters mean any user
+appends `&talk=1` and grants themselves a microphone the host never
+authorised.
+
+They were immutable at first, on the reasoning that a page is already framing
+this. That named the risk correctly and charged it to the wrong party: the
+only way to change anything was to issue a second key and delete the first,
+which is a new id — every authorize profile that had ticked the old one
+silently stops naming anything, and the far end has to be sent a credential
+and wire it in again, to correct a hostname. So the record is editable through
+`/embeds/update`, by the same validator that wrote it, and what the risk
+actually asked for is met instead: **an envelope that narrows takes its live
+sessions with it.** A session token carries the parts, the capability and the
+origins it was minted with, so a narrowed key whose sessions kept running
+would be narrower on paper only, for as long as a session lasts. Change any of
+them and every session that key holds is dropped; a rename drops nothing.
 
 **Two admins, and grants only ever travel one way.** This admin sets the
 ceiling. The host's own admin may narrow what their users get, on either axis,
@@ -529,9 +547,11 @@ over `postMessage` — and can never widen it. The refusal lives in the embed
 rather than in an agreement: the host page is untrusted by definition, so
 "cannot add" has to be code that ships from here.
 
-**Incoherent arrangements are refused at creation**, in the admin page, naming
-the orphaned part — a human sees the mistake immediately rather than a host
-developer reading it out of a 400 three weeks later.
+**Incoherent arrangements are refused at creation and at every edit**, in the
+admin page, naming the orphaned part — a human sees the mistake immediately
+rather than a host developer reading it out of a 400 three weeks later. One
+validator serves both, which is what keeps an edit from reaching a state a
+create could not have produced.
 
 **Responsiveness belongs to the embed, not the API.** Desktop console and
 phone voice-only is a breakpoint problem, and the narrow-viewport rules key
@@ -587,6 +607,62 @@ does not read as the assistant forgetting the last ten minutes.
 
 **The embed is memoryless**, and that is the sequencing rather than an
 omission — see the roadmap.
+
+### Reaching the host application's data
+
+An embed can answer about the application it is sitting in rather than only
+beside it. The design question was never how to fetch the data; it was **who
+makes the request**, and the answer decides everything else.
+
+**The browser does.** Calling their API from this server would need a service
+credential on every host application — one account for everybody, necessarily
+holding more than any single visitor should see — network reach into places
+that have never accepted an inbound connection, and a schema per customer
+forever. The panel is already framed inside a page authenticated as that
+person, so the call is made there, same-origin, with their own session. This
+server holds no secret of theirs and reaches nothing of theirs.
+
+**So the loop runs through a request rather than inside one.** `/ask` answers
+with `tool_call` instead of `reply`; the frame asks the host page to perform
+it; the same question comes back with `tool_results`. Four laps and it stops —
+a model that has misread its tools will call the same one for ever, and every
+lap is a request through somebody's page in their name. Nothing is parked on
+this side between laps: the conversation is client-held everywhere else here,
+and a half-finished question in server memory would be state to expire, to
+sweep, and to lose on a restart.
+
+**Three authorities, and the narrowest wins.** The application declares a
+ceiling in a grant file it serves itself; the admin ticks within it on the
+site's row; the visitor's own login caps whatever survives. The owner of the
+data sets the outer bound and only they can raise it, which is what makes this
+safe to embed in an application somebody else runs. No grant file means read
+verbs only — silence never grants a write.
+
+**Nothing here is specific to any application.** Operations are read out of an
+OpenAPI document and granted against `operationId`, the one identifier in that
+document meant to be stable; a grant naming a path would follow the next
+refactor onto a different operation and keep working. Both that document and
+the grant file must sit on an origin the site is already registered under —
+not tidiness, but the difference between a text box and a text box this server
+will fetch from every address on its network.
+
+**The model's output is untrusted input.** An invented operation, a renamed
+parameter, a path segment stuffed with a slash are ordinary failure modes of a
+model rather than attacks, and each would otherwise arrive at somebody's API
+as a request their page made in their name. Every proposed call is resolved
+and checked here against what the session was granted, and `embed.js` checks
+again at the far end against the operation's own path template — so a frame
+that has been tampered with still reaches only the declared paths.
+
+**A write stops and asks, per action.** The confirmation is drawn by the frame
+and never by the host page: a confirmation rendered by the party that wants
+the action is not a confirmation. It names the real values, because a voice
+interface has no address bar to check. There is no session-wide "allow
+writes" — that is the same hole with one more click in front of it.
+
+Only the OpenAI dialect and Anthropic carry tool definitions. Home Assistant
+does its own on its own side and is untouched; `demo` cannot. Written up in
+full in [Reaching the host application's data](host-data.md).
 
 **The gotcha that catches everybody:** a microphone inside an iframe needs
 `allow="microphone"` from the host, the host page itself on HTTPS, and

@@ -79,3 +79,58 @@ The network is still the stronger of the two boundaries, and the VLAN is still
 the right answer for wall displays. What the token changes is that reaching the
 port is no longer the same as being able to *use* what is on it.
 
+## An embed reaching the host application's data
+
+A site can be granted operations on the application it is embedded in. That is
+a new surface, and it is worth being exact about what it does and does not
+move.
+
+**No credential of theirs is held here, and no request is made from here.**
+Every call is made by the host's own page, same-origin, carrying the session
+of whoever is signed in to their application. So the ceiling on what an embed
+can read is *what that person could already read* — enforced by their
+application, on every request, exactly as it would be if they had clicked the
+same thing themselves. Nothing about this widens a person's reach; it shortens
+the path to what they already had.
+
+**Three authorities, and the narrowest wins:**
+
+| | who decides | where it lives |
+| --- | --- | --- |
+| the ceiling | the application's owner | `/.well-known/resonance.json`, on their own origin |
+| what is enabled | this server's admin | ticks on the site's row |
+| what that person may do | their application | their session, on every request |
+
+The middle one can only narrow. An admin here cannot grant an operation the
+application did not declare, which is what makes this safe to embed in an
+application somebody else runs — and **no grant file means read verbs only**,
+because silence must never grant a write.
+
+**The spec and the grant file must come from a registered origin.** Without
+that rule the spec field is a text box this server will fetch from any address
+on its network, and the grant file is a document anybody could serve while
+claiming to speak for that application.
+
+**The model's output is untrusted input.** A model that invents an operation,
+renames a parameter or puts a slash in a path segment is a model failing in
+the ordinary way, and each of those would otherwise arrive at somebody's API
+as a request their page made in their name. Every proposed call is resolved
+against the operation's own description and checked against the session's
+grant here; `embed.js` checks again at the far end against the operation's
+path template, so a tampered frame still reaches only declared paths.
+
+**The host page could lie about what its application said.** It could — and it
+could equally lie about the question, which it has always been able to do. The
+host page is untrusted by definition; what it cannot do is reach an operation
+the site was not granted, which is checked on the way out and again on the way
+back in.
+
+**A write is confirmed by the frame, not by the host.** A confirmation drawn
+by the party that wants the action is not a confirmation. It names the real
+values, per action, with no session-wide switch to turn it off.
+
+**What this does not do.** It is not a general answer to recency: an embed
+reaches the application it is embedded in and nothing else, there is no web
+search, and a display on a wall is inside no application and has no page to
+make a request from. See [Reaching the host application's
+data](host-data.md).

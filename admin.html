@@ -806,15 +806,20 @@
      name, and a body that opens. */
   /* …and the embed draft is one of these too: it is a row in a list of named
      things, made the same way an endpoint is, so it reads the same way down
-     its own row. */
+     its own row. A SAVED SITE joins them: its settings are edited in the row
+     they belong to, in the same sections the draft made them in, so the three
+     lists are one kind of thing all the way down. */
   .erow[data-rid] .subgrp,
+  .erow[data-emb] .subgrp,
   #em_draft .subgrp{border:0;margin:0}
   .erow[data-rid] .subgrp + .subgrp,
+  .erow[data-emb] .subgrp + .subgrp,
   #em_draft .subgrp + .subgrp{margin-top:9px}
   /* One per line, full width, the way a profile's sections stack — rather than
      tiling into 215px columns. An endpoint reads down its own row instead of
      across it, and the two lists look like the same kind of thing. */
   .erow[data-rid] .subwrap,
+  .erow[data-emb] .subwrap,
   #em_draft .subwrap{
     display:block;margin:8px 0 2px;padding-left:9px;
     border-left:2px solid rgba(var(--glass),.22);
@@ -822,13 +827,16 @@
   /* No box of its own either: a profile's sections are separated by a hairline
      under the name, not by a frame each. */
   .erow[data-rid] .subgrp,
+  .erow[data-emb] .subgrp,
   #em_draft .subgrp{
     border:0;border-top:1px solid rgba(var(--glass),.10);
     background:none;margin:0;
   }
   .erow[data-rid] .subgrp:first-child,
+  .erow[data-emb] .subgrp:first-child,
   #em_draft .subgrp:first-child{border-top:0}
   .erow[data-rid] .subgrp > h5,
+  .erow[data-emb] .subgrp > h5,
   #em_draft .subgrp > h5{padding-left:20px}
 
   /* the first topic's own top rule would double up with the box edge */
@@ -2198,6 +2206,23 @@
     display:flex;flex-wrap:wrap;gap:5px;
     margin-top:12px;padding-top:10px;
     border-top:1px solid rgba(var(--glass),.22);
+  }
+  /* A SITE'S OPERATIONS. One a line and monospaced where it names something
+     from somebody else's document — an operationId and a path are strings to
+     be compared against their spec, not prose, and proportional type makes
+     `getLogEntry` and `getLogEntries` look alike at a glance. */
+  .oplist{
+    display:flex;flex-direction:column;gap:4px;margin-top:9px;
+    max-height:280px;overflow-y:auto;
+  }
+  .oplist label{display:flex;align-items:baseline;gap:6px;cursor:pointer}
+  .oplist .opname{font-family:var(--face-mono);font-weight:600}
+  .oplist .opmeta{opacity:.62;font-size:.92em}
+  /* The one distinction on this list that changes what happens to somebody's
+     data, so it is the one thing given a colour. */
+  .oplist .opwrite{
+    font-size:.72em;letter-spacing:.14em;padding:1px 5px;border-radius:2px;
+    border:1px solid rgba(255,138,138,.55);color:#ff8a8a;
   }
   /* The toolbar's own buttons, matched to the commit shape rather than given a
      heavier one. It used to be 2px on 6/10, which was fine while it was the
@@ -5050,7 +5075,7 @@ pointed at a severity rather than at this product's own words.</div>
     <h4>Alerts</h4>
     <div class="grpbody">
   <div class="setuprow">
-    <label class="vo"><input type="checkbox" id="sl_on"> Also send alerts to syslog</label>
+    <label class="vo"><input type="checkbox" id="sl_on"> Send this server’s log and its alerts to syslog</label>
   </div>
   <!-- .setpair on every label and its control. This row is a flex line that
        wraps, and without the pairs it breaks on whatever boundary happens to
@@ -5153,10 +5178,26 @@ pointed at a severity rather than at this product's own words.</div>
 standard library speaks it, every operator already has somewhere it goes, and
 it costs one socket and no credentials.
 
-Sent when an alert opens <b>and again when it resolves</b> — a screen that came
-back at four in the morning is exactly what somebody reading a log at nine
-wants to see beside the line saying it went. Severity follows the alert:
-errors as <b>err</b>, warnings as <b>warning</b>, recoveries as <b>info</b>.
+<b>Everything this server logs goes with the alerts</b>, not only the alerts —
+the startup banner, what a migration did, every request it answers, every
+failed sign-in, and any traceback it produces. It is the same stream that lands
+in <b>server.log</b> beside the program, mirrored line by line as it is
+written. A collector holding a screen's dead microphone and none of the
+restarts, sign-ins and errors around it shows half a picture, which reads as
+the whole one.
+
+<b>Severity is where the line came from.</b> The server's ordinary log is
+<b>info</b>; anything it writes to its error stream, which in practice means a
+traceback, is <b>err</b>. An alert carries its own instead: errors as
+<b>err</b>, warnings as <b>warning</b>, recoveries as <b>info</b>. Alerts are
+sent when one opens <b>and again when it resolves</b> — a screen that came back
+at four in the morning is exactly what somebody reading a log at nine wants to
+see beside the line saying it went.
+
+<b>Send</b> governs both. Left on <b>everything</b>, which is how it ships, the
+collector gets the lot; set to <b>errors only</b> it gets tracebacks and error
+alerts and none of the running commentary. That is the field to reach for when
+the collector is too noisy — switching the sink off stops the alerts as well.
 
 <b>Fire and forget.</b> Nothing here retries or blocks, because a sink that did
 would turn reporting a fault into a second fault — and the alert it failed to
@@ -5271,10 +5312,12 @@ recorded, and nothing at all until somebody says a wake word.</div>
        sitting on the tab that mints them, above a form, which asks one page
        to be both the door and the room.
 
-       So this is the room. Read-only by design, and not only because a key
-       cannot be edited: an admin comes here to find out what is currently
-       able to frame this assistant, which is a question about the deployment
-       and not about a credential they are in the middle of issuing.
+       So this is the room, and a room is where a thing is looked after. It
+       was read-only, on the reasoning that a key could not be edited at all;
+       now that it can, this is where — an admin comes here to find out what
+       is able to frame this assistant and to change it, which are the same
+       visit, and neither is a question about a credential they are in the
+       middle of issuing next door.
 
        It is #emblist, moved rather than copied. refreshEmbeds paints it
        wherever it is, and one list means DISABLE cannot leave a stale row
@@ -5300,23 +5343,39 @@ appears here the moment it is created, and stays until it is deleted.
 
 <b>Open a row for the rest of it.</b> <b>Reaches</b> is the line to read first
 and the one you cannot work out from anywhere else: which assistants this key
-may actually talk to. What a key may DO is fixed on the key; what it may talk
-TO is decided on the far side, in an authorize profile under PERMISSIONS ▸
+may actually talk to. What a key may DO is set on the key, here; what it may
+talk TO is decided on the far side, in an authorize profile under PERMISSIONS ▸
 AUTHORIZE, and a site that draws everything and reaches nothing looks perfectly
 configured while answering 403 to every question it is asked. An endpoint with
 no permission, or half a one, is refused to everybody and is not listed here.
 
 <b>Made</b> is the audit line — when the key was issued, by which admin, and
-the preset it started from.
+the id every log line and every authorize profile names it by.
 
-<b>What a key may do and what it draws are fixed at creation</b>, so a row here
-opens read-only. Somebody's page is already framing it, and widening it from
-here would change what that page can do without anybody at that end knowing.
-To change either, make a key and delete this one.
+<b>The settings under it are the key's, and they are yours to change.</b> Name,
+preset, what it may do, what it draws, which origins may frame it, whether the
+host must name the person, and the session and rate numbers. <b>SAVE</b>
+rewrites the key in place: same id, same secret, same grants, so nobody at the
+far end is sent anything and no permission stops naming it. This is what used
+to cost a new key and a deletion — which was a new id, an integration re-done
+at the other end, and every authorize profile that had ticked the old one
+quietly naming nothing, all to correct a hostname.
 
-<b>DISABLE</b> stops it working and keeps the row — a site taken off the air
-and put back without anybody's developer being sent a new key. <b>DELETE</b>
-is final, and every page using that key stops working immediately.
+<b>Narrow it and the live sessions go.</b> A session token carries the
+permissions and the origins it was minted with, so a key that is narrowed while
+its sessions run would be narrower on paper only, for up to a day. Change any
+of that and every session this key holds is dropped — the pages framing it ask
+for another within a moment and come back inside the new envelope. A rename
+drops nothing. The one edit the far end has to follow is <b>the host must name
+the person</b>: their own endpoint has to send it from the moment you save, so
+send them the code on the row again.
+
+<b>REISSUE KEY</b> is for a secret that has been lost or leaked, and only that
+— a new secret on the same site, which is why losing a key no longer costs the
+site its access. <b>DISABLE</b> stops it working and keeps the row — a site
+taken off the air and put back without anybody's developer being sent a new
+key. <b>DELETE</b> is final, and every page using that key stops working
+immediately.
 
 <b>SESSIONS</b> on a row is live traffic, browsers holding an exchanged session
 right now. <b>Last used</b> is the last time that application's server asked
@@ -5332,12 +5391,19 @@ goes looking for it.</div>
        always fully expanded, and a create form always on screen whether or not
        you were making anything.
 
-       Where it PARTS from AI is behaviour, not shape. An endpoint block is an
-       editing surface; a key is not. What it may do and what it draws are
-       fixed when it is created, because a saved key can already be framed by
-       somebody's page and quietly widening it is not a thing an admin should
-       be able to do by accident. So a saved row opens read-only, and the draft
-       is the only row with fields in it. -->
+       It parts from AI in ONE way now: what is here is the draft alone. A
+       saved key is edited in its own row under ACCESS ▸ SITES, where the rest
+       of it already is — this tab issues, that one keeps. The two carry the
+       same six sections and the same words, which is why the fields there are
+       built from a template rather than cloned off these: this form is
+       addressed by id and there is exactly one of it, and there are as many
+       of those as there are sites.
+
+       This row used to be the only one with fields in it at all, because a
+       saved key could not be edited. That rule was protecting something real
+       — a page somewhere is already framing it — and the protection lives on
+       the save now: an envelope that narrows takes its live sessions with
+       it. -->
   <section class="grp bare proflist" data-tab="embeds">
     <!-- IT NAMES ITSELF NOW. It had no title at all: the tab opened on a
          hostname field and a note, and buildHelp minted a bare header just to
@@ -13171,6 +13237,281 @@ function siteCopy(get, what){
    drawn into would be keeping a credential in a page for no reason. */
 let NEWKEY = null;
 
+/* ---- a site's settings, in the row they belong to ----
+   THE REGISTER USED TO BE READ-ONLY, and the reason given was that a page
+   somewhere is already framing this — widening a key from here changes what
+   that page can do without anybody at that end knowing. True, and it charged
+   the risk to the wrong party: the only way to change anything was to make a
+   second key and delete the first, which is a NEW ID. Every authorize profile
+   that had ticked the old one silently stops naming anything, the far end is
+   sent a credential and wires it in again, and all of that to correct a
+   hostname somebody typed wrong on the day.
+
+   So the row is where a site is maintained. The secret is still one-way and
+   still only rotated by REISSUE KEY; what an edit touches is the record, and
+   the server puts it through the same validator that wrote it. What the risk
+   actually asked for is that a narrowed key take its live sessions with it,
+   and it does — see the note under the fields.
+
+   Built from a template with `data-f` names rather than ids, the way an
+   endpoint's block is: there are as many of these on screen as there are
+   sites, and ids would collide with each other and with the draft form on
+   ENROLLMENTS ▸ EMBED, which is the same six sections under fixed ids. */
+function siteFieldsHTML(){
+  return `
+  <div class="grant"><b>Settings</b></div>
+  <label class="bklab" style="margin-top:2px">Name</label>
+  <input data-f="name" type="text" spellcheck="false" autocomplete="off"
+         placeholder="lobby kiosk">
+  <div class="note help">Labels the key here and in the server log. It is never
+sent to the host page and never seen by anybody using the embed, so renaming a
+site changes nothing at the far end.</div>
+
+  <div class="subwrap">
+  <div class="subgrp">
+    <h5>Presets<span class="subsum"></span></h5>
+    <div class="subbody">
+  <div class="seg" data-f="preset">
+    <button type="button" data-v="full">FULL</button>
+    <button type="button" data-v="console">CONSOLE</button>
+    <button type="button" data-v="voice">VOICE</button>
+    <button type="button" data-v="chat">CHAT</button>
+    <button type="button" data-v="kiosk">KIOSK</button>
+    <button type="button" data-v="signage">SIGNAGE</button>
+  </div>
+  <div class="note help">A starting point, not a mode. Pressing one rewrites
+the two lists below; edit either afterwards and the preset lights out, because
+the name would no longer be true of what is stored.</div>
+    </div>
+  </div>
+
+  <div class="subgrp">
+    <h5>Audio Selections<span class="subsum"></span></h5>
+    <div class="subbody">
+  <div class="cks" data-f="cap">
+    <label><input type="checkbox" data-c="ask"> Ask</label>
+    <label><input type="checkbox" data-c="mic"> Microphone</label>
+    <label><input type="checkbox" data-c="speak"> Speak</label>
+  </div>
+  <div class="note help">Permission, not furniture. Hiding the TALK button
+under <b>Component Selection</b> does not withdraw the microphone — these are
+two axes on purpose, and the host may narrow either at runtime but never widen
+one.</div>
+    </div>
+  </div>
+
+  <div class="subgrp">
+    <h5>Component Selection<span class="subsum"></span></h5>
+    <div class="subbody">
+  <div class="cks" data-f="parts">
+    <label><input type="checkbox" data-p="visual"> Figure</label>
+    <label><input type="checkbox" data-p="transcript"> Transcript</label>
+    <label><input type="checkbox" data-p="input"> Input field</label>
+    <label><input type="checkbox" data-p="mode"> SPACE/AUTO</label>
+    <label><input type="checkbox" data-p="talk"> TALK</label>
+    <label><input type="checkbox" data-p="audio"> AUDIO</label>
+    <label><input type="checkbox" data-p="text"> TEXT</label>
+  </div>
+  <div class="note help">Parts, not combinations. Some arrangements are
+incoherent — a TEXT button with no transcript to toggle — and those are
+refused here in the same words the server uses, rather than saved onto a key
+somebody's application is already using.</div>
+    </div>
+  </div>
+
+  <div class="subgrp">
+    <h5>Allowed Remote URLs<span class="subsum"></span></h5>
+    <div class="subbody">
+  <label class="bklab" style="margin-top:2px">One origin a line</label>
+  <textarea data-f="origins" rows="3" spellcheck="false"
+            placeholder="https://app.example.com"></textarea>
+  <div class="note help">These become the <b>frame-ancestors</b> this server
+sends, so a page on any other origin cannot frame it at all. This is the field
+a live site most often needs changed — a staging address, a second domain, a
+move — and it is the one that used to cost a new key.</div>
+    </div>
+  </div>
+
+  <div class="subgrp">
+    <h5>Speakers Name<span class="subsum"></span></h5>
+    <div class="subbody">
+  <div class="cks">
+    <label><input type="checkbox" data-f="needsuser"> The host must name the
+person</label>
+  </div>
+  <div class="note help">Their server sends whoever is signed in to their
+application along with the key, and this server records the question against
+that person. <b>Their server, never the browser.</b>
+
+<b>Ticking it changes what the far end has to send</b>, and a request that
+names nobody is refused from the moment you save. The code under <b>How this
+site is wired</b> is rewritten with it — send them that, or their integration
+stops on the line that used to be optional.</div>
+    </div>
+  </div>
+
+  <div class="subgrp">
+    <h5>Session<span class="subsum"></span></h5>
+    <div class="subbody">
+  <label class="bklab" style="margin-top:2px">Length, minutes</label>
+  <input data-f="ttl" type="number" min="5" max="1440">
+  <div class="note help">How long one exchanged session lasts before the host's
+server has to ask for another. The key itself does not expire; this is the
+window a browser holds.</div>
+
+  <label class="bklab">Questions a minute · the whole key</label>
+  <input data-f="rate" type="number" min="1" max="600">
+  <div class="note help">Everything this application asks, added up across
+every visitor it has. This is the ceiling and the bill.</div>
+
+  <label class="bklab">…and one visitor's share of that</label>
+  <input data-f="vrate" type="number" min="1" max="600">
+  <div class="note help">One browser, one page load. It has to be the smaller
+of the two, and comfortably above what a person actually does — a few a minute
+— so it catches a page stuck in a loop rather than somebody in a hurry.</div>
+    </div>
+  </div>
+  </div>
+
+  <div class="note" data-r="edit"></div>`;
+}
+
+/* The fields of one row, filled from the record and read back the same way.
+   Returns what the action bar needs — the row's buttons are built with the
+   others down there, because REVERT and SAVE belong beside DELETE and not in
+   a second action row of their own. */
+function siteEditor(wrap, e){
+  const F = n => wrap.querySelector('[data-f="' + n + '"]');
+  const parts = ()=> [...F('parts').querySelectorAll('input:checked')]
+                       .map(i=> i.dataset.p);
+  const cap = ()=>{
+    const c = {};
+    F('cap').querySelectorAll('input').forEach(i=> c[i.dataset.c] = i.checked);
+    /* Under Session rather than in the tick list — they are numbers and the
+       rest are permissions — but the same envelope, and the server reads them
+       off `cap`. Kept out of the tick container for the same reason the draft
+       does: the preset logic walks it and would have to learn to skip them. */
+    c.rate_per_min     = Number(F('rate').value)  || 0;
+    c.rate_per_visitor = Number(F('vrate').value) || 0;
+    return c;
+  };
+  const origins = ()=> F('origins').value.split('\n')
+                         .map(x=> x.trim()).filter(Boolean);
+  const preset = ()=>{
+    const b = F('preset').querySelector('button.on');
+    return b ? b.dataset.v : 'custom';
+  };
+  const read = ()=> ({id: e.id, name: F('name').value.trim(), preset: preset(),
+                      parts: parts(), cap: cap(), origins: origins(),
+                      ttl_minutes: Number(F('ttl').value) || 0,
+                      needs_user: F('needsuser').checked});
+  /* WHAT IS ON SCREEN, AS ONE STRING, so "has this been touched" is a
+     comparison rather than seven of them. Saving an untouched row is harmless
+     — the server drops no sessions when nothing in the envelope moved — but a
+     SAVE that is lit on a row nobody has edited says something happened. */
+  const snap = ()=> JSON.stringify(read());
+  let clean = '';
+
+  const note = wrap.querySelector('[data-r="edit"]');
+  const api = {after: null};
+
+  /* The ranges the server enforces, in the server's words, for the same
+     reason the orphan rules are duplicated: a number out of range should be
+     refused under the box it was typed in rather than after a round trip. */
+  function bad(){
+    const c = cap(), t = Number(F('ttl').value) || 0;
+    if (!F('name').value.trim())
+      return 'give it a name — the admin list is unreadable without one';
+    if (!(c.rate_per_min >= 1 && c.rate_per_min <= 600))
+      return 'the rate limit must be between 1 and 600 a minute';
+    if (!(c.rate_per_visitor >= 1 && c.rate_per_visitor <= 600))
+      return 'the per-visitor rate limit must be between 1 and 600 a minute';
+    if (!(t >= 5 && t <= 1440))
+      return 'the session length must be between 5 and 1440 minutes';
+    if (!origins().length)
+      return 'list at least one origin allowed to frame this — an embed with '
+           + 'no allow-list is one any site can frame';
+    return emIncoherent(parts(), cap());
+  }
+
+  api.err = ()=> bad();
+  api.dirty = ()=> snap() !== clean;
+  api.read = read;
+
+  function sync(){
+    const err = bad();
+    note.className = err ? 'note bad' : 'note';
+    note.textContent = err || '';
+    if (api.after) api.after();
+  }
+
+  api.fill = ()=>{
+    F('name').value = e.name || '';
+    F('origins').value = (e.origins || []).join('\n');
+    F('ttl').value = e.ttl_minutes;
+    F('rate').value = (e.cap && e.cap.rate_per_min) || '';
+    F('vrate').value = (e.cap && e.cap.rate_per_visitor) || '';
+    F('needsuser').checked = !!e.needs_user;
+    F('parts').querySelectorAll('input').forEach(i=>
+      i.checked = (e.parts || []).indexOf(i.dataset.p) >= 0);
+    F('cap').querySelectorAll('input').forEach(i=>
+      i.checked = !!(e.cap && e.cap[i.dataset.c]));
+    F('preset').querySelectorAll('button').forEach(b=>
+      b.classList.toggle('on', b.dataset.v === e.preset));
+    clean = snap();
+    sync();
+  };
+
+  /* One at a time, the same as the draft's and the same as an endpoint's —
+     but scoped to this row, so opening a section on one site does not shut
+     the one you were reading on another. */
+  wrap.addEventListener('click', ev=>{
+    const h5 = ev.target.closest('.subgrp > h5');
+    if (!h5 || !wrap.contains(h5)) return;
+    const g = h5.parentNode, was = g.classList.contains('open');
+    wrap.querySelectorAll('.subgrp').forEach(x=> x.classList.remove('open'));
+    g.classList.toggle('open', !was);
+  });
+
+  F('preset').addEventListener('click', ev=>{
+    const b = ev.target.closest('button');
+    if (!b) return;
+    ev.stopPropagation();
+    F('preset').querySelectorAll('button')
+               .forEach(x=> x.classList.toggle('on', x === b));
+    const pr = EM_PRESETS[b.dataset.v];
+    if (pr){
+      F('parts').querySelectorAll('input').forEach(i=>
+        i.checked = pr.parts.indexOf(i.dataset.p) >= 0);
+      F('cap').querySelectorAll('input').forEach(i=>
+        i.checked = !!pr.cap[i.dataset.c]);
+    }
+    sync();
+  });
+
+  /* Editing a box after choosing a preset does not stop it being that
+     arrangement in spirit, but it does stop the name being true — so the
+     preset lights out and the key is stored as custom. Same rule as the
+     draft, and the reason both `input` and `change` are bound is that a
+     number typed into is neither of the other two until it blurs. */
+  ['input', 'change'].forEach(evt=>
+    wrap.addEventListener(evt, ev=>{
+      if (ev.target.closest('[data-f="preset"]')) return;
+      const lit = F('preset').querySelector('button.on');
+      if (lit){
+        const pr = EM_PRESETS[lit.dataset.v];
+        const same = pr
+          && pr.parts.slice().sort().join() === parts().sort().join()
+          && ['ask','mic','speak'].every(k=> !!pr.cap[k] === cap()[k]);
+        if (!same) lit.classList.remove('on');
+      }
+      sync();
+    }));
+
+  api.fill();
+  return api;
+}
+
 async function refreshEmbeds(){
   const box = $('emblist');
   if (!box || ME.role !== 'admin'){ if (box) box.textContent = ''; return; }
@@ -13273,12 +13614,19 @@ async function refreshEmbeds(){
 
       const meta = document.createElement('div');
       meta.className = 'meta';
+      /* WHAT IS NOT SETTABLE HERE, and only that. May, Draws, Frames,
+         Session and Asking used to be read out on these lines because they
+         could not be anything else — the row was a printout. They are fields
+         a few lines down now, holding the same values and able to change
+         them, and printing each one twice on the same row would leave an
+         admin editing one copy while reading the other. What stays is the
+         three an edit cannot reach: what the far side lets this key talk to,
+         when it was last used, and who issued it. */
       const lines = [
-        ['May', cap.length ? cap.join(', ') : 'nothing'],
-        /* Directly under what it may DO, because it is the other half of the
-           same question and the half an admin cannot work out from here.
-           A site that draws everything and reaches nothing looks configured
-           and answers 403 to every question it is asked. */
+        /* FIRST, because it is the question the register exists to answer and
+           the one an admin cannot work out from here. A site that draws
+           everything and reaches nothing looks configured and answers 403 to
+           every question it is asked. */
         ['Reaches', (()=>{
           const rs = siteRoutes(e.id);
           if (!(RT.routes || []).length)
@@ -13288,26 +13636,22 @@ async function refreshEmbeds(){
                + 'so every question is refused. Tick it on an authorize '
                + 'profile under PERMISSIONS \u25b8 AUTHORIZE.';
         })()],
-        ['Draws', (e.parts || []).join(', ') || 'nothing'],
-        ['Frames', (e.origins || []).join('  ')],
-        ['Session', e.ttl_minutes + ' min · ' + (e.cap && e.cap.rate_per_min)
-                    + '/min, ' + (e.cap && e.cap.rate_per_visitor)
-                    + ' a visitor · id ' + e.id],
-        ['Asking', e.needs_user
-          ? 'the host names the person, and questions are recorded against them'
-          : 'anonymous — nothing about who is asking is collected'],
         ['Last used', e.last_used
           ? new Date(e.last_used * 1000).toLocaleString() : 'never'],
-        /* WHO ISSUED IT AND WHEN. The server has sent all three of these since
-           the key was written and the panel threw them away, which left the
-           one question an audit actually asks — where did this come from —
-           answerable only out of the log. The preset rides here rather than
-           beside the parts: it is what was CHOSEN, not what the key is, and
-           the two lines above already say what it is. */
+        /* WHO ISSUED IT AND WHEN, plus the id every log line and every
+           authorize profile names it by. The server has sent these since the
+           key was written and the panel threw them away, which left the one
+           question an audit actually asks — where did this come from —
+           answerable only out of the log.
+
+           The preset used to ride here as "what was CHOSEN, not what the key
+           is". It is a control on the row now, lit on whichever arrangement
+           the key currently matches, so saying it twice would be saying two
+           different things the day somebody edits one. */
         ['Made', (e.created
             ? new Date(e.created * 1000).toLocaleString() : 'date not recorded')
           + (e.created_by ? ' by ' + e.created_by : '')
-          + (e.preset ? ' \u00b7 from ' + e.preset : '')],
+          + ' \u00b7 id ' + e.id],
       ];
       lines.forEach(([k, v])=>{
         const d = document.createElement('div');
@@ -13318,6 +13662,16 @@ async function refreshEmbeds(){
         meta.appendChild(d);
       });
       body.appendChild(meta);
+
+      /* THE SETTINGS, AS FIELDS — the same six sections the draft makes a key
+         in, filled from the record. Above the code and below the facts,
+         because that is the order somebody works in: read what it reaches,
+         change what it does, then take the snippet the change may have
+         rewritten. */
+      const ed = document.createElement('div');
+      ed.innerHTML = siteFieldsHTML();
+      body.appendChild(ed);
+      const editor = siteEditor(ed, e);
 
       /* THE CODE, REBUILT. It was written once, in the response that created
          the key, and never again — so "how is this site wired" was a question
@@ -13411,34 +13765,34 @@ async function refreshEmbeds(){
           + 'server\u2019s environment as RESONANCE_KEY, which is why the code '
           + 'can be pasted into a chat or a repository and the credential '
           + 'cannot \u2014 and why this can be shown again at all. The key '
-          + 'itself is stored hashed and cannot: if it has been lost, add a '
-          + 'site and delete this one.';
+          + 'itself is stored hashed and cannot: if it has been lost, press '
+          + 'REISSUE KEY, which keeps this site and everything granted to it '
+          + 'and changes only the secret.';
         body.appendChild(kn);
       }
 
-      /* Read-only, deliberately, where an endpoint's block is an editing
-         surface: what a key may do and what it draws are fixed when it is
-         created. A page somewhere is already framing this, and widening it
-         from here would change what that page can do without anybody at that
-         end knowing. To change either, make a new key and delete this one. */
+      /* An editing surface, like an endpoint's block and unlike this row a
+         version ago. What that read-only rule protected is real and is
+         handled below instead: an envelope that narrows takes its live
+         sessions with it, so the change is true at once rather than true on
+         paper and false for as long as a session lasts. */
       const why = document.createElement('div');
       why.className = 'note help';
-      why.textContent = 'What a key may do and what it draws are fixed at '
-        + 'creation. To change either, add a key and delete this one — a page '
-        + 'is already framing this one, and widening it from here would change '
-        + 'what that page can do without anybody at that end knowing.';
+      why.textContent = 'SAVE rewrites this key in place. The key itself, the '
+        + 'id and everything granted to it are untouched \u2014 nobody at the '
+        + 'far end is sent anything, and no authorize profile stops naming it. '
+        + 'Change what it may do, what it draws, which origins may frame it or '
+        + 'how long a session lasts and every session this key is holding is '
+        + 'dropped, so a narrowing is true immediately rather than whenever '
+        + 'the last browser expires: pages framing it reload their session '
+        + 'within a moment and come back inside the new envelope. A rename '
+        + 'costs nothing and drops nothing. Ticking THE HOST MUST NAME THE '
+        + 'PERSON is the one edit the far end has to follow \u2014 send them '
+        + 'the code above again.';
       body.appendChild(why);
 
       const acts = document.createElement('div');
       acts.className = 'rtacts';
-      /* HARD RIGHT, like every other row in a register. The panel's way of
-         doing that is a spacer rather than justify-content — `.rtacts .spacer`
-         is already defined for exactly this, and every action row that pushes
-         its buttons over uses one — which also leaves the left of the row free
-         for something later without re-laying it out. */
-      const gap = document.createElement('span');
-      gap.className = 'spacer';
-      acts.appendChild(gap);
       /* THE ONLY WAY TO GET A WORKING KEY OUT OF THIS ROW. The secret is a
          hash from the moment it is written and nothing here can show the
          original — so the answer to "I have lost the key" is a new secret on
@@ -13476,6 +13830,54 @@ async function refreshEmbeds(){
       flip.textContent = e.enabled === false ? 'ENABLE' : 'DISABLE';
       flip.onclick = ()=> embedAction('/embeds/enable',
                                       {id:e.id, enabled: e.enabled === false});
+      acts.appendChild(flip);
+      /* WHAT OPERATES THE SITE ON THE LEFT, WHAT WRITES TO IT ON THE RIGHT —
+         the endpoint blocks on AI already split their bar this way, and the
+         panel's device for it is a spacer rather than justify-content
+         (`.rtacts .spacer`, defined for exactly this). REISSUE and DISABLE
+         act the moment they are pressed; REVERT and SAVE belong to the fields
+         above and are dark until those fields have been touched. */
+      const gap = document.createElement('span');
+      gap.className = 'spacer';
+      acts.appendChild(gap);
+      const undo = document.createElement('button');
+      undo.textContent = 'REVERT';
+      undo.className = 'act-undo';    // throws away an edit not yet committed
+      undo.onclick = ()=>{ editor.fill();
+                           const n = $('sitenote');
+                           if (n){ n.className = 'note'; n.textContent = ''; } };
+      const save = document.createElement('button');
+      save.textContent = 'SAVE';
+      save.className = 'act-save';
+      save.onclick = async ()=>{
+        const err = editor.err();
+        if (err){ const n = $('sitenote');
+                  n.className = 'note bad'; n.textContent = err; return; }
+        const note = $('sitenote');
+        note.className = 'note'; note.textContent = 'saving\u2026';
+        try{
+          const j = await api('/embeds/update',
+                              {method:'POST',
+                               body: JSON.stringify(editor.read())});
+          OPENEM = e.id;
+          await refreshEmbeds();
+          const n2 = $('sitenote');
+          n2.className = 'note';
+          /* WHAT IT COST, from the server rather than from a guess here: it
+             is the server that decided whether the envelope moved, and an
+             admin who has just taken somebody's page dark for a second should
+             read that they did rather than work it out. */
+          const ch = j.changed || [];
+          n2.textContent = 'Saved.'
+            + (j.dropped ? ' ' + j.dropped + ' live session'
+                         + (j.dropped === 1 ? '' : 's') + ' dropped \u2014 the '
+                         + 'pages framing this reload inside the new envelope.'
+                         : '')
+            + (ch.indexOf('needs_user') >= 0
+               ? ' The host\u2019s own endpoint has to change with it: send '
+                 + 'them the code on this row again.' : '');
+        }catch(err2){ note.className = 'note bad'; note.textContent = err2.message; }
+      };
       const del = document.createElement('button');
       del.textContent = 'DELETE';
       del.className = 'act-danger';   // destroys something already saved
@@ -13484,8 +13886,173 @@ async function refreshEmbeds(){
                     + 'stops working immediately.'))
           embedAction('/embeds/delete', {id:e.id});
       };
-      acts.appendChild(flip); acts.appendChild(del);
+      acts.appendChild(undo); acts.appendChild(save); acts.appendChild(del);
+      /* Lit only by an edit, and only a coherent one. The editor calls this
+         on every keystroke and tick; the fields set it up on first paint. */
+      editor.after = ()=>{
+        const touched = editor.dirty();
+        undo.disabled = !touched;
+        save.disabled = !touched || !!editor.err();
+      };
+      editor.after();
       body.appendChild(acts);
+
+      /* ===== WHAT THIS SITE MAY ASK ITS OWN APPLICATION FOR =====
+         Its own section with its own controls, below the envelope and
+         deliberately not part of it. The two are edited on different clocks:
+         the envelope is what this key draws and may do, settled once with the
+         integrator; this is a permission over somebody else's data, read from
+         their server and re-read whenever it changes. Sharing one SAVE would
+         mean a rename could not be made without also re-reading their spec. */
+      const hd = document.createElement('div');
+      hd.className = 'namerow';
+      const hb = document.createElement('b');
+      hb.textContent = '3 \u00b7 their application \u2014 what this panel may ask it';
+      hd.appendChild(hb);
+      body.appendChild(hd);
+
+      const hrow = document.createElement('div');
+      hrow.className = 'namerow';
+      const surl = document.createElement('input');
+      surl.type = 'text';
+      surl.value = e.spec_url || '';
+      surl.placeholder = '/openapi.json';
+      /* min-width, not just flex: an input's default `size` is its flex basis,
+         so `flex:1` alone leaves it at twenty characters on a row with plenty
+         of space. */
+      surl.style.cssText = 'flex:1;min-width:0';
+      const sread = document.createElement('button');
+      sread.textContent = 'READ SPEC';
+      hrow.appendChild(surl); hrow.appendChild(sread);
+      body.appendChild(hrow);
+
+      /* THE STATE, from the server. Three separate facts and each of them
+         changes what an admin should do next: whether a spec has ever been
+         read, whether the application declared a grant of its own, and
+         whether anything they had enabled has since disappeared from it. */
+      const sn = document.createElement('div');
+      sn.className = 'note';
+      const opbox = document.createElement('div');
+      opbox.className = 'oplist';
+
+      function paintOps(list, state){
+        opbox.innerHTML = '';
+        (list || []).forEach(o=>{
+          const lab = document.createElement('label');
+          const cb = document.createElement('input');
+          cb.type = 'checkbox'; cb.dataset.op = o.op; cb.checked = !!o.on;
+          lab.appendChild(cb);
+          const nm = document.createElement('span');
+          nm.className = 'opname';
+          nm.textContent = ' ' + o.op;
+          lab.appendChild(nm);
+          if (o.writes){
+            const w = document.createElement('span');
+            w.className = 'opwrite';
+            w.textContent = 'WRITES';
+            lab.appendChild(w);
+          }
+          const meta = document.createElement('span');
+          meta.className = 'opmeta';
+          meta.textContent = ' ' + String(o.method || '').toUpperCase() + ' ' + o.path
+            + (o.summary ? ' \u2014 ' + o.summary : '');
+          lab.appendChild(meta);
+          opbox.appendChild(lab);
+        });
+        if (!(list || []).length){
+          const em = document.createElement('span');
+          em.className = 'opmeta';
+          em.textContent = state || 'no spec has been read for this site yet, '
+            + 'so this panel can answer about the page it is on and nothing '
+            + 'else in that application.';
+          opbox.appendChild(em);
+        }
+        opsave.disabled = !(list || []).length;
+      }
+
+      function paintState(o){
+        const bits = [];
+        if (o.spec_fetched)
+          bits.push('read ' + new Date(o.spec_fetched * 1000).toLocaleString());
+        /* THE CEILING, NAMED AS ONE. An admin looking at a list of reads with
+           no writes in it should be able to tell "they permit no writes" from
+           "they have never heard of this", because the answers are different
+           and only one of them is a conversation with the far end. */
+        bits.push(o.grant_seen
+          ? 'their grant file sets what may be enabled here'
+          : 'no grant file at ' + (e.origins && e.origins[0] || 'their origin')
+            + '/.well-known/resonance.json \u2014 reads only, and writes cannot '
+            + 'be enabled until they publish one');
+        if (o.spec_note) bits.push(o.spec_note);
+        if ((o.dropped || o.ops_dropped || []).length)
+          bits.push('gone from their spec since it was last read, and no longer '
+                    + 'enabled: ' + (o.dropped || o.ops_dropped).join(', '));
+        sn.className = 'note' + (o.grant_seen ? '' : ' help');
+        sn.textContent = bits.join(' \u00b7 ');
+      }
+
+      const opacts = document.createElement('div');
+      opacts.className = 'rtacts';
+      const opgap = document.createElement('span');
+      opgap.className = 'spacer';
+      const opsave = document.createElement('button');
+      opsave.textContent = 'SAVE OPERATIONS';
+      opsave.className = 'act-save';
+      opacts.appendChild(opgap); opacts.appendChild(opsave);
+
+      sread.onclick = async ()=>{
+        sn.className = 'note'; sn.textContent = 'reading\u2026';
+        try{
+          const j = await api('/embeds/spec',
+                              {method:'POST',
+                               body: JSON.stringify({id: e.id, url: surl.value.trim()})});
+          surl.value = j.spec_url || surl.value;
+          paintState(j);
+          paintOps(j.ops, '');
+        }catch(err){ sn.className = 'note bad'; sn.textContent = err.message; }
+      };
+
+      opsave.onclick = async ()=>{
+        const want = [].slice.call(opbox.querySelectorAll('input:checked'))
+                       .map(cb=> cb.dataset.op);
+        sn.className = 'note'; sn.textContent = 'saving\u2026';
+        try{
+          const j = await api('/embeds/ops',
+                              {method:'POST',
+                               body: JSON.stringify({id: e.id, ops: want})});
+          sn.className = 'note';
+          /* WHAT IT COST, from the server. Withdrawing an operation drops the
+             sessions holding it, which takes somebody's panel back to the
+             server for a moment — an admin should read that they did it
+             rather than deduce it. */
+          sn.textContent = j.ops.length + ' operation'
+            + (j.ops.length === 1 ? '' : 's') + ' enabled.'
+            + (j.dropped ? ' ' + j.dropped + ' live session'
+                         + (j.dropped === 1 ? '' : 's') + ' dropped \u2014 the '
+                         + 'pages framing this pick the change up within a '
+                         + 'moment.' : '');
+        }catch(err){ sn.className = 'note bad'; sn.textContent = err.message; }
+      };
+
+      body.appendChild(sn);
+      body.appendChild(opbox);
+      body.appendChild(opacts);
+      paintState(e);
+      paintOps(e.ops, '');
+
+      const hn = document.createElement('div');
+      hn.className = 'note help';
+      hn.textContent = 'READ SPEC fetches their OpenAPI document and, beside '
+        + 'it, /.well-known/resonance.json \u2014 the file THEY publish saying '
+        + 'what they permit. Both have to sit on an origin this site is '
+        + 'registered under. Everything starts off: what is ticked here is '
+        + 'what the panel may call, and it can never exceed what their grant '
+        + 'file allows. Anything marked WRITES stops and asks the person, by '
+        + 'voice or by button, with the real values read back to them. Every '
+        + 'call is made by their own page carrying that visitor\u2019s login, '
+        + 'so nobody reaches data they could not already reach.';
+      body.appendChild(hn);
+
       row.appendChild(body);
       box.appendChild(row);
     });
@@ -13704,8 +14271,9 @@ $('b_addembed').addEventListener('click', async ()=>{
                      + 'this server cannot show it again.'
                      + ((j.snippets && !j.snippets.base)
                         ? ' No address is set above, so the code below says '
-                          + 'YOUR-RESONANCE-HOST — set one and make another key '
-                          + 'rather than editing it in by hand.'
+                          + 'YOUR-RESONANCE-HOST — set one and the code on this '
+                          + 'key\u2019s row under ACCESS \u25b8 SITES is written '
+                          + 'against it, rather than editing it in by hand.'
                         : '');
     $('em_name').value = ''; $('em_origins').value = '';
     /* The draft has done its job and goes away, the way a saved endpoint's

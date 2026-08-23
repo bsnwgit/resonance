@@ -207,6 +207,21 @@
   }
   .msg.you .body{color:rgba(var(--paper),.82)}
   .msg.ai  .body{color:var(--text)}
+  /* A WRITE WAITING ON A PERSON. Drawn inside the transcript rather than as
+     a dialog over it: what is being confirmed is part of the conversation,
+     and a modal box on top of somebody else's page is the one thing an embed
+     should never throw. */
+  .confirm{display:flex;gap:8px;margin-top:9px;flex-wrap:wrap}
+  .confirm button{
+    font:inherit;font-size:calc(11px * var(--fs));letter-spacing:.14em;
+    text-transform:uppercase;padding:6px 13px;border-radius:3px;cursor:pointer;
+    border:1px solid rgba(var(--paper),.34);background:transparent;
+    color:rgba(var(--paper),.86);
+  }
+  .confirm button.go{border-color:var(--text);color:var(--text)}
+  .confirm button:hover{border-color:var(--text);color:var(--text)}
+  .confirm button:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+  .confirm[data-done] button{display:none}
   .caret{display:inline-block;width:7px;height:13px;background:var(--text);
          vertical-align:-2px;margin-left:2px;animation:blink 1s steps(1) infinite}
   @keyframes blink{50%{opacity:0}}
@@ -286,6 +301,29 @@
   body[data-noparts~="input"]      #bar{justify-content:flex-end}
   /* a composer with nothing in it is a strip of furniture, not a control */
   body[data-nobar] #bar{display:none}
+  /* ---------- and in an embed the controls sit UNDER the field ----------
+     A display is a whole screen and the composer is a line across the bottom
+     of it: prompt, field, buttons, one row, and the field has more width than
+     anybody types into. A panel in the corner of somebody else's page is 400
+     points wide, and that same row leaves the field about ninety of them —
+     four buttons and a caret take the rest. A text field you cannot read your
+     own sentence in is not a text field, and it is the part of the panel
+     people actually use.
+
+     So the buttons take a line of their own beneath it. `flex-basis:100%` on
+     the .src group is the whole of it: the caret and the field are earlier in
+     the row and keep the first line to themselves, the field gets the width
+     back, and the wrap needs no wrapper element and no second markup for the
+     embed to drift out of step with.
+
+     Right-aligned, where they already were — the row grew a line, it did not
+     move — and it is .src that says so rather than #bar, because a full-width
+     line ignores its parent's justification. That also keeps the arrangement
+     true for a key granted no input part, where the buttons are the only
+     thing in the composer. */
+  body[data-embed] #bar{flex-wrap:wrap;row-gap:8px}
+  body[data-embed] #bar #q{flex:1 1 auto;min-width:0}
+  body[data-embed] #bar .src{flex:1 0 100%;justify-content:flex-end}
   /* the frame rate counter is a rig instrument; it has no business in
      somebody else's product — and a tablet bolted to somebody's hallway wall
      is as much somebody else's product as an embed is. It was worse than
@@ -4712,6 +4750,14 @@ async function askBackend(text, bare, rid){
        one's trail, and a failed request must not leave it to be picked up by
        the next. */
     const trail = Wake.trail; Wake.trail = null;
+    /* THE LAP THROUGH THE HOST'S PAGE. A question whose answer is in the
+       application this frame is embedded in does not come back answered — it
+       comes back as a call to make. This asks the host page to perform it,
+       with the visitor's own login, and sends what came back up with the next
+       request. Bounded here as well as on the server: a browser is not the
+       place to find out about a loop by watching one. */
+    const results = [];
+    for (let lap = 0; ; lap++){
     const r = await fetch('ask', {
       method:'POST', headers:{'Content-Type':'application/json'},
       /* The server runs on UTC and the person is not necessarily standing in
@@ -4738,6 +4784,13 @@ async function askBackend(text, bare, rid){
                                the rest of the turn stopped trusting it. */
                             route: rid || Routes.currentId(),
                             trail: trail,
+                            /* What the application has already answered for
+                               this same question. The server holds none of
+                               it — the conversation is client-held everywhere
+                               else here, and a half-finished question parked
+                               in server memory would be state to expire and
+                               to lose on a restart. */
+                            tool_results: results,
                             conversation_id: bare ? '' : Wake.convo})
     });
     const j = await r.json().catch(()=>({}));
@@ -4757,6 +4810,24 @@ async function askBackend(text, bare, rid){
     if (j && j.demo) return {reply: REPLIES[replyIx++ % REPLIES.length],
                              route: (j && j.route) || ''};
     if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
+    if (j.tool_call){
+      /* WRITES STOP AND ASK, and the asking is here rather than in the host
+         page: the page is untrusted by definition, and a confirmation drawn
+         by the party that wants the action is not a confirmation. Reads go
+         straight through — they can only return what this person could have
+         read themselves. */
+      const call = j.tool_call;
+      if (lap >= 4) throw new Error('this question went round the application ' +
+                                    'more times than it should have needed');
+      let out;
+      if (call.writes && !(await confirmWrite(call)))
+        out = {status: 0, body: {error: 'the person declined that action'}};
+      else
+        out = await HostCall.run(call);
+      results.push({id: call.id, op: call.op, args: call.args,
+                    status: out.status, body: out.body});
+      continue;
+    }
     if (j.ms) ev((j.name || 'reply') + ' ' + j.ms + 'ms');
     if (!bare && j.conversation_id) Wake.convo = j.conversation_id;
     /* Which endpoint actually answered. It has been in this response all
@@ -4764,6 +4835,7 @@ async function askBackend(text, bare, rid){
        itself, later, and got it wrong whenever the answer outlasted the
        awake window. */
     return {reply: j.reply, route: j.route || ''};
+    }
   }catch(e){
     /* Say something, and name whoever did not answer. A voice interface that
        goes quiet is indistinguishable from a broken one, and the person may
@@ -4781,6 +4853,14 @@ async function askBackend(text, bare, rid){
 
 function submit(text){
   if (EMBED && !Embed.can('ask')) return;
+  /* A WRITE IS WAITING ON THIS PERSON, so what they just said is an answer to
+     it before it is anything else. Anything that is not a yes cancels the
+     action — the safe direction — and a sentence that was plainly not about
+     it cancels and is then asked as the question it was. */
+  if (typeof HostCall !== 'undefined' && HostCall.pending){
+    const said = HostCall.pending.spoken(text);
+    if (said !== 'other'){ addMsg('you', text); qEl.value = ''; return; }
+  }
   /* WHO THIS WAS SAID TO, read now rather than when the answer comes back.
      Everything below this line happens after a round trip that can take ten
      seconds or more, and the wake binding does not survive that: the person's
@@ -6113,6 +6193,12 @@ function tellHost(kind){
      which is one lost question and a person wondering what they did. */
   window.parent.postMessage({rsn:1, kind, name: Embed.grant.name,
                              parts: Embed.live.parts, cap: Embed.live.cap,
+                             /* WHAT THIS PANEL MAY ASK THEIR APPLICATION FOR.
+                                The host is going to be handed calls to make;
+                                being told up front which ones exist is what
+                                lets their page refuse anything else rather
+                                than perform whatever arrives. */
+                             tools: Embed.grant.tools || [],
                              expires_in: Embed.grant.expires_in || 0},
                             target);
 }
@@ -6180,6 +6266,7 @@ async function loadEmbed(){
       if (!m || m.rsn !== 1) return;
       if (m.kind === 'narrow') narrowEmbed(m);
       else if (m.kind === 'renew') renewEmbed(m.code);
+      else if (m.kind === 'result') HostCall.result(m);
     });
     tellHost('ready');
   }catch(e){
@@ -6189,6 +6276,128 @@ async function loadEmbed(){
     document.body.dataset.nobar = '1';
     addMsg('ai', 'This embed could not start its session: ' + e.message);
   }
+}
+
+/* ================================ REACHING THE HOST'S APPLICATION
+   The panel answering about the application it is embedded in. The call is
+   made BY THE HOST PAGE — it is already authenticated as this person, and
+   this frame is not — so what travels down the channel is a request to make
+   and what comes back is what their own server said. See docs/host-data.md.
+
+   Nothing here decides what may be called. The server resolved the method,
+   the path and the query from the application's own spec and checked them
+   against what an admin enabled; this end performs what it is handed and
+   stops a write until somebody says yes. */
+const HostCall = {
+  seq: 0,
+  waiting: {},          // id -> settle function
+  pending: null,        // the write in front of a person, if there is one
+  TIMEOUT: 20000,
+
+  run(call){
+    const target = hostOrigin();
+    if (!target || window.parent === window)
+      return Promise.resolve({status: 0, body: {error:
+        'this panel is not inside an application, so there is nothing to ask'}});
+    const id = 'h' + (++this.seq);
+    return new Promise(resolve => {
+      /* A HOST THAT NEVER ANSWERS IS THE COMMON FAILURE, not a host that
+         answers badly: an integration that has not implemented the channel
+         at all is silence, and silence with no timer is a person watching a
+         panel think for ever. Twenty seconds, then say so to the model, which
+         can tell them. */
+      const timer = setTimeout(()=>{
+        delete this.waiting[id];
+        resolve({status: 0, body: {error: 'the application did not answer'}});
+      }, this.TIMEOUT);
+      this.waiting[id] = out => { clearTimeout(timer); delete this.waiting[id]; resolve(out); };
+      window.parent.postMessage({rsn:1, kind:'call', id: id, op: call.op,
+                                 method: call.method, path: call.path,
+                                 query: call.query || {},
+                                 body: (call.body === undefined) ? null : call.body,
+                                 writes: !!call.writes}, target);
+    });
+  },
+
+  /* The host's answer. Only an id this frame is actually waiting on: a page
+     posting results nobody asked for is a page trying to answer a question
+     that was never sent. */
+  result(m){
+    const settle = this.waiting[m && m.id];
+    if (!settle) return;
+    settle({status: Number(m.status) || 0,
+            body: (m.body === undefined) ? null : m.body});
+  },
+};
+
+/* What is about to happen, in the words of the operation and the values it
+   was given. NAMING THE SPECIFICS is the whole point — a voice interface has
+   no address bar to check, and "make this change?" is a question nobody can
+   answer. */
+function readback(call){
+  const bits = [];
+  Object.keys(call.query || {}).forEach(k=> bits.push(k + ' ' + call.query[k]));
+  if (call.body && typeof call.body === 'object')
+    Object.keys(call.body).slice(0, 6).forEach(k=>{
+      const v = call.body[k];
+      bits.push(k + ' ' + (typeof v === 'object' ? JSON.stringify(v).slice(0,60) : v));
+    });
+  /* The path's own parameters are already substituted into it by the time it
+     gets here, so the path is where the id of the thing being changed is. */
+  return (call.summary || call.op) + (bits.length ? ' — ' + bits.join(', ') : '') +
+         ' (' + call.method.toUpperCase() + ' ' + call.path + ')';
+}
+
+/* Per action, never per session: there is no "allow writes for this
+   conversation", because that is the same hole with one more click in front
+   of it. Resolves true only if somebody actually said yes. */
+function confirmWrite(call){
+  return new Promise(resolve => {
+    const line = readback(call);
+    const body = addMsg('ai', 'This will change something in the application:\n'
+                             + line + '\nSay yes, or press CONFIRM.');
+    const row = document.createElement('div');
+    row.className = 'confirm';
+    const go = document.createElement('button'); go.className = 'go'; go.textContent = 'Confirm';
+    const no = document.createElement('button'); no.textContent = 'Cancel';
+    row.appendChild(go); row.appendChild(no);
+    body.parentElement.appendChild(row);
+    let settled = false;
+    const finish = (ok, why) => {
+      if (settled) return;
+      settled = true;
+      HostCall.pending = null;
+      row.dataset.done = '1';
+      /* The row stays, saying which way it went. A confirmation that vanishes
+         leaves a transcript where somebody was asked and nothing followed. */
+      const said = document.createElement('span');
+      said.className = 'who';
+      said.textContent = ok ? 'confirmed' : (why || 'cancelled');
+      row.appendChild(said);
+      resolve(ok);
+    };
+    go.addEventListener('click', ()=> finish(true));
+    no.addEventListener('click', ()=> finish(false));
+    /* AND BY VOICE, because this is a voice interface and a person who has
+       been talking to it should not have to find a button. Anything that is
+       not a yes cancels — the safe direction — and an unrelated sentence
+       cancels and is then asked as the question it was. */
+    HostCall.pending = {
+      spoken(text){
+        const t = (text || '').trim().toLowerCase().replace(/[.!]$/, '');
+        if (/^(yes|yeah|yep|yes please|confirm|do it|go ahead|ok|okay)$/.test(t)){
+          finish(true); return 'yes';
+        }
+        if (/^(no|nope|cancel|stop|don't|dont|do not)$/.test(t)){
+          finish(false); return 'no';
+        }
+        finish(false, 'cancelled — you asked something else');
+        return 'other';
+      },
+      cancel(){ finish(false); },
+    };
+    if (typeof resize === 'function') setTimeout(resize, 0);
+  });
 }
 
 /* ------------------------------------------------------ preview channel
