@@ -29,6 +29,13 @@ Display listeners only — the embed does not exist on the admin port:
 | `GET` | `/embed/session` | what this session was granted — bearer token |
 | `GET` | `/embed.js` | the loader a host page drops in: fetches a code from *their* endpoint, frames this, draws the bubble, renews the session |
 
+**These five are the only endpoints another application is meant to call**, and
+the table above is an index rather than a contract. The request and response
+bodies, every status code and what to do about it, the two TTLs, the three
+different `429`s and the `postMessage` channel are written out in
+[Integrating it](integrating.md), which is the document to hand a host
+developer.
+
 Admin listener only — everything below returns 404 on the public ports:
 
 | Method | Path | Purpose |

@@ -27,6 +27,40 @@ What the host channel actually carries, now: out `ready`, `narrowed`,
 `renew`. `embed.js` handles the second of those, so a host only writes one if
 they are doing without the loader.
 
+**Found by the first outside integration.** A team wiring this into their own
+application arrived with eight questions before they could start, and every one
+of them was answerable from the source and from nowhere a host developer would
+look. Most of that was a documentation gap and is closed —
+`docs/integrating.md` is now the document they are handed. Two of the eight
+were not documentation:
+
+- **`embed.js` cannot take a code from the host's own code.** It reads
+  `data-code-url` and fetches it with `credentials: 'include'`, so it carries a
+  cookie and nothing else. A single-page application holding an access token in
+  memory and sending it as a bearer header gets its login page or a 401 — and
+  that is most single-page applications, so this is not an edge. The shape
+  asked for is `getCode: () => Promise<string>`, and the awkward half is
+  registration: the loader starts on its own, so there is no moment for the
+  host to hand a function in. Two candidates, and picking between them is the
+  actual decision — `data-code-fn` naming a global, which keeps "one tag,
+  nothing else" true and is ugly for a bundled application; or the loader
+  waiting when `data-code-url` is absent and the host calling
+  `Resonance.start(getCode)`, which is clean for a SPA and adds a second step
+  for everyone. The renewal path has to use the same function either way.
+  Until it exists the answer is the loader-free mount, written out in
+  `docs/integrating.md` — which works, and is forty lines of exactly what the
+  loader exists to stop people writing.
+
+- **The loader does not retry, so a renewal failure is permanent.** One failed
+  fetch in the renewal window writes a `console.warn` and never schedules
+  again; the session then lapses and questions start being refused, in a page
+  that was working a minute ago. The initial mount is the same — one
+  `console.error` and no bubble until a reload. Not a tight loop, which was the
+  thing to avoid, but the opposite error: no recovery at all. Four tries inside
+  the minute of headroom the early renewal already buys would cost nothing.
+  Nothing sends or reads `Retry-After` either, on any endpoint, which is worth
+  fixing at the same time and on the `/ask` limits rather than the key ledger.
+
 Still open, each of which is a different product:
 
 - **A host cannot ask a question and get the answer back.** It can frame the
