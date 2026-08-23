@@ -424,6 +424,8 @@ impractical quickly without ever locking a legitimate user out permanently.
 | `users.json` | accounts and password hashes | 600 |
 | `embeds.json` | embed keys, hashed | 600 |
 | `app.json` | the admin portal's port, binding, sign-in mode and session lifetime | ordinary |
+| `cert.pem` | the certificate every HTTPS listener answers with | ordinary — it is public by definition |
+| `key.pem` | its private key | 600 |
 | `server.pid` | the running process id | ordinary |
 
 `settings.json` has to be readable — every viewer's browser fetches it to

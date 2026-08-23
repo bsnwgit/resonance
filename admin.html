@@ -587,7 +587,20 @@
      stays as the floor: space-between hands out what is spare and there is
      nothing spare on a narrow panel, so without it these would touch before
      they wrapped. */
-  .profrow{flex-wrap:wrap;align-items:flex-start;justify-content:space-between}
+  /* THREE COLUMNS SHARED WITH THE BAR, so the boxes in the two rows stand on
+     the same left edges. space-between could never do that: it distributes
+     what is spare, and the two rows have different content, so the second and
+     third boxes landed 51 and 137 pixels apart. The fractions are this row's
+     natural widths — 455 / 326 / 270 — because it is the wider of the two and
+     must not be squeezed to suit the narrower one.
+
+     What changes on a narrow panel is which thing wraps: the third box used to
+     drop onto a line of its own, which reads as a group belonging to something
+     else, and now the buttons wrap inside a box that stays where it is. */
+  #navlinks, .profrow{
+    display:grid;grid-template-columns:433fr 310fr 257fr;
+    align-items:start;justify-items:start;min-width:0;
+  }
   /* NO LONGER PUSHED TO THE RIGHT EDGE. CONNECTIONS held the far end of the
      row on the reasoning that it is the third subject and should read as one —
      and what that actually bought was a stretch of nothing between it and
@@ -620,7 +633,9 @@
      scale spends a little of them. `max` keeps it sane at the top of the
      range, where there is nothing left to give and wrapping is the honest
      answer. Tracking is not in here — that was the wrong space to take. */
-  .profrow{gap:max(6px, calc(14px - (var(--fs) - 1) * 25px))}
+  /* The same gap on both rows, because a grid puts its columns after its
+     gaps: two rows with one template and two gaps do not line up. */
+  #navlinks, .profrow{gap:max(6px, calc(14px - (var(--fs) - 1) * 25px))}
   .profrow .tabbox{padding:2px max(5px, calc(10px - (var(--fs) - 1) * 25px)) 4px}
   .profrow .tabs button{padding:2px max(6px, calc(14px - (var(--fs) - 1) * 37px))}
   .profhead{margin:2px 0 10px}
@@ -1111,10 +1126,13 @@
      stays as the FLOOR — `space-between` distributes what is spare, and on a
      narrow panel there is none to distribute, so the boxes must still have
      something between them before they wrap. */
-  #navlinks{
-    display:flex;align-items:flex-start;flex-wrap:wrap;
-    justify-content:space-between;gap:10px;min-width:0;
-  }
+  /* AND THE BAR IS THE SCROLLBAR NARROWER THAN THE ROW BELOW IT. The row
+     below lives inside #panelscroll and this one does not, so with the same
+     template the columns still landed four pixels apart — the gutter, spent on
+     one row and not the other. Reserved here instead, from --sb, which is
+     measured off the scroll container and is 0 where the scrollbar is an
+     overlay. */
+  #navlinks{padding-right:var(--sb, 0px)}
   /* Selected is painted with the tab rows' rule, further down — one gradient,
      one place. What stays here is the transparent border it paints into. */
   /* `.navgap` is gone with the run it divided: the boxes divide themselves
@@ -2619,14 +2637,15 @@
          one side is where you are going, the other is who you are.
 
          THREE subjects now, each behind its own boxed label with a large space
-         between them, and they read in the order the work happens: who the
-         server knows about, how something comes to be here, and only then how
-         the server itself is run. ENROLLMENTS sits in the middle because it is
-         the thing an admin is here to DO — a screen is waiting on the far side
-         of it — where SETTINGS is what you come back to afterwards and rarely
-         twice. SETTINGS used to sit outside this row as the title of the page,
-         which worked while it was the only label and read as a fourth kind of
-         thing the moment there were three. -->
+         between them, and they read outward from the server: how it is run,
+         then how something comes to be here, then who it knows about — the
+         shape of the deployment first and the people inside it last.
+         ENROLLMENTS keeps the middle because it is the thing an admin is here
+         to DO, with a screen or a person waiting on the far side of it, and
+         because it is the one of the three that touches both its neighbours.
+         SETTINGS used to sit outside this row as the title of the page, which
+         worked while it was the only label and read as a fourth kind of thing
+         the moment there were three. -->
     <span id="navlinks">
       <!-- THE THREE SUBJECTS, each in a box that says its own name in its top
            edge — the same fieldset-and-legend the profile rows use. They were
@@ -2636,21 +2655,35 @@
            what is inside the box is what the label names, and there is nothing
            to infer from spacing.
 
-           They read in the order the work happens: who the server knows about,
-           how something comes to be here, and only then how the server itself
-           is run. -->
+           They read outward from the server: how it is run, how something
+           comes to be here, and then who it knows about. -->
       <fieldset class="tabbox">
-        <!-- Who the server knows about, split by which side of the product
-             they exist on: ADMIN is an account that reaches THIS panel, USER
-             is a person the display side knows about. They are not the same
-             population and never have been — one signs in with a password to
-             configure the server, the other picks up a minted URL and talks to
-             it — so they are two places rather than one list with a column
-             saying which. -->
-        <legend><span class="tablabel">IDENTITY</span></legend>
+        <!-- The server itself: its portal, its mail, its maintenance, and the
+             door people arrive at. First of the three, because everything in
+             the two boxes after it happens inside what is decided here. -->
+        <legend><span class="tablabel">SETTINGS</span></legend>
         <div class="tabs">
-          <button id="tab_accounts" data-tab="accounts">ADMIN</button>
-          <button id="tab_users" data-tab="users">USER</button>
+          <button id="tab_app" data-tab="app">ADMIN</button>
+          <!-- How the server itself is defended, which is administration
+               rather than a connection: who gets in, on what terms, and into
+               which group. -->
+          <button id="tab_security" data-tab="security">SECURITY</button>
+          <!-- What the server does when a screen goes wrong: where alerts are
+               sent, how much log is kept back, and how long what screens
+               report is held. All three are settings, which is what puts them
+               here and not on STATUS — that is where the same three subjects
+               are READ. One is configured, the other is watched, and a page
+               that did both would be a page you cannot safely leave open. -->
+          <button id="tab_alerts" data-tab="alerts">ALERT</button>
+          <!-- HOW PEOPLE AND SCREENS GET IN, as opposed to who is already in.
+               Divided from the three beside it because those configure the
+               server itself — its portal, its mail, its maintenance — and this
+               configures a door: which port invitations are accepted on, what
+               name the link carries, and what somebody is asked when they
+               request access. The QUEUES those settings feed are in the box to
+               the left; this is where the shape of the door is decided. -->
+          <span class="navrule"></span>
+          <button id="tab_enrolcfg" data-tab="enrolcfg">ENROLL</button>
         </div>
       </fieldset>
 
@@ -2676,32 +2709,17 @@
       </fieldset>
 
       <fieldset class="tabbox">
-        <!-- The server itself — the thing you configure once and then leave
-             alone, which is why it reads last rather than standing between an
-             admin and the queue somebody is waiting in. -->
-        <legend><span class="tablabel">SETTINGS</span></legend>
+        <!-- Who the server knows about, split by which side of the product
+             they exist on: ADMIN is an account that reaches THIS panel, USER
+             is a person the display side knows about. They are not the same
+             population and never have been — one signs in with a password to
+             configure the server, the other picks up a minted URL and talks to
+             it — so they are two places rather than one list with a column
+             saying which. -->
+        <legend><span class="tablabel">IDENTITY</span></legend>
         <div class="tabs">
-          <button id="tab_app" data-tab="app">ADMIN</button>
-          <!-- How the server itself is defended, which is administration
-               rather than a connection: who gets in, on what terms, and into
-               which group. -->
-          <button id="tab_security" data-tab="security">SECURITY</button>
-          <!-- What the server does when a screen goes wrong: where alerts are
-               sent, how much log is kept back, and how long what screens
-               report is held. All three are settings, which is what puts them
-               here and not on STATUS — that is where the same three subjects
-               are READ. One is configured, the other is watched, and a page
-               that did both would be a page you cannot safely leave open. -->
-          <button id="tab_alerts" data-tab="alerts">ALERT</button>
-          <!-- HOW PEOPLE AND SCREENS GET IN, as opposed to who is already in.
-               Divided from the three beside it because those configure the
-               server itself — its portal, its mail, its maintenance — and this
-               configures a door: which port invitations are accepted on, what
-               name the link carries, and what somebody is asked when they
-               request access. The QUEUES those settings feed are in the box to
-               the left; this is where the shape of the door is decided. -->
-          <span class="navrule"></span>
-          <button id="tab_enrolcfg" data-tab="enrolcfg">ENROLL</button>
+          <button id="tab_accounts" data-tab="accounts">ADMIN</button>
+          <button id="tab_users" data-tab="users">USER</button>
         </div>
       </fieldset>
     </span>
@@ -3241,11 +3259,11 @@ nothing crosses a network. Start it, open localhost, talk to it.</div>
        admin setting this is answering one question, not three unrelated
        ones. -->
   <section class="grp bare titleonly" data-tab="enrolcfg">
-    <div class="barehead"><span class="listtitle">Enrolment settings</span></div>
+    <div class="barehead"><span class="listtitle">Enrollment Settings</span></div>
   </section>
 
   <section class="grp wide" data-tab="enrolcfg">
-    <h4>Enrolment</h4>
+    <h4>Enroll Network</h4>
     <div class="grpbody">
   <!-- WHICH INTERFACE, THEN WHICH PORT, then what to call the interface —
        the same order every other pair on this panel is in, and the order the
@@ -3295,7 +3313,42 @@ read when a link is minted.</div>
     </div>
   </section>
 
+  <!-- MOVED HERE FROM SECURITY. SECURITY answers whether anybody has to be
+       approved at all; how long what you hand them afterwards is worth is a
+       property of the enrolment, not of the policy. -->
+  <!-- AND ITS OWN COMMIT, which it never had. On SECURITY this field was
+       written by the AI Requires Permission SAVE two sections above it, which
+       read as a group with no save of its own; across a tab boundary it would
+       have been a field that silently never saved. saveDp writes only the
+       keys it is given, so this sends the one and leaves the rest alone. -->
+  <section class="grp wide" data-tab="enrolcfg">
+    <h4>Enroll Time Limit</h4>
+    <div class="grpbody">
+  <label class="bklab" style="margin-top:2px">A code lasts (minutes, 0 for no
+limit)</label>
+  <input id="dp_codemins" class="num" type="number" inputmode="numeric"
+         min="0" max="10080">
+  <div class="note help">How long a code is worth anything for after you press
+GET A CODE. Ten minutes by default, because the usual case is somebody walking
+across a building with six characters in their head — and the clock beside each
+one under ENROLLMENTS ▸ DEVICE is counting this down.
 
+<b>Zero switches the clock off</b>, and that is a real answer rather than a way
+of being careless: a code is <b>one use</b>, and the row it enrols was approved
+the moment you created it. A deployment that mints codes on Friday and hangs the
+screens on Monday is not less safe for it — what a code can do is become one
+screen you already decided to have.
+
+The clock applies from the moment a code is issued, so changing this does not
+extend one already out there. REISSUE gives that row a fresh one on the new
+setting.</div>
+
+  <div class="seg actrow">
+    <button id="b_codesave" class="act-save">SAVE</button>
+  </div>
+  <div class="note" id="codenote"></div>
+    </div>
+  </section>
 
   <!-- MOVED HERE FROM ENROLLMENTS ▸ USER. It sat above the queue it feeds,
        which reads well and put a thing you write ONCE — in your own words,
@@ -3303,7 +3356,7 @@ read when a link is minted.</div>
        have already answered it. Those are different jobs at different
        moments: this is configuration, the queue is work. -->
   <section class="grp wide" data-tab="enrolcfg">
-    <h4>Enrollment Request Form</h4>
+    <h4>Enroll User Form</h4>
     <div class="grpbody">
   <div id="dp_form"></div>
   <div class="seg" style="margin-top:6px">
@@ -3331,6 +3384,11 @@ queue as the people you enrolled — chipped <b>FORM</b> where they asked and
   <div class="note" id="formnote"></div>
     </div>
   </section>
+
+
+
+
+
 
   <section class="grp wide" data-tab="app">
     <h4>Time format</h4>
@@ -3729,32 +3787,6 @@ by noise.</div>
     </div>
   </section>
 
-    <section class="grp wide" data-tab="security">
-    <h4>Enrolment codes</h4>
-    <div class="grpbody">
-  <label class="bklab" style="margin-top:2px">A code lasts (minutes, 0 for no
-limit)</label>
-  <input id="dp_codemins" class="num" type="number" inputmode="numeric"
-         min="0" max="10080">
-  <div class="note help">How long a code is worth anything for after you press
-GET A CODE. Ten minutes by default, because the usual case is somebody walking
-across a building with six characters in their head — and the clock beside each
-one under ENROLLMENTS ▸ DEVICE is counting this down.
-
-<b>Zero switches the clock off</b>, and that is a real answer rather than a way
-of being careless: a code is <b>one use</b>, and the row it enrols was approved
-the moment you created it. A deployment that mints codes on Friday and hangs the
-screens on Monday is not less safe for it — what a code can do is become one
-screen you already decided to have.
-
-The clock applies from the moment a code is issued, so changing this does not
-extend one already out there. REISSUE gives that row a fresh one on the new
-setting.</div>
-    </div>
-  </section>
-
-  
-
   <section class="grp wide" data-tab="security">
     <h4>Sessions</h4>
     <div class="grpbody">
@@ -3771,6 +3803,93 @@ Short by default — this session configures what everyone else is looking at.
   <div class="seg actrow">
     <button id="b_sesssave" class="act-save">SAVE</button>
   </div>
+    </div>
+  </section>
+
+  <!-- THE GROUND THE REST OF THIS TAB STANDS ON, and until now the one thing
+       on the server nothing could see: the pair was loaded at startup or it
+       was absent, and when it ran out was a date in somebody's diary. It
+       expires on every listener at once — this panel, each assistant, the
+       enrolment page — so the day it happens is the day nothing works and no
+       page says why.
+
+       Last of the security topics rather than first: it is read when
+       something is wrong or once a year, and putting two tall boxes above the
+       settings an admin actually visits would bury them. -->
+  <section class="grp wide" data-tab="security">
+    <h4>Certificate</h4>
+    <div class="grpbody">
+  <div class="now" id="certnow"></div>
+  <div class="note" id="certstate"></div>
+  <div class="note help">What every HTTPS listener answers with, read off the
+file itself rather than from anything stored — <b>cert.pem</b> and
+<b>key.pem</b>, beside the server.
+
+<b>Installing one does not need a restart.</b> The pair is checked the way a
+listener checks it before either file is replaced, and every listener is handed
+it as soon as it is in place: connections already open finish on the old one,
+everything after gets the new. The exception is a server that started with no
+certificate at all — there is no HTTPS to hand it to, and the ports come from
+the network profiles, so that one case does take a restart and this says so.
+
+<b>Nothing here is refused quietly.</b> A key that is not this certificate's, a
+block that is not a certificate, one that has already expired, or one carrying
+no subject alternative name — a browser refuses that last one whatever its
+common name says — are all turned back with what is on disk untouched.
+
+<b>The key never leaves this machine.</b> It is written beside the server with
+owner-only permissions, the same as one made here.</div>
+
+  <label class="bklab" for="ct_cert">Certificate (PEM, chain included)</label>
+  <textarea id="ct_cert" rows="4" spellcheck="false" autocomplete="off"
+            placeholder="-----BEGIN CERTIFICATE-----"></textarea>
+  <label class="bklab" for="ct_key">Private key (PEM)</label>
+  <textarea id="ct_key" rows="4" spellcheck="false" autocomplete="off"
+            placeholder="-----BEGIN PRIVATE KEY-----"></textarea>
+  <div class="seg actrow">
+    <button id="b_certinstall" class="act-save">INSTALL</button>
+  </div>
+  <div class="note" id="certnote"></div>
+    </div>
+  </section>
+
+  <!-- MAKING ONE, with every name in it. make-cert.sh takes a single host and
+       writes the SAN from that, so a deployment reached by an address, a name
+       and the hostname in an invitation had to pick which of the three would
+       work and re-run the script to change its mind. All of them go in at
+       once here, which is most of the reason this is a page rather than a
+       shell command. It is still self-signed: a browser will warn until the
+       machines that matter trust it, and this box does not pretend otherwise. -->
+  <section class="grp wide" data-tab="security">
+    <h4>Make a certificate</h4>
+    <div class="grpbody">
+  <label class="bklab" for="ct_names">Names and addresses it must answer to</label>
+  <input id="ct_names" type="text" spellcheck="false" autocomplete="off"
+         autocapitalize="none"
+         placeholder="10.1.153.21, ai.example.com, join.example.com">
+  <div class="note help">Every address anybody opens this server on, separated
+by commas or spaces. <b>Each one has to be in here</b> — a certificate is
+judged against the address in the bar, not against the machine, so a name left
+out is a warning on that name however correct the rest is. Put in the panel's
+address, each assistant's, and whatever <b>Address in the link</b> is set to
+under SETTINGS ▸ ENROLL.
+
+<b>127.0.0.1 and localhost are always included</b>, because the machine itself
+is always one of the ways this is opened.
+
+Good for a year — a browser refuses anything longer outright, sometimes as a
+blank page rather than a warning you can click past.
+
+<b>It is self-signed</b>, so browsers will warn until its issuer is trusted on
+the machines that use it. That is enough for a screen somebody clicks past once
+and <b>not</b> enough for an embed on another site, which fails silently
+instead: for that, install a certificate above from a name a browser already
+trusts.</div>
+
+  <div class="seg actrow">
+    <button id="b_certmake" class="act-save">MAKE A CERTIFICATE</button>
+  </div>
+  <div class="note" id="certmakenote"></div>
     </div>
   </section>
 
@@ -4302,8 +4421,9 @@ it grants nothing. They can be changed afterwards on the person's own row, or
 from the endpoint.
 
 <b>The link always opens in one place</b> — the enrolment listener, under
-SETTINGS ▸ ADMIN ▸ Enrolment. The same link on any other port of this server
-answers 404, so somebody who knows a working address cannot substitute it. Once
+SETTINGS ▸ ENROLL ▸ Enroll Network. The same link on any other port of
+this server answers 404, so somebody who knows a working address cannot
+substitute it. Once
 they have chosen a password, that page hands them the addresses of the
 assistants you ticked, because the enrolment port is deliberately not one of
 them. It is shown <b>once</b>, here, at the moment
@@ -4414,9 +4534,9 @@ group and does not count as a display that works. Reissuing a code puts it back
 to exactly that state.
 
 <b>A code works once</b>, and the clock on its row is counting down what is
-left of it — set under SECURITY, where it can also be switched off entirely. If
-it runs out, <b>REISSUE</b> gives another on the current setting: the row is the
-PLACE, so its name and every endpoint that names it are kept.
+left of it — set under SETTINGS ▸ ENROLL, where it can also be switched off
+entirely. If it runs out, <b>REISSUE</b> gives another on the current setting:
+the row is the PLACE, so its name and every endpoint that names it are kept.
 
 The screen takes the code either way: type <b>&lt;this server&gt;/e/CODE</b>
 into its address bar, or open the display page on it and type the six
@@ -6088,6 +6208,131 @@ function enrolNow(j){
     + (running.enrol_port === port ? '' : ' — once this server is restarted');
 }
 
+/* SETTINGS ▸ SECURITY ▸ Certificate. Every line of it is read off the file on
+   the server rather than out of a settings document, so there is nothing here
+   to keep in sync and nothing to revert: the only two acts are installing a
+   pair and making one. */
+function certPaint(j){
+  const box = $('certnow'), state = $('certstate');
+  if (!box || !state) return;
+  const c = (j && j.cert) || {};
+  const day = t => t ? new Date(t * 1000).toLocaleDateString(undefined,
+                      {day:'numeric', month:'short', year:'numeric'}) : 'an unreadable date';
+  state.className = 'note';
+  if (!c.present){
+    box.textContent = 'There is no certificate beside this server.';
+    state.className = 'note bad';
+    state.textContent = c.error || 'HTTPS is off. Beyond loopback the admin '
+      + 'interface does not start without one, embeds cannot load at all, and '
+      + 'the microphone is blocked on every address but localhost.';
+    return;
+  }
+  if (c.error){
+    box.textContent = 'cert.pem is beside this server.';
+    state.className = 'note bad';
+    state.textContent = c.error;
+    return;
+  }
+  const names = (c.names || []).map(esc).join(', ');
+  box.innerHTML =
+    '<div>' + (c.self_signed ? 'Self-signed'
+                             : 'Issued by ' + esc(c.issuer || 'somebody'))
+      + (c.subject ? ' · ' + esc(c.subject) : '') + '</div>'
+    + '<div>Answers to ' + (names || 'nothing — it carries no names, and no '
+                                   + 'browser will accept it') + '</div>'
+    + '<div>Valid until ' + esc(day(c.not_after)) + '</div>';
+  /* Two sentences, and they are two different questions: how long this one is
+     good for, and whether it is the one being served. A page that answered
+     only the first would call a certificate installed while every browser was
+     still being handed the one before it. */
+  let when, bad = false;
+  if (c.expired){
+    when = 'It expired on ' + day(c.not_after)
+         + ', so every browser is refusing this server.';
+    bad = true;
+  }else if (c.days_left <= 30){
+    when = 'It runs out in ' + c.days_left + ' day'
+         + (c.days_left === 1 ? '' : 's') + ' — replace it before it does, '
+         + 'because it goes on every listener at once.';
+    bad = true;
+  }else{
+    when = c.days_left + ' days left.';
+  }
+  let served;
+  if (!c.https){
+    served = ' HTTPS is not running here, so nothing is serving it.';
+    bad = true;
+  }else if (!c.serving){
+    served = ' The listeners are still answering with the one they started '
+           + 'with — restart to serve this.';
+    bad = true;
+  }else{
+    served = ' Every HTTPS listener is answering with it.';
+  }
+  state.className = bad ? 'note bad' : 'note';
+  state.textContent = when + served;
+  /* MANAGED SOMEWHERE ELSE, said before anybody types into a box that will
+     refuse them. A link at /etc/ssl or a directory an ACME client renews is a
+     deployment that already has an answer to this question, and the panel's
+     job there is to show what is loaded and stay out of the way. */
+  if (c.managed){
+    box.innerHTML += '<div>Managed outside this app · cert.pem → '
+                   + esc(c.managed) + '</div>';
+    ['b_certinstall', 'b_certmake'].forEach(id=>{
+      const b = $(id); if (b) b.disabled = true;
+    });
+    ['certnote', 'certmakenote'].forEach(id=>{
+      const n = $(id);
+      if (!n) return;
+      n.className = 'note';
+      n.textContent = 'Not from here — cert.pem points at ' + c.managed
+        + ', and writing over that link would detach this server from '
+        + 'whatever renews it. Replace it where it is managed; this page will '
+        + 'show the new one.';
+    });
+  }
+  /* The names it has now, so renewing one is a press rather than a memory
+     test. Loopback is left out because it goes in whatever anybody types. */
+  const nm = $('ct_names');
+  if (nm && !nm.value && (c.names || []).length)
+    nm.value = c.names.filter(n=> n !== '127.0.0.1' && n !== 'localhost')
+                      .join(', ');
+}
+
+async function certPost(path, body, noteId){
+  const note = $(noteId);
+  note.className = 'note';
+  note.textContent = 'checking it…';
+  try{
+    const j = await api(path, {method: 'POST', body: JSON.stringify(body)});
+    note.textContent = j.restart
+      ? 'in place — but this server started without a certificate, so HTTPS '
+        + 'does not exist until it is restarted'
+      : 'in place — ' + j.served + ' listener'
+        + (j.served === 1 ? ' is' : 's are') + ' answering with it now';
+    /* Cleared on success only: a paste that was refused is still the paste
+       somebody wants to fix, and clearing it would make them go and find it
+       again. */
+    ['ct_cert', 'ct_key'].forEach(id=>{ if ($(id)) $(id).value = ''; });
+    loadApp();
+  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+}
+
+$('b_certinstall').addEventListener('click', ()=>{
+  certPost('/cert/install', {cert: $('ct_cert').value,
+                             key: $('ct_key').value}, 'certnote');
+});
+$('b_certmake').addEventListener('click', ()=>{
+  const names = ($('ct_names').value || '').trim();
+  if (!names){
+    $('certmakenote').className = 'note bad';
+    $('certmakenote').textContent = 'give it at least one name or address to '
+      + 'answer to';
+    return;
+  }
+  certPost('/cert/selfsign', {names}, 'certmakenote');
+});
+
 /* The two axes are a segmented control each, so they read as one choice from
    a closed set rather than a value you could mistype. */
 const segValue = id => ((document.querySelector('#' + id + ' button.on') || {}).dataset || {}).v;
@@ -6220,6 +6465,7 @@ async function loadApp(){
     if ($('ap_enrolhost')) $('ap_enrolhost').value = j.app.enrol_host || '';
     if ($('ap_embedhost')) $('ap_embedhost').value = j.app.embed_host || '';
     enrolNow(j);
+    certPaint(j);
     segSet('ap_bind', j.app.bind);
     postureSync();
     showPending(j);
@@ -7835,7 +8081,7 @@ function showPersonUrl(name, token, mailed, base, pid){
   const at = base || IDBASE;
   line.textContent = at ? at + token
     : 'the enrolment listener is not bound — set its port under SETTINGS ▸ '
-      + 'ADMIN ▸ Enrolment, restart, then reissue this link';
+      + 'ENROLL ▸ Enroll Network, restart, then reissue this link';
   const sub = document.createElement('span');
   /* WHETHER IT WAS ALSO EMAILED. The server says so and this ignored it,
      which left an admin copying a link by hand with no way to know one had
@@ -9291,7 +9537,6 @@ $('b_dpsave').addEventListener('click', ()=>{
     guest_days: parseInt($('dp_days').value, 10),
     max_displays: parseInt($('dp_max').value, 10),
     max_pending: parseInt($('dp_pending').value, 10),
-    code_minutes: parseInt($('dp_codemins').value, 10),
   }, 'dpnote');
 });
 
@@ -9301,6 +9546,13 @@ $('b_formrevert').addEventListener('click', ()=>{
 });
 $('b_formsave').addEventListener('click', ()=>{
   saveDp({form: DPFORM.filter(f=> (f.label || '').trim())}, 'formnote');
+});
+
+/* SETTINGS ▸ ENROLL ▸ Enroll Time Limit, which used to be committed by the AI
+   Requires Permission SAVE on SECURITY. Its own button now that it is on
+   another tab — the same reason the mail settings have theirs. */
+$('b_codesave').addEventListener('click', ()=>{
+  saveDp({code_minutes: parseInt($('dp_codemins').value, 10)}, 'codenote');
 });
 
 /* ---- the model profiles ----
@@ -13172,6 +13424,24 @@ $('b_docpdf').addEventListener('click', async ()=>{
    replaced in the same tab, and calling this twice would stack a second set
    of listeners on every tab button and heading — so each click would toggle
    twice and appear to do nothing. */
+/* THE SCROLLBAR, AS A NUMBER THE BAR CAN USE. #navlinks is above the scroll
+   container and the row it aligns with is inside it, so the bar is the gutter
+   wider — and two grids with one template but different widths put their
+   columns in different places. Watched rather than measured once: the gutter
+   comes and goes with the length of the tab you are on, and a stale number is
+   a bar that lines up on some tabs and not others. Overlay scrollbars report
+   0, which is the right answer there. */
+function measureGutter(){
+  const ps = document.getElementById('panelscroll');
+  if (!ps) return;
+  document.documentElement.style.setProperty(
+    '--sb', (ps.offsetWidth - ps.clientWidth) + 'px');
+}
+measureGutter();
+if (window.ResizeObserver && document.getElementById('panelscroll'))
+  new ResizeObserver(measureGutter).observe(document.getElementById('panelscroll'));
+window.addEventListener('resize', measureGutter);
+
 let CURRENT_TAB = 'look';
 let navBuilt = false;
 function panelNav(){
@@ -13321,6 +13591,10 @@ function panelNav(){
                           shut.set(g, true); });
     render();
     syncSaveRow();
+    // The gutter comes and goes with the length of the tab, and the bar above
+    // reserves it — re-read here as well as by the observer, which does not
+    // fire when the scroll container keeps its size and only gains a bar.
+    measureGutter();
     $('panelscroll').scrollTop = 0;
     if (tab === 'accounts') refreshUsers();
     // Groups live on SECURITY now, and the list is populated by its own fetch
