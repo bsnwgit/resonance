@@ -25,9 +25,15 @@ Display listeners only — the embed does not exist on the admin port:
 | --- | --- | --- |
 | `POST` | `/embed/session` | an embed key in, a one-use handover code out. Where the key requires it, `user.id` must come with the key or the call is refused. Never returns a session token: see [Embedding](embedding.md) |
 | `GET` | `/embed?c=` | the display, framed, drawing only what the key grants. The code is read for the `frame-ancestors` line and **not** spent |
-| `POST` | `/embed/claim` | the code, spent once, for the session token and the grant. The token is a bearer credential and lives only in that page's memory |
+| `POST` | `/embed/claim` | the code, spent once, for the session token and the grant — including `tools`, the operations this session may ask the host's own application for. The token is a bearer credential and lives only in that page's memory |
 | `GET` | `/embed/session` | what this session was granted — bearer token |
 | `GET` | `/embed.js` | the loader a host page drops in: fetches a code from *their* endpoint, frames this, draws the bubble, renews the session |
+
+`POST /ask` from an embed session answers with `tool_call` instead of `reply`
+where the answer is in the host's own application: the frame performs it
+through the host page and posts the same question again with `tool_results`.
+Four laps, then it stops. See [Reaching the host application's
+data](host-data.md).
 
 **These five are the only endpoints another application is meant to call**, and
 the table above is an index rather than a contract. The request and response
@@ -71,7 +77,10 @@ Admin listener only — everything below returns 404 on the public ports:
 | `POST` | `/displays/delete` | revoke: its token stops matching, and it is removed from every route's allow-list — `admin` role |
 | `GET` | `/embeds` | list embed keys, each with the integration code rebuilt for it — `admin` role |
 | `POST` | `/embeds` | create one; the key is returned once — `admin` role |
-| `POST` | `/embeds/reissue` | a new secret on the same key: same id, same grants, live sessions dropped. Returned once — `admin` role |
+| `POST` | `/embeds/update` | rewrite one in place: same id, same secret, same grants. Live sessions dropped if the envelope moved — `admin` role |
+| `POST` | `/embeds/reissue` | a new secret on the same key: same id, same settings, same grants, live sessions dropped. Returned once — `admin` role |
+| `POST` | `/embeds/spec` | read a site's OpenAPI document and the grant file beside it, and cache the operations. `url` or a pasted `doc`; both must resolve to an origin the site is registered under |
+| `POST` | `/embeds/ops` | which of those operations the panel may call. Bounded by the application's own grant file; anything outside it is dropped rather than refused. Withdrawing one drops the site's live sessions |
 | `POST` | `/embeds/enable` | enable or disable one — `admin` role |
 | `POST` | `/embeds/delete` | revoke one — `admin` role |
 
@@ -81,6 +90,19 @@ be rebuilt long after the one response that held the secret has gone. The
 secret itself is a hash from the moment it is written and never comes back;
 `/embeds/reissue` is the only way to obtain a working key for an existing site,
 and it keeps the id so every grant made to that site survives.
+
+`/embeds/update` takes the same body as `/embeds` plus the `id`, and runs it
+through the same validator — an edit cannot reach a record a create could not
+have produced. It replaces `name`, `preset`, `parts`, `cap`, `origins`,
+`ttl_minutes` and `needs_user`, and leaves the secret, the audit fields and
+`enabled` alone (`enabled` has `/embeds/enable`, so a form carrying it would
+put a site back on the air as a side effect of a rename). It answers `changed`,
+the list of envelope fields that moved, and `dropped`, how many live sessions
+were cut because they moved: a session token carries the parts, the capability
+and the origins it was minted with, so a narrowed key whose sessions were left
+running would be narrower on paper for as long as a session lasts. A rename
+drops nothing. `snippets` comes back too, because `needs_user` decides whether
+the host's own endpoint has to send a person.
 
 **Everything else 404s, including files that are not secret.** The server
 hands out four files — `index.html`, `admin.html`, `icon.svg`, `lockup.svg` —

@@ -70,6 +70,13 @@ DOCS = [
                 "or as a bubble: embed keys, the four things one fixes, the "
                 "code you hand their developer, and what has to be true of "
                 "the server first."},
+    {"id": "hostdata", "file": "host-data.md",
+     "category": "Assistants & integration",
+     "title": "Reaching an application's data", "audience": "admin",
+     "summary": "The embedded panel answering about the application it is "
+                "sitting in: their API spec, the grant file they publish, the "
+                "operations you tick on the site's row, and why every call is "
+                "made by their page with the visitor's own login."},
 ]
 DOC_BY_ID = {d["id"]: d for d in DOCS}
 

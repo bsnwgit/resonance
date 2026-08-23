@@ -127,3 +127,31 @@ end the script where a browser does — at the FIRST `</script`, in a string or 
 comment or anywhere else — because reading to the last one hands the parser a
 file no browser will run.
 
+**The two tool-calling dialects agree on the definitions and disagree on the
+replay.** A tool definition is the same object in both, one field name apart —
+`parameters` for the OpenAI shape, `input_schema` for Anthropic. What differs
+is how the round already taken is handed back: OpenAI wants an `assistant`
+message carrying `tool_calls` followed by a `role: "tool"` message keyed on
+`tool_call_id`, and Anthropic wants an `assistant` message whose content is a
+`tool_use` block followed by a **user** message whose content is a
+`tool_result` block keyed on `tool_use_id`. Get it wrong and the model does not
+error — it calls the same tool again, because from where it sits nothing came
+back.
+
+**A model that cannot see a result will loop for ever, so the lap is what needs
+bounding, not the call.** The obvious guard is a timeout on the request. The
+failure in practice is a model calling the same operation on every pass because
+its result never reached it in a shape it recognised — each pass a fresh
+request, each one fast, none of them wrong enough to throw. Four laps, counted
+in the request rather than held on the server.
+
+**An embedded panel cannot reach the host's API and must not try.** It is on
+another origin, holds no credential of theirs, and any fix for that — CORS on
+their side, a service account on ours — is worse than the problem. The page it
+is framed in is already authenticated as the person; make the request there.
+The cost is that the loop runs through a request rather than inside one, which
+is a smaller price than it sounds and buys the whole permission model.
+
+**`flex: 1` on an `<input>` is not enough.** An input's default `size`
+attribute is its flex basis, so it sits at about twenty characters on a row
+with plenty of room. It needs `min-width: 0` beside it.

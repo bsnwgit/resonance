@@ -193,7 +193,7 @@ To put something real behind it, open ADMIN and set an endpoint's service to
 
 ## Documentation
 
-**The manual.** These seven are also built into the admin panel — the **?**
+**The manual.** These eight are also built into the admin panel — the **?**
 beside the SETTINGS title opens them in a modal, and each has a DOWNLOAD PDF
 button. Readable by any signed-in account, not just admins.
 
@@ -207,6 +207,7 @@ button. Readable by any signed-in account, not just admins.
 | **[Admin settings & accounts](docs/app-settings.md)** | Ports, restarts, session lifetime, and the two roles |
 | **[Embedding it elsewhere](docs/embedding.md)** | Putting it on somebody else's web page, inline or as a bubble: keys, the code you hand their developer, and what the server needs first |
 | **[Integrating it](docs/integrating.md)** | The other side of that one, addressed to the host developer: the exact contract, the timings, what fails and how. Send them this link |
+| **[Reaching an application's data](docs/host-data.md)** | The panel answering about the application it is embedded in: their API spec, the grant file they publish, and what you tick on the site's row |
 
 **Project reference.** In the repository, not in the panel.
 

@@ -17,6 +17,12 @@ the one case the drop-in tag does not cover: a single-page application whose
 session is a token in memory rather than a cookie cannot use the loader, and
 writes its own mount instead.
 
+A third document, [Reaching the host application's data](host-data.md), is the
+panel answering *about their application* rather than only beside it — the
+site's own spec, the grant file they publish, and the operations you tick on
+its row. Nothing on this page depends on it; a site that never uses it works
+exactly as described here.
+
 ---
 
 ## Read this before you start
@@ -160,10 +166,34 @@ weeks later.
 - `input` with neither a transcript nor a voice — typing into a void.
 - one visitor allowed more a minute than the whole key is.
 
+### What it may ask their application for
+
+Off, and separate from everything above, because it is a permission over
+somebody else's data rather than over this server. A site's row carries a
+spec address; **READ SPEC** reads their OpenAPI document and, beside it, the
+`/.well-known/resonance.json` **they** publish saying what they permit. You
+tick within that ceiling and press **SAVE OPERATIONS** — never outside it, and
+never at all until they have published one, beyond the reads their spec
+declares.
+
+Both documents must sit on an origin the site is already registered under.
+Withdrawing an operation drops the site's live sessions, the same way
+narrowing its chrome does. See [Reaching the host application's
+data](host-data.md).
+
 One key is one surface. A lobby kiosk and a support widget are two keys,
 separately revocable and separately rate-limited, and the register under
-**ACCESS ▸ SITES** says exactly what each one draws. That is where keys are
-disabled and deleted; this tab only makes them.
+**ACCESS ▸ SITES** says exactly what each one draws. That is also where a key
+is changed afterwards, disabled and deleted; this tab only makes them.
+
+**Nothing here is a decision you are stuck with.** Every field on this form is
+a field on the row under ACCESS ▸ SITES, and **SAVE** there rewrites the key in
+place — same id, same secret, same grants, so nobody at the far end is sent
+anything. Narrow one and the sessions it is holding are dropped, so the change
+is true at once rather than true on paper until they expire; rename it and
+nothing is dropped at all. The one edit the far end must follow is **the host
+must name the person**, which their own endpoint has to start sending the
+moment you save.
 
 ---
 
@@ -192,7 +222,9 @@ that it is somewhere it should not be.
 Do not answer a lost key by deleting the site and making another. A new key is
 a new id, and every authorize profile that named the old one silently stops
 naming anything — recovering a credential would withdraw the site's access to
-every assistant.
+every assistant. The same goes for a change of any other kind: a new origin, a
+permission withdrawn, a rate raised, a name corrected. Those are edits on the
+row, and they keep the id.
 
 ### 1 — their server: one endpoint, behind their login
 
@@ -339,7 +371,7 @@ this server's admin.
 The embed answers on the same channel, to the host's origin and never to `*`:
 
 ```js
-{rsn: 1, kind: 'ready',    name, parts, cap, expires_in}
+{rsn: 1, kind: 'ready',    name, parts, cap, expires_in, tools}
 {rsn: 1, kind: 'narrowed', name, parts, cap, expires_in}
 {rsn: 1, kind: 'renewed',  name, parts, cap, expires_in}
 ```
