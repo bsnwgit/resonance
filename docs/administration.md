@@ -61,6 +61,41 @@ the same values rather than matched by eye, so the panel and the thing it
 configures are not two people's idea of one palette. The colour is there to
 tell the rows apart at a glance; it is not saying anything you have to decode.
 
+**SETTINGS** — how the server itself is run.
+
+- **ADMIN** — how the server is wired: where it can be reached from,
+  maintenance, and the admin portal's own port. What the app answers on is a
+  network profile, not here; signing in and session lifetime are on SECURITY,
+  with the rest of who-gets-in.
+- **SECURITY** — who gets in and on what terms: **signing in** and how long an
+  admin session lasts, **AI Requires Permission** — whether a general user
+  needs approval at all, how long a grant lasts, how many devices and waiting
+  requests there may be — the **certificate** every listener answers with,
+  and the **groups** access is granted to.
+  ENROLLMENTS ▸ USER answers who is waiting; this is whether anybody is asked
+  in the first place.
+- **ALERT** — what the server does when a screen goes wrong: where alerts are
+  **sent** (syslog, a webhook, Home Assistant, email), **quiet hours** and the
+  **digest**, how much of the **server log** is answered with, and how long
+  what screens report is **kept**. All of it is configuration. What it
+  configures is read on **STATUS**, which is a different page on purpose: one
+  is set and the other is watched, and a page doing both is a page you cannot
+  safely leave open.
+- **ENROLL** — the door itself, as against who is already through it: which
+  **port and interface** invitations are accepted on and what **name** the link
+  carries, the **request form** somebody fills in from a display, and how long
+  an **enrolment code** is worth anything for. The queues those settings feed
+  are under ENROLLMENTS.
+
+**ENROLLMENTS** — how something comes to be here: SETTINGS on its left decides
+what the server is, IDENTITY on its right is who is here already, and this is
+the one in the middle because it is the one somebody is waiting on.
+
+- **USER** — the people you have minted a URL for, and
+  everybody who has asked to be here and not yet been decided about.
+- **DEVICE** — where a screen is set up: named, given a code, and watched until
+  it takes it.
+
 **IDENTITY** — who this server knows about. Two populations that are not one
 list: one signs in with a password to configure the server, the other picks up
 a URL and talks to the display.
@@ -69,35 +104,6 @@ a URL and talks to the display.
 - **USER** — the people the display side knows about: everybody who has used
   their enrolment link and set a password. Somebody who has been given a link
   and not used it yet is on ENROLLMENTS ▸ USER until they do.
-
-**ENROLLMENTS** — how something comes to be here: IDENTITY on its left is who
-is here already, SETTINGS on its right configures the server, and this is the
-one in the middle because it is the one somebody is waiting on.
-
-- **USER** — the people you have minted a URL for, and
-  everybody who has asked to be here and not yet been decided about.
-- **DEVICE** — where a screen is set up: named, given a code, and watched until
-  it takes it.
-
-**SETTINGS** — how the server itself is run.
-
-- **ADMIN** — how the server is wired: where it can be reached from,
-  maintenance, and the admin portal's own port. What the app answers on is a
-  network profile, not here; signing in and session lifetime are on SECURITY,
-  with the rest of who-gets-in.
-- **SECURITY** — who gets in and on what terms: **signing in** and how long an
-  admin session lasts, how long an **enrolment code** is worth anything for,
-  **AI Requires Permission** — whether a general user needs approval at all,
-  how long a grant lasts, how many devices and waiting requests there may be —
-  and the **groups** access is granted to. ENROLLMENTS ▸ USER answers who is
-  waiting; this is whether anybody is asked in the first place.
-- **ALERT** — what the server does when a screen goes wrong: where alerts are
-  **sent** (syslog, a webhook, Home Assistant, email), **quiet hours** and the
-  **digest**, how much of the **server log** is answered with, and how long
-  what screens report is **kept**. All of it is configuration. What it
-  configures is read on **STATUS**, which is a different page on purpose: one
-  is set and the other is watched, and a page doing both is a page you cannot
-  safely leave open.
 
 At the right of the same bar: **STATUS**, **HOME**, your own name, your role,
 **SIGN OUT**, and the **?**. One side of the bar is where you are going, the
@@ -263,10 +269,13 @@ Each of these writes a different document, so each has its own button:
 |---|---|---|
 | SAVE, inside a profile row | that profile alone, and every display naming it | immediately |
 | SAVE, inside an AI endpoint's box | that endpoint alone | immediately, next question |
-| SAVE, on SECURITY | who has to be approved, what a grant is worth, how long a code lasts | immediately |
+| SAVE, on SECURITY | who has to be approved and what a grant is worth | immediately |
+| SAVE, inside Enroll Time Limit | how long a code is worth anything for | immediately |
 | SAVE, inside Sign in | how you get in | only after a restart |
 | SAVE, inside an authenticate, authorize or permission row | that profile alone, and every endpoint naming it | immediately, next question |
 | SAVE, inside Sessions | how long an admin session lasts | only after a restart |
+| INSTALL, inside Certificate | `cert.pem` and `key.pem` | immediately, on every listener |
+| MAKE A CERTIFICATE | the same two files, self-signed | immediately, on every listener |
 | SAVE, on ADMIN | the admin port, binding, maintenance | only after a restart, except maintenance |
 
 Offering one button that meant all of them is how somebody presses the wrong
@@ -327,7 +336,7 @@ They were two separate boxes, which asked you to know the difference before
 you could find either. The chip says which a row is, and that was the whole of
 what the split was telling you.
 
-What a request *asks* is **SETTINGS ▸ ADMIN ▸ Enrollment Request Form**.
+What a request *asks* is **SETTINGS ▸ ENROLL ▸ Enroll User Form**.
 
 ### A person, as against a device
 
@@ -559,10 +568,10 @@ connected.
 **A clock runs on the row**, above everything else it says and in the one
 colour on it that is not grey: green while there is time, amber in the last
 minute, red once it is spent and telling you to REISSUE. How long it starts at
-is yours, under SECURITY ▸ Enrolment codes, and **zero switches it off** — a
-code is one use, and the row it enrols was approved the moment you created it,
-so a deployment that mints codes on Friday and hangs the screens on Monday is
-not less safe for it.
+is yours, under SETTINGS ▸ ENROLL ▸ Enroll Time Limit, and **zero switches
+it off** — a code is one use, and the row it enrols was approved the moment you
+created it, so a deployment that mints codes on Friday and hangs the screens
+on Monday is not less safe for it.
 
 **It turned up by itself — approve it.** Somebody opens the display page on a
 laptop or a phone, and it appears in the list as WAITING within seconds. Give it
@@ -1381,6 +1390,57 @@ clears the password and signs out every browser they had open.
 **Deleting a group** removes it from every endpoint that named it. Nothing in
 it is deleted — a group is a way of referring to people and devices, not a
 thing they belong to.
+
+## The certificate
+
+*SETTINGS ▸ SECURITY ▸ Certificate.*
+
+**One pair serves every listener** — this panel, each assistant, the enrolment
+port. The microphone needs a secure context on all of them, and a second
+certificate for the same machine would be a second thing to renew and a second
+thing to forget.
+
+**What it shows is read off the file, not out of a setting**: who issued it,
+what names and addresses it answers to, when it runs out, and whether the
+listeners are actually answering with it. Nothing in this product could see any
+of that before — the pair was loaded at startup or it was absent, and its
+expiry was a date in somebody's diary. It expires on every listener at once, so
+the day that happens is the day nothing works and no page says why. Under
+thirty days left, this section says so in the colour it uses for faults.
+
+**Installing one does not need a restart.** Paste the certificate and its key,
+press INSTALL, and every listener is handed it as soon as the pair is in place:
+connections already open finish on the old one, everything arriving afterwards
+gets the new. The single exception is a server that started with **no**
+certificate at all — there is no HTTPS to hand anything to, the ports come from
+the network profiles, and binding a socket under an admin's mouse is a thing
+this panel has never done. That case takes a restart, and the note says so
+rather than claiming a change nobody can see.
+
+**Nothing is refused quietly.** A key that is not this certificate's, a block
+that is not a certificate, one that has already expired, or one carrying no
+subject alternative name — a browser refuses that last one whatever its common
+name says — are each turned back by name, with what is on disk untouched. The
+pair is checked with the same call a listener makes, beside the live files and
+before either is replaced.
+
+**MAKE A CERTIFICATE takes every name at once.** `make-cert.sh` takes one host
+and writes the subject alternative name from it, so a deployment reached by an
+address, a name, and the hostname in an invitation had to choose which of the
+three would work. Type all of them here, separated by commas or spaces;
+`127.0.0.1` and `localhost` are always included, because the machine itself is
+always one of the ways this is opened. Good for a year, because a browser
+refuses anything longer outright — sometimes as a blank page rather than a
+warning anybody can click past.
+
+**What it makes is still self-signed**, and that is a real limit rather than a
+formality. Browsers warn until its issuer is trusted on the machines that use
+it: fine for a screen somebody clicks past once, and **not** fine for an embed
+on somebody else's site, which fails silently and blankly instead. For that,
+install a certificate for a name a browser already trusts.
+
+**The key never leaves the machine.** It is written beside the server as
+`key.pem` at mode 600, the same as one made by the script.
 
 ## Locking down a deployment
 

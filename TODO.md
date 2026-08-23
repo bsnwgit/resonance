@@ -115,17 +115,39 @@ nothing out there trusts this root. That is the right answer for six internal
 tools and not an answer at all for a public one, and the two are worth not
 confusing when the next application is added.
 
+**The panel can see it and replace it now** — SETTINGS ▸ SECURITY ▸
+Certificate, added 2026-08-22. Issuer, subject, every name in the SAN, when it
+runs out and how many days that is, and whether the listeners are answering
+with it — read off `cert.pem` itself rather than out of a setting, and shown as
+a fault under thirty days. Nothing in this product could see any of that
+before. A pair pastes in from the page and reaches every listener **without a
+restart**: connections already open finish on the old certificate, everything
+arriving afterwards gets the new one, and the only case that still needs a
+restart is a server that started with no certificate at all, because there is
+no HTTPS to hand anything to. A key that is not the certificate's, a block that
+is not a certificate, an expired one, and one with no SAN are each refused by
+name with the live files untouched.
+
+So next August is a paste rather than an ssh session. The same page makes a
+self-signed one carrying **every** name and address typed into it, which is the
+thing `make-cert.sh` could never do — a fallback rather than the answer here,
+but a fallback that no longer lands somebody in the one-name situation.
+
 **What is left:**
 
 - **A public certificate**, if any embed is ever to sit on a public site. A
   real domain that resolves to this server, and a renewal path.
-- **A renewal that is not a diary entry.** This one expires 21 Aug 2027 and
-  nothing will say so. It is a year of not thinking about it followed by every
-  listener failing at once.
+- **A renewal nobody has to remember.** The panel warns under thirty days,
+  which only helps somebody who opens the panel — and nobody opens it for a
+  year. It belongs in the alert system, where everything else that goes wrong
+  here already goes: an `EVENT_KINDS` entry and a daily check, so the warning
+  arrives by whatever route the deployment already trusts. Until then this
+  one expires 21 Aug 2027 and every listener fails at once on the day.
 - **`make-cert.sh` is now beside the point** for this deployment and still
-  takes one host, so anybody falling back to it lands in the old situation
-  without noticing. Worth either teaching it several names or saying plainly
-  at the top that the CA is where certificates come from here.
+  takes one host — the multi-name answer lives in the panel, not in the
+  script. Anybody who falls back to it still lands in the old situation
+  without noticing, so it wants a line at the top saying where certificates
+  come from here and that the panel will make a better one than it can.
 
 ---
 

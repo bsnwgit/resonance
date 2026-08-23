@@ -8078,7 +8078,11 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/identities/wake", "/identities/wake/check",
                      "/identities", "/identities/new", "/identities/rename",
                      "/identities/delete", "/identities/reissue",
-                     "/identities/endpoints")
+                     "/identities/endpoints",
+                     # It writes the private key every listener on
+                     # this machine answers with. There is no listener
+                     # but the admin one it could belong to.
+                     "/cert/install", "/cert/selfsign")
 #: where an enrolment code is typed. On the display listeners only — it hands
 #: out a display's token, and the admin listener is not a display.
 ENROL_PREFIX = "/e/"
@@ -9152,7 +9156,12 @@ class Handler(SimpleHTTPRequestHandler):
             # whether a restart is owed. The page should never have to guess.
             # Two warnings, and they are different questions: what is stored
             # would be unsafe once applied, and what is running is unsafe now.
+            # The certificate too, because the page that has to warn
+            # about it is this one and it is read from disk rather
+            # than stored: what is in app.json cannot say when the
+            # thing expires.
             return self._json(200, {"app": cfg, "running": RUNNING,
+                                    "cert": cert_info(),
                                     "pending": app_pending(cfg),
                                     "warning": posture_warning(cfg),
                                     "running_warning": posture_warning(RUNNING),
@@ -11459,6 +11468,51 @@ class Handler(SimpleHTTPRequestHandler):
                                     "running_warning": posture_warning(RUNNING),
                                     "running": RUNNING})
 
+        if parsed.path in ("/cert/install", "/cert/selfsign"):
+            s_ = self._require("admin")
+            if not s_:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            if parsed.path == "/cert/selfsign":
+                names = cert_names(obj.get("names"))
+                served, err = cert_self_sign(names)
+                what = "self-signed for " + ", ".join(names)
+            else:
+                cert_pem = (obj.get("cert") or "").strip() + "\n"
+                key_pem = (obj.get("key") or "").strip() + "\n"
+                if len(cert_pem) > CERT_FIELD_MAX or len(key_pem) > CERT_FIELD_MAX:
+                    return self._json(400, {"error": "that is too long to be "
+                                                     "a certificate or a key"})
+                if "BEGIN CERTIFICATE" not in cert_pem:
+                    return self._json(400, {"error": "the certificate box "
+                                            "wants PEM — the block that "
+                                            "starts BEGIN CERTIFICATE"})
+                if "PRIVATE KEY" not in key_pem:
+                    return self._json(400, {"error": "the key box wants PEM — "
+                                            "the block that starts BEGIN "
+                                            "PRIVATE KEY. It never leaves "
+                                            "this machine."})
+                served, err = cert_install(cert_pem, key_pem)
+                what = "installed"
+            if err:
+                # 400 rather than 500: every one of these is something about
+                # what was handed over, and what is on disk is untouched.
+                print("certificate refused for %s: %s" % (s_["user"], err),
+                      flush=True)
+                return self._json(400, {"error": err})
+            print("certificate %s by %s — %d listener(s) now serving it"
+                  % (what, s_["user"], served), flush=True)
+            return self._json(200, {"ok": True, "cert": cert_info(),
+                                    "served": served,
+                                    # HTTPS that was never started cannot be
+                                    # started from here: the ports come from
+                                    # the network profiles and binding a
+                                    # socket under somebody's mouse is the one
+                                    # thing this panel has never done.
+                                    "restart": served == 0})
+
         if parsed.path == "/settings":
             s = self._require("admin")
             if not s:
@@ -11559,12 +11613,317 @@ def make_server(port, admin_port=False, host="0.0.0.0", redirect_to=None,
     return ThreadingHTTPServer((host, port), handler)
 
 
+#: Every live listener's TLS context, and the digest of the certificate they
+#: were last handed. Kept because a context can be given a new certificate
+#: while it is serving — without this list a pair installed from the panel
+#: would sit on disk, correct and unused, until somebody restarted the process
+#: over ssh, which is the whole of what "managing" one would have meant.
+_tls_contexts = []
+_tls_loaded = ""
+
+
+def _tls_register(ctx, cert):
+    global _tls_loaded
+    _tls_contexts.append(ctx)
+    _tls_loaded = _file_digest(cert)
+
+
+def reload_tls():
+    """Hand every listener the certificate that is on disk now.
+
+    A live context takes load_cert_chain again: connections already open
+    finish on the certificate they started with, and everything arriving
+    afterwards is served the new one. So an install is not a restart — except
+    on a server that started with no certificate at all, where there is no
+    listener to hand it to and HTTPS does not exist yet. That case is what the
+    count returned here reports, and the panel says so rather than claiming a
+    change nobody can see.
+    """
+    global _tls_loaded
+    cert, key = cert_paths()
+    for ctx in _tls_contexts:
+        ctx.load_cert_chain(cert, key)
+    _tls_loaded = _file_digest(cert)
+    return len(_tls_contexts)
+
+
+# ── The certificate ─────────────────────────────────────────────────────────
+# One pair for every listener. The microphone needs a secure context on each
+# port, and a second certificate for the same machine would be a second thing
+# to renew and a second thing to forget — see the admin listener's own note.
+
+#: Validity for one made here. Chrome refuses anything over 398 days OUTRIGHT,
+#: and often as a blank page rather than the click-through warning, so this is
+#: not a preference and the ceiling is not ours to raise. The same number
+#: make-cert.sh uses, for the same reason.
+CERT_DAYS = 365
+#: One field of a pasted PEM. The body limit above this is 256 KB; a chain
+#: bigger than this is not a chain, and refusing it here names the field.
+CERT_FIELD_MAX = 64 * 1024
+#: What openssl calls a name, and what a person types. Anything that parses as
+#: four octets goes in as IP: — openssl types every SAN entry itself and
+#: rejects an IP: that is not a literal address, which is the failure
+#: make-cert.sh documents.
+_IP_RE = re.compile(r"^(\d{1,3}\.){3}\d{1,3}$")
+
+
+def cert_paths():
+    """Where every listener looks, and where an install writes."""
+    return os.path.join(ROOT, "cert.pem"), os.path.join(ROOT, "key.pem")
+
+
+def _cert_text(path):
+    """openssl's own reading of a certificate, or "" if it cannot read it.
+
+    openssl rather than a Python parser because generating one needs openssl
+    anyway: one tool that has to be present beats two, and the alternative in
+    the standard library is a private function (`ssl._ssl._test_decode_cert`)
+    that would take the panel down with it the day it moves.
+    """
+    try:
+        p = subprocess.run(["openssl", "x509", "-in", path, "-noout", "-text"],
+                           capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return p.stdout if p.returncode == 0 else ""
+
+
+def _cert_fields(text):
+    """Subject, issuer, dates and every name, out of `openssl x509 -text`.
+
+    Read off the long form rather than off `-subject -dates -ext`, because
+    `-ext` is not in every openssl a deployment might have and a missing SAN
+    reads exactly like a certificate that has none — which is the one fact on
+    this page that must never be guessed.
+    """
+    out = {"subject": "", "issuer": "", "not_before": 0, "not_after": 0,
+           "names": []}
+    lines = text.splitlines()
+    for i, ln in enumerate(lines):
+        s = ln.strip()
+        if s.startswith("Subject:") and not out["subject"]:
+            out["subject"] = s[len("Subject:"):].strip()
+        elif s.startswith("Issuer:") and not out["issuer"]:
+            out["issuer"] = s[len("Issuer:"):].strip()
+        elif s.startswith("Not Before:"):
+            out["not_before"] = _cert_seconds(s.split(":", 1)[1].strip())
+        elif s.startswith("Not After"):
+            out["not_after"] = _cert_seconds(s.split(":", 1)[1].strip())
+        elif "Subject Alternative Name" in s and i + 1 < len(lines):
+            for part in lines[i + 1].strip().split(","):
+                part = part.strip()
+                if ":" in part:
+                    out["names"].append(part.split(":", 1)[1].strip())
+    return out
+
+
+def _cert_seconds(when):
+    """`Aug 13 07:59:39 2026 GMT` as an epoch, or 0 if it will not parse."""
+    try:
+        return ssl.cert_time_to_seconds(when)
+    except (ValueError, TypeError):
+        return 0
+
+
+def cert_info():
+    """What is on disk, in the terms a browser judges it by.
+
+    Nothing in this product read the certificate before this: it was loaded,
+    or it was absent, and its expiry was a date in somebody's diary. A
+    certificate that runs out takes every listener with it at once — the
+    panel, each assistant, the enrolment page — so the day it happens is the
+    day nothing works and no page says why.
+    """
+    cert, key = cert_paths()
+    if not (os.path.exists(cert) and os.path.exists(key)):
+        return {"present": False, "https": bool(_tls_contexts),
+                "error": "" if os.path.exists(cert) == os.path.exists(key)
+                         else "one of cert.pem / key.pem is here without the "
+                              "other, so neither is used"}
+    text = _cert_text(cert)
+    if not text:
+        return {"present": True, "https": bool(_tls_contexts),
+                "error": "cert.pem is here but openssl cannot read it — it is "
+                         "not a certificate, or openssl is not installed"}
+    f = _cert_fields(text)
+    now_ = time.time()
+    left = int((f["not_after"] - now_) // 86400) if f["not_after"] else 0
+    return {"present": True, "https": bool(_tls_contexts),
+            "subject": f["subject"], "issuer": f["issuer"],
+            "self_signed": bool(f["subject"]) and f["subject"] == f["issuer"],
+            "names": f["names"],
+            "not_before": f["not_before"], "not_after": f["not_after"],
+            "days_left": left,
+            # Managed elsewhere, and therefore not ours to replace.
+            "managed": cert_link(cert) or cert_link(key),
+            "expired": bool(f["not_after"]) and f["not_after"] <= now_,
+            # SERVED, not merely stored. A pair written since the listeners
+            # started — or written while none were running — is a certificate
+            # nobody is being shown, and saying "installed" about it would be
+            # the panel reporting a change the network cannot see.
+            "serving": bool(_tls_contexts) and _tls_loaded == _file_digest(cert),
+            "error": ""}
+
+
+def cert_link(path):
+    """Where cert.pem actually points, when it is a link rather than a file.
+
+    A deployment whose certificate is issued by something else — an internal
+    CA writing into /etc/ssl, an ACME client renewing on its own schedule —
+    links these two names at the certificate it manages. Replacing one from
+    this panel would drop a regular file over the link and quietly detach the
+    server from the thing that renews it: everything would keep working until
+    the CA rotated, and then nothing would, with no page saying why. So the
+    link is a fact this page has to know about rather than write through.
+    """
+    try:
+        return os.path.realpath(path) if os.path.islink(path) else ""
+    except OSError:
+        return ""
+
+
+def _file_digest(path):
+    try:
+        with open(path, "rb") as fh:
+            return hashlib.sha256(fh.read()).hexdigest()
+    except OSError:
+        return ""
+
+
+def cert_san(names):
+    """The SAN line, from what somebody typed. Never empty.
+
+    A certificate with only a CN is rejected outright by every modern browser,
+    so the SAN is the whole of what makes one work — and loopback goes in
+    whatever else does, because the machine itself is always one of the ways
+    this server is opened.
+    """
+    seen, san = set(), []
+    for n in names:
+        n = n.strip().strip(",")
+        if not n or n.lower() in seen:
+            continue
+        seen.add(n.lower())
+        san.append(("IP:" if _IP_RE.match(n) else "DNS:") + n)
+    for fixed in ("IP:127.0.0.1", "DNS:localhost"):
+        if fixed.split(":", 1)[1].lower() not in seen:
+            san.append(fixed)
+    return ",".join(san)
+
+
+def cert_names(raw):
+    """Names as typed — commas, spaces or newlines, because a field that
+    accepts one separator is a field somebody fills in wrongly once."""
+    return [n for n in re.split(r"[,\s]+", (raw or "").strip()) if n]
+
+
+def cert_install(cert_pem, key_pem):
+    """Put a pair in place, or refuse it and leave what is there alone.
+
+    Written beside the live files and validated THERE — with the same call the
+    listener makes — before either is replaced. A key that does not match its
+    certificate is not a bad setting: it is a server that cannot answer on any
+    port, from a page that has just told somebody it saved.
+    """
+    cert, key = cert_paths()
+    linked = cert_link(cert) or cert_link(key)
+    if linked:
+        return 0, ("this server's certificate is managed outside the app — "
+                   "cert.pem points at %s. Installing one here would replace "
+                   "that link with a file and detach this server from "
+                   "whatever renews it. Put the new pair where it is managed, "
+                   "or remove the link first." % linked)
+    tmp_c, tmp_k = cert + ".new", key + ".new"
+    try:
+        with open(tmp_c, "w") as fh:
+            fh.write(cert_pem)
+        with open(os.open(tmp_k, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600),
+                  "w") as fh:
+            fh.write(key_pem)
+        # READ IT FIRST, so a paste that is not a certificate is told that
+        # rather than told its key does not match — which is what the
+        # loader's own message says about anything it cannot parse.
+        text = _cert_text(tmp_c)
+        if not text:
+            return 0, ("that is not a certificate — openssl cannot read the "
+                       "block in the certificate box")
+        try:
+            ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            ctx.load_cert_chain(tmp_c, tmp_k)
+        except (ssl.SSLError, OSError) as exc:
+            return 0, ("that pair will not load: %s. The key has to be the "
+                       "one this certificate was issued for." % exc)
+        f = _cert_fields(text)
+        if f["not_after"] and f["not_after"] <= time.time():
+            return 0, ("that certificate expired on %s — installing it would "
+                        "take every listener off the air"
+                        % time.strftime("%d %b %Y",
+                                        time.localtime(f["not_after"])))
+        if not f["names"]:
+            return 0, ("that certificate carries no subject alternative "
+                        "name, and a browser will refuse it whatever its "
+                        "common name says")
+        os.replace(tmp_c, cert)
+        os.replace(tmp_k, key)
+        os.chmod(key, 0o600)
+    finally:
+        for t in (tmp_c, tmp_k):
+            if os.path.exists(t):
+                with contextlib.suppress(OSError):
+                    os.remove(t)
+    return reload_tls(), ""
+
+
+def cert_self_sign(names):
+    """Make one here, for every name and address it will be reached by.
+
+    The script this replaces took ONE host and wrote the SAN from it, so a
+    deployment that answers to an address, a name and an enrolment hostname
+    had to choose which of the three would work. They all go in together now,
+    which is the whole reason this is on a page rather than in a shell.
+    """
+    if not names:
+        return 0, "give it at least one name or address to answer to"
+    san = cert_san(names)
+    tmp_c = os.path.join(ROOT, "cert.pem.new")
+    tmp_k = os.path.join(ROOT, "key.pem.new")
+    try:
+        p = subprocess.run(
+            ["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+             "-days", str(CERT_DAYS), "-keyout", tmp_k, "-out", tmp_c,
+             "-subj", "/CN=%s" % names[0], "-addext", "subjectAltName=" + san],
+            capture_output=True, text=True, timeout=120)
+    except FileNotFoundError:
+        return 0, ("openssl is not installed on this machine, so nothing "
+                    "here can make a certificate — paste one in instead")
+    except (OSError, subprocess.SubprocessError) as exc:
+        return 0, "openssl could not be run: %s" % exc
+    if p.returncode != 0:
+        # openssl's own words. A generic failure here would send somebody to a
+        # log they cannot read from the page that refused them.
+        return 0, "openssl refused it: %s" % (p.stderr.strip().splitlines()
+                                               or ["no reason given"])[-1]
+    try:
+        with open(tmp_c) as fh:
+            cert_pem = fh.read()
+        with open(tmp_k) as fh:
+            key_pem = fh.read()
+    finally:
+        for t in (tmp_c, tmp_k):
+            if os.path.exists(t):
+                with contextlib.suppress(OSError):
+                    os.remove(t)
+    return cert_install(cert_pem, key_pem)
+
+
 def start_tls(port, cert, key, admin_port=False, host="0.0.0.0", pinned_net="",
               enrol_port=False):
     srv = make_server(port, admin_port=admin_port, host=host,
                       pinned_net=pinned_net, enrol_port=enrol_port)
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.load_cert_chain(cert, key)
+    # Kept, so SECURITY ▸ Certificate can hand it another one later.
+    _tls_register(ctx, cert)
     srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     return srv
