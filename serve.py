@@ -159,7 +159,21 @@ APP_DEFAULTS = {
     #
     # Only the generated snippets read it — it is not a binding and not a
     # check. Empty means the panel writes no address rather than a wrong one.
+    # HTTPS OR NOT, and it is a choice rather than a rule now. A microphone
+    # in an iframe will not open over plain HTTP and that has not changed —
+    # but the constraint belongs to the browser, not to this field, and a
+    # deployment doing something this server has not thought of should not
+    # find the panel writing a scheme it did not pick. The panel says what
+    # plain HTTP costs; it does not refuse it.
+    "embed_scheme": "https",
     "embed_host": "",
+    # ITS OWN FIELD, not a colon in the one above. A deployment behind a
+    # reverse proxy is reached on 443 and names no port at all; one reached
+    # directly names this server's. Only the admin knows which, so it is
+    # typed rather than assumed — and typed SEPARATELY, because a host and a
+    # port are two facts and a single box that sometimes holds both is a box
+    # you have to explain. 0 means none, which is the common case.
+    "embed_port": 0,
     # Minutes, and a short default on purpose. An admin session is a window
     # onto a configuration everyone else is looking at the results of; it
     # should last a piece of work, not a working day. The panel signs you
@@ -1622,12 +1636,33 @@ def validate_app(obj, current):
             return None, ("this machine has no address %s — enrolment would "
                           "fail to start on it" % v)
         cfg["enrol_address"] = v
+    if "embed_scheme" in obj:
+        v = str(obj["embed_scheme"] or "").strip().lower()
+        if v not in ("http", "https"):
+            return None, "the scheme is http or https"
+        cfg["embed_scheme"] = v
     if "embed_host" in obj:
         v = str(obj["embed_host"] or "").strip().lower()[:120]
+        # THE HOST ONLY. The port has a field of its own beside it — see
+        # embed_port — so a colon here is somebody filling in the wrong box,
+        # and saying which box is more use than quietly accepting both.
         if v and not re.match(r"^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$", v):
             return None, ("that reads as a URL rather than a name — just the "
-                          "host, with no https:// in front and no port after")
+                          "host, with no https:// in front. The port goes in "
+                          "the field beside it, if there is one")
         cfg["embed_host"] = v
+    if "embed_port" in obj:
+        raw = str(obj["embed_port"] or "").strip()
+        if not raw:
+            cfg["embed_port"] = 0          # blank means none, not zero-the-port
+        else:
+            try:
+                n = int(raw)
+            except ValueError:
+                return None, "that is not a port"
+            if not 0 < n < 65536:
+                return None, "a port is between 1 and 65535, or blank for none"
+            cfg["embed_port"] = n
     if "enrol_host" in obj:
         v = str(obj["enrol_host"] or "").strip().lower()[:120]
         # A HOSTNAME, not a URL. Somebody pasting https://name/ or name:9703
@@ -7519,16 +7554,31 @@ def incoherent(parts, cap):
 def embed_base(cfg=None):
     """The address a host application's server and its visitors both reach.
 
-    HTTPS and the full display port, always. Not because this server insists
-    on it but because a microphone in an iframe does — a snippet naming the
-    plain port produces an assistant that cannot listen, and the integrator
-    has no way to know that is why. Empty when no address has been set, so the
-    panel can say so rather than writing a guess into somebody else's source."""
+    EXACTLY WHAT THE ADMIN TYPED, with https:// in front and nothing else
+    added. It used to append this server's own display port on the reasoning
+    that a microphone in an iframe needs HTTPS and the right port — true of a
+    browser reaching this process directly, and wrong the moment anything
+    sits in front of it. A deployment behind a reverse proxy is reached on
+    443, and a snippet naming :9701 sends the integrator at a port their
+    firewall does not publish.
+
+    So the port is the admin's to type, because they are the only party that
+    knows whether there is one — and so is the scheme. A microphone in an
+    iframe will not open over plain HTTP, which is a fact about browsers
+    rather than a rule this field should enforce: the panel says what plain
+    HTTP costs and writes whichever was chosen.
+
+    Empty when no address has been set, so the panel can say so rather than
+    writing a guess into somebody else's source."""
     cfg = cfg if cfg is not None else read_app()
     host = str(cfg.get("embed_host") or "").strip()
     if not host:
         return ""
-    return "https://%s:%d" % (host, int(cfg.get("https_port") or 9701))
+    port = int(cfg.get("embed_port") or 0)
+    scheme = str(cfg.get("embed_scheme") or "https").lower()
+    if scheme not in ("http", "https"):
+        scheme = "https"
+    return "%s://%s%s" % (scheme, host, ":%d" % port if port else "")
 
 
 #: The one endpoint a host adds to their own application. Named here because it
@@ -7622,8 +7672,11 @@ EMBED_SNIPPET_USER = {
 def embed_snippets(rec, base):
     """The working code an admin hands to whoever runs the host application.
 
-    Built at the one moment the key exists in plain text, and shaped by the key
-    itself — what it requires is what the snippet sends."""
+    Shaped by the key — what it requires is what the snippet sends — but it
+    does NOT contain the key, and reads nothing that only exists at creation.
+    So it is built twice: once beside the secret, and again for every row of
+    the register, where an admin goes to find out how a site is wired long
+    after the one response that held the key has gone."""
     fields = {"base": base or "https://YOUR-RESONANCE-HOST:9701",
               "path": EMBED_CODE_PATH}
     named = bool(rec.get("needs_user"))
@@ -8063,6 +8116,7 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/routes/delete", "/routes/enable", "/routes/default",
                      "/routes/test",
                      "/embeds", "/embeds/delete", "/embeds/enable",
+                     "/embeds/reissue",
                      # …and note what is NOT here either: /display/hello, which
                      # is how a display gets its token and therefore has to be
                      # reachable from the listener a display is served on.
@@ -9188,6 +9242,17 @@ class Handler(SimpleHTTPRequestHandler):
                 for s in _embed_sessions.values():
                     if s["expires"] > now_:
                         live[s["id"]] = live.get(s["id"], 0) + 1
+            # AND THE CODE, REBUILT. It was written once, in the response
+            # that created the key, and never again — which left "how is this
+            # site wired" a question the register could not answer and an
+            # admin reading somebody else's source to find out.
+            #
+            # The KEY cannot come back: it is a hash from the moment it is
+            # written. The CODE can, because the key was never in it — see
+            # embed_snippets, which reads nothing but needs_user and the
+            # address. That is the same property which makes these safe to
+            # paste into a ticket, used a second time.
+            base = embed_base()
             out = []
             for eid, rec in sorted(read_embeds().items(),
                                    key=lambda kv: kv[1].get("created", 0)):
@@ -9195,10 +9260,11 @@ class Handler(SimpleHTTPRequestHandler):
                        ("name", "preset", "parts", "cap", "origins",
                         "ttl_minutes", "created", "created_by",
                         "last_used", "enabled", "needs_user")}
-                row.update(id=eid, sessions=live.get(eid, 0))
+                row.update(id=eid, sessions=live.get(eid, 0),
+                           snippets=embed_snippets(rec, base))
                 out.append(row)
             return self._json(200, {"embeds": out, "parts": list(PARTS),
-                                    "presets": PRESETS,
+                                    "presets": PRESETS, "base": base,
                                     "ttl": {"min": EMBED_TTL_MIN,
                                             "max": EMBED_TTL_MAX,
                                             "default": EMBED_TTL_DEFAULT}})
@@ -9829,6 +9895,46 @@ class Handler(SimpleHTTPRequestHandler):
             print("embed key %s %s by %s"
                   % (eid, "enabled" if on else "disabled", s["user"]), flush=True)
             return self._json(200, {"ok": True})
+
+        if parsed.path == "/embeds/reissue":
+            # A NEW SECRET ON THE SAME SITE. The key is a hash from the moment
+            # it is written, so a lost one cannot be recovered — and the only
+            # answer this server had was "make another and delete this one",
+            # which is the wrong answer: a new key is a new ID, and every
+            # authorize profile that had ticked the old one silently stops
+            # naming anything. An admin recovering a lost credential would
+            # have quietly withdrawn the site's access to every assistant.
+            #
+            # So the ROW survives and only the secret changes. Same id, same
+            # capability, same chrome, same origins, same grants — the record
+            # is untouched but for salt and hash.
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            eid = str(obj.get("id") or "")
+            embeds = read_embeds()
+            if eid not in embeds:
+                return self._json(404, {"error": "no such embed"})
+            secret = secrets.token_urlsafe(32)
+            salt, dk = hash_key(secret)
+            rec = embeds[eid]
+            rec.update(salt=salt, hash=dk)
+            write_embeds(embeds)
+            # EVERY LIVE SESSION GOES. The reason to reissue is that the old
+            # secret is somewhere it should not be, and leaving the sessions it
+            # already minted running would rotate the lock while the doors
+            # stand open. A reissue for convenience costs the host one call to
+            # /embed/session; a reissue after a leak that left them running
+            # would cost rather more.
+            drop_embed_sessions(eid)
+            print("embed key %s (%s) reissued by %s — sessions dropped"
+                  % (eid, rec.get("name"), s["user"]), flush=True)
+            return self._json(200, {"ok": True, "id": eid,
+                                    "key": eid + "." + secret,
+                                    "snippets": embed_snippets(rec, embed_base())})
 
         if parsed.path == "/display/hello":
             # A display announcing itself, and where a token comes from.

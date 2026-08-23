@@ -56,8 +56,14 @@
        of leaving eight derived figures scattered through the media queries to
        be found one at a time.
 
-       --title-rate is the floor over 317, which is what "AI Voice Interface"
+       --title-rate is the floor over 282, which is what "Interface Portal"
        measures at 27px: how many pixels of type one pixel of room buys.
+
+       The 282 is arithmetic, not a guess. The face is monospaced, so a string
+       is exactly len × (0.6em + the .05em tracking) = len × .65 × size. The
+       old title measured 317 at 18 characters, which is 17.61 each; sixteen
+       characters is 282. Change the words and this number changes with them —
+       every figure below is derived from it, so it is the one to edit.
        Unitless on purpose — CSS multiplies a number by a length and refuses
        to multiply two lengths.
 
@@ -67,7 +73,7 @@
        be worse than leaving it alone. */
     --title-min: 23px;
     --title-max: 46px;
-    --title-rate: .0726;
+    --title-rate: .0816;
 
     /* Typography — the same three faces and three sizes the display has,
        kept identical to the block in index.html on purpose: the panel is
@@ -403,6 +409,33 @@
   #panelhead > .profrow{max-width:none}
   /* …but the tab row itself runs the whole width, out to the edge of the
      preview, because it now carries two groups that have to sit apart. */
+  /* FIXED WHILE THE TOPICS SCROLL UNDER IT. This row says which list you are
+     editing, and on any tab long enough to scroll it was the first thing to
+     leave the screen — so the one control that answers "where am I" was gone
+     exactly when a long page made you want it.
+
+     STICKY RATHER THAN LIFTED OUT of #panelscroll. That box is the container
+     the topics tile against (container-type:inline-size) and the gutter is
+     reserved against its width; moving the header out from under it would
+     change what both of those measure, and the profiles row fitting on the
+     first paint and not the second is the bug that reservation exists to fix.
+
+     THE GROUND IS PAINTED THE WAY THE PANEL PAINTS IT, not approximated. The
+     panel is rgba(0,0,0,.35) over the body's --ink, so an opaque patch picked
+     in hex would be a slightly different colour from the thing beside it —
+     the failure this panel keeps taking out everywhere else. The same
+     translucent black laid over --ink composites to exactly the panel's own
+     ground, whatever --ink is set to.
+
+     The scroll box's 12px of top padding would otherwise scroll away above a
+     header stuck at 0, leaving a band of moving content over the row. So the
+     header takes that padding itself and pulls back over it. */
+  #panelhead{
+    position:sticky;top:0;z-index:5;
+    background:linear-gradient(rgba(0,0,0,.35),rgba(0,0,0,.35)),var(--ink);
+    margin-top:-12px;margin-left:-14px;margin-right:-14px;
+    padding:12px 14px 0;
+  }
   #panelhead > .tabrow{max-width:none}
   /* `relative` for .helpside, which is centred against the ROW rather than
      placed between its two sides — see below. */
@@ -1022,6 +1055,82 @@
     font-size:var(--title-min);
     letter-spacing:.05em;
   }
+  /* AND IT IS CUT OUT OF LIGHT. This is the one thing on the bar that says
+     what the whole panel is for, on a page about a VOICE interface, in a
+     product called Resonance — and it was set in flat paper-white, the
+     plainest thing on a deliberately plain screen.
+
+     TWO LAYERS, both clipped to the letterforms. Underneath, the cold end of
+     the display's own palette running across the words — blue where you start
+     reading, through ice, to milk. It is there at all times, which is the
+     half that matters: a title you have to catch at the right second is a
+     title nobody has seen. Over it, a specular band that walks the length of
+     the words every eight seconds and rests at either end.
+
+     The COLD three, not all five. Amber and rust are the two the panel spends
+     on warnings and on the control that ends your session, and a title
+     wearing them would be claiming a state. And not --hue, which in this
+     panel resolves to very nearly the near-white the title already was and
+     would have graded invisibly — which is exactly what the first attempt at
+     this did.
+
+     NOTHING ABOUT THE METRICS MOVES. Same face, size, tracking and weight:
+     the three media queries below are measured against this exact string at
+     this exact size, and a title that grew by a hair would break the bands
+     that decide whether it is drawn at all. Paint only — the glow is a
+     filter, which does not lay anything out either.
+
+     GUARDED, because the fill goes transparent while this runs: a browser
+     without background-clip:text keeps the flat colour above rather than
+     losing the title altogether. */
+  @supports ((background-clip:text) or (-webkit-background-clip:text)){
+    #barwhat{
+      background-image:
+        linear-gradient(96deg,
+          rgba(255,255,255,0)   38%,
+          rgba(255,255,255,.55) 47%,
+          rgba(255,255,255,.92) 50%,
+          rgba(255,255,255,.55) 53%,
+          rgba(255,255,255,0)   62%),
+        linear-gradient(96deg,
+          rgba(var(--pal-blue),1)   0%,
+          rgba(var(--pal-ice),1)   34%,
+          rgba(var(--pal-milk),1)  62%,
+          rgba(var(--pal-ice),1)   88%,
+          rgba(var(--pal-blue),1) 100%);
+      /* The sweep is wider than the element so it can sit clear of it at
+         either end; the colour underneath is exactly the width of the words,
+         so the blue lands on the A and the milk in the middle however wide
+         the panel gets. */
+      background-size:260% 100%, 100% 100%;
+      background-position:100% 0, 0 0;
+      background-repeat:no-repeat;
+      -webkit-background-clip:text;
+      background-clip:text;
+      -webkit-text-fill-color:transparent;
+      color:transparent;
+      /* Presence rather than decoration: near-white letters on near-black
+         have nothing around them, and a title is allowed to sit in a little
+         of its own light. Filters do not lay out. */
+      filter:drop-shadow(0 0 13px rgba(var(--pal-blue),.30));
+      animation:barsweep 8s ease-in-out infinite;
+    }
+  }
+  /* Raising the position slides the image LEFT, so counting DOWN walks the
+     highlight with the reading rather than against it. The long holds either
+     end are the point — a highlight that never stops is a loading bar, and
+     this is a title. The colour layer is repeated in both frames because the
+     shorthand animates as one value and the second layer must not move. */
+  @keyframes barsweep{
+    0%,  18%{background-position:112% 0, 0 0}
+    82%,100%{background-position:-12% 0, 0 0}
+  }
+  /* Asked for less movement, the sweep stops across the middle rather than
+     falling back to flat. The complaint was that the title was plain, and
+     stillness is not the same thing as plainness. */
+  @media (prefers-reduced-motion:reduce){
+    #barwhat{animation:none;background-position:50% 0, 0 0}
+  }
   /* Row one, hard right. `justify-self` rather than the margin trick the flex
      layout used: in a grid a margin of auto and a 1fr column would fight. */
   #panelbar > #whobox{grid-column:3;grid-row:1;justify-self:end}
@@ -1057,26 +1166,30 @@
      second code path, so there is one, and it is the exact one.
 
      The arithmetic, since the numbers are otherwise mysterious. Centred at
-     --title-min it measures 317 × 23/27 = 270, and the sides cost
+     --title-min it measures 282 × 23/27 = 240, and the sides cost
      2 × (identity 192 + panel padding 15 + clearance 20) = 454. So it wants
-     724px of panel. The panel is the window less --stage, and --stage steps
+     694px of panel. The panel is the window less --stage, and --stage steps
      twice:
 
-        window ≤ 1000    panel = window          fits from 724
-        1001 … 1280      panel = window − 480    fits from 1204
-        window ≥ 1281    panel = window − 600    fits from 1324
+        window ≤ 1000    panel = window          fits from 694
+        1001 … 1280      panel = window − 480    fits from 1174
+        window ≥ 1281    panel = window − 600    fits from 1294
 
      Which is the three bands below — the third is narrow because --stage
      jumping 480 → 600 at 1281 takes 120px of panel away just as the window
-     gets wider. The mark at the left still says what this is. */
-  @media (max-width:723px){ #barwhat{display:none} }
-  @media (min-width:1001px) and (max-width:1203px){ #barwhat{display:none} }
-  @media (min-width:1281px) and (max-width:1323px){ #barwhat{display:none} }
+     gets wider. The mark at the left still says what this is.
+
+     A SHORTER TITLE MOVED ALL SIX FIGURES. "Interface Portal" wants 30px less
+     room than the name before it, so every threshold came down by 30 and the
+     panel now draws the title on windows that used to be too narrow for it. */
+  @media (max-width:693px){ #barwhat{display:none} }
+  @media (min-width:1001px) and (max-width:1173px){ #barwhat{display:none} }
+  @media (min-width:1281px) and (max-width:1293px){ #barwhat{display:none} }
 
   /* …AND AS LARGE AS THE ROOM ALLOWS IN THE BANDS WHERE IT IS DRAWN.
      `available = panel - 2 x (identity + panel padding + clearance)`
-     = panel - 2 x (192 + 15 + 20) = panel - 454, and the title wants 317px at
-     27, so the size is 27 x available / 317 — 8.517vw, less 8.517% of
+     = panel - 2 x (192 + 15 + 20) = panel - 454, and the title wants 282px at
+     27, so the size is 27 x available / 282 — 9.574vw, less 9.574% of
      whatever --stage takes plus that 454. Clamped to the 27 it starts at and
      the 54 that is double.
 
@@ -1089,17 +1202,17 @@
      Three rules because --stage takes three widths and each gives the panel a
      different share of the window. They cannot be one: a single vw expression
      would be right in one band and wrong by 120px in the next. */
-  @media (min-width:1324px){
+  @media (min-width:1294px){
     #barwhat{font-size:clamp(var(--title-min),
                              calc(var(--title-rate) * (100vw - 1054px)),
                              var(--title-max))}
   }
-  @media (min-width:1204px) and (max-width:1280px){
+  @media (min-width:1174px) and (max-width:1280px){
     #barwhat{font-size:clamp(var(--title-min),
                              calc(var(--title-rate) * (100vw - 934px)),
                              var(--title-max))}
   }
-  @media (min-width:724px) and (max-width:1000px){
+  @media (min-width:694px) and (max-width:1000px){
     #barwhat{font-size:clamp(var(--title-min),
                              calc(var(--title-rate) * (100vw - 454px)),
                              var(--title-max))}
@@ -1476,13 +1589,54 @@
      by id — there are now several of each on the page, and an id can only
      ever name one of them. */
   #pw_cur,#pw_new,#nu_name,#nu_pw,
+  /* #ap_embedhost carries no data-f — it writes app.json through its own
+     save rather than the settings document — so it was in none of the lists
+     that style a text field, and had been drawing as a raw browser input
+     since the tab was written. */
   #panel input[data-f],#panel textarea[data-f],#panel select[data-f],
-  #em_name,#em_origins{
+  #em_name,#em_origins,#ap_embedhost{
     width:100%;margin:4px 0;font:inherit;font-size:calc(9.5px * var(--fs));padding:5px 6px;
     background:rgba(0,0,0,.6);color:var(--text);
     border:1px solid rgba(var(--glass),.16);outline:0;
   }
   #em_origins{resize:vertical;line-height:1.6}
+  /* A FIELD AND ITS OWN SAVE ON ONE LINE. The button sat on an .addrow under
+     the box, and .addrow draws the heavy 2px rule that divides a list from the
+     control which adds to it — so a single text field had a divider under it,
+     and the ADD AN EMBED KEY row drew a second one a few pixels further down.
+     Two rules with nothing between them.
+
+     The shape was wrong as well as the spacing: .addrow means "this makes a
+     new thing", and this saves the field above it. On the line, hard right,
+     which is where every other commit in this panel sits. */
+  /* A LABEL AND ITS COPY ON ONE LINE, used either side of the same job — the
+     rows of the register and the handover on the form that makes a key. One
+     class rather than two arrangements that have to be kept looking alike.
+
+     The button sits in a .seg because that is what gives a button its shell
+     in this panel: the act-* classes carry colour and nothing else, so a
+     button outside a .seg or a .rtacts is a raw browser button wearing a
+     tint. Which is what the register's COPY buttons were. */
+  .copyrow{display:flex;align-items:center;gap:8px;margin:9px 0 2px}
+  .copyrow > .bklab{margin:0;flex:1 1 auto;min-width:0}
+  .erow .namerow > .seg,
+  .copyrow > .seg{margin-left:auto;flex:0 0 auto}
+  .erow .namerow > .seg button,
+  .copyrow > .seg button{padding:3px 8px;font-size:calc(8.5px * var(--fs))}
+  .fieldsave{display:flex;align-items:center;gap:8px}
+  .fieldsave > input{flex:1 1 auto;min-width:0}
+  .fieldsave > button{flex:0 0 auto;white-space:nowrap}
+  /* The port keeps its own width and does not stretch: it is five characters
+     at most, and a box the width of a hostname invites a hostname. */
+  .fieldsave > input.num{flex:0 0 76px;width:76px;margin:0}
+  /* The separator is what says the second box is a port, without a second
+     label above the row — host, colon, port is a shape everybody reads. */
+  .fieldsave > .colon{flex:0 0 auto;color:rgba(var(--paper),.45);
+                      font-size:calc(11px * var(--fs))}
+  /* The scheme reads as the first part of the address rather than as a
+     setting about it, so it sits flush against the host box with no gap —
+     https://name is one string wherever else it appears. */
+  .fieldsave > select.ppick{flex:0 0 auto;margin-right:-4px}
   .urow{display:flex;align-items:center;gap:8px;padding:6px 0;
         border-bottom:1px solid rgba(var(--glass),.08);font-size:calc(9.5px * var(--fs));
         letter-spacing:.06em;color:rgba(var(--paper),.94)}
@@ -1948,6 +2102,18 @@
     margin-top:11px;padding-top:10px;
     border-top:2px solid rgba(var(--glass),.34);
   }
+  /* …EXCEPT WHERE THERE IS NOTHING ABOVE IT TO DIVIDE FROM. That rule marks
+     the end of a list and the start of the control that adds to it. On EMBED
+     the list moved to ACCESS ▸ SITES, so ADD AN EMBED KEY is the first thing
+     on the page and its rule was landing a few pixels under the title's —
+     two lines across the top with nothing between them.
+
+     Not .addtop, which is the same row at the HEAD of a list it still has:
+     that one keeps its margins to stand off the rows below. This one has no
+     rows, so it only needs the line taken off. */
+  .grp[data-tab="embeds"] .addrow{
+    border-top:0;margin-top:4px;padding-top:0;
+  }
   .erow .acts button{white-space:nowrap;min-width:0}
 
   /* Each endpoint keeps a full edge whether it is open or closed. The other
@@ -2290,6 +2456,28 @@
     color:rgb(var(--paper));font-weight:600;
     letter-spacing:.18em;
   }
+  /* EVERY SUBPAGE'S TITLE SITS ON A RULE. This started as one tab and grew by
+     naming three more, which is how a list of exceptions gets written — there
+     is no page where the answer is different, so it is one selector for all of
+     them. What is under a title is dense: a name, a badge and a caret on every
+     row, and the heading was landing straight on the first of them so the two
+     read as one line of the list rather than as a title over it.
+
+     .55 is the weight this panel spends between SUBJECTS — the same rule under
+     the bar and above the foot — rather than the hairline it spends between
+     neighbouring controls. A page title and the list beneath it are two
+     things, not two settings.
+
+     ONLY WHERE THERE IS A TITLE TO SIT ON. buildHelp mints an empty .barehead
+     on any bare section that has none, purely to have somewhere to hang the ?,
+     and a rule under nothing is a line drawn across the page for no reason.
+
+     Full width of the section: the horizontal padding is on this element, so
+     the border already runs to its edges. */
+  .grp.bare > .barehead:has(.listtitle){
+    border-bottom:1px solid rgba(var(--glass),.55);
+    padding-bottom:6px;
+  }
   .grp.bare{border-top:0;padding-top:2px}
   .seg{display:flex;flex-wrap:wrap;gap:4px}
   /* Committing a block — CREATE, SAVE, REVERT — in the corner every dialog
@@ -2561,7 +2749,7 @@
          it sits in the middle column of a grid whose outer columns are equal,
          so a long username on the right cannot shove it off centre. -->
       <img id="barmark" src="lockup.svg" alt="Resonance">
-      <span id="barwhat">AI Voice Interface</span>
+      <span id="barwhat">Interface Portal</span>
     <span class="right" id="whobox">
       <!-- What the screens are DOING, as opposed to how they are configured —
            health, the alerts they raised, and the server's own log. It sits
@@ -2956,6 +3144,18 @@ recognised is left standing so a typo is visible rather than silent.</div>
        same shape as a profile list: rows shut by default, one open at a time,
        everything about an endpoint inside the row you opened. -->
   <section class="grp bare proflist" data-tab="ai">
+    <!-- The one register on this row that never named itself. NODES and SITES
+         say what they list in their own top edge; this said nothing, so the
+         page opened on a column of blocks with the tab label as the only clue
+         what they were — and once every other subpage grew a rule under its
+         title, the one without a title was the one that looked unfinished.
+
+         ASSISTANTS, plural, like the two beside it: the three registers under
+         ACCESS are three populations — what this server answers as, what it
+         answers to, and what may frame it. A row is still an ENDPOINT
+         everywhere it is described, which is the right word for the thing;
+         this is the word for the set of them. -->
+    <div class="barehead"><span class="listtitle">Assistants</span></div>
     <div class="grpbody">
   <div id="rtlist"></div>
   <div class="note" id="rtlistnote"></div>
@@ -3382,6 +3582,70 @@ queue as the people you enrolled — chipped <b>FORM</b> where they asked and
     <button id="b_formrevert" class="act-undo">REVERT</button>
   </div>
   <div class="note" id="formnote"></div>
+    </div>
+  </section>
+
+  <!-- WHERE AN EMBED ARRIVES, which is the same question the two sections
+       above answer for a person and a screen: what address does the thing
+       being enrolled reach this server on. It sat at the head of ENROLLMENTS ▸
+       EMBED, above the form that mints a key — a setting on a page whose job
+       is to issue a credential, which is the split this tab exists to undo.
+
+       ENROLL is where the shape of every door is decided; the queues those
+       settings feed are elsewhere. This is the embed's door. -->
+  <section class="grp wide" data-tab="enrolcfg">
+    <h4>Enroll Embed Server</h4>
+    <div class="grpbody">
+  <label class="bklab" style="margin-top:2px" for="ap_embedhost">Address
+integrators reach this on</label>
+  <div class="fieldsave">
+    <!-- HTTPS is the answer almost always, and it is first and default for
+         that reason. It is a choice rather than a rule because the constraint
+         is the browser's — a microphone in an iframe will not open over plain
+         HTTP — and a deployment doing something this server has not thought
+         of should not find the panel writing a scheme nobody picked. -->
+    <select id="ap_embedscheme" class="ppick" title="how the outside reaches this">
+      <option value="https">https://</option>
+      <option value="http">http://</option>
+    </select>
+    <input id="ap_embedhost" type="text" spellcheck="false" autocomplete="off"
+           autocapitalize="none" placeholder="ai.example.com">
+    <span class="colon">:</span>
+    <!-- ITS OWN BOX. A host and a port are two facts, and one field that
+         sometimes holds both is a field that has to be explained. Blank is the
+         answer behind a proxy and blank is what it says — "none" rather than a
+         number nobody chose. -->
+    <input id="ap_embedport" class="num" type="number" min="1" max="65535"
+           inputmode="numeric" autocomplete="off" placeholder="none"
+           title="port, if the outside reaches this server on one">
+    <button id="b_embedhost" class="act-save">SAVE</button>
+  </div>
+  <div class="note" id="ehnote"></div>
+  <div class="note help">The address a host application's server and its
+visitors both reach this server by — <b>not</b> the address enrolment uses for
+people and screens. Those are yours on a network you control; an embed is a
+stranger's browser on somebody else's website, and the two arrive by different
+names as often as not.
+
+<b>Exactly as the outside world reaches it</b>, with no <b>https://</b> in
+front. The port has its own box and is blank behind a reverse proxy, which is
+the common case — this server no longer assumes its own. It used to append the
+display port, which is right for a browser reaching this process directly and
+wrong the moment anything sits in front of it: the integrator was sent at a
+port the firewall does not publish.
+
+<b>http:// is offered and is almost never right.</b> A microphone in an iframe
+will not open over plain HTTP — the browser refuses it, whatever is in front of
+this server — so an embed served that way can be read and typed at but never
+spoken to, and the reason is invisible to whoever is trying. It is a choice
+rather than a rule because the constraint belongs to the browser and not to
+this field.
+
+It changes nothing that is running. It is the address written into the code
+under ENROLLMENTS ▸ EMBED and shown again on every row of ACCESS ▸ SITES, and
+nothing else reads it. Set it before you make a key: with it empty the
+generated code says YOUR-RESONANCE-HOST, which an admin then edits by hand in
+three places, two of which they will get right.</div>
     </div>
   </section>
 
@@ -3866,7 +4130,7 @@ owner-only permissions, the same as one made here.</div>
   <label class="bklab" for="ct_names">Names and addresses it must answer to</label>
   <input id="ct_names" type="text" spellcheck="false" autocomplete="off"
          autocapitalize="none"
-         placeholder="10.1.153.21, ai.example.com, join.example.com">
+         placeholder="10.0.0.5, ai.example.com, join.example.com">
   <div class="note help">Every address anybody opens this server on, separated
 by commas or spaces. <b>Each one has to be in here</b> — a certificate is
 judged against the address in the bar, not against the machine, so a name left
@@ -4997,6 +5261,70 @@ recorded, and nothing at all until somebody says a wake word.</div>
   </section>
 
 
+  <!-- ============================================================== SITES
+       The register of embeds, under ACCESS with the other two rather than
+       under the form that makes one. The division is the one this panel
+       already draws everywhere else: ENROLLMENTS is where something arrives,
+       ACCESS is where it lives once it has. A screen makes exactly that move
+       from ENROLLMENTS ▸ DEVICE to ACCESS ▸ NODES, and there was no reason
+       for an embed to be the exception — the list of keys that exist was
+       sitting on the tab that mints them, above a form, which asks one page
+       to be both the door and the room.
+
+       So this is the room. Read-only by design, and not only because a key
+       cannot be edited: an admin comes here to find out what is currently
+       able to frame this assistant, which is a question about the deployment
+       and not about a credential they are in the middle of issuing.
+
+       It is #emblist, moved rather than copied. refreshEmbeds paints it
+       wherever it is, and one list means DISABLE cannot leave a stale row
+       behind it on the tab you are not looking at. -->
+  <section class="grp bare proflist" data-tab="sites">
+    <div class="barehead"><span class="listtitle">Sites</span></div>
+    <div class="grpbody">
+  <div id="emblist"></div>
+  <!-- The buttons are on the rows above, so their answer belongs here. It
+       used to be written to #embnote, which is on ENROLLMENTS ▸ EMBED — the
+       same fault the bulk bar's note on NODES was moved to fix: a result
+       reported on a page nobody pressing the button could see. -->
+  <div class="note" id="sitenote"></div>
+
+  <div class="note help" style="margin-top:10px">Every application holding a
+key to frame this assistant. One row a key, and the row says what that key is
+without opening it — what it may do, how many parts it draws, how many origins
+may frame it, and how long one session lasts.
+
+<b>Keys are made under ENROLLMENTS ▸ EMBED.</b> That tab is the door and this
+is the register, the same division ▸ DEVICE and NODES already have. A key
+appears here the moment it is created, and stays until it is deleted.
+
+<b>Open a row for the rest of it.</b> <b>Reaches</b> is the line to read first
+and the one you cannot work out from anywhere else: which assistants this key
+may actually talk to. What a key may DO is fixed on the key; what it may talk
+TO is decided on the far side, in an authorize profile under PERMISSIONS ▸
+AUTHORIZE, and a site that draws everything and reaches nothing looks perfectly
+configured while answering 403 to every question it is asked. An endpoint with
+no permission, or half a one, is refused to everybody and is not listed here.
+
+<b>Made</b> is the audit line — when the key was issued, by which admin, and
+the preset it started from.
+
+<b>What a key may do and what it draws are fixed at creation</b>, so a row here
+opens read-only. Somebody's page is already framing it, and widening it from
+here would change what that page can do without anybody at that end knowing.
+To change either, make a key and delete this one.
+
+<b>DISABLE</b> stops it working and keeps the row — a site taken off the air
+and put back without anybody's developer being sent a new key. <b>DELETE</b>
+is final, and every page using that key stops working immediately.
+
+<b>SESSIONS</b> on a row is live traffic, browsers holding an exchanged session
+right now. <b>Last used</b> is the last time that application's server asked
+for one, so a site nobody has framed for a month says so here before anybody
+goes looking for it.</div>
+    </div>
+  </section>
+
   <!-- Laid out like the endpoints on AI, because it is the same kind of list:
        a set of named things, each of which is one line until you want it, and
        a new one made by adding a row rather than by filling in a permanent
@@ -5011,34 +5339,24 @@ recorded, and nothing at all until somebody says a wake word.</div>
        be able to do by accident. So a saved row opens read-only, and the draft
        is the only row with fields in it. -->
   <section class="grp bare proflist" data-tab="embeds">
+    <!-- IT NAMES ITSELF NOW. It had no title at all: the tab opened on a
+         hostname field and a note, and buildHelp minted a bare header just to
+         have somewhere to hang the ?. Every other bare section on this panel
+         says what it is in that row — Nodes, Sites, Health, Manual — and this
+         was the one that did not. -->
+    <div class="barehead"><span class="listtitle">Embed Enrollment</span></div>
     <div class="grpbody">
-  <!-- WHERE INTEGRATORS REACH THIS, and it is at the top of this tab because
-       every snippet below is written against it. Set nothing and the generated
-       code says YOUR-RESONANCE-HOST, which an admin then edits by hand in three
-       places — two of which they will get right. -->
-  <label class="bklab" style="margin-top:2px" for="ap_embedhost">Address
-integrators reach this on</label>
-  <input id="ap_embedhost" type="text" spellcheck="false" autocomplete="off"
-         autocapitalize="none" placeholder="ai.example.com">
-  <div class="seg addrow">
-    <button id="b_embedhost" class="act-save">SAVE ADDRESS</button>
-  </div>
-  <div class="note" id="ehnote"></div>
-  <div class="note help">The name a host application's server and its visitors
-both reach this server by — <b>not</b> the address enrolment uses. Screens are
-yours on a network you control; an embed is a stranger's browser on somebody
-else's website, and the two arrive by different names as often as not.
+  <!-- THE LIST IS NOT HERE ANY MORE. The keys that exist are under ACCESS ▸
+       SITES, in the row of registers with the nodes and the endpoints. This
+       tab issues a credential; that one holds what has been issued — the same
+       move a screen makes from ENROLLMENTS ▸ DEVICE to ACCESS ▸ NODES.
 
-A name, with no <b>https://</b> in front and no port after. The HTTPS display
-port is added for you, because a microphone in an iframe will not open over
-plain HTTP and a snippet naming the wrong port produces an assistant that
-cannot listen for a reason nobody can see.
-
-It changes nothing that is running. It is the address written into the code on
-this tab, and nothing else reads it.</div>
-
-  <div id="emblist"></div>
-
+       BEHIND THE ?, like every other line of prose in this panel. It was a
+       bare .note sitting permanently above the form, on the reasoning that
+       somebody arriving to look for a list that has moved needs telling
+       without pressing anything. That reasoning would put a paragraph on
+       every tab that has ever been rearranged, and the panel has spent its
+       whole life taking exactly those out. -->
   <!-- Kept in the document rather than built on demand: everything below is
        addressed by id — by the preset buttons, the coherence check and the
        create itself — and a form cloned into place would either duplicate
@@ -5059,7 +5377,7 @@ sent to the host page and never seen by anybody using the embed.</div>
 
   <div class="subwrap">
   <div class="subgrp open">
-    <h5>Start from<span class="subsum"></span></h5>
+    <h5>Presets<span class="subsum"></span></h5>
     <div class="subbody">
   <div class="seg" id="em_preset">
     <button data-v="full" class="on">FULL</button>
@@ -5077,7 +5395,7 @@ chose rather than as fourteen ticks.</div>
   </div>
 
   <div class="subgrp">
-    <h5>What it may do<span class="subsum"></span></h5>
+    <h5>Audio Selections<span class="subsum"></span></h5>
     <div class="subbody">
   <div class="cks" id="em_cap">
     <label><input type="checkbox" data-c="ask"> Ask</label>
@@ -5085,14 +5403,14 @@ chose rather than as fourteen ticks.</div>
     <label><input type="checkbox" data-c="speak"> Speak</label>
   </div>
   <div class="note help">Permission, not furniture. Hiding the TALK button
-under <b>What it draws</b> does not withdraw the microphone — these are two
+under <b>Component Selection</b> does not withdraw the microphone — these are two
 axes on purpose, and the host may narrow either at runtime but never widen
 one.</div>
     </div>
   </div>
 
   <div class="subgrp">
-    <h5>What it draws<span class="subsum"></span></h5>
+    <h5>Component Selection<span class="subsum"></span></h5>
     <div class="subbody">
   <div class="cks" id="em_parts">
     <label><input type="checkbox" data-p="visual"> Figure</label>
@@ -5111,7 +5429,7 @@ the key is in somebody's application.</div>
   </div>
 
   <div class="subgrp">
-    <h5>Who may frame it<span class="subsum"></span></h5>
+    <h5>Allowed Remote URLs<span class="subsum"></span></h5>
     <div class="subbody">
   <label class="bklab" style="margin-top:2px">One origin a line</label>
   <textarea id="em_origins" rows="3" spellcheck="false"
@@ -5123,7 +5441,7 @@ useless anywhere you did not name.</div>
   </div>
 
   <div class="subgrp">
-    <h5>Who is asking<span class="subsum"></span></h5>
+    <h5>Speakers Name<span class="subsum"></span></h5>
     <div class="subbody">
   <div class="cks">
     <label><input id="em_needsuser" type="checkbox"> The host must name the
@@ -5166,9 +5484,17 @@ of the two, and comfortably above what a person actually does — a few a minute
     </div>
   </div>
 
-  <div class="subgrp">
-    <h5>How a host uses it<span class="subsum"></span></h5>
-    <div class="subbody">
+  </div>
+
+  <!-- NOT A SUBGROUP. It was one, and it held nothing but this paragraph — so
+       with help off, which is how the tab opens, "How a host uses it" was a
+       heading you could press to reveal an empty box. Every other subgroup on
+       this draft has controls in it and prose behind the ?; this one only ever
+       had the prose, which makes it help rather than a section.
+
+       Its own comment further down already said the three steps "are now the
+       help behind Embed keys". The move was made and the empty container was
+       left standing. -->
   <div class="note help">A key lets another application's <b>server</b> ask
 this one for a short-lived session and put the result in an iframe. The key
 never reaches a browser.
@@ -5183,9 +5509,6 @@ granted on their origin. Miss one and it looks broken for reasons that have
 nothing to do with this server.
 
 Worked examples in DOCUMENTATION → Embedding it elsewhere.</div>
-    </div>
-  </div>
-  </div>
 
   <div class="rtacts">
     <button id="b_addembed" class="act-save">CREATE</button>
@@ -5195,7 +5518,15 @@ Worked examples in DOCUMENTATION → Embedding it elsewhere.</div>
   </div>
 
   <div class="note" id="embnote"></div>
-  <div id="em_key"></div>
+  <!-- Wrapped, so the label and its COPY come and go with the key rather than
+       sitting over an empty box on a tab where nothing has been made yet. -->
+  <div id="em_keywrap" hidden>
+    <div class="copyrow">
+      <label class="bklab">The key — shown once</label>
+      <div class="seg"><button id="b_copykey" type="button">COPY</button></div>
+    </div>
+    <div id="em_key"></div>
+  </div>
   <!-- THE HANDOVER. Shown once, beside the key, because this is the only
        moment everything needed to write it exists in one place — after this
        the key is a hash and the code could not be generated again. -->
@@ -5205,7 +5536,12 @@ whoever runs the application.</b> The key is not in them: it goes in that
 server's environment as <b>RESONANCE_KEY</b>, so the code can be pasted into a
 chat or a repository and the credential cannot.</div>
 
-    <label class="bklab">1 · their server — one endpoint, behind their login</label>
+    <div class="copyrow">
+      <label class="bklab">1 · their server — one endpoint, behind their login</label>
+      <!-- Takes whichever of the three is showing, so it belongs beside the
+           control that chooses rather than under the block. -->
+      <div class="seg"><button id="b_copybe" type="button">COPY</button></div>
+    </div>
     <div class="seg" id="em_lang">
       <button data-v="node" class="on">NODE</button>
       <button data-v="python">PYTHON</button>
@@ -5213,7 +5549,10 @@ chat or a repository and the credential cannot.</div>
     </div>
     <pre class="snip" id="em_snip_be"></pre>
 
-    <label class="bklab">2 · their page — once, in the template</label>
+    <div class="copyrow">
+      <label class="bklab">2 · their page — once, in the template</label>
+      <div class="seg"><button id="b_copypg" type="button">COPY</button></div>
+    </div>
     <pre class="snip" id="em_snip_pg"></pre>
 
     <div class="note help"><b>Then three things to check with them.</b>
@@ -5357,12 +5696,19 @@ key inside an example sends you to a line that cannot answer you.</div>
              SETTINGS_TABS — like AI, nothing here writes the shared settings
              document. -->
         <button id="tab_devices" data-tab="devices">NODES</button>
-        <!-- EMBED was here, on the reasoning that an embed is another
-             application this server is wired to. True, and it filed the tab
-             under what an embed IS rather than under what an admin does with
-             it — which is issue a credential to something that wants in, and
-             then revoke it. That is enrolment, and it is in the bar at the
-             top with the other two. -->
+        <!-- THE THIRD REGISTER, and it is here for the reason NODES is: what
+             has finished arriving belongs under ACCESS, whatever door it came
+             through. A node is a screen on a network you control; a site is a
+             page on somebody else’s server holding a key to frame this
+             interface. Different doors, one question — what is reaching this
+             server, and what may it do once it has.
+
+             EMBED was on this row once, filed under what an embed IS rather
+             than under what an admin does with it. Issuing a credential and
+             revoking it is enrolment, and that half is in the bar at the top
+             with the other two. This is the other half, and it is the half
+             that belongs down here: the register of what was issued. -->
+        <button id="tab_sites" data-tab="sites">SITES</button>
       </div>
       </fieldset>
     </div>
@@ -6463,7 +6809,13 @@ async function loadApp(){
       esel.value = j.app.enrol_address || '';
     }
     if ($('ap_enrolhost')) $('ap_enrolhost').value = j.app.enrol_host || '';
+    if ($('ap_embedscheme'))
+      $('ap_embedscheme').value = j.app.embed_scheme || 'https';
     if ($('ap_embedhost')) $('ap_embedhost').value = j.app.embed_host || '';
+    /* Blank rather than 0. The document stores "no port" as zero because it is
+       an int; a field showing 0 is a port somebody then has to delete. */
+    if ($('ap_embedport'))
+      $('ap_embedport').value = j.app.embed_port ? String(j.app.embed_port) : '';
     enrolNow(j);
     certPaint(j);
     segSet('ap_bind', j.app.bind);
@@ -6908,12 +7260,17 @@ function routePerm(r){
      ways to be wrong about that, the panel promising access is the worse. */
   if (!an || !az) return null;
   const a = an.values || {}, b = az.values || {};
+  /* ALL FOUR LISTS. It carried three, and paintAuthzs has been writing a
+     fourth since a key became grantable — so anything asking this helper
+     "may that embed use this endpoint" was reading an answer the profile
+     does not give. Nothing asked until the register under ACCESS ▸ SITES
+     did. */
   return {perm: p, authn: an, authz: az,
           needs_signin: !!a.needs_signin,
           session_idle: a.session_idle,
           restricted: !!b.restricted,
           displays: b.displays || [], groups: b.groups || [],
-          identities: b.identities || []};
+          identities: b.identities || [], embeds: b.embeds || []};
 }
 function routeProvider(r){
   const m = routeModel(r);
@@ -12749,9 +13106,70 @@ function emCheck(){
   return !err;
 }
 
+/* WHICH ASSISTANTS A SITE MAY ACTUALLY REACH, through the same one
+   indirection routePerm does for a screen and a person. It is the question
+   the register exists to answer and the one nothing in the panel answered:
+   what a key MAY DO is on the key, but what it may TALK TO is decided on the
+   far side, in an authorize profile a page framing this will never see.
+
+   An endpoint with no permission, or half a one, is refused to everybody —
+   so it is not listed. That is the server's answer rather than a hopeful
+   one, and of the two ways to be wrong here the panel promising access is
+   the worse. Same rule routePerm already states for itself. */
+function siteRoutes(id){
+  return (RT.routes || []).filter(r=>{
+    const p = routePerm(r);
+    return !!p && (!p.restricted || p.embeds.indexOf(id) >= 0);
+  });
+}
+
 /* Which key is open, by id — the list is rebuilt on every change and an index
    would move under it. The same reason OPENRT holds an endpoint's id. */
 let OPENEM = '';
+
+/* A BUTTON THAT SAYS COPY. Click-to-take on the block itself is still
+   there — it is the older gesture and somebody has learned it — but a
+   scrollable box of source with no visible control is a box people drag
+   across, and half a snippet pasted into somebody's server is worse than no
+   snippet at all. So the affordance is a button, and the block is a shortcut.
+
+   Takes a getter rather than the text: the server block is re-rendered under
+   the language buttons, and a button holding a copy of what was there when it
+   was built would keep handing out NODE after somebody pressed PYTHON. */
+function copyText(txt, what, btn, noteId){
+  const note = $(noteId);
+  const say = (m, bad)=>{ if (!note) return;
+                          note.className = bad ? 'note bad' : 'note';
+                          note.textContent = m; };
+  if (!navigator.clipboard)
+    return say('this browser will not let a page write to the clipboard '
+               + '\u2014 click the block itself and copy by hand', true);
+  navigator.clipboard.writeText(txt)
+    .then(()=>{ if (btn){ btn.textContent = 'COPIED';
+                          setTimeout(()=>{ btn.textContent = 'COPY'; }, 1600); }
+                say(what + ' copied to the clipboard'); })
+    .catch(()=> say('could not write to the clipboard', true));
+}
+
+/* The register's version, built per row. Returns the .seg rather than the
+   button: see .copyrow for why a bare button in this panel has no shape. */
+function siteCopy(get, what){
+  const wrap = document.createElement('div');
+  wrap.className = 'seg';
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.textContent = 'COPY';
+  b.onclick = ev=>{ ev.stopPropagation();
+                    copyText(get(), what, b, 'sitenote'); };
+  wrap.appendChild(b);
+  return wrap;
+}
+
+/* A JUST-REISSUED SECRET, waiting for the repaint that will show it. It lives
+   for exactly one paint: the response that carried it is the only place it has
+   ever existed in plain text, and holding it any longer than the row it is
+   drawn into would be keeping a credential in a page for no reason. */
+let NEWKEY = null;
 
 async function refreshEmbeds(){
   const box = $('emblist');
@@ -12761,7 +13179,8 @@ async function refreshEmbeds(){
     box.innerHTML = '';
     if (!j.embeds.length){
       box.className = 'note';
-      box.textContent = 'No embed keys yet. Nothing can frame this interface.';
+      box.textContent = 'No embed keys yet. Nothing can frame this interface '
+                      + '\u2014 make one under ENROLLMENTS \u25b8 EMBED.';
       return;
     }
     box.className = '';
@@ -12813,10 +13232,62 @@ async function refreshEmbeds(){
 
       const body = document.createElement('div');
       body.className = 'grpbody';
+
+      /* THE KEY, FOR AS LONG AS THIS PAINT LASTS. It exists in one response
+         and is a hash everywhere else, so it is held in a variable and cleared
+         the moment the list is drawn again — not stored, not refetched, and
+         gone on the next repaint whether or not anybody took it. */
+      if (NEWKEY && NEWKEY.id === e.id){
+        const kb = document.createElement('div');
+        kb.id = 'em_key_' + e.id;
+        kb.className = 'on';
+        kb.style.cssText = 'margin:8px 0 2px;cursor:pointer;word-break:break-all';
+        kb.textContent = NEWKEY.key;
+        kb.title = 'click to copy';
+        kb.addEventListener('click', function(ev){
+          ev.stopPropagation();
+          const rg = document.createRange(); rg.selectNodeContents(this);
+          const sl = getSelection(); sl.removeAllRanges(); sl.addRange(rg);
+          if (navigator.clipboard) navigator.clipboard.writeText(this.textContent)
+            .then(()=>{ const n = $('sitenote');
+                        if (n){ n.className = 'note';
+                                n.textContent = 'key copied to the clipboard'; } })
+            .catch(()=>{});
+        });
+        const krow = document.createElement('div');
+        krow.className = 'namerow';
+        const kbb = document.createElement('b');
+        kbb.textContent = 'The key';
+        krow.appendChild(kbb);
+        krow.appendChild(siteCopy(()=> kb.textContent, 'key'));
+        body.appendChild(krow);
+        body.appendChild(kb);
+        const kw = document.createElement('div');
+        kw.className = 'note';
+        kw.textContent = 'Shown once. It goes in the host server\u2019s '
+          + 'environment as RESONANCE_KEY \u2014 never in the page, and never '
+          + 'in the code below.';
+        body.appendChild(kw);
+        NEWKEY = null;      // one paint only
+      }
+
       const meta = document.createElement('div');
       meta.className = 'meta';
       const lines = [
         ['May', cap.length ? cap.join(', ') : 'nothing'],
+        /* Directly under what it may DO, because it is the other half of the
+           same question and the half an admin cannot work out from here.
+           A site that draws everything and reaches nothing looks configured
+           and answers 403 to every question it is asked. */
+        ['Reaches', (()=>{
+          const rs = siteRoutes(e.id);
+          if (!(RT.routes || []).length)
+            return 'no endpoints configured yet \u2014 ACCESS \u25b8 AI';
+          if (rs.length) return rs.map(r=> r.name || 'unnamed').join(', ');
+          return 'nothing \u2014 no endpoint\u2019s permission admits this key, '
+               + 'so every question is refused. Tick it on an authorize '
+               + 'profile under PERMISSIONS \u25b8 AUTHORIZE.';
+        })()],
         ['Draws', (e.parts || []).join(', ') || 'nothing'],
         ['Frames', (e.origins || []).join('  ')],
         ['Session', e.ttl_minutes + ' min · ' + (e.cap && e.cap.rate_per_min)
@@ -12827,6 +13298,16 @@ async function refreshEmbeds(){
           : 'anonymous — nothing about who is asking is collected'],
         ['Last used', e.last_used
           ? new Date(e.last_used * 1000).toLocaleString() : 'never'],
+        /* WHO ISSUED IT AND WHEN. The server has sent all three of these since
+           the key was written and the panel threw them away, which left the
+           one question an audit actually asks — where did this come from —
+           answerable only out of the log. The preset rides here rather than
+           beside the parts: it is what was CHOSEN, not what the key is, and
+           the two lines above already say what it is. */
+        ['Made', (e.created
+            ? new Date(e.created * 1000).toLocaleString() : 'date not recorded')
+          + (e.created_by ? ' by ' + e.created_by : '')
+          + (e.preset ? ' \u00b7 from ' + e.preset : '')],
       ];
       lines.forEach(([k, v])=>{
         const d = document.createElement('div');
@@ -12837,6 +13318,104 @@ async function refreshEmbeds(){
         meta.appendChild(d);
       });
       body.appendChild(meta);
+
+      /* THE CODE, REBUILT. It was written once, in the response that created
+         the key, and never again — so "how is this site wired" was a question
+         the register could not answer, and an admin went and read somebody
+         else's source to find out.
+
+         The KEY cannot come back: it is a hash from the moment it is written.
+         The CODE can, because the key was never in it — it is read from
+         RESONANCE_KEY on the host's own server, which is the whole reason
+         these are safe to paste into a ticket. */
+      if (e.snippets){
+        const ch = document.createElement('div');
+        ch.className = 'grant';
+        const chb = document.createElement('b');
+        chb.textContent = 'How this site is wired';
+        ch.appendChild(chb);
+        body.appendChild(ch);
+
+        const r1 = document.createElement('div');
+        r1.className = 'namerow';
+        const b1 = document.createElement('b');
+        b1.textContent = '1 \u00b7 their server \u2014 one endpoint, behind their login';
+        r1.appendChild(b1);
+        body.appendChild(r1);
+
+        const seg = document.createElement('div');
+        seg.className = 'seg';
+        const be = document.createElement('pre');
+        be.className = 'snip';
+        let lang = 'node';
+        const draw = ()=>{
+          [...seg.children].forEach(b=> b.classList.toggle('on', b.dataset.v === lang));
+          be.textContent = e.snippets[lang] || '';
+        };
+        [['node','NODE'],['python','PYTHON'],['php','PHP']].forEach(([v, t])=>{
+          const b = document.createElement('button');
+          b.type = 'button'; b.dataset.v = v; b.textContent = t;
+          b.onclick = ev=>{ ev.stopPropagation(); lang = v; draw(); };
+          seg.appendChild(b);
+        });
+        /* COPY sits with the language buttons rather than up on the label:
+           what it takes is whichever of the three is showing, so it belongs
+           on the control that chooses. */
+        r1.appendChild(siteCopy(()=> be.textContent, 'server code'));
+        body.appendChild(seg);
+        body.appendChild(be);
+
+        const r2 = document.createElement('div');
+        r2.className = 'namerow';
+        const b2 = document.createElement('b');
+        b2.textContent = '2 \u00b7 their page \u2014 once, in the template';
+        r2.appendChild(b2);
+        const pg = document.createElement('pre');
+        pg.className = 'snip';
+        pg.textContent = e.snippets.page || '';
+        r2.appendChild(siteCopy(()=> pg.textContent, 'page tag'));
+        body.appendChild(r2);
+        body.appendChild(pg);
+        draw();
+
+        /* One click takes the whole block, the same gesture the create form's
+           snippets have. Bound per row rather than by the query at load: these
+           did not exist when that ran, and copying source by dragging out of a
+           scrollable box is how half a snippet ends up pasted. */
+        [be, pg].forEach(el=> el.addEventListener('click', function(ev){
+          ev.stopPropagation();
+          const rg = document.createRange(); rg.selectNodeContents(this);
+          const sl = getSelection(); sl.removeAllRanges(); sl.addRange(rg);
+          if (navigator.clipboard) navigator.clipboard.writeText(this.textContent)
+            .then(()=>{ const n = $('sitenote');
+                        if (n){ n.className = 'note';
+                                n.textContent = 'copied to the clipboard'; } })
+            .catch(()=>{});
+        }));
+
+        /* A STATE, NOT PROSE, so it is not behind the ?: the code on screen
+           says YOUR-RESONANCE-HOST and an admin who cannot see why will edit
+           it in by hand in three places, two of which they will get right. */
+        if (!e.snippets.base){
+          const nb = document.createElement('div');
+          nb.className = 'note bad';
+          nb.textContent = 'No address is set, so the code above says '
+            + 'YOUR-RESONANCE-HOST \u2014 set one under ENROLLMENTS \u25b8 EMBED '
+            + 'and it is written in for you.';
+          body.appendChild(nb);
+        }
+
+        const kn = document.createElement('div');
+        kn.className = 'note help';
+        kn.textContent = 'The key is in neither of these. It goes in that '
+          + 'server\u2019s environment as RESONANCE_KEY, which is why the code '
+          + 'can be pasted into a chat or a repository and the credential '
+          + 'cannot \u2014 and why this can be shown again at all. The key '
+          + 'itself is stored hashed and cannot: if it has been lost, add a '
+          + 'site and delete this one.';
+        body.appendChild(kn);
+      }
+
       /* Read-only, deliberately, where an endpoint's block is an editing
          surface: what a key may do and what it draws are fixed when it is
          created. A page somewhere is already framing this, and widening it
@@ -12852,6 +13431,47 @@ async function refreshEmbeds(){
 
       const acts = document.createElement('div');
       acts.className = 'rtacts';
+      /* HARD RIGHT, like every other row in a register. The panel's way of
+         doing that is a spacer rather than justify-content — `.rtacts .spacer`
+         is already defined for exactly this, and every action row that pushes
+         its buttons over uses one — which also leaves the left of the row free
+         for something later without re-laying it out. */
+      const gap = document.createElement('span');
+      gap.className = 'spacer';
+      acts.appendChild(gap);
+      /* THE ONLY WAY TO GET A WORKING KEY OUT OF THIS ROW. The secret is a
+         hash from the moment it is written and nothing here can show the
+         original — so the answer to "I have lost the key" is a new secret on
+         the SAME site, not a new site.
+
+         That distinction is the whole of why this button exists rather than
+         "delete and make another": a new key is a new id, and every authorize
+         profile that had ticked the old one would quietly stop naming
+         anything. Recovering a credential would have withdrawn the site's
+         access to every assistant, invisibly. */
+      const again = document.createElement('button');
+      again.textContent = 'REISSUE KEY';
+      again.onclick = async ()=>{
+        if (!confirm('Reissue the key for "' + e.name + '"?\n\nThe site keeps '
+                     + 'its id, its permissions and everything granted to it. '
+                     + 'The old key stops working at once and every session it '
+                     + 'is holding is dropped, so the page framing this goes '
+                     + 'dark until its server has the new one.')) return;
+        const note = $('sitenote');
+        note.className = 'note'; note.textContent = 'reissuing\u2026';
+        try{
+          const j = await api('/embeds/reissue',
+                              {method:'POST', body: JSON.stringify({id:e.id})});
+          OPENEM = e.id;
+          NEWKEY = {id: e.id, key: j.key};
+          await refreshEmbeds();
+          const n2 = $('sitenote');
+          n2.className = 'note';
+          n2.textContent = 'Reissued. Copy the key now \u2014 it is stored '
+            + 'hashed and this server cannot show it again.';
+        }catch(err){ note.className = 'note bad'; note.textContent = err.message; }
+      };
+      acts.appendChild(again);
       const flip = document.createElement('button');
       flip.textContent = e.enabled === false ? 'ENABLE' : 'DISABLE';
       flip.onclick = ()=> embedAction('/embeds/enable',
@@ -12885,12 +13505,17 @@ function emDraft(on){
   const add = $('b_newembed');
   if (add){ add.hidden = on; add.disabled = on; }
   if (on){
-    /* Nothing else open while you are making one: the draft is the thing you
-       are looking at, and a saved row open underneath it is a second subject
-       on screen. And the LAST key's code goes with it — two keys' worth of
-       snippets on one screen is a way to send somebody the wrong one. */
+    /* The LAST key's code goes with the draft opening — two keys' worth of
+       snippets on one screen is a way to send somebody the wrong one.
+
+       The register closes with it. It is on ACCESS ▸ SITES now rather than
+       underneath this form, so it is no longer a second subject on the screen
+       you are looking at — but a row left open there from before you came here
+       is a state nobody chose, and the walk over to read the new key should
+       land on the list rather than on last week's. */
     OPENEM = '';
     const k = $('em_key'); if (k){ k.textContent = ''; k.classList.remove('on'); }
+    const kw = $('em_keywrap'); if (kw) kw.hidden = true;
     emShowSnippets(null);
     const box = $('emblist');
     if (box) box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
@@ -12901,7 +13526,11 @@ function emDraft(on){
 }
 
 async function embedAction(path, body){
-  const note = $('embnote');
+  /* On the tab the buttons are on. Both callers are a row in the register
+     under ACCESS ▸ SITES, and #embnote is over on ENROLLMENTS ▸ EMBED —
+     the fault the bulk bar's note on NODES was moved to fix, which is a
+     result written to a page nobody pressing the button can see. */
+  const note = $('sitenote');
   note.className = 'note';
   try{
     await api(path, {method:'POST', body: JSON.stringify(body)});
@@ -12997,12 +13626,42 @@ document.querySelectorAll('.snip').forEach(el=>{
   });
 });
 
+/* COPY BUTTONS ON THE HANDOVER. Click-to-take on the block itself stays —
+   it is the older gesture and somebody has learned it — but a scrollable box
+   of source with no visible control is one people drag across, and half a
+   snippet pasted into somebody's server is worse than none at all.
+
+   The register got these first, which was backwards: this is the one moment
+   the key exists in plain text anywhere, and it is the moment a copy has to
+   be easy. */
+[['b_copykey', ()=> $('em_key').textContent,     'key'],
+ ['b_copybe',  ()=> $('em_snip_be').textContent, 'server code'],
+ ['b_copypg',  ()=> $('em_snip_pg').textContent, 'page tag']].forEach(([id, get, what])=>{
+  const b = $(id);
+  if (b) b.addEventListener('click', ()=> copyText(get(), what, b, 'embnote'));
+});
+
 /* ---- the address the snippets are written against ----
    Its own save rather than saveAppBit, because that one reports on the whole
    document's pending restarts — and this field owes none. An admin who has a
    port change waiting would otherwise be told a restart is needed for typing
    in a hostname, which is both untrue and the kind of untrue that gets a
    server bounced in the middle of the afternoon. */
+/* SAID WHERE THE CHOICE IS MADE, not discovered afterwards by an integrator
+   whose microphone never opens. It is a warning and not a refusal — the
+   constraint is the browser's — so it reports and leaves the choice alone. */
+const embSch = $('ap_embedscheme');
+if (embSch) embSch.addEventListener('change', ()=>{
+  const note = $('ehnote');
+  if (!note) return;
+  if (embSch.value === 'http'){
+    note.className = 'note bad';
+    note.textContent = 'Plain HTTP: a microphone in an iframe will not open, '
+      + 'so an embed served this way can be typed at but never spoken to. '
+      + 'Nothing on the page says why.';
+  } else { note.className = 'note'; note.textContent = ''; }
+});
+
 $('b_embedhost').addEventListener('click', async ()=>{
   const note = $('ehnote');
   note.className = 'note';
@@ -13011,7 +13670,9 @@ $('b_embedhost').addEventListener('click', async ()=>{
     /* Sent even when empty, which is how the name is taken back off — the
        same rule the enrolment host follows. */
     await api('/app', {method:'POST', body: JSON.stringify(
-      {embed_host: $('ap_embedhost').value.trim()})});
+      {embed_scheme: $('ap_embedscheme').value,
+       embed_host: $('ap_embedhost').value.trim(),
+       embed_port: $('ap_embedport').value.trim()})});
     note.textContent = $('ap_embedhost').value.trim()
       ? 'saved — new keys will be written against this address'
       : 'cleared — the code below will say YOUR-RESONANCE-HOST';
@@ -13037,6 +13698,7 @@ $('b_addembed').addEventListener('click', async ()=>{
     })});
     out.textContent = j.key;
     out.classList.add('on');
+    const kw = $('em_keywrap'); if (kw) kw.hidden = false;
     emShowSnippets(j.snippets);
     note.textContent = 'Created. Copy the key now — it is stored hashed and '
                      + 'this server cannot show it again.'
@@ -13647,7 +14309,20 @@ function panelNav(){
        arrive rather than left saying "no endpoint" about every port. */
     if (tab === 'network')
       Promise.resolve(loadBackend()).then(()=> paintNetworks(DPNETS));
-    if (tab === 'embeds') refreshEmbeds();
+    /* SITES, not EMBED: the list moved and the fetch went with it. EMBED
+       makes a key and calls this itself afterwards, so the register is
+       already correct by the time anybody walks over to look at it.
+
+       Through loadBackend, because Reaches is read off the endpoints document
+       and the displays document and this tab has never fetched either.
+       Painted before they land, every row says it reaches nothing — which is
+       the worst answer this page could give, an admin sent looking for a
+       grant that was there all along. It catches its own errors, so the
+       register still paints when the endpoints cannot be had. */
+    if (tab === 'sites') Promise.resolve(loadBackend()).then(refreshEmbeds);
+    /* The address moved to SETTINGS ▸ ENROLL, which loads app.json already —
+       see the enrolcfg branch below. Nothing on EMBED reads that document
+       now, so nothing here fetches it. */
     /* …and the displays document with it, because the request form lives on
        this tab now and is painted from it — see paintDpSettings. Without this
        the form is drawn at its defaults on the tab that owns it, which is the
@@ -13786,6 +14461,9 @@ function start(){
   $('tab_displays').style.display = admin ? '' : 'none';
   $('tab_enrol').style.display = admin ? '' : 'none';
   $('tab_embeds').style.display = admin ? '' : 'none';
+  // …and the register of what those keys are, which reads the same admin-only
+  // route. A viewer offered it would meet one empty list and two 403s.
+  $('tab_sites').style.display = admin ? '' : 'none';
   // Empty today, and admin-only from the start rather than from whenever it
   // stops being empty: everything a person is made of here is minted, granted
   // or revoked, and none of those is a thing a read-only account does.

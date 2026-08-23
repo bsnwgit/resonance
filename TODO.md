@@ -84,30 +84,31 @@ with the root installed reach every listener with no warning at all.
 
 ```
 subject   CN = *.server.example.internal
-issuer    CN = <your internal CA>            (an internal CA, not self-signed)
-valid     21 Aug 2026 → 21 Aug 2027
-SAN       DNS:*.server.example.internal         — and nothing else
+issuer    CN = <your internal CA>       (an internal CA, not self-signed)
+valid     one year
+SAN       DNS:*.server.example.internal — and nothing else
 ```
 
-`https://ai.server.example.internal:9701` loads clean. The panel, the assistants and
-the enrolment page can all be opened, driven and screenshotted, so the tooling
-gap that made the enrolment gate ship with two attributes unset is closed.
+`https://ai.server.example.internal:9701` loads clean. The panel, the
+assistants and the enrolment page can all be opened, driven and screenshotted,
+so the tooling gap that made the enrolment gate ship with two attributes unset
+is closed.
 
 **Three things the SAN does not carry**, each verified against a browser rather
 than reasoned about:
 
-- **The IP.** `https://10.1.153.21:9701` still warns — there is no IP in the
+- **The IP.** `https://10.0.0.5:9701` still warns — there is no IP in the
   SAN. Every bookmark, every *Address in the link*, and the embed address must
   be a name. Anybody still using the IP sees exactly the warning this work was
   meant to remove, and will reasonably conclude nothing changed.
-- **The bare domain.** `*.server.example.internal` does not match `server.example.internal` —
-  a wildcard matches one label, never its own parent. `ai.server.example.internal`
-  works; `server.example.internal` warns.
-- **A second level.** `a.b.server.example.internal` is two labels down and is not
-  covered either.
+- **The bare domain.** `*.server.example.internal` does not match
+  `server.example.internal` — a wildcard matches one label, never its own
+  parent. `ai.server.example.internal` works; `server.example.internal` warns.
+- **A second level.** `a.b.server.example.internal` is two labels down and is
+  not covered either.
 
-**And it is a private CA on a `.lan` domain**, which decides what an embed can
-be. A host application whose users' machines carry <your internal CA> gets an embed
+**And it is a private CA on an internal domain**, which decides what an embed
+can be. A host application whose users' machines carry that root gets an embed
 that simply works. Anything outside that — a public website, a contractor's
 laptop, somebody's phone off the VPN — gets a blank iframe with nothing in the
 console naming the cause, because `.lan` does not resolve on the internet and

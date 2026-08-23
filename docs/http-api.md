@@ -62,10 +62,18 @@ Admin listener only — everything below returns 404 on the public ports:
 | `POST` | `/displays/approve` | approve one, or withdraw it; may name it in the same call — `admin` role |
 | `POST` | `/displays/rename` | change what it is listed as; blank hands the row back to the name the device declares — `admin` role |
 | `POST` | `/displays/delete` | revoke: its token stops matching, and it is removed from every route's allow-list — `admin` role |
-| `GET` | `/embeds` | list embed keys — `admin` role |
+| `GET` | `/embeds` | list embed keys, each with the integration code rebuilt for it — `admin` role |
 | `POST` | `/embeds` | create one; the key is returned once — `admin` role |
+| `POST` | `/embeds/reissue` | a new secret on the same key: same id, same grants, live sessions dropped. Returned once — `admin` role |
 | `POST` | `/embeds/enable` | enable or disable one — `admin` role |
 | `POST` | `/embeds/delete` | revoke one — `admin` role |
+
+`GET /embeds` carries `snippets` on every row. The key is not in them — it is
+read from `RESONANCE_KEY` in the host's own environment — which is why they can
+be rebuilt long after the one response that held the secret has gone. The
+secret itself is a hash from the moment it is written and never comes back;
+`/embeds/reissue` is the only way to obtain a working key for an existing site,
+and it keeps the id so every grant made to that site survives.
 
 **Everything else 404s, including files that are not secret.** The server
 hands out four files — `index.html`, `admin.html`, `icon.svg`, `lockup.svg` —
