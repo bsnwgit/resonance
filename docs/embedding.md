@@ -6,7 +6,16 @@ without leaving the page they are on.
 
 Two jobs. **You** create a key here and hand over the code the panel writes
 for you. **They** add one endpoint to their application and one tag to their
-page template. Nothing else, ever.
+page template.
+
+**This document is your half.** Their half is
+[Integrating it](integrating.md) — the same mechanism written for the
+developer on the receiving end, with the request and response shapes, the
+status codes, the timings, and what fails and how. Send them that link with
+the key. Everything they would otherwise have to ask you is in it, including
+the one case the drop-in tag does not cover: a single-page application whose
+session is a token in memory rather than a cookie cannot use the loader, and
+writes its own mount instead.
 
 ---
 
@@ -216,6 +225,14 @@ there when the key requires it.
 `RESONANCE_KEY`, so the code can be pasted into a chat message or committed to
 a repository and the credential cannot.
 
+**Where their front end holds a token rather than a cookie**, that endpoint
+still gets written the same way — but the tag below cannot call it, because
+`embed.js` fetches with the browser's own credentials and has nowhere to put an
+`Authorization` header. That integration does the two calls itself and is
+written out in full in [Integrating it](integrating.md). It is the common case
+for a single-page application, so it is worth asking which they have before
+they start rather than after.
+
 ### 2 — their page: one tag, in the template
 
 ```html
@@ -340,6 +357,13 @@ launcher can do the two calls themselves: `POST /embed/session` server-side
 for a code, then frame `https://…/embed?c=…` with `allow="microphone"`. They
 then own the renewal, the bubble, and the message-origin checks — which is
 three of the four things the loader exists to get right.
+
+It is also the only path open to a **single-page application authenticating
+with a bearer token**, which is most of them: the loader fetches their code
+endpoint with `credentials: 'include'` and no way to attach a header, so it
+gets their login page or a 401. A working forty-line mount for that case,
+with the renewal retry the loader does not have, is in
+[Integrating it](integrating.md).
 
 ---
 

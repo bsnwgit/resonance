@@ -206,6 +206,7 @@ button. Readable by any signed-in account, not just admins.
 | **[Administration](docs/administration.md)** | The panel, the live preview, approving displays, and keeping an untouched screen working |
 | **[Admin settings & accounts](docs/app-settings.md)** | Ports, restarts, session lifetime, and the two roles |
 | **[Embedding it elsewhere](docs/embedding.md)** | Putting it on somebody else's web page, inline or as a bubble: keys, the code you hand their developer, and what the server needs first |
+| **[Integrating it](docs/integrating.md)** | The other side of that one, addressed to the host developer: the exact contract, the timings, what fails and how. Send them this link |
 
 **Project reference.** In the repository, not in the panel.
 
