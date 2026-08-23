@@ -188,9 +188,10 @@ needed for the pair above:
   register, not the form: a key is issued under ENROLLMENTS ▸ EMBED and appears
   here the moment it exists, the same move a screen makes from ▸ DEVICE to
   NODES. This is also where a site is *maintained* — a row opens on the key's
-  own settings, in the same six sections the key was made in: name, preset,
-  what it may do, what it draws, which origins may frame it, whether the host
-  must name the person, and the session and rate numbers.
+  own settings, in the same seven sections the key was made in: name, preset,
+  which assistant it talks to, what it may do, what it draws, which origins may
+  frame it, whether the host must name the person, and the session and rate
+  numbers.
 
   **SAVE** rewrites the key in place. Same id, same secret, same grants — so
   nobody at the far end is sent anything, and no authorize profile stops naming
@@ -208,6 +209,13 @@ needed for the pair above:
   the person** is the one edit the far end has to follow: their own endpoint
   must send it from the moment you save, so send them the code on the row
   again.
+
+  **Which assistant a site talks to is set here**, not by the address their
+  page frames. Left blank it behaves as it always did — whatever endpoint
+  answers on the port their integrator was given — and naming one moves the
+  decision off their source and onto this row. Changing it drops the site's
+  live sessions so the next question goes to the new one, and the endpoint's
+  own permissions still apply.
 
   **What it may ask its own application for** is the third block on the row,
   and it is a separate decision with a separate SAVE — a permission over
@@ -239,6 +247,20 @@ needed for the pair above:
   anything they could not already open for themselves, and a write stops and
   asks the person by voice or by button with the real values read back. See
   [Reaching an application's data](host-data.md).
+
+  **What it actually asked for is in `server.log`**, both legs of it:
+
+  ```
+  embed efe2c22ff5da2 (pktLog) -> GET /api/logs/search?limit=1 (lap 1)
+  embed efe2c22ff5da2 (pktLog) <- searchSyslog 200 648B
+  ```
+
+  The outgoing line matches what the application's own access log recorded, so
+  a disagreement about who dropped a call is settled by laying the two side by
+  side. The reply is its status and size only — never the body, which is their
+  data and would leave the machine with the log. **`no status` is not an HTTP
+  code**: it means the browser never got a response, which is the difference
+  between their API refusing and the call never leaving the page.
 
   **DISABLE** takes a site off the air and keeps the row; **DELETE** is final.
   **REISSUE KEY** mints a new secret on the same site — same id, same settings,

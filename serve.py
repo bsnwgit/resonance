@@ -7085,6 +7085,106 @@ def app_pending(cfg):
                   if RUNNING.get(k) is not None and RUNNING[k] != cfg[k])
 
 
+def net_wanted(doc=None, cfg=None):
+    """Every listener the SAVED configuration asks for.
+
+    The same derivation `main` uses to bind them, deliberately: the panel's
+    answer to "is this profile live" must not be a second opinion about what
+    happened at startup, because the two would disagree exactly when it
+    mattered. Returns one entry per socket, with `why` set where the profile
+    asks for nothing bindable at all — a port nobody typed, or a port with no
+    endpoint answering on it, which is half a job rather than a fault.
+    """
+    doc = doc if doc is not None else read_routes()
+    cfg = cfg if cfg is not None else read_app()
+    host0 = bind_host(cfg)
+    out = []
+    for n in display_settings()["networks"]:
+        vals = n.get("values") or {}
+        mine = [r for r in net_members(doc, n["id"])
+                if doc["routes"][r].get("enabled", True)]
+        try:
+            port = int(vals.get("port"))
+        except (TypeError, ValueError):
+            port = 0
+        host = net_host(vals, host0)
+        row = {"id": n["id"], "name": n["name"], "host": host, "port": port}
+        if not port:
+            out.append(dict(row, why="no port is set on it"))
+            continue
+        if not mine:
+            out.append(dict(row, why="no endpoint answers on it"))
+            continue
+        out.append(dict(row, why=""))
+        try:
+            redirect = int(vals.get("redirect") or 0)
+        except (TypeError, ValueError):
+            redirect = 0
+        if redirect:
+            out.append({"id": n["id"], "name": n["name"] + " · plain HTTP",
+                        "host": host, "port": redirect, "why": ""})
+    return out
+
+
+def net_state(doc=None, cfg=None):
+    """`net_wanted` with the one fact the panel cannot work out for itself:
+    whether this process is holding that socket right now.
+
+    A PROFILE SAVED WHILE THE SERVER IS UP IS NOT LISTENING, and nothing on
+    screen said so — the first symptom was a dead port two layers away, in
+    somebody else's proxy, with nothing to connect it back to a form that had
+    saved cleanly ten minutes earlier."""
+    return [dict(w, bound=bool(w["port"]) and not w["why"]
+                        and holding_it(w["host"], w["port"]))
+            for w in net_wanted(doc, cfg)]
+
+
+def restart_blockers(cfg=None):
+    """What would fail to bind if this process restarted now, as a list of
+    plain sentences.
+
+    THE POINT OF ASKING BEFORE RESTARTING. A restart into a configuration that
+    cannot bind does not fail loudly — it takes the admin panel down with
+    everything else, and the fix becomes editing JSON on the box by hand. The
+    bind test already exists for the same reason on the way in; this is the
+    same test asked about every socket at once, at the one moment where being
+    wrong is unrecoverable.
+
+    A socket THIS process is holding counts as free: it is about to be
+    released by the same restart that needs it."""
+    cfg = cfg if cfg is not None else read_app()
+    out = []
+    for w in net_wanted(cfg=cfg):
+        if w["why"] or not w["port"]:
+            continue
+        if not port_free(w["port"], w["host"]):
+            out.append("%s wants %s:%d, which something else is holding"
+                       % (w["name"], w["host"], w["port"]))
+    host0 = bind_host(cfg)
+    for key, what in (("admin_port", "the admin panel"),
+                      ("enrol_port", "enrolment")):
+        try:
+            p = int(cfg.get(key) or 0)
+        except (TypeError, ValueError):
+            continue
+        if not p:
+            continue
+        # OURS ALREADY, AND ABOUT TO BE RELEASED BY THE RESTART THAT NEEDS IT.
+        # `_BOUND` holds the network profiles' sockets and not these two, so
+        # without this the enrolment port reads as taken — by this process —
+        # and every restart is refused with a reason that is true and
+        # completely useless.
+        if RUNNING.get(key) == p:
+            continue
+        # The admin port is the one that must never be lost: get this wrong
+        # and the restart removes the only way to correct it.
+        addr = cfg.get("enrol_address") if key == "enrol_port" else None
+        if not port_free(p, str(addr or host0)):
+            out.append("%s wants port %d, which something else is holding"
+                       % (what, p))
+    return out
+
+
 # ------------------------------------------------------- a scheduled restart
 # Nothing supervises this process. `serve.sh` launches it with `setsid nohup`
 # and there is deliberately no systemd unit, because that is what lets the
@@ -7168,6 +7268,28 @@ def restart_due(now=None):
     return now - _last_use >= RESTART_QUIET
 
 
+def hand_over(why):
+    """Launch `serve.sh restart` detached and expect to be killed by it.
+
+    One implementation for the clock and for the button, because they are the
+    same act — and the detail that makes it work either way is `start_new_session`:
+    the death of this process is what the helper was launched to cause, rather
+    than something that takes the helper with it.
+
+    Returns an error string, or "" when the handover is away."""
+    sh = os.path.join(ROOT, "serve.sh")
+    if not os.access(sh, os.X_OK):
+        return "%s is not executable, so there is nothing to hand over to" % sh
+    log = open(RESTART_LOG, "a")
+    log.write("\n=== %s — %s ===\n"
+              % (time.strftime("%Y-%m-%d %H:%M:%S"), why))
+    log.flush()
+    print("%s — handing over to serve.sh" % why, flush=True)
+    subprocess.Popen([sh, "restart"], cwd=ROOT, stdout=log, stderr=log,
+                     stdin=subprocess.DEVNULL, start_new_session=True)
+    return ""
+
+
 def do_scheduled_restart():
     """Hand over to serve.sh and expect to be killed by it."""
     sh = os.path.join(ROOT, "serve.sh")
@@ -7177,14 +7299,10 @@ def do_scheduled_restart():
         _restart["fired"] = True          # do not spin on it every tick
         return
     try:
-        log = open(RESTART_LOG, "a")
-        log.write("\n=== %s — scheduled restart (%s) ===\n"
-                  % (time.strftime("%Y-%m-%d %H:%M:%S"), _restart["at"]))
-        log.flush()
         _restart["fired"] = True
-        print("scheduled restart — handing over to serve.sh", flush=True)
-        subprocess.Popen([sh, "restart"], cwd=ROOT, stdout=log, stderr=log,
-                         stdin=subprocess.DEVNULL, start_new_session=True)
+        err = hand_over("scheduled restart (%s)" % _restart["at"])
+        if err:
+            raise RuntimeError(err)
     except Exception as e:
         # Still marked as fired: a handover that could not be launched will not
         # launch on the next tick either, and a server retrying it every twenty
@@ -7693,8 +7811,23 @@ def validate_embed(obj):
     # and must not start collecting; an internal tool's has, and an audit line
     # naming nobody is not much of an audit line. It is a property of the
     # application rather than of this server, so it lives on the key.
+    # WHICH ASSISTANT THIS SITE TALKS TO, and it belongs on the key rather
+    # than in the address the host frames. A display is at a port and answers
+    # as that port's endpoints; an embed is a key inside somebody else's page,
+    # and every other thing about it — what it draws, what it may do, which
+    # origins may frame it, what it may ask their application for — is decided
+    # here. Deciding the assistant by which hostname their page happens to
+    # name meant moving a site between assistants was an edit to THEIR source,
+    # a deploy on their side, for a choice that was never theirs to make and
+    # is paid for on this one.
+    #
+    # Blank is the old behaviour and stays the default: whatever endpoint the
+    # address it was framed from carries.
+    endpoint = str(obj.get("endpoint") or "")[:32]
+    if endpoint and endpoint not in read_routes()["routes"]:
+        return None, "no endpoint with that id"
     return {"name": name, "preset": preset, "parts": parts, "cap": cap,
-            "origins": origins, "ttl_minutes": ttl,
+            "origins": origins, "ttl_minutes": ttl, "endpoint": endpoint,
             "needs_user": bool(obj.get("needs_user"))}, None
 
 
@@ -7944,6 +8077,7 @@ def new_embed_code(embed_id, rec, user=None):
             "rec": {"name": rec["name"], "parts": list(rec["parts"]),
                     "cap": dict(rec["cap"]), "origins": list(rec["origins"]),
                     "ttl_minutes": rec["ttl_minutes"],
+                    "endpoint": rec.get("endpoint") or "",
                     # WHAT IT MAY ASK THEIR APPLICATION FOR, snapshot with
                     # everything else and for the same reason: an admin
                     # unticking an operation in the seconds between a host
@@ -8013,6 +8147,7 @@ def new_embed_session(embed_id, rec, user=None):
             "id": embed_id, "name": rec["name"],
             "parts": list(rec["parts"]), "cap": dict(rec["cap"]),
             "origins": list(rec["origins"]),
+            "endpoint": rec.get("endpoint") or "",
             "ops": list(rec.get("ops") or []),
             "expires": now_ + rec["ttl_minutes"] * 60,
         }
@@ -8615,6 +8750,32 @@ def embed_tool_context(emb, obj):
                        "args": r.get("args") if isinstance(r.get("args"), dict)
                                else {},
                        "content": content})
+    # WHAT THE APPLICATION ANSWERED, and only the newest one: the page resends
+    # every earlier round on each lap, so logging the list would write the same
+    # line again on every pass.
+    #
+    # THE STATUS AND NEVER THE BODY. A body is that application's data — it has
+    # no business in this server's log — while a status is the one fact that
+    # says whose problem this is. `0` in particular is not an HTTP code: it
+    # means the browser never got a response at all, which is the difference
+    # between "their API said no" and "the call never left the page", and those
+    # two send you to different buildings.
+    if rounds:
+        last = rounds[-1]
+        try:
+            got = json.loads(last["content"])
+        except ValueError:
+            got = {}
+        st = got.get("status")
+        why = ""
+        if not st:
+            body = got.get("body")
+            why = " — " + str(body.get("error"))[:120] if isinstance(body, dict) \
+                  and body.get("error") else " — no response"
+        print("embed %s (%s) <- %s %s%s%s"
+              % ((emb or {}).get("id", "?"), (emb or {}).get("name", "?"),
+                 last["op"], st if st else "no status", why,
+                 " %dB" % len(last["content"]) if st else ""), flush=True)
     if len(rounds) > MAX_TOOL_ROUNDS:
         # The loop's end, and it is a real one: a model that has misread its
         # tools will call the same one until something stops it, and every lap
@@ -8796,7 +8957,7 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/routes/test",
                      "/embeds", "/embeds/update", "/embeds/delete",
                      "/embeds/enable", "/embeds/reissue",
-                     "/embeds/spec", "/embeds/ops",
+                     "/embeds/spec", "/embeds/ops", "/app/restart",
                      # …and note what is NOT here either: /display/hello, which
                      # is how a display gets its token and therefore has to be
                      # reachable from the listener a display is served on.
@@ -9902,6 +10063,13 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"app": cfg, "running": RUNNING,
                                     "cert": cert_info(),
                                     "pending": app_pending(cfg),
+                                    # AND WHICH LISTENERS ARE ACTUALLY UP. A
+                                    # profile saved while the server is
+                                    # running binds nothing until it restarts,
+                                    # and that used to be visible only as a
+                                    # dead port somewhere else entirely.
+                                    "nets": net_state(cfg=cfg),
+                                    "blockers": restart_blockers(cfg),
                                     "warning": posture_warning(cfg),
                                     "running_warning": posture_warning(RUNNING),
                                     "addresses": local_addresses(),
@@ -9944,7 +10112,7 @@ class Handler(SimpleHTTPRequestHandler):
                 row = {k: rec.get(k) for k in
                        ("name", "preset", "parts", "cap", "origins",
                         "ttl_minutes", "created", "created_by",
-                        "last_used", "enabled", "needs_user")}
+                        "last_used", "enabled", "needs_user", "endpoint")}
                 row.update(id=eid, sessions=live.get(eid, 0),
                            snippets=embed_snippets(rec, base),
                            # WHAT THIS SITE MAY ASK ITS OWN APPLICATION FOR.
@@ -10616,7 +10784,8 @@ class Handler(SimpleHTTPRequestHandler):
             # when any of that moves — and stay when it does not, because
             # renaming a site must not take somebody's page dark.
             moved = [k for k in ("parts", "cap", "origins", "ttl_minutes",
-                                 "needs_user") if old.get(k) != rec[k]]
+                                 "needs_user", "endpoint")
+                     if old.get(k) != rec[k]]
             embeds[eid] = rec
             write_embeds(embeds)
             dropped = 0
@@ -10637,6 +10806,39 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"ok": True, "id": eid, "changed": moved,
                                     "dropped": dropped,
                                     "snippets": embed_snippets(rec, embed_base())})
+
+        if parsed.path == "/app/restart":
+            # THE ONE ACTION THAT CAN REMOVE THE WAY TO UNDO IT. Everything
+            # else in this panel is recoverable from this panel; a restart into
+            # a configuration that cannot bind takes the panel down with the
+            # rest and leaves editing JSON on the box by hand.
+            #
+            # So it is refused rather than attempted, naming what is in the
+            # way. The same bind test already runs when a port is typed — this
+            # asks it about every socket at once, at the moment where being
+            # wrong is unrecoverable rather than merely wrong.
+            s = self._require("admin")
+            if not s:
+                return
+            blockers = restart_blockers()
+            if blockers:
+                print("restart refused for %s: %s"
+                      % (s["user"], "; ".join(blockers)), flush=True)
+                return self._json(409, {"error": "this configuration would not "
+                                                 "come back up",
+                                        "blockers": blockers})
+            err = hand_over("restart requested by %s" % s["user"])
+            if err:
+                return self._json(500, {"error": err})
+            # ANSWERED BEFORE IT DIES, and this is the whole reason the reply
+            # is sent from here rather than after the handover: `serve.sh stop`
+            # is already on its way to kill this process, and a browser waiting
+            # on a socket that closes mid-response reads it as a failed request
+            # rather than as the restart it asked for.
+            return self._json(200, {"ok": True,
+                                    "note": "handed over to serve.sh — this "
+                                            "page will lose the server for a "
+                                            "few seconds"})
 
         if parsed.path == "/embeds/spec":
             # READ THIS SITE'S APPLICATION, and it is a read of two documents:
@@ -12241,7 +12443,24 @@ class Handler(SimpleHTTPRequestHandler):
             # through an embed, and that is what the default route is for.
             doc = read_routes()
             want = str(obj.get("route") or "")[:32]
-            if self.pinned_net:
+            # THE KEY'S ENDPOINT WINS OVER THE PORT'S, for an embed only. See
+            # validate_embed: which assistant a site reaches is a grant, and
+            # the port it was framed from is an accident of the address its
+            # integrator was given.
+            keyed = str((emb or {}).get("endpoint") or "")
+            if keyed and not (keyed in doc["routes"]
+                              and doc["routes"][keyed].get("enabled", True)):
+                # Deleted or switched off since the key was written. Falling
+                # back to what the address carries is the lesser failure: a
+                # panel that goes silent because somebody renamed an assistant
+                # is worse than one that answers from another and says which.
+                print("embed %s names endpoint %s, which is gone or not "
+                      "answering — falling back to this port's default"
+                      % (emb["id"], keyed), flush=True)
+                keyed = ""
+            if keyed:
+                want = keyed
+            elif self.pinned_net:
                 # A port answers as its own endpoints and no others. Asking
                 # for one it does not carry is a caller at the wrong door —
                 # given this port's default rather than refused, which is the
@@ -12387,6 +12606,16 @@ class Handler(SimpleHTTPRequestHandler):
                 # person before it goes, and it must not have to work that out
                 # for itself.
                 tc = out["tool_call"]
+                # WHAT WAS ASKED FOR, as the far end will see it. The same line
+                # their own access log should carry, so "we never got it" and
+                # "we got it and refused" can be told apart from one side.
+                print("embed %s (%s) -> %s %s%s (lap %d)"
+                      % (emb["id"], emb["name"], pending["method"].upper(),
+                         pending["path"],
+                         ("?" + "&".join("%s=%s" % kv
+                                         for kv in pending["query"].items()))
+                         if pending["query"] else "",
+                         len(rounds) + 1), flush=True)
                 return self._json(200, dict(
                     about, tool_call=dict(pending, id=tc["id"],
                                           args=tc.get("args") or {}),

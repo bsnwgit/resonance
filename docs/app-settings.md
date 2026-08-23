@@ -249,7 +249,27 @@ interface is gone and the fix is editing JSON on the box by hand.
 
 **Nothing on this tab takes effect until the process restarts.** You cannot
 move the floor you are standing on. The panel tracks what is configured
-against what is actually bound and tells you which values are waiting.
+against what is actually bound and tells you which values are waiting — and
+that now includes **network profiles**, which bind at startup like everything
+else: one saved while the server is running is listening on nothing, and until
+this was reported the first symptom was a dead port in somebody else's proxy.
+Each profile carries its own state under PROFILES ▸ NETWORK — *listening*, or
+a red **NOT LISTENING · RESTART OWED**.
+
+**RESTART SERVER** does it from here, under that warning. It confirms first,
+because every display, panel and embedded site loses its session for the few
+seconds it takes.
+
+**It refuses rather than attempts where the saved configuration would not come
+back up**, naming what is in the way — a port something else has taken since
+you typed it. This is the one action in the panel that can remove the way to
+undo itself: a restart into a configuration that cannot bind takes the panel
+down with everything else and leaves editing JSON on the box by hand. A socket
+this process is already holding counts as free, because the restart is what
+releases it.
+
+By hand, and the only way where the process was not started by `serve.sh` —
+the button works through its pidfile:
 
 ```
 ./serve.sh stop
@@ -258,7 +278,8 @@ against what is actually bound and tells you which values are waiting.
 
 Note the address you will need afterwards. Changing the admin port and then
 restarting means the page you are on is no longer served — that is expected,
-and the new address is the one you just saved.
+and the new address is the one you just saved. If it does not come back,
+`restart.log` on the box survives the handover; `server.log` does not.
 
 ## Sessions
 

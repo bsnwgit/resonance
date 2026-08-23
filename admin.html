@@ -5495,6 +5495,18 @@ the key is in somebody's application.</div>
   </div>
 
   <div class="subgrp">
+    <h5>Assistant<span class="subsum"></span></h5>
+    <div class="subbody">
+  <label class="bklab" style="margin-top:2px">Which assistant this site talks to</label>
+  <select id="em_endpoint" class="ppick"></select>
+  <div class="note help">Leave it on <b>whatever the address carries</b> and
+this behaves as it always did. Name one and the site reaches that assistant
+whichever embed address its page frames — which is the difference between
+changing your mind here and asking somebody to edit their application.</div>
+    </div>
+  </div>
+
+  <div class="subgrp">
     <h5>Allowed Remote URLs<span class="subsum"></span></h5>
     <div class="subbody">
   <label class="bklab" style="margin-top:2px">One origin a line</label>
@@ -5704,6 +5716,15 @@ key inside an example sends you to a line that cannot answer you.</div>
     <div id="approw">
     <div class="note" id="appnote"></div>
     <div class="pending" id="apppending" hidden></div>
+    <!-- RESTARTING IS NOT A SAVE, so it is not on the save row. It applies
+         what has already been saved, and it is the one action here that can
+         take away the page you would undo it from — which is why the server
+         refuses it rather than attempts it when the stored configuration
+         would not bind. -->
+    <div class="seg actrow">
+      <button id="b_apprestart" class="act-danger">RESTART SERVER</button>
+      <span class="note" id="restartnote"></span>
+    </div>
     <div class="seg actrow">
       <button id="b_appsave" class="act-save">SAVE</button>
       <button id="b_apprevert" class="act-undo">REVERT</button>
@@ -6787,6 +6808,29 @@ function postureSync(){
   } else w.hidden = true;
 }
 
+/* WHICH LISTENERS ARE UP, from the server, because a browser cannot know. A
+   network profile saved while the server is running binds nothing until it
+   restarts, and until this existed the only symptom was a dead port somewhere
+   else entirely — in a proxy, in somebody else's log, hours later. */
+let NETLIVE = [];
+
+function paintNetLive(){
+  document.querySelectorAll('#dp_networks .badge[data-net]').forEach(el=>{
+    const id = el.dataset.net;
+    const rows = NETLIVE.filter(x=> x.id === id);
+    if (!id || !rows.length){ el.hidden = true; el.textContent = ''; return; }
+    el.hidden = false;
+    /* A profile can want two sockets — its own and a plain-HTTP redirect —
+       and one of them being down is the profile being down. */
+    const dead = rows.filter(r=> !r.bound && !r.why);
+    const idle = rows.find(r=> r.why);
+    el.classList.toggle('warn', !!dead.length);
+    el.textContent = dead.length ? 'NOT LISTENING \u00b7 RESTART OWED'
+                   : idle ? idle.why
+                   : 'listening';
+  });
+}
+
 function showPending(j, into){
   const box = $(into || 'apppending');
   const names = {http_port:'display · plain HTTP', https_port:'display · HTTPS',
@@ -6799,13 +6843,21 @@ function showPending(j, into){
     const el = $('now_' + k), p = run[k + '_port'];
     if (el) el.textContent = p ? 'running on ' + p : 'not bound';
   });
-  if (!j.pending || !j.pending.length){ box.hidden = true; return; }
-  const lines = j.pending.map(k=>{
+  /* AND THE PROFILES THAT ARE NOT LISTENING. Same warning, because it is the
+     same fact: something was saved and is not in effect. It was missing here
+     entirely, and a network profile is the case where nothing else on screen
+     says so — a port setting at least sits beside the number it changed. */
+  const unbound = (j.nets || []).filter(n=> !n.bound && !n.why);
+  if ((!j.pending || !j.pending.length) && !unbound.length){
+    box.hidden = true; return;
+  }
+  const lines = (j.pending || []).map(k=>{
     const was = run[k], now = (j.app || {})[k];
     return '   ' + (names[k] || k) + ': ' + was + ' → ' + now;
-  });
+  }).concat(unbound.map(n=>
+    '   ' + n.name + ': nothing is listening on ' + n.host + ':' + n.port));
   let msg = 'SAVED, BUT NOT YET IN EFFECT\n' + lines.join('\n') +
-            '\n\nRestart the server to apply:\n' +
+            '\n\nRestart the server to apply — RESTART SERVER below, or:\n' +
             '   ./serve.sh stop\n   ./serve.sh start';
   if (j.pending.includes('admin_port'))
     msg += '\n\nThis page moves to port ' + j.app.admin_port +
@@ -6818,6 +6870,8 @@ async function loadApp(){
   if (!ME || ME.role !== 'admin') return;
   try{
     const j = await api('/app');
+    NETLIVE = j.nets || [];
+    paintNetLive();
     Object.keys(APP_FIELDS).forEach(id=>{
       const el = $(id); if (el) el.value = j.app[APP_FIELDS[id]];
     });
@@ -6961,6 +7015,44 @@ $('b_enrolsave').addEventListener('click', ()=>{
   };
   if (port && port.value !== '') body.enrol_port = parseInt(port.value, 10);
   saveAppBit(body, 'enrolsavenote', 'enrolpending');
+});
+
+/* THE RESTART. Confirmed, because it drops every session and every embed on
+   the machine for a few seconds — and refused by the SERVER, not by this
+   button, when the stored configuration would not come back up. A check in a
+   browser is one an API call walks past, and this is the one action where
+   being wrong takes away the page you would fix it from. */
+$('b_apprestart').addEventListener('click', async ()=>{
+  const note = $('restartnote');
+  if (!confirm('Restart the server now?\n\nEvery display, panel and embedded '
+             + 'site loses its session for a few seconds while it comes back. '
+             + 'This page will go quiet until it does.')) return;
+  note.className = 'note'; note.textContent = 'checking the configuration\u2026';
+  try{
+    const j = await api('/app/restart', {method:'POST', body:'{}'});
+    note.className = 'note';
+    note.textContent = j.note || 'restarting\u2026';
+    /* Nothing to poll: the socket this page is talking to is the one going
+       away. Ask again in a few seconds and let the ordinary load path report
+       what came back — including a listener that did not. */
+    setTimeout(()=>{ loadApp().then(()=>{
+      const n2 = $('restartnote');
+      if (n2){ n2.className = 'note'; n2.textContent = 'back up.'; }
+    }).catch(()=>{
+      const n2 = $('restartnote');
+      if (n2){ n2.className = 'note bad';
+               n2.textContent = 'it has not come back yet \u2014 reload this '
+                              + 'page, and see restart.log on the box if it '
+                              + 'stays down.'; }
+    }); }, 6000);
+  }catch(err){
+    /* THE REFUSAL, and it is the useful case. The server names what is in the
+       way rather than restarting into it. */
+    note.className = 'note bad';
+    const blockers = (err.payload && err.payload.blockers) || [];
+    note.textContent = err.message
+      + (blockers.length ? ' \u2014 ' + blockers.join('; ') : '');
+  }
 });
 
 $('b_appsave').addEventListener('click', async ()=>{
@@ -10691,6 +10783,13 @@ function paintNetworks(list){
        saying so is the whole of what somebody needs to know about it. */
     const used = document.createElement('span'); used.className = 'badge';
     top.appendChild(used);
+    /* …and whether it is actually up. Filled from /app rather than from
+       anything this page knows: a saved profile and a bound socket are
+       different facts, and the gap between them is exactly what goes
+       unnoticed. Empty on a profile that has never been saved. */
+    const live = document.createElement('span');
+    live.className = 'badge'; live.dataset.net = n.id || ''; live.hidden = true;
+    top.appendChild(live);
     const retitle = ()=>{
       nmt.textContent = (n.name || '').trim() || 'unnamed profile';
       sum.textContent = (v.address || 'any') + ' · '
@@ -10706,6 +10805,7 @@ function paintNetworks(list){
       used.textContent = on.length ? on.join(', ') : 'no endpoint';
     };
     retitle();
+    paintNetLive();
     top.onclick = (e)=>{
       if (e.target.closest('input, button, select, textarea')) return;
       const opening = row.classList.contains('shut');
@@ -13320,6 +13420,23 @@ somebody's application is already using.</div>
   </div>
 
   <div class="subgrp">
+    <h5>Assistant<span class="subsum"></span></h5>
+    <div class="subbody">
+  <label class="bklab" style="margin-top:2px">Which assistant this site talks to</label>
+  <select data-f="endpoint" class="ppick"></select>
+  <div class="note help">Set here rather than decided by the address their page
+frames. Left on <b>whatever the address carries</b> it behaves as it always
+did — the endpoint on the port their integrator was given. Name one and this
+site reaches that assistant from any embed address, so moving it between
+assistants costs a save here rather than an edit and a deploy on their side.
+Changing it drops this site's live sessions, so the next question goes to the
+new one. It is still subject to that endpoint's own permissions: where one is
+set to ONLY THESE, this key has to be ticked onto it under PROFILES ▸
+AUTHORIZE.</div>
+    </div>
+  </div>
+
+  <div class="subgrp">
     <h5>Allowed Remote URLs<span class="subsum"></span></h5>
     <div class="subbody">
   <label class="bklab" style="margin-top:2px">One origin a line</label>
@@ -13380,6 +13497,34 @@ of the two, and comfortably above what a person actually does — a few a minute
    Returns what the action bar needs — the row's buttons are built with the
    others down there, because REVERT and SAVE belong beside DELETE and not in
    a second action row of their own. */
+/* THE ASSISTANT LIST, built at the moment a row is opened rather than once at
+   load: endpoints are added, renamed and switched off while this page is open,
+   and a list built at load goes stale exactly on the row somebody opened in
+   order to fix it. */
+function fillEndpoints(sel, chosen){
+  if (!sel) return;
+  sel.innerHTML = '';
+  const any = document.createElement('option');
+  any.value = ''; any.textContent = 'whatever the address carries';
+  sel.appendChild(any);
+  (RT.routes || []).forEach(r=>{
+    const o = document.createElement('option');
+    o.value = r.id;
+    o.textContent = r.name + (r.enabled === false ? ' \u2014 not answering' : '');
+    sel.appendChild(o);
+  });
+  /* AN ENDPOINT THIS KEY NAMES THAT NO LONGER EXISTS still has to appear, or
+     the select falls silently to the first option and the next save rewrites
+     the grant to something nobody chose. */
+  if (chosen && !(RT.routes || []).some(r=> r.id === chosen)){
+    const gone = document.createElement('option');
+    gone.value = chosen;
+    gone.textContent = 'an endpoint that no longer exists';
+    sel.appendChild(gone);
+  }
+  sel.value = chosen || '';
+}
+
 function siteEditor(wrap, e){
   const F = n => wrap.querySelector('[data-f="' + n + '"]');
   const parts = ()=> [...F('parts').querySelectorAll('input:checked')]
@@ -13452,6 +13597,7 @@ function siteEditor(wrap, e){
     F('rate').value = (e.cap && e.cap.rate_per_min) || '';
     F('vrate').value = (e.cap && e.cap.rate_per_visitor) || '';
     F('needsuser').checked = !!e.needs_user;
+    fillEndpoints(F('endpoint'), e.endpoint || '');
     F('parts').querySelectorAll('input').forEach(i=>
       i.checked = (e.parts || []).indexOf(i.dataset.p) >= 0);
     F('cap').querySelectorAll('input').forEach(i=>
@@ -14084,6 +14230,7 @@ function emDraft(on){
     const k = $('em_key'); if (k){ k.textContent = ''; k.classList.remove('on'); }
     const kw = $('em_keywrap'); if (kw) kw.hidden = true;
     emShowSnippets(null);
+    fillEndpoints($('em_endpoint'), '');
     const box = $('emblist');
     if (box) box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
     const nm = $('em_name');
@@ -14260,6 +14407,7 @@ $('b_addembed').addEventListener('click', async ()=>{
       parts: emParts(),
       cap: emCap(),
       origins: $('em_origins').value.split('\n').map(s=> s.trim()).filter(Boolean),
+      endpoint: ($('em_endpoint') || {}).value || '',
       ttl_minutes: Number($('em_ttl').value) || 60,
       needs_user: $('em_needsuser').checked,
     })});

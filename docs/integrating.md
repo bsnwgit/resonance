@@ -66,6 +66,11 @@ SPA writes its own mount.
 
 ---
 
+**Which assistant answers is not yours to set, and not in your code.** It is a
+property of the key, chosen by whoever issued it, and it can be changed without
+anything on your side moving. Do not hardcode an assumption about which model
+or which endpoint is behind the address you were given.
+
 ## What happens per visitor, either way
 
 1. Someone opens a page in your application.
@@ -657,6 +662,20 @@ before your handler is reached.
 
 - **A 400 naming a parameter.** Almost always a missing `enum`: the model
   guessed a value your API does not use.
+
+  **Make your 400s name the valid values.** The thing reading that message is
+  the model, and the model is what retries. Given a bare refusal it re-guesses
+  and sends again — a whole extra round trip through your page, often landing
+  on the same wrong operation. Given *"bucket_minutes must be one of 1, 5, 15,
+  60"* it corrects itself on the next call. Your error strings are part of the
+  interface now.
+
+- **The right question answered by the wrong operation.** A model chooses
+  between your operations on their `description` and nothing else. If two of
+  them could plausibly answer "which host is noisiest" — one that ranks hosts
+  and one that plots volume over time — say so in the sentence, in those words.
+  Observed in the field: the timeline operation chosen twice for a question the
+  summary operation answers directly.
 - **The panel saying it could not read a result in full.** A result over 20KB
   is truncated and the model is told it was. Bound your list operations.
 - **Nothing happening at all.** The operation is in your spec and your grant

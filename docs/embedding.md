@@ -77,7 +77,28 @@ ticked.
 An admin creates a key under **ENROLLMENTS ▸ EMBED** — beside the two other
 things that enrol, a person and a screen. What has been issued is listed under
 **ACCESS ▸ SITES**, the register beside the nodes and the assistants: that tab
-is the door, this one is the room. A key fixes four things.
+is the door, this one is the room. A key fixes five things.
+
+### Which assistant it talks to
+
+Blank by default, which is the behaviour this had before the field existed:
+whatever endpoint answers on the address their page frames.
+
+**Name one and the address stops deciding.** That matters because the address
+is in *their* source — in the script tag and in the constant their server posts
+to — so moving a site from one assistant to another used to be an edit and a
+deploy on their side, for a choice that was never theirs and is paid for on
+yours. Named here, it is a dropdown and a save.
+
+Changing it drops the site's live sessions, so the next question goes to the
+new one rather than at the end of somebody's hour. The endpoint's own
+permissions still apply: where one is set to ONLY THESE, this key has to be
+ticked onto it under PROFILES ▸ AUTHORIZE, or every question comes back *this
+embed may not use that endpoint* with everything else looking right.
+
+An endpoint that is later deleted or switched off falls back to whatever the
+address carries, and says so in the log. A panel that goes silent because
+somebody renamed an assistant is the worse failure.
 
 ### Capability — what the application may do
 

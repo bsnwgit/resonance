@@ -277,6 +277,44 @@ directions.
 
 ---
 
+## Following a call in the log
+
+Every call is recorded on both legs, and the pair is what tells you whose
+problem a failure is. **The request, and never the response.** A response body
+is that application's data and has no business in this server's log; the status
+is the one fact that decides where to look next.
+
+```
+embed efe2c22ff5da2 (pktLog) -> GET /api/logs/search?limit=1 (lap 1)
+embed efe2c22ff5da2 (pktLog) <- searchSyslog 200 648B
+```
+
+The `->` line is the request as the host application's own access log will
+have recorded it, so the two can be laid side by side. The `<-` line is what
+came back:
+
+| what it says | what it means |
+|---|---|
+| a status and a size | their API answered. A `4xx` or `5xx` is theirs to explain |
+| `no status — the application did not answer` | twenty seconds passed with no reply from the page |
+| `no status — this page does not perform that operation` | `embed.js` refused it: the operation was not in the session's grant, or the path did not match its template |
+| nothing at all, and an `SSLEOFError` beside it | **something in front of this server closed the connection.** See below |
+
+**A reverse proxy in front of this server needs its read timeout raised.**
+Every lap is its own HTTP request, and each one waits on a whole model pass —
+tens of seconds on a small local model. nginx's default `proxy_read_timeout`
+is 60 seconds, which is not a setting anybody remembers making. When it fires,
+this server finishes the lap and then fails writing the response, the browser
+sees a dead connection, and the panel says it could not reach the assistant.
+The failure therefore reads as the *assistant* being broken, which is the one
+place it is not.
+
+**A question that needs several laps is where this bites**, and a model that
+chooses the wrong operation is what causes several laps: a rejected call is
+answered to the model and it tries again, so a poor choice costs a whole extra
+round trip. The two failures compound, and the log above is what separates
+them.
+
 ## Still open
 
 Three, and none of them blocks using it.

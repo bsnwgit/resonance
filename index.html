@@ -226,6 +226,27 @@
          vertical-align:-2px;margin-left:2px;animation:blink 1s steps(1) infinite}
   @keyframes blink{50%{opacity:0}}
 
+  /* WAITING FOR AN ANSWER. A question that reaches the application it is
+     embedded in is two model passes and a round trip through somebody's page,
+     which is tens of seconds — and a surface that shows nothing for that long
+     is indistinguishable from one that has stopped. Brightness rather than
+     movement: this sits on other people's pages, and a bouncing widget is a
+     widget they turn off. */
+  .think{display:inline-flex;gap:5px;align-items:center;height:13px}
+  .think i{
+    width:5px;height:5px;border-radius:50%;background:var(--text);
+    opacity:.18;animation:thinkpulse 1.25s ease-in-out infinite;
+  }
+  .think i:nth-child(2){animation-delay:.18s}
+  .think i:nth-child(3){animation-delay:.36s}
+  @keyframes thinkpulse{0%,70%,100%{opacity:.18}35%{opacity:1}}
+  /* Still says "working", still says nothing is moving on its own. */
+  @media (prefers-reduced-motion:reduce){
+    .think i{animation:none;opacity:.5}
+    .think i:nth-child(2){opacity:.75}
+    .think i:nth-child(3){opacity:1}
+  }
+
   /* layout: hero = viz on top, transcript below.  bleed = transcript over viz. */
   body[data-layout="hero"]  #screen{flex:0 0 52%}
   body[data-layout="hero"]  #log{flex:1 1 auto;border-top:1px solid rgba(var(--glass),.10)}
@@ -4633,6 +4654,33 @@ function newReply(rid){
   return {body, caret, rid};
 }
 
+/* THE WAIT, MADE VISIBLE. One line in the transcript, replaced by the answer
+   when it arrives — not a status note, because this belongs to the turn
+   somebody is waiting on rather than to the machinery.
+
+   It matters most where the answer is slowest: a question that has to reach
+   the host application is two model passes with a round trip through their
+   page in between, and on a small local model that is most of a minute. */
+const Thinking = {
+  el: null,
+  start(rid){
+    this.stop();
+    const body = addMsg('ai', '', rid);
+    const dots = document.createElement('span');
+    dots.className = 'think';
+    dots.innerHTML = '<i></i><i></i><i></i>';
+    /* An assistive reader gets a word rather than three decorative dots. */
+    dots.setAttribute('role', 'status');
+    dots.setAttribute('aria-label', 'thinking');
+    body.appendChild(dots);
+    this.el = body.parentElement;
+  },
+  stop(){
+    if (this.el && this.el.parentElement) this.el.parentElement.removeChild(this.el);
+    this.el = null;
+  },
+};
+
 /* One entry point; the source decides who drives the geometry.
    Muting only silences the VOICE — the reply still streams and the geometry
    still reacts, so the surface never looks dead just because audio is off. */
@@ -4875,12 +4923,16 @@ function submit(text){
   /* Held from here until the answer is in, so the awake window cannot end
      during the wait it is meant to be waiting through. */
   Wake.asked();
+  Thinking.start(rid);
   askBackend(text, false, rid)
     /* Released in a finally, not at the top of the then: this counter is the
        only thing keeping the display awake, and a path that skipped it — a
        refusal, a throw inside respond — would be a screen that never sleeps
        again. Exactly once, whatever happened. */
-    .finally(()=> Wake.answered())
+    /* Cleared in the same finally as the awake counter, and for the same
+       reason: a refusal, an error or a throw must not leave three dots
+       pulsing at somebody for ever. Exactly once, whatever happened. */
+    .finally(()=>{ Wake.answered(); Thinking.stop(); })
     .then(out => {
     /* A refusal is silent, so there is nothing to say and nothing to
        remember. Putting an empty turn in the history would leave the next

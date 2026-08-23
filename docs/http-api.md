@@ -79,6 +79,7 @@ Admin listener only — everything below returns 404 on the public ports:
 | `POST` | `/embeds` | create one; the key is returned once — `admin` role |
 | `POST` | `/embeds/update` | rewrite one in place: same id, same secret, same grants. Live sessions dropped if the envelope moved — `admin` role |
 | `POST` | `/embeds/reissue` | a new secret on the same key: same id, same settings, same grants, live sessions dropped. Returned once — `admin` role |
+| `POST` | `/app/restart` | hand over to `serve.sh restart`. **Refused with `409` and the reason where the saved configuration would not bind**, rather than restarting into a server that cannot come back |
 | `POST` | `/embeds/spec` | read a site's OpenAPI document and the grant file beside it, and cache the operations. `url` or a pasted `doc`; both must resolve to an origin the site is registered under |
 | `POST` | `/embeds/ops` | which of those operations the panel may call. Bounded by the application's own grant file; anything outside it is dropped rather than refused. Withdrawing one drops the site's live sessions |
 | `POST` | `/embeds/enable` | enable or disable one — `admin` role |

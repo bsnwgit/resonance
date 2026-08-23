@@ -125,6 +125,14 @@ host page is untrusted by definition; what it cannot do is reach an operation
 the site was not granted, which is checked on the way out and again on the way
 back in.
 
+**What the log keeps of all this.** The request, and never the response. A
+call is recorded as its method, path and query — the same line the host's own
+access log carries, so the two can be compared — and the answer is recorded as
+its status code and byte count alone. The body never reaches `server.log`, and
+`server.log` travels: it is the stream a syslog sink carries off the machine.
+An application's data must not leave by that route because somebody was
+debugging a 400.
+
 **A write is confirmed by the frame, not by the host.** A confirmation drawn
 by the party that wants the action is not a confirmation. It names the real
 values, per action, with no session-wide switch to turn it off.

@@ -608,6 +608,20 @@ does not read as the assistant forgetting the last ten minutes.
 **The embed is memoryless**, and that is the sequencing rather than an
 omission — see the roadmap.
 
+**Which endpoint an embed reaches is the key's, not the port's.** A display is
+at a port and answers as that port's endpoints and no others, which is right
+for a screen on a wall. An embed is not at a port: it is a key inside somebody
+else's page, and everything else about it — what it draws, what it may do,
+which origins may frame it, what it may ask their application for — is decided
+on that key. Leaving the assistant to be decided by which hostname their page
+happened to name meant moving a site between assistants was an edit and a
+deploy on *their* side, for a choice that was never theirs to make and is paid
+for on this one. So the key names it, blank means the port's, and a named
+endpoint that is later deleted or switched off falls back to the port's with a
+line in the log — a panel going silent because somebody renamed an assistant
+is the worse failure. The authorize profile is unchanged and is still the
+gate: the port stopped being a boundary because it never was one.
+
 ### Reaching the host application's data
 
 An embed can answer about the application it is sitting in rather than only
@@ -659,6 +673,18 @@ and never by the host page: a confirmation rendered by the party that wants
 the action is not a confirmation. It names the real values, because a voice
 interface has no address bar to check. There is no session-wide "allow
 writes" — that is the same hole with one more click in front of it.
+
+**Both legs of every call are logged, and only the request survives.** Method,
+path and query going out — the same line the host's own access log will carry,
+so the two can be laid side by side — and status and byte count coming back. A
+`no status` is not an HTTP code: it means the browser never received a
+response, which separates "their API refused it" from "the call never left the
+page". The body is never written: it is their data, and `server.log` travels.
+
+**A proxy in front of this server needs its read timeout raised.** Every lap is
+its own request waiting on a whole model pass, and 60 seconds — nginx's default
+— is less than two laps on a small local model. It presents as the assistant
+being unreachable, which is the one thing it is not.
 
 Only the OpenAI dialect and Anthropic carry tool definitions. Home Assistant
 does its own on its own side and is untouched; `demo` cannot. Written up in

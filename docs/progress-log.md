@@ -5,6 +5,81 @@ rediscovered. For what is planned rather than done, see [Roadmap](roadmap.md).
 
 Newest first.
 
+## 2026-08-23 — a listener you can see, a restart you can press, an assistant you can change
+
+Three things, all from the same afternoon of running this against a real
+deployment, and all the same shape: a decision that lived somewhere you could
+not see or could not reach.
+
+- **A network profile now says whether it is actually listening.** They bind at
+  startup, so one saved while the server is running is a port nothing answers
+  on — and nothing said so. The first symptom was a 502 in somebody else's
+  proxy, an hour of looking at nginx, and a correct diagnosis of "the backend
+  is down" that could not say why. `/app` now reports every listener the saved
+  configuration asks for and whether the process is holding it, derived by the
+  same code that binds them so the two cannot drift, and each row carries
+  *listening* or **NOT LISTENING · RESTART OWED**.
+- **RESTART SERVER, and it refuses rather than attempts.** The panel used to
+  print two shell commands. It now hands over to `serve.sh restart` — the same
+  mechanism the scheduled restart uses — but only after testing that every
+  socket the saved configuration wants can actually be bound. This is the one
+  action here that can remove the way to undo it: a restart into an unbindable
+  configuration takes the panel down with everything else. A socket this
+  process holds counts as free, because the restart is what releases it — which
+  needed saying in code, since the enrolment port first read as "taken", by
+  this very process, and would have refused every restart with a reason that
+  was true and useless.
+- **An embed key names its assistant.** Which endpoint an embed reached was
+  decided by the port its frame was served from, so moving a site from one
+  assistant to another was an edit to the host application's source and a
+  deploy on their side — for a choice that was never theirs and is paid for
+  here. It is a field on the key now, blank meaning the port's endpoint as
+  before. The authorize profile is untouched and still the gate; the port
+  stopped being a boundary because it never was one. A named endpoint later
+  deleted or switched off falls back to the port's, with a line in the log,
+  because a panel going quiet over a rename is the worse failure.
+
+## 2026-08-23 — what the first real integration taught, in one evening
+
+The feature above went live against a real application the same day, and
+everything that went wrong afterwards was findable only by reading two servers'
+logs side by side. Both additions come from that.
+
+- **Every call is logged on both legs.** Method, path and query going out —
+  deliberately the same line the host's own access log carries, so "we never
+  received it" and "we received it and refused" can be told apart in a minute
+  rather than an hour. Status and byte count coming back, and **never the
+  body**: that is their data, and `server.log` is a stream that travels off the
+  machine. `no status` is not an HTTP code — it means the browser never got a
+  response at all, which is the one distinction that decides whose problem it
+  is.
+- **The wait is drawn.** Three dots where the answer will be, brightening in
+  sequence, from the question until the reply. A turn that reaches the host
+  application is two model passes and a round trip through their page; on a
+  small local model that is most of a minute, and a surface showing nothing for
+  that long is indistinguishable from one that has stopped. Brightness rather
+  than movement — this sits on other people's pages.
+
+What the evening actually cost, recorded because none of it was guessable:
+
+- **A reverse proxy's read timeout applies per lap, not per question.** nginx
+  defaults to 60 seconds and nobody remembers setting it. The server finished
+  the lap and died writing the response — `SSLEOFError` — and the panel said it
+  could not reach the assistant, which sent the search to the one place the
+  fault was not. Measured on the deployment: 30s a lap warm, 48s cold.
+- **A small model answers a rejected call by re-sending the same one.** Given a
+  400 it re-guessed a parameter rather than reconsidering the operation, which
+  cost an extra lap, which is what ran into the timeout. Two faults that only
+  fail together.
+- **So an API's 400 should name the valid values**, because the reader is a
+  model and the model is what retries — and an operation's `description` is the
+  entire basis on which it is chosen. Both now said plainly in
+  [Integrating it](integrating.md).
+- **Tool calling is where model size stops being a preference**, and it pulls
+  against a voice interface's need for latency on hardware without a GPU. There
+  is no local resolution to that; it is a hosted endpoint for the sites that
+  need one, or different hardware.
+
 ## 2026-08-23 — the panel answers about the application it is sitting in
 
 An embed put this interface on somebody else's page and left it able to talk
