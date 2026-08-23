@@ -494,7 +494,7 @@ Measured round-trips on the reference box, cold then warm:
 
 ## Embedding it in another application
 
-An admin creates an **embed key** under ENROLLMENTS ▸ EMBED, beside the person and the screen — the three things that arrive here, each admitted and revoked the same way. The host application's
+An admin creates an **embed key** under ENROLLMENTS ▸ EMBED, beside the person and the screen — the three things that arrive here, each admitted and revoked the same way. What exists is listed under ACCESS ▸ SITES, the third register beside the nodes and the assistants, on the same division the other two already draw: ENROLLMENTS is where something arrives, ACCESS is where it lives once it has. The host application's
 *server* exchanges it for a one-use code; the host's page frames the result
 and trades the code for a session. Server to server, so the layout it asked
 for and its right to ask are settled before a browser is involved.

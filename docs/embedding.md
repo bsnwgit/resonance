@@ -31,9 +31,9 @@ off the VPN, or anything on the public internet still gets the blank frame.
 *By a name that is on it* means exactly that — an IP address is not on a
 certificate unless somebody put it there, and a wildcard covers one label and
 never its own parent, so `ai.example.internal` can work while
-`example.internal` and `10.0.0.5` both fail. Set **Address integrators reach
-this on** to a name you have checked in a browser, not to whatever you happen
-to type into your own address bar.
+`example.internal` and `10.0.0.5` both fail. Set **SETTINGS ▸ ENROLL ▸ Enroll
+Embed Server** to a name you have checked in a browser, not to whatever you
+happen to type into your own address bar.
 
 **Their pages on HTTPS.** A microphone will not open otherwise. The loader
 sets `allow="microphone"` for them, but that is only one of the three things a
@@ -59,7 +59,10 @@ ticked.
 
 ## What an embed key is
 
-An admin creates a key under **ENROLLMENTS ▸ EMBED** — beside the two other things that enrol, a person and a screen. It fixes four things.
+An admin creates a key under **ENROLLMENTS ▸ EMBED** — beside the two other
+things that enrol, a person and a screen. What has been issued is listed under
+**ACCESS ▸ SITES**, the register beside the nodes and the assistants: that tab
+is the door, this one is the room. A key fixes four things.
 
 ### Capability — what the application may do
 
@@ -87,7 +90,7 @@ both is a pair of the presets: `kiosk` and `signage` draw exactly the same
 thing — the figure alone — and have opposite permissions. One listens
 hands-free. The other must never open a microphone.
 
-### Who is asking
+### Speakers Name
 
 Off by default. Ticked, the host's server must name whoever is signed in to
 their application when it asks for a code, and every question is recorded
@@ -149,20 +152,38 @@ weeks later.
 - one visitor allowed more a minute than the whole key is.
 
 One key is one surface. A lobby kiosk and a support widget are two keys,
-separately revocable and separately rate-limited, and the admin list says
-exactly what each one draws.
+separately revocable and separately rate-limited, and the register under
+**ACCESS ▸ SITES** says exactly what each one draws. That is where keys are
+disabled and deleted; this tab only makes them.
 
 ---
 
 ## What you hand over
 
-Set **Address integrators reach this on** at the top of that tab first —
-the name a stranger's browser reaches this server by, which is not necessarily
-the name your own screens use. Then create the key.
+Set **SETTINGS ▸ ENROLL ▸ Enroll Embed Server** first — the address a
+stranger's browser reaches this server by, which is not necessarily the name
+your own screens use. It is three fields: the scheme, the host, and a port that
+is **blank behind a reverse proxy**, which is the common case. This server adds
+nothing of its own; it used to append the display port, which is right for a
+browser reaching the process directly and wrong the moment anything sits in
+front of it. Then create the key.
 
 The panel shows the key **once**, with working code written against that
-address and shaped by that key. Copy both parts and send them over. Nothing on
-this server can show the key again.
+address and shaped by that key, each block with its own COPY.
+
+**The code can be shown again; the key cannot.** Every row under ACCESS ▸ SITES
+carries the same three snippets, rebuilt — they never contained the key, which
+is read from `RESONANCE_KEY` in the host's environment. The secret is stored
+hashed and this server cannot produce it a second time. If it has been lost,
+**REISSUE KEY** on that row mints a new one on the *same* site: same id, same
+capability, same origins, and every grant made to it intact. Reissuing drops
+the sessions the old secret minted, because the reason to reissue is usually
+that it is somewhere it should not be.
+
+Do not answer a lost key by deleting the site and making another. A new key is
+a new id, and every authorize profile that named the old one silently stops
+naming anything — recovering a credential would withdraw the site's access to
+every assistant.
 
 ### 1 — their server: one endpoint, behind their login
 

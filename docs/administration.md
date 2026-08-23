@@ -84,8 +84,11 @@ tell the rows apart at a glance; it is not saying anything you have to decode.
 - **ENROLL** — the door itself, as against who is already through it: which
   **port and interface** invitations are accepted on and what **name** the link
   carries, the **request form** somebody fills in from a display, and how long
-  an **enrolment code** is worth anything for. The queues those settings feed
-  are under ENROLLMENTS.
+  an **enrolment code** is worth anything for, and **Enroll Embed Server** —
+  the scheme, host and optional port an outside application reaches this server
+  by, which is the embed's equivalent of the two above and is nothing to do
+  with the address your own screens use. The queues those settings feed are
+  under ENROLLMENTS.
 
 **ENROLLMENTS** — how something comes to be here: SETTINGS on its left decides
 what the server is, IDENTITY on its right is who is here already, and this is
@@ -95,6 +98,11 @@ the one in the middle because it is the one somebody is waiting on.
   everybody who has asked to be here and not yet been decided about.
 - **DEVICE** — where a screen is set up: named, given a code, and watched until
   it takes it.
+- **EMBED** — the third thing that enrols, and the one that is neither a person
+  nor a screen: an *application*, admitted by a key its server holds rather than
+  by a link somebody opens or a code somebody types. This is where one is made
+  and where the code you hand its developer is shown, once. What has been issued
+  is listed under ACCESS ▸ SITES.
 
 **IDENTITY** — who this server knows about. Two populations that are not one
 list: one signs in with a password to configure the server, the other picks up
@@ -169,13 +177,34 @@ onto every endpoint that shares it.
 what you administer about it. It was called CONNECTIONS until the word was
 needed for the pair above:
 
-- **AI** — the endpoints, each naming a connection, a layout and a permission.
+- **AI** — titled **Assistants**: the endpoints, each naming a connection, a
+  layout and a permission.
 - **NODES** — everything currently connected, in one register. Each row is
   badged for the door it came through — **ASKED** for a device whose user
   filled in the request form, **INVITED** for one you issued a code to — which
   is a fact about the row and not two lists to have filed it under. What those
   devices are *reporting* is not here — that is STATUS.
-- **EMBEDS** — keys that let another application frame this interface.
+- **SITES** — every application holding a key to frame this interface. The
+  register, not the form: a key is issued under ENROLLMENTS ▸ EMBED and appears
+  here the moment it exists, the same move a screen makes from ▸ DEVICE to
+  NODES. A row opens read-only, because what a key may do and what it draws are
+  fixed at creation — somebody's page is already framing it, and widening it
+  from here would change what that page can do without anybody at that end
+  knowing. **DISABLE** takes a site off the air and keeps the row; **DELETE**
+  is final. **REISSUE KEY** mints a new secret on the same site — same id,
+  same grants — for a key that has been lost; it is not the same as deleting
+  and remaking, which would give the site a new id and silently drop every
+  grant made to the old one.
+
+  Open a row for the rest. **Reaches** is the line to read first, and the one
+  you cannot work out anywhere else: which assistants that key may actually
+  talk to. What a key may *do* is fixed on the key; what it may talk *to* is
+  decided on the far side, in an authorize profile under PERMISSIONS ▸
+  AUTHORIZE — so a site that draws everything and reaches nothing looks
+  perfectly configured while answering 403 to every question it is asked. An
+  endpoint with no permission, or half a one, is refused to everybody and is
+  not listed. **Made** is the audit line: when it was issued, by which admin,
+  and the preset it started from.
 
 **SEARCH** shares that bottom row, on the right third of it. Type to search
 across every topic in every tab at once — the fastest way to find a control
