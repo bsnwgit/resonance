@@ -10147,8 +10147,12 @@ const PROVIDERS = [['demo','DEMO'], ['openai','OPENAI-COMPATIBLE'],
 /* The shipped values, for a slider on a profile that has never been given one.
    Same numbers ROUTE_DEFAULTS carries on the server — a slider that opened at
    its own minimum would read as a setting somebody chose. */
-const RT_DEFAULTS = {max_tokens: 400, temperature: 0.7, history_turns: 8,
-                     timeout: 120};
+/* THE SERVER'S DEFAULTS, and they have to stay the server's: these are what
+   an empty box means, so a number here that BACKEND_DEFAULTS does not agree
+   with is the panel promising one thing and the assistant doing another. The
+   temperature said 0.7 while every unset endpoint ran at 0.4. */
+const RT_DEFAULTS = {max_tokens: 400, temperature: 0.4, history_turns: 8,
+                     timeout: 120, keep_alive: '30m'};
 
 function paintModelsRows(list){ return list; }
 function paintModels(list){
@@ -10246,32 +10250,70 @@ function paintModels(list){
        Assistant holds the conversation and the instructions itself, so only
        the timeout survives; Anthropic is sent neither the temperature nor the
        keep-alive. */
-    const slider = (label, key, lo, hi, step, fmt)=>{
-      const w = document.createElement('div'); w.className = 'sl';
-      const b = document.createElement('label'); b.textContent = label;
-      const out = document.createElement('output');
+    /* TYPED, NOT DRAGGED. These were sliders, and a slider is the wrong
+       control for them twice over.
+
+       It cannot be empty. A range input has no such thing as no value, so an
+       untouched one sat at the default and LOOKED like a saved setting — while
+       the document behind it held "", and only a drag ever wrote anything. An
+       endpoint reading as eight turns of context had none, and the panel was
+       the reason nobody thought to check. A box that is blank is blank, and
+       says what it will do instead.
+
+       And it cannot be typed. A timeout is 300 because somebody decided 300,
+       not because they dragged until the number under their thumb said
+       something near it. The sliders on the appearance tabs stay sliders:
+       there you drag and watch the figure move, which is the case a slider is
+       actually for.
+
+       Blank means the default, and the placeholder is that default — so the
+       control tells you what happens if you leave it alone rather than
+       pretending you already chose it. */
+    const num = (label, key, lo, hi, step)=>{
       const inp = document.createElement('input');
-      inp.type = 'range'; inp.min = lo; inp.max = hi; inp.step = step;
-      inp.value = (v[key] !== undefined && v[key] !== '') ? v[key]
-                : (RT_DEFAULTS[key] !== undefined ? RT_DEFAULTS[key] : lo);
-      const show = ()=>{ out.textContent = fmt ? fmt(inp.value) : inp.value; };
-      show();
-      inp.oninput = ()=>{ v[key] = parseFloat(inp.value); show(); };
-      w.appendChild(b); w.appendChild(out); w.appendChild(inp);
-      row.appendChild(w);
+      inp.type = 'number'; inp.className = 'nmedit';
+      inp.min = lo; inp.max = hi; if (step) inp.step = step;
+      inp.value = (v[key] === undefined || v[key] === '') ? '' : v[key];
+      const dflt = RT_DEFAULTS[key];
+      inp.placeholder = dflt === undefined ? '' : (dflt + ' (default)');
+      inp.spellcheck = false;
+      inp.oninput = ()=>{
+        const raw = inp.value.trim();
+        if (raw === ''){ v[key] = ''; return; }   // back to the default
+        const n = parseFloat(raw);
+        if (!isNaN(n)) v[key] = n;
+      };
+      /* Clamped on the way out rather than on every keystroke: a ceiling of
+         2000 must not stop somebody typing the 3 of 300. */
+      inp.onblur = ()=>{
+        const raw = inp.value.trim();
+        if (raw === ''){ v[key] = ''; return; }
+        let n = parseFloat(raw);
+        if (isNaN(n)){ inp.value = ''; v[key] = ''; return; }
+        n = Math.min(hi, Math.max(lo, n));
+        inp.value = n; v[key] = n;
+      };
+      return field(label, inp);
     };
     const ha = v.provider === 'homeassistant', demo = v.provider === 'demo',
           anth = v.provider === 'anthropic';
     if (!demo){
       if (!ha){
-        slider('Reply limit (tokens)', 'max_tokens', 16, 2000, 16);
-        if (!anth) slider('Temperature', 'temperature', 0, 1.5, .05,
-                          x=> (+x).toFixed(2));
-        slider('Turns of context', 'history_turns', 0, 24, 1,
-               x=> x == 0 ? 'none' : x);
+        num('Reply limit (tokens)', 'max_tokens', 16, 2000, 16);
+        if (!anth) num('Temperature', 'temperature', 0, 1.5, .05);
+        // 0 is a real answer here and not the same as blank: none at all,
+        // as against however many the default is.
+        num('Turns of context (0 for none)', 'history_turns', 0, 24, 1);
       }
-      slider('Timeout', 'timeout', 5, 600, 5, x=> x + 's');
-      if (!ha && !anth) text('Keep model loaded', 'keep_alive', '30m');
+      num('Timeout (seconds)', 'timeout', 5, 600, 5);
+      // NOT "30m". Blank here does not mean thirty minutes, it means the
+      // field is not sent at all — deliberately, because a hosted provider
+      // rejects it — and the model server then applies its own idea, which
+      // for Ollama is five minutes. A placeholder reading 30m said the
+      // opposite, and an endpoint cold-loading its model between questions is
+      // most of what makes an answer slow.
+      if (!ha && !anth)
+        text('Keep model loaded', 'keep_alive', 'e.g. 30m — blank sends nothing');
       if (!ha){
         const b = document.createElement('b');
         b.textContent = 'System prompt';
