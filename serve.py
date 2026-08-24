@@ -701,6 +701,22 @@ def validate_backend(obj, current):
     return cfg, None
 
 
+def _payload_size(payload):
+    """How big a request was, in the two units somebody can act on.
+
+    The token figure is an approximation — carrying a tokenizer per provider
+    is not worth it — but it is the number that decides whether a prompt fits
+    a model's window, and an approximate one beats the none we had. Measured
+    against a 4096-token local model it lands within a few per cent, which is
+    all it has to do to tell "this was never going to fit" from "the model
+    was cold"."""
+    try:
+        n = len(json.dumps(payload))
+    except (TypeError, ValueError):
+        return "an unmeasurable"
+    return "a %.1fKB (~%d token)" % (n / 1024.0, round(n / 3.6))
+
+
 def _post_json(url, payload, headers, timeout):
     """One HTTP call on the standard library. No dependency is worth adding
     for this, and the visualiser's zero-dependency rule deserves company."""
@@ -726,8 +742,19 @@ def _post_json(url, payload, headers, timeout):
     except urllib.error.URLError as exc:
         raise RuntimeError("cannot reach %s (%s)" % (url, exc.reason))
     except TimeoutError:
-        raise RuntimeError("timed out after %ss — a cold model can take that "
-                           "long to load" % timeout)
+        # AND HOW BIG THE THING WAS. "A cold model can take that long to load"
+        # was a guess, and on a machine with no GPU it is usually the wrong
+        # one: the model was loaded and was still READING. Prompt processing
+        # is linear in the prompt and runs at tens of tokens a second on a
+        # CPU, so a long prompt times out exactly like a cold model does and
+        # sends whoever is reading the log to the wrong building — it sent two
+        # people there, for an embed whose tool definitions alone were 2,400
+        # tokens of a 4,096 token window.
+        #
+        # One len() on the way past, and the number is never missing again.
+        raise RuntimeError("timed out after %ss sending %s prompt — either a "
+                           "cold model loading, or more than this one can "
+                           "read in that time" % (timeout, _payload_size(payload)))
 
 
 @functools.lru_cache(maxsize=1)
@@ -8347,9 +8374,19 @@ GRANT_PATH = "/.well-known/resonance.json"
 #: Not a performance limit: a model that has misread its tools will call the
 #: same one for ever, and every lap is a request through somebody's page.
 MAX_TOOL_ROUNDS = 4
-#: How much of one result a model is shown. A log search is the shape this was
-#: built for and forty thousand rows is the shape it must not forward.
-TOOL_RESULT_MAX = 20000
+#: How much of one result a model is shown.
+#:
+#: FOUR THOUSAND CHARACTERS, WHICH IS ABOUT A THOUSAND TOKENS. It was twenty
+#: thousand, chosen against "a log search returns forty thousand rows" and
+#: without asking what the model could actually hold. A small local model has a
+#: 4096-token window in total — tool definitions, system prompt, history and
+#: the result together — so a 17KB answer to `limit=100` did not overflow it,
+#: it exceeded it two and a half times over, and the turn died with a 400 the
+#: person read as the assistant being unreachable.
+#:
+#: The model is TOLD it was truncated, so the recovery is a narrower question
+#: rather than a wrong answer off half a page.
+TOOL_RESULT_MAX = 4000
 #: Only the verbs a description can be trusted about. Everything else has to
 #: be declared as a write in the grant file — see site_ceiling.
 READ_METHODS = ("get", "head")
@@ -8623,6 +8660,131 @@ def refresh_site_spec(rec, url=None, doc=None):
     return rec, None
 
 
+def embed_reach(eid, doc=None, cfg=None):
+    """WHICH ENDPOINTS THIS SITE MAY REACH, as the panel draws them.
+
+    The permission already existed and was only editable from the other side:
+    each endpoint's authorize profile carries a list of the embed keys allowed
+    to use it, so granting one site three endpoints meant opening three
+    profiles and remembering an id. This is the same data read the other way
+    round — one site, every endpoint, ticked or not."""
+    doc = doc if doc is not None else read_routes()
+    cfg = cfg if cfg is not None else display_settings()
+    out = []
+    for rid in route_order(doc):
+        rec = doc["routes"][rid]
+        perm = route_perm(rec, cfg)
+        if perm is None:
+            # No permission named at all, which subject_may refuses outright.
+            # Shown, and not tickable: the fix is on the endpoint, not here.
+            row = {"on": False, "fixed": True,
+                   "note": "no permission set on this endpoint"}
+        elif not perm.get("restricted"):
+            # An unrestricted endpoint is reachable by anything that can reach
+            # the port. Ticking would be a permission it does not need and
+            # would read as one being granted.
+            row = {"on": True, "fixed": True, "note": "open to anything"}
+        else:
+            row = {"on": eid in (perm.get("embeds") or []), "fixed": False,
+                   "note": ""}
+        row.update(id=rid, name=rec.get("name") or rid,
+                   enabled=rec.get("enabled", True))
+        out.append(row)
+    return out
+
+
+def set_embed_reach(eid, want):
+    """Tick this key onto each endpoint's authorize profile, or off it.
+
+    Written through the profiles themselves rather than kept as a second list
+    on the key: one permission with two places to set it is two places to
+    disagree, and the endpoint's own screen would stop telling the truth.
+
+    Returns (changed, shared) — what moved, and any profile that more than one
+    endpoint names, because ticking there grants all of them and an admin
+    should be told rather than find out."""
+    ddoc = read_displays_doc()
+    cfg = ddoc.get("settings")
+    if not isinstance(cfg, dict):
+        return [], []
+    doc = read_routes()
+    users = {}
+    for rid in route_order(doc):
+        pid = str(doc["routes"][rid].get("permission") or "")
+        perm = next((p for p in cfg.get("permissions") or []
+                     if p.get("id") == pid), None)
+        zid = str(((perm or {}).get("values") or {}).get("authz") or "")
+        if zid:
+            users.setdefault(zid, []).append(rid)
+    changed, shared = [], []
+    for rid in route_order(doc):
+        rec = doc["routes"][rid]
+        pid = str(rec.get("permission") or "")
+        perm = next((p for p in cfg.get("permissions") or []
+                     if p.get("id") == pid), None)
+        if not perm:
+            continue
+        zid = str((perm.get("values") or {}).get("authz") or "")
+        az = next((a for a in cfg.get("authzs") or []
+                   if a.get("id") == zid), None)
+        if not az:
+            continue
+        vals = az.setdefault("values", {})
+        lst = list(vals.get("embeds") or [])
+        has, wants = eid in lst, rid in want
+        if has == wants:
+            continue
+        vals["embeds"] = (lst + [eid]) if wants else [x for x in lst if x != eid]
+        changed.append("%s %s" % (rec.get("name") or rid,
+                                  "granted" if wants else "withdrawn"))
+        if len(users.get(zid) or []) > 1:
+            shared.append("%s shares its permission with %s"
+                          % (rec.get("name") or rid,
+                             ", ".join(doc["routes"][o].get("name") or o
+                                       for o in users[zid] if o != rid)))
+    if changed:
+        _write_displays_doc(ddoc)
+    return changed, sorted(set(shared))
+
+
+def embed_look(rec):
+    """THE FACE OF THE ASSISTANT THIS KEY REACHES, as the frame draws it.
+
+    A screen gets its appearance from the layout profile its own row names,
+    handed down in the kiosk block on /display/hello. An embed has no row, so
+    it was handed nothing — and there is no shared appearance to fall back on,
+    deliberately, because a display "reads its appearance from the profiles it
+    names and from nowhere else" (see display_document). Nothing plus nothing
+    is the constants index.html ships with, so an endpoint whose layout says
+    ORB drew as ORB on every wall in the building and as RIDGE inside a host
+    page, and the setting looked like it had not saved.
+
+    The endpoint is the KEY's, not the port's — the same rule the question
+    itself follows, for the same reason.
+
+    THE THREE APPEARANCE PROFILES AND NOTHING ELSE. A layout also carries
+    fullscreen, a clock, a screensaver and whether to listen: those are
+    decisions about a wall in a corridor, and a host page composes its own
+    frame. Only what the assistant LOOKS and SOUNDS like travels."""
+    eid = str((rec or {}).get("endpoint") or "")
+    if not eid:
+        return None
+    route = read_routes()["routes"].get(eid)
+    if not route:
+        return None
+    cfg = display_settings()
+    prof = route_layout(route, cfg)
+    if not prof:
+        return None
+    merged = {}
+    for key, pool in (("look", "looks"), ("motion", "motions"),
+                      ("speech", "speeches")):
+        got = find_look(str(prof.get(key) or ""), cfg.get(pool) or [])
+        if got:
+            merged.update(got)
+    return merged or None
+
+
 def embed_op_list(rec):
     """A site's operations as the panel draws them: everything the
     application permits, each saying whether it writes and whether an admin
@@ -8694,8 +8856,35 @@ def tool_prompt(ops):
             "depends on that application's data rather than on general "
             "knowledge, and say what you found rather than describing the "
             "call you made. Ask for a narrower search rather than requesting "
-            "large amounts of data. If a call is refused, say plainly that "
-            "their account could not do that; do not retry it.")
+            # A REFUSAL AND A WRONG REQUEST ARE NOT THE SAME ANSWER, and one
+            # sentence covering both taught the model to give up on either.
+            # 401 and 403 are that person's account saying no and nothing the
+            # model does will change it. Everything else — a rejected
+            # parameter, a window too wide, a bucket too fine — is this call
+            # being wrong, and these applications answer it by naming the
+            # value that would have worked. Told to retry, a capable model
+            # spends the second lap and gets the data; told not to, it
+            # explains the error to somebody who asked about their logs.
+            "large amounts of data. If a call comes back 401 or 403 their "
+            "account is not allowed it: say so plainly and do not try again. "
+            "Any other failure is this call being wrong rather than refused — "
+            "read what the application said, correct the arguments and call "
+            "it again. Do not describe the corrected call instead of making "
+            "it, and do not repeat a call that failed the same way twice."
+            # AND NEVER ASK PERMISSION TO READ. Observed, twice: asked for the
+            # oldest log, it answered "I would need to query the syslog data —
+            # would you like me to proceed?", and the person said yes to a
+            # model that by then had a bare "yes" and no idea what it had
+            # offered. Nothing was waiting on their answer. A read can only
+            # return what they could have read themselves, which is why reads
+            # go straight through; the one thing that DOES stop and ask is a
+            # write, and that confirmation is drawn by the browser, not by the
+            # model. So an offer to proceed is a turn spent buying permission
+            # that was already given, and it costs the person their question.
+            "\n\nNever ask whether to make a call. Reads need no permission "
+            "and a write is confirmed elsewhere, so an offer to proceed only "
+            "loses a turn: if a tool would answer the question, call it now "
+            "and reply with what came back.")
 
 
 def embed_tool_context(emb, obj):
@@ -8957,7 +9146,8 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/routes/test",
                      "/embeds", "/embeds/update", "/embeds/delete",
                      "/embeds/enable", "/embeds/reissue",
-                     "/embeds/spec", "/embeds/ops", "/app/restart",
+                     "/embeds/spec", "/embeds/ops", "/embeds/reach",
+                     "/app/restart",
                      # …and note what is NOT here either: /display/hello, which
                      # is how a display gets its token and therefore has to be
                      # reachable from the listener a display is served on.
@@ -9190,6 +9380,19 @@ class Handler(SimpleHTTPRequestHandler):
         anyone can already open."""
         s = self._embed()
         if not s:
+            # A FRAME WHOSE SESSION HAS GONE IS NOT A PASSER-BY. It presented a
+            # bearer token and the token is dead — expired, or dropped by an
+            # admin's edit or a restart. Falling through to "an ordinary
+            # visitor at the display" then handed it to the display gate, which
+            # judged it on whatever cookie that origin happened to hold and
+            # refused it as an unapproved SCREEN. The person in the panel was
+            # told they were not permitted to use an endpoint, when what had
+            # actually happened was that their session ended.
+            raw = self.headers.get("Authorization") or ""
+            if raw.lower().startswith("bearer "):
+                self._json(401, {"error": "this embed session has ended",
+                                 "embed_expired": True})
+                return None, True
             return None, False
         if not s["cap"].get(want):
             self._json(403, {"error": "this embed is not permitted to %s"
@@ -10126,10 +10329,28 @@ class Handler(SimpleHTTPRequestHandler):
                            grant_seen=bool(rec.get("grant_seen")),
                            grant_note=rec.get("grant_note") or "",
                            ops_dropped=rec.get("ops_dropped") or [],
-                           ops=embed_op_list(rec))
+                           ops=embed_op_list(rec),
+                           # AND WHICH ENDPOINTS IT MAY REACH. The permission
+                           # lives on the endpoints; this is the same data
+                           # read from the site's side, which is where an
+                           # admin setting up one application is looking.
+                           reach=embed_reach(eid))
                 out.append(row)
+            # THE ENDPOINTS, WITH THE SITES THAT MAY NAME THEM. Sent here
+            # rather than left to the panel's own copy: that copy is filled by
+            # whichever tab happened to be opened first, so a site row opened
+            # before the endpoints tab had ever been looked at drew its
+            # assistant picker with nothing in it — and an empty picker saves
+            # an empty value, which reads as a broken save rather than as a
+            # list that had not arrived.
+            _doc = read_routes()
             return self._json(200, {"embeds": out, "parts": list(PARTS),
                                     "presets": PRESETS, "base": base,
+                                    "endpoints": [
+                                        {"id": _rid,
+                                         "name": _doc["routes"][_rid].get("name") or _rid,
+                                         "enabled": _doc["routes"][_rid].get("enabled", True)}
+                                        for _rid in route_order(_doc)],
                                     "ttl": {"min": EMBED_TTL_MIN,
                                             "max": EMBED_TTL_MAX,
                                             "default": EMBED_TTL_DEFAULT}})
@@ -10624,6 +10845,10 @@ class Handler(SimpleHTTPRequestHandler):
                            "path": o["path"], "writes": bool(o.get("writes")),
                            "summary": o.get("summary") or o["op"]}
                           for o in (s.get("ops") or [])],
+                # …AND WHAT IT LOOKS LIKE. See embed_look: the endpoint's own
+                # appearance, which every screen naming the same layout has
+                # been drawing all along and the frame alone was missing.
+                "look": embed_look(v["rec"]),
                 "expires_in": max(0, int(s["expires"] - time.time())),
             }})
 
@@ -10887,6 +11112,31 @@ class Handler(SimpleHTTPRequestHandler):
                                     "note": rec["spec_note"],
                                     "dropped": rec.get("ops_dropped") or []})
 
+        if parsed.path == "/embeds/reach":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            eid = str(obj.get("id") or "")
+            embeds = read_embeds()
+            if eid not in embeds:
+                return self._json(404, {"error": "no such embed"})
+            want = {str(x)[:32] for x in (obj.get("endpoints") or [])}
+            changed, shared = set_embed_reach(eid, want)
+            # NO SESSIONS DROPPED, and that is not an omission: this grant is
+            # read on every question through the endpoint's own profile rather
+            # than snapshot into the session, so a withdrawal is true on the
+            # next question without anybody's page going dark.
+            if changed:
+                print("embed key %s (%s) reach changed by %s: %s"
+                      % (eid, embeds[eid].get("name"), s["user"],
+                         "; ".join(changed)), flush=True)
+            return self._json(200, {"ok": True, "changed": changed,
+                                    "shared": shared,
+                                    "reach": embed_reach(eid)})
+
         if parsed.path == "/embeds/ops":
             # THE TICKS. Everything is off until an admin does this, and what
             # they may tick is bounded by the ceiling the application declared
@@ -11078,6 +11328,21 @@ class Handler(SimpleHTTPRequestHandler):
                 if asked:
                     rec["asked"] = asked
                 return self._json(200, {"display": self._display_state(rec)})
+            # A NAME, OR NOTHING. Hanging a screen is a deliberate act — the
+            # page is opened as `?display=Kitchen`, or an enrolment code is
+            # spent — and either way this arrives with a name. A browser that
+            # merely opened the address is somebody looking at a page, and it
+            # must not leave a row in the approval queue for an admin to
+            # wonder about later.
+            #
+            # That was already the stated rule two branches up, and it was
+            # only honoured for a visitor who happened to be SIGNED IN;
+            # everyone else fell through to here and was minted a device.
+            # Twenty rows on the first deployment, eighteen of them unnamed
+            # page loads, and a refusal at an endpoint the person could not
+            # account for — they had never enrolled anything.
+            if not asked:
+                return self._json(200, {})
             token, rec = new_display(asked, hint)
             if not token:
                 return self._json(409, {"error": rec})
@@ -12539,6 +12804,20 @@ class Handler(SimpleHTTPRequestHandler):
             tools, rounds, tool_err = embed_tool_context(emb, obj)
             if tool_err:
                 return self._json(400, dict(about, error=tool_err))
+            if emb and tools:
+                # WHAT WENT, IN THE ONE UNIT THAT DECIDES WHETHER IT FITS.
+                # Three separate faults on this endpoint were diagnosed from
+                # guesses — a cold model, a lost conversation, a dropped
+                # history — because the log said what was ASKED and never how
+                # much was sent to ask it. A model's window is the budget
+                # everything here competes for, and the tool definitions alone
+                # can be most of it.
+                print("embed %s (%s) -> %s: %d tool(s), %d turn(s) of history,"
+                      " %d lap(s)"
+                      % (emb["id"], emb["name"], cfg.get("name") or rid,
+                         len(tools), len([m for m in history
+                                          if isinstance(m, dict)]),
+                         len(rounds)), flush=True)
             pending = None
             t0 = time.time()
             try:

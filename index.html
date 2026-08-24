@@ -4805,7 +4805,12 @@ async function askBackend(text, bare, rid){
        request. Bounded here as well as on the server: a browser is not the
        place to find out about a loop by watching one. */
     const results = [];
-    for (let lap = 0; ; lap++){
+    /* Laps counted here rather than by the loop. A session that expired
+       mid-question sends the SAME question round again once the host has
+       minted a new token, and that second attempt is not a lap the model
+       spent on the application. */
+    let lap = 0, renewed = false;
+    for (;;){
     const r = await fetch('ask', {
       method:'POST', headers:{'Content-Type':'application/json'},
       /* The server runs on UTC and the person is not necessarily standing in
@@ -4852,11 +4857,48 @@ async function askBackend(text, bare, rid){
     if (j && j.refused){
       note('refused: this ' + (j.refused === 'embed' ? 'embed' : 'display') +
            ' may not use ' + (who || 'that endpoint'), true);
+      /* SAID OUT LOUD WHERE SOMEBODY IS WAITING FOR IT. The silence below was
+         written for a wall display that overheard an utterance meant for
+         another room — announcing "I may not" over the answer somebody else
+         is waiting for is noise. A question TYPED into the composer is the
+         opposite case: one person, looking at the box they typed into, with
+         nothing to tell them the request went anywhere at all. That silence
+         reads as a broken assistant and costs an hour in a log. */
+      if (!trail)
+        addMsg('ai', 'This ' + (j.refused === 'embed' ? 'embed' : 'display')
+             + ' is not permitted to use ' + (who || 'that endpoint') + '.',
+               rid);
       return {reply: '', refused: true};
     }
     // the route still being on demo is not an error, just not wired up yet
     if (j && j.demo) return {reply: REPLIES[replyIx++ % REPLIES.length],
                              route: (j && j.route) || ''};
+    /* THE SESSION ENDED, which is not a refusal and not a fault of theirs.
+       Ask the host for a fresh one — the loader holds the code endpoint, so
+       this frame cannot mint one itself — and then ASK THE QUESTION AGAIN.
+
+       Saying "fetching a new one" and returning was worse than saying
+       nothing: the renewal did arrive, the panel was working again a second
+       later, and the question that triggered it was gone. Every restart of
+       this server ends every open panel's session, so the first question
+       after one was reliably eaten and the person retyped it into a panel
+       that had been ready the whole time.
+
+       Once. A second expiry on the same question is a session that will not
+       hold, and going round again would be a question the person cannot
+       stop. */
+    if (r.status === 401 && j && j.embed_expired){
+      const target = hostOrigin();
+      if (renewed || !target || window.parent === window)
+        throw new Error('this panel\u2019s session ended and could not be renewed');
+      renewed = true;
+      window.parent.postMessage({rsn:1, kind:'expired'}, target);
+      /* Fifteen seconds covers a round trip to the host's own server and back
+         through their login. Past that it is not slow, it is not coming. */
+      if (!await waitForRenewal(15000))
+        throw new Error('this panel\u2019s session ended and could not be renewed');
+      continue;                  // same question, same history, new token
+    }
     if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
     if (j.tool_call){
       /* WRITES STOP AND ASK, and the asking is here rather than in the host
@@ -4874,6 +4916,7 @@ async function askBackend(text, bare, rid){
         out = await HostCall.run(call);
       results.push({id: call.id, op: call.op, args: call.args,
                     status: out.status, body: out.body});
+      lap++;
       continue;
     }
     if (j.ms) ev((j.name || 'reply') + ' ' + j.ms + 'ms');
@@ -6191,6 +6234,23 @@ function applyEmbed(){
   if (parts.indexOf('text') < 0 && typeof setTextVisible === 'function')
     setTextVisible(parts.indexOf('transcript') >= 0);
 
+  /* THE ENDPOINT'S OWN FACE, which a screen is handed in its kiosk block and
+     a frame was handed nowhere. There is no shared appearance to inherit —
+     that is deliberate, see display_document — so an embed applied neither
+     the endpoint's profile nor the panel's document and drew the constants
+     at the top of this file: an assistant set to ORB rendered as RIDGE in a
+     host page while every wall naming the same layout rendered as orb.
+
+     Applied here AND left on Kiosk.look, because the shared settings load in
+     parallel with the claim and overwrite S wholesale — the same race the
+     startup sequence already re-applies through. Kiosk.apply() is not called:
+     the chrome a layout also carries is about a wall, not about somebody
+     else's page. */
+  if (Embed.grant.look){
+    Kiosk.look = Embed.grant.look;
+    Kiosk.applyLook();
+  }
+
   /* The capability half. The server refuses these too — this is so the
      interface never offers something that will come back a 403, not the
      enforcement itself. */
@@ -6255,6 +6315,30 @@ function tellHost(kind){
                             target);
 }
 
+/* WHO IS WAITING ON THE NEXT TOKEN. A question that reached the server and
+   found its session gone is not lost and not answered — it is parked here
+   while the host mints another, and sent again the moment one lands. Without
+   this the person watched their question disappear and had to type it twice,
+   which after every restart of this server is every open panel's first
+   question. */
+let renewWaiters = [];
+function renewSettled(ok){
+  const waiting = renewWaiters;
+  renewWaiters = [];
+  waiting.forEach(done => done(ok));
+}
+/* Resolves true on a fresh token, false if the renewal failed or the host
+   never answered. The timeout is the important half: a host page that has
+   navigated away, lost its own login, or simply has no code endpoint any more
+   will never reply, and a question waiting on it forever is the same silence
+   this was written to remove. */
+function waitForRenewal(ms){
+  return new Promise(done => {
+    renewWaiters.push(done);
+    setTimeout(()=>done(false), ms);
+  });
+}
+
 /* A fresh code from the host, spent for a fresh token WITHOUT RELOADING. The
    obvious implementation of renewal — point the frame at a new /embed?c= —
    is correct and throws away the conversation, which from the other side of
@@ -6281,7 +6365,9 @@ async function renewEmbed(code){
     Embed.live  = {parts: j.embed.parts.slice(), cap: Object.assign({}, j.embed.cap)};
     narrowEmbed(was);            // re-intersects, and tells the host itself
     tellHost('renewed');
+    renewSettled(true);
   }catch(e){
+    renewSettled(false);
     /* Not spoken and not in the transcript. The session on the table is still
        good — the loader renews a minute early precisely so this can be
        retried — and announcing plumbing to whoever is mid-question is noise
