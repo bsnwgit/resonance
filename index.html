@@ -226,6 +226,27 @@
          vertical-align:-2px;margin-left:2px;animation:blink 1s steps(1) infinite}
   @keyframes blink{50%{opacity:0}}
 
+  /* WAITING FOR AN ANSWER. A question that reaches the application it is
+     embedded in is two model passes and a round trip through somebody's page,
+     which is tens of seconds — and a surface that shows nothing for that long
+     is indistinguishable from one that has stopped. Brightness rather than
+     movement: this sits on other people's pages, and a bouncing widget is a
+     widget they turn off. */
+  .think{display:inline-flex;gap:5px;align-items:center;height:13px}
+  .think i{
+    width:5px;height:5px;border-radius:50%;background:var(--text);
+    opacity:.18;animation:thinkpulse 1.25s ease-in-out infinite;
+  }
+  .think i:nth-child(2){animation-delay:.18s}
+  .think i:nth-child(3){animation-delay:.36s}
+  @keyframes thinkpulse{0%,70%,100%{opacity:.18}35%{opacity:1}}
+  /* Still says "working", still says nothing is moving on its own. */
+  @media (prefers-reduced-motion:reduce){
+    .think i{animation:none;opacity:.5}
+    .think i:nth-child(2){opacity:.75}
+    .think i:nth-child(3){opacity:1}
+  }
+
   /* layout: hero = viz on top, transcript below.  bleed = transcript over viz. */
   body[data-layout="hero"]  #screen{flex:0 0 52%}
   body[data-layout="hero"]  #log{flex:1 1 auto;border-top:1px solid rgba(var(--glass),.10)}
@@ -4633,6 +4654,33 @@ function newReply(rid){
   return {body, caret, rid};
 }
 
+/* THE WAIT, MADE VISIBLE. One line in the transcript, replaced by the answer
+   when it arrives — not a status note, because this belongs to the turn
+   somebody is waiting on rather than to the machinery.
+
+   It matters most where the answer is slowest: a question that has to reach
+   the host application is two model passes with a round trip through their
+   page in between, and on a small local model that is most of a minute. */
+const Thinking = {
+  el: null,
+  start(rid){
+    this.stop();
+    const body = addMsg('ai', '', rid);
+    const dots = document.createElement('span');
+    dots.className = 'think';
+    dots.innerHTML = '<i></i><i></i><i></i>';
+    /* An assistive reader gets a word rather than three decorative dots. */
+    dots.setAttribute('role', 'status');
+    dots.setAttribute('aria-label', 'thinking');
+    body.appendChild(dots);
+    this.el = body.parentElement;
+  },
+  stop(){
+    if (this.el && this.el.parentElement) this.el.parentElement.removeChild(this.el);
+    this.el = null;
+  },
+};
+
 /* One entry point; the source decides who drives the geometry.
    Muting only silences the VOICE — the reply still streams and the geometry
    still reacts, so the surface never looks dead just because audio is off. */
@@ -4756,8 +4804,24 @@ async function askBackend(text, bare, rid){
        with the visitor's own login, and sends what came back up with the next
        request. Bounded here as well as on the server: a browser is not the
        place to find out about a loop by watching one. */
+    /* THE CONVERSATION BEFORE THIS QUESTION, which is what the server means
+       by history: it appends `text` as the current turn itself. submit()
+       remembers the turn before this runs, so sending `convo` whole put the
+       question in twice — once as history and once as the question — and
+       every model on every path read it doubled. Dropped only when the last
+       entry really is this same question, so a genuine repeat of the previous
+       one still reads as two turns. */
+    const c = convo[convo.length - 1];
+    const past = (!bare && c && c.role === 'user' && c.content === text)
+               ? convo.slice(0, -1) : convo;
+
     const results = [];
-    for (let lap = 0; ; lap++){
+    /* Laps counted here rather than by the loop. A session that expired
+       mid-question sends the SAME question round again once the host has
+       minted a new token, and that second attempt is not a lap the model
+       spent on the application. */
+    let lap = 0, renewed = false;
+    for (;;){
     const r = await fetch('ask', {
       method:'POST', headers:{'Content-Type':'application/json'},
       /* The server runs on UTC and the person is not necessarily standing in
@@ -4775,7 +4839,7 @@ async function askBackend(text, bare, rid){
          Only for a turn that arrived by voice: a question typed into the
          composer has no recogniser output and no wake word to have matched,
          and inventing one would put a fiction in the record. */
-      body: JSON.stringify({text, history: bare ? [] : convo, tz: LOCAL_TZ,
+      body: JSON.stringify({text, history: bare ? [] : past, tz: LOCAL_TZ,
                             /* The one passed in, where there is one. It
                                agrees with the live binding today only because
                                this body is built before the first await —
@@ -4804,11 +4868,48 @@ async function askBackend(text, bare, rid){
     if (j && j.refused){
       note('refused: this ' + (j.refused === 'embed' ? 'embed' : 'display') +
            ' may not use ' + (who || 'that endpoint'), true);
+      /* SAID OUT LOUD WHERE SOMEBODY IS WAITING FOR IT. The silence below was
+         written for a wall display that overheard an utterance meant for
+         another room — announcing "I may not" over the answer somebody else
+         is waiting for is noise. A question TYPED into the composer is the
+         opposite case: one person, looking at the box they typed into, with
+         nothing to tell them the request went anywhere at all. That silence
+         reads as a broken assistant and costs an hour in a log. */
+      if (!trail)
+        addMsg('ai', 'This ' + (j.refused === 'embed' ? 'embed' : 'display')
+             + ' is not permitted to use ' + (who || 'that endpoint') + '.',
+               rid);
       return {reply: '', refused: true};
     }
     // the route still being on demo is not an error, just not wired up yet
     if (j && j.demo) return {reply: REPLIES[replyIx++ % REPLIES.length],
                              route: (j && j.route) || ''};
+    /* THE SESSION ENDED, which is not a refusal and not a fault of theirs.
+       Ask the host for a fresh one — the loader holds the code endpoint, so
+       this frame cannot mint one itself — and then ASK THE QUESTION AGAIN.
+
+       Saying "fetching a new one" and returning was worse than saying
+       nothing: the renewal did arrive, the panel was working again a second
+       later, and the question that triggered it was gone. Every restart of
+       this server ends every open panel's session, so the first question
+       after one was reliably eaten and the person retyped it into a panel
+       that had been ready the whole time.
+
+       Once. A second expiry on the same question is a session that will not
+       hold, and going round again would be a question the person cannot
+       stop. */
+    if (r.status === 401 && j && j.embed_expired){
+      const target = hostOrigin();
+      if (renewed || !target || window.parent === window)
+        throw new Error('this panel\u2019s session ended and could not be renewed');
+      renewed = true;
+      window.parent.postMessage({rsn:1, kind:'expired'}, target);
+      /* Fifteen seconds covers a round trip to the host's own server and back
+         through their login. Past that it is not slow, it is not coming. */
+      if (!await waitForRenewal(15000))
+        throw new Error('this panel\u2019s session ended and could not be renewed');
+      continue;                  // same question, same history, new token
+    }
     if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
     if (j.tool_call){
       /* WRITES STOP AND ASK, and the asking is here rather than in the host
@@ -4826,6 +4927,7 @@ async function askBackend(text, bare, rid){
         out = await HostCall.run(call);
       results.push({id: call.id, op: call.op, args: call.args,
                     status: out.status, body: out.body});
+      lap++;
       continue;
     }
     if (j.ms) ev((j.name || 'reply') + ' ' + j.ms + 'ms');
@@ -4875,12 +4977,16 @@ function submit(text){
   /* Held from here until the answer is in, so the awake window cannot end
      during the wait it is meant to be waiting through. */
   Wake.asked();
+  Thinking.start(rid);
   askBackend(text, false, rid)
     /* Released in a finally, not at the top of the then: this counter is the
        only thing keeping the display awake, and a path that skipped it — a
        refusal, a throw inside respond — would be a screen that never sleeps
        again. Exactly once, whatever happened. */
-    .finally(()=> Wake.answered())
+    /* Cleared in the same finally as the awake counter, and for the same
+       reason: a refusal, an error or a throw must not leave three dots
+       pulsing at somebody for ever. Exactly once, whatever happened. */
+    .finally(()=>{ Wake.answered(); Thinking.stop(); })
     .then(out => {
     /* A refusal is silent, so there is nothing to say and nothing to
        remember. Putting an empty turn in the history would leave the next
@@ -6139,6 +6245,23 @@ function applyEmbed(){
   if (parts.indexOf('text') < 0 && typeof setTextVisible === 'function')
     setTextVisible(parts.indexOf('transcript') >= 0);
 
+  /* THE ENDPOINT'S OWN FACE, which a screen is handed in its kiosk block and
+     a frame was handed nowhere. There is no shared appearance to inherit —
+     that is deliberate, see display_document — so an embed applied neither
+     the endpoint's profile nor the panel's document and drew the constants
+     at the top of this file: an assistant set to ORB rendered as RIDGE in a
+     host page while every wall naming the same layout rendered as orb.
+
+     Applied here AND left on Kiosk.look, because the shared settings load in
+     parallel with the claim and overwrite S wholesale — the same race the
+     startup sequence already re-applies through. Kiosk.apply() is not called:
+     the chrome a layout also carries is about a wall, not about somebody
+     else's page. */
+  if (Embed.grant.look){
+    Kiosk.look = Embed.grant.look;
+    Kiosk.applyLook();
+  }
+
   /* The capability half. The server refuses these too — this is so the
      interface never offers something that will come back a 403, not the
      enforcement itself. */
@@ -6203,6 +6326,30 @@ function tellHost(kind){
                             target);
 }
 
+/* WHO IS WAITING ON THE NEXT TOKEN. A question that reached the server and
+   found its session gone is not lost and not answered — it is parked here
+   while the host mints another, and sent again the moment one lands. Without
+   this the person watched their question disappear and had to type it twice,
+   which after every restart of this server is every open panel's first
+   question. */
+let renewWaiters = [];
+function renewSettled(ok){
+  const waiting = renewWaiters;
+  renewWaiters = [];
+  waiting.forEach(done => done(ok));
+}
+/* Resolves true on a fresh token, false if the renewal failed or the host
+   never answered. The timeout is the important half: a host page that has
+   navigated away, lost its own login, or simply has no code endpoint any more
+   will never reply, and a question waiting on it forever is the same silence
+   this was written to remove. */
+function waitForRenewal(ms){
+  return new Promise(done => {
+    renewWaiters.push(done);
+    setTimeout(()=>done(false), ms);
+  });
+}
+
 /* A fresh code from the host, spent for a fresh token WITHOUT RELOADING. The
    obvious implementation of renewal — point the frame at a new /embed?c= —
    is correct and throws away the conversation, which from the other side of
@@ -6229,7 +6376,9 @@ async function renewEmbed(code){
     Embed.live  = {parts: j.embed.parts.slice(), cap: Object.assign({}, j.embed.cap)};
     narrowEmbed(was);            // re-intersects, and tells the host itself
     tellHost('renewed');
+    renewSettled(true);
   }catch(e){
+    renewSettled(false);
     /* Not spoken and not in the transcript. The session on the table is still
        good — the loader renews a minute early precisely so this can be
        retried — and announcing plumbing to whoever is mid-question is noise

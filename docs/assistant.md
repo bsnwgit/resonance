@@ -609,8 +609,8 @@ right, which is three of the four things that go wrong.
 
 **temperature is not sent to Anthropic at all.** The current Claude models
 reject the sampling parameters outright, and older ones stop at 1.0 where this
-panel's slider goes to 1.5. A control that quietly breaks half the models is
-worse than no control, so the slider hides itself and the system prompt does
+panel's field goes to 1.5. A control that quietly breaks half the models is
+worse than no control, so the field hides itself and the system prompt does
 the steering instead.
 
 **keep model loaded** is an Ollama extension. Without it the model unloads
@@ -618,25 +618,42 @@ after a few minutes idle and the next question waits for it to load again —
 measured at 28 seconds for a 7b on the reference hardware. It means nothing to
 a hosted provider and is never sent to Anthropic.
 
+Blank here does **not** mean the placeholder. It means the field is not sent at
+all, which is what a hosted provider needs — and the model server then applies
+its own idea, which for Ollama is five minutes. If you want it held, type a
+duration.
+
 ## The other settings
 
 On the **model profile**, beside the system prompt — not on the endpoint.
 
-| Control | What it does |
-|---|---|
-| reply limit (tokens) | ceiling on the length of an answer |
-| temperature | how varied the wording is |
-| turns of context | how much of the conversation is sent back |
-| timeout | how long to wait before giving up |
+| Control | What it does | Blank means |
+|---|---|---|
+| reply limit (tokens) | ceiling on the length of an answer | 400 |
+| temperature | how varied the wording is | 0.4 |
+| turns of context | how much of the conversation is sent back | 8 |
+| timeout (seconds) | how long to wait before giving up | 120 |
 
-**turns of context** is the one worth thinking about. At zero, every question
-is answered cold and "what about the other one?" is meaningless. Higher costs
-more per question and eventually confuses a small model. Around eight is a
-reasonable place to start.
+**They are typed, not dragged, and blank is a real state.** Each shows its
+default as a placeholder rather than filling itself in, so a field you have
+never touched reads as empty and tells you what will happen if you leave it
+that way. They were sliders once, and a range input has no way to be unset: an
+untouched one sat on the default and looked like a saved setting while the
+profile behind it held nothing. An endpoint reading as eight turns of context
+had none, and the control was the reason nobody thought to check.
+
+**turns of context** is the one worth thinking about. Blank is eight; an
+explicit **zero is not the same thing** — it means none at all, every question
+answered cold, and "what about the other one?" meaningless. Higher costs more
+per question, eventually confuses a small model, and competes for the same
+window as the tool definitions where an endpoint has them: four is a better
+starting point for an assistant reaching a host application than eight.
 
 **timeout** needs to be generous. A cold local model can take half a minute
 just to load before it begins answering, and a timeout tuned to a warm model
-will look like a dead server every morning.
+will look like a dead server every morning. On a machine with no GPU, add the
+reading time: prompt processing runs at tens of tokens a second, so a long
+prompt can spend a minute being read before a word is generated.
 
 ## Where the API key lives
 

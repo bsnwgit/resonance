@@ -48,11 +48,12 @@ Two roles:
 
 ### The built-in manual
 
-The **?** beside the SETTINGS title opens seven documents covering the display
-and every tab of the admin interface. It is blue, the same blue as every ?
-beside a topic heading, so help is one colour wherever you meet it — there is
-no DOCUMENTATION button in the tab row any more, because it is not something
-you configure. They live as markdown in
+The **?** in the strip at the foot of the panel opens seven documents covering
+the display and every tab of the admin interface. It is blue, the same blue as
+every ? beside a topic heading, so help is one colour wherever you meet it — and
+it sits with ACCESS and the search rather than in the menu, because reading a
+document is a way of getting somewhere, not something you configure. They live
+as markdown in
 `docs/`, are read in a modal over the whole window rather than in the 425px
 column, and each has a **DOWNLOAD PDF** button.
 
@@ -407,15 +408,42 @@ neither code fires.
 
 **temperature** is not sent to Anthropic at all. The current Claude models
 reject the sampling parameters outright with a 400, and the older ones stop at
-1.0 where this panel's slider goes to 1.5 — a control that quietly breaks half
+1.0 where this panel's field goes to 1.5 — a control that quietly breaks half
 the models is worse than no control. Steer those with the system prompt
-instead. The slider hides itself when Anthropic is selected.
+instead. The field hides itself when Anthropic is selected.
 
 **keep model loaded** (`keep_alive`) is an Ollama extension accepted on its
 OpenAI-compatible path. Without it the model unloads after a few minutes idle
 and the next question waits for it to load again — measured at 28s for a 7b on
 the reference hardware. It means nothing to a hosted provider, and is never
-sent to Anthropic.
+sent to Anthropic. Blank does not mean the placeholder: it means the field is
+not sent, which is what a hosted provider needs, and the model server applies
+its own default instead.
+
+### Blank is a value, and it means the default
+
+`max_tokens`, `temperature`, `history_turns` and `timeout` are stored empty
+until somebody sets them, and empty is read as the documented default — 400,
+0.4, 8 and 120 — the same way in every one of them. `history_turns` was the
+exception and read empty as ZERO, so an endpoint whose model profile had never
+been filled in answered every question with no conversation behind it. It
+replied to the first question and then, told "yes", answered as though a new
+conversation had begun. An explicit zero still means none: somebody who types
+it has chosen it.
+
+These were sliders in the panel and are typed fields now, for the same reason.
+A range input cannot be unset, so an untouched one sat on the default and read
+as configured while the document behind it was empty — the panel was the reason
+the fault stayed invisible. A blank box reads as blank and shows its default as
+a placeholder.
+
+**An endpoint answering with no system prompt is named at startup**, beside the
+one that answers nowhere and the two that share a port. It is reachable, it
+replies, and nothing about it looks wrong from outside. That warning asks the
+RESOLVED configuration rather than a field on the endpoint: a profile reaches
+an endpoint either by being named there or by being named on the connection it
+answers through, and checking only the first told an admin who had assigned one
+that they had not.
 
 **Listing what a host has installed** — asking Ollama's `/api/tags` on the
 same host so a model name is chosen rather than typed from memory — is
@@ -449,9 +477,16 @@ is spoken as **"Done."** for the same reason: silence is how a failure sounds.
 
 ### What the model knows
 
-The server appends the current date and time to the system prompt on every
-request, because a model's sense of "now" is frozen at its training cutoff and
-it will otherwise answer that question confidently and wrongly. The time is
+The server states the current date and time on every request, because a model's
+sense of "now" is frozen at its training cutoff and it will otherwise answer
+that question confidently and wrongly. It goes in as its own note immediately
+before the question rather than in the system prompt, and that placement is
+about speed rather than tidiness: a prompt cache matches from the first token,
+so a stamp that changes every minute sitting ahead of the system prompt and the
+tool definitions threw away everything a server could have reused. On a machine
+without a GPU that cost the whole prompt again on every call. The system prompt
+and the tools are identical from one question to the next, so they come first
+and the clock comes last. The time is
 the **display's** local time: the browser reports its IANA zone with each
 question and the server formats accordingly, so a box running on UTC does not
 tell somebody in New York at 8pm that it is already tomorrow.
@@ -608,6 +643,20 @@ does not read as the assistant forgetting the last ten minutes.
 **The embed is memoryless**, and that is the sequencing rather than an
 omission — see the roadmap.
 
+**Which endpoint an embed reaches is the key's, not the port's.** A display is
+at a port and answers as that port's endpoints and no others, which is right
+for a screen on a wall. An embed is not at a port: it is a key inside somebody
+else's page, and everything else about it — what it draws, what it may do,
+which origins may frame it, what it may ask their application for — is decided
+on that key. Leaving the assistant to be decided by which hostname their page
+happened to name meant moving a site between assistants was an edit and a
+deploy on *their* side, for a choice that was never theirs to make and is paid
+for on this one. So the key names it, blank means the port's, and a named
+endpoint that is later deleted or switched off falls back to the port's with a
+line in the log — a panel going silent because somebody renamed an assistant
+is the worse failure. The authorize profile is unchanged and is still the
+gate: the port stopped being a boundary because it never was one.
+
 ### Reaching the host application's data
 
 An embed can answer about the application it is sitting in rather than only
@@ -659,6 +708,18 @@ and never by the host page: a confirmation rendered by the party that wants
 the action is not a confirmation. It names the real values, because a voice
 interface has no address bar to check. There is no session-wide "allow
 writes" — that is the same hole with one more click in front of it.
+
+**Both legs of every call are logged, and only the request survives.** Method,
+path and query going out — the same line the host's own access log will carry,
+so the two can be laid side by side — and status and byte count coming back. A
+`no status` is not an HTTP code: it means the browser never received a
+response, which separates "their API refused it" from "the call never left the
+page". The body is never written: it is their data, and `server.log` travels.
+
+**A proxy in front of this server needs its read timeout raised.** Every lap is
+its own request waiting on a whole model pass, and 60 seconds — nginx's default
+— is less than two laps on a small local model. It presents as the assistant
+being unreachable, which is the one thing it is not.
 
 Only the OpenAI dialect and Anthropic carry tool definitions. Home Assistant
 does its own on its own side and is untouched; `demo` cannot. Written up in

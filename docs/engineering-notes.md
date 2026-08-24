@@ -155,3 +155,41 @@ is a smaller price than it sounds and buys the whole permission model.
 **`flex: 1` on an `<input>` is not enough.** An input's default `size`
 attribute is its flex basis, so it sits at about twenty characters on a row
 with plenty of room. It needs `min-width: 0` beside it.
+
+**A reverse proxy's read timeout applies to each lap, not to the question.**
+A tool-calling turn is several HTTP requests, each waiting on a whole model
+pass. nginx's `proxy_read_timeout` defaults to 60 seconds and is usually not
+set anywhere, so nobody remembers choosing it. When it fires the server
+completes the lap and then dies writing the response — `ssl.SSLEOFError: EOF
+occurred in violation of protocol` — and the browser sees a dead connection.
+Measured on a CPU-only box: 30s a lap warm, 48s cold, and a question needing
+three laps failed while the same question in two laps succeeded. The tell is
+that it looks intermittent and looks like the assistant, and it is neither.
+
+**A small model answers a rejected tool call by calling the same one again.**
+Given a 400 it does not reconsider which operation it chose; it re-guesses a
+parameter and re-sends. Observed: `getSyslogTimeline?hours=24&point_limit=10`
+→ 400 → `getSyslogTimeline?hours=24&bucket_minutes=144`, when the question
+wanted a different operation entirely. Two consequences. An API's 400 should
+name the valid values rather than say no, because a model reads it and is the
+one retrying. And every wrong choice costs a whole extra lap, which is what
+turns a latency problem into a timeout.
+
+**Tool calling is where model size stops being a preference.** The job is
+choosing among a set of operations and filling parameters from a sentence, and
+a 3B model does it wrongly often enough to matter — while the fix, a larger
+model, is the opposite of what a latency-sensitive voice interface wants on
+CPU-only hardware. There is no local answer to that tension on a box without a
+GPU; the honest options are a hosted endpoint for the sites that need it, or
+different hardware.
+
+**Log the request and never the response.** For a call made on somebody else's
+behalf into somebody else's application, the method, path and query are the
+line to keep — it matches what their own access log recorded, so the two can be
+laid side by side and the argument about who dropped it ends in a minute. The
+body is their data, and `server.log` is a stream that travels off the machine.
+
+**`strings` cuts a line at the first multi-byte character.** Reading a log
+that contains an em-dash, every line appeared truncated exactly where the
+message became interesting, which reads convincingly as a bug in the code that
+wrote it. Decode the file rather than scraping printable runs out of it.

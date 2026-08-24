@@ -277,6 +277,44 @@ directions.
 
 ---
 
+## Following a call in the log
+
+Every call is recorded on both legs, and the pair is what tells you whose
+problem a failure is. **The request, and never the response.** A response body
+is that application's data and has no business in this server's log; the status
+is the one fact that decides where to look next.
+
+```
+embed efe2c22ff5da2 (pktLog) -> GET /api/logs/search?limit=1 (lap 1)
+embed efe2c22ff5da2 (pktLog) <- searchSyslog 200 648B
+```
+
+The `->` line is the request as the host application's own access log will
+have recorded it, so the two can be laid side by side. The `<-` line is what
+came back:
+
+| what it says | what it means |
+|---|---|
+| a status and a size | their API answered. A `4xx` or `5xx` is theirs to explain |
+| `no status — the application did not answer` | twenty seconds passed with no reply from the page |
+| `no status — this page does not perform that operation` | `embed.js` refused it: the operation was not in the session's grant, or the path did not match its template |
+| nothing at all, and an `SSLEOFError` beside it | **something in front of this server closed the connection.** See below |
+
+**A reverse proxy in front of this server needs its read timeout raised.**
+Every lap is its own HTTP request, and each one waits on a whole model pass —
+tens of seconds on a small local model. nginx's default `proxy_read_timeout`
+is 60 seconds, which is not a setting anybody remembers making. When it fires,
+this server finishes the lap and then fails writing the response, the browser
+sees a dead connection, and the panel says it could not reach the assistant.
+The failure therefore reads as the *assistant* being broken, which is the one
+place it is not.
+
+**A question that needs several laps is where this bites**, and a model that
+chooses the wrong operation is what causes several laps: a rejected call is
+answered to the model and it tries again, so a poor choice costs a whole extra
+round trip. The two failures compound, and the log above is what separates
+them.
+
 ## Still open
 
 Three, and none of them blocks using it.
@@ -292,6 +330,15 @@ Three, and none of them blocks using it.
 - **Where a refused call surfaces.** A 403 from the host application reaches
   the model as the result of its call and is answered in words. That is right
   for the person and leaves an admin nothing to look at.
+- **A refusal and a wrong request are told apart.** 401 and 403 are that
+  person's account saying no, and the model is told to say so and stop.
+  Anything else — a rejected parameter, a window too wide, a bucket too fine —
+  is the call being wrong, and these applications answer it by naming the value
+  that would have worked, so the model is told to correct the arguments and
+  call again. One sentence used to cover both and taught it to give up on
+  either. It is also told never to ask whether to make a call: a read needs no
+  permission and a write is confirmed by the browser, so an offer to proceed
+  only costs the person a turn.
 
 - **Only the OpenAI dialect and Anthropic call tools.** Home Assistant does
   its own on its own side and is not affected; `demo` cannot, and a small
@@ -462,9 +509,13 @@ and it is written to be copied as it stands.
         the person, so make it one they can act on.
       * BOUND YOUR RESULTS. A page plus a total, never the whole table. A
         search matching 40,000 rows should return 50 and say 40,000.
-      * *** Results over 20 KB are truncated *** and the model is told they
-        were. It will then ask a narrower question — but only if your
-        operation lets it (see `limit`, above).
+      * *** Results over 4,000 characters are truncated *** and the model
+        is told they were. It will then ask a narrower question — but only
+        if your operation lets it (see `limit`, above). It was 20 KB, which
+        was chosen against "a log search returns 40,000 rows" without
+        asking what a model could hold: 20 KB is around 5,000 tokens, and a
+        small local model's ENTIRE window — tools, prompt, history and
+        result together — is 4,096.
       * *** You have 20 seconds to answer. *** Past that the panel treats
         the call as unanswered and tells the person so.
       * Keep field names stable. They end up in the sentences people read.
@@ -522,7 +573,8 @@ and it is written to be copied as it stands.
                                       your grant file, and nobody has
                                       ticked it at the Resonance end.
                                       Everything starts off, by design.
-      * "results are truncated"    -> over 20 KB. Add/lower `limit`.
+      * "results are truncated"    -> over 4,000 characters. Add/lower
+                                      `limit`.
       * "the assistant says the
          application didn't answer" -> over 20 seconds.
       * "writes never happen"      -> either no grant file, or

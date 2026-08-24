@@ -156,6 +156,19 @@
       scheduleRenew(m.expires_in);
     } else if (m.kind === 'call') {
       perform(m);
+    } else if (m.kind === 'expired') {
+      /* The frame's session died before its renewal was due — an admin edited
+         the key, or the server restarted. Mint another now rather than wait
+         for the timer that was scheduled against a session that is gone. */
+      clearTimeout(renewAt);
+      getCode().then(function (code) {
+        if (frame && frame.contentWindow) {
+          frame.contentWindow.postMessage({ rsn: 1, kind: 'renew', code: code },
+                                          ORIGIN);
+        }
+      }).catch(function (e) {
+        console.warn('[resonance] could not renew the session: ' + e.message);
+      });
     }
   });
 

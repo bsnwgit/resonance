@@ -701,6 +701,22 @@ def validate_backend(obj, current):
     return cfg, None
 
 
+def _payload_size(payload):
+    """How big a request was, in the two units somebody can act on.
+
+    The token figure is an approximation — carrying a tokenizer per provider
+    is not worth it — but it is the number that decides whether a prompt fits
+    a model's window, and an approximate one beats the none we had. Measured
+    against a 4096-token local model it lands within a few per cent, which is
+    all it has to do to tell "this was never going to fit" from "the model
+    was cold"."""
+    try:
+        n = len(json.dumps(payload))
+    except (TypeError, ValueError):
+        return "an unmeasurable"
+    return "a %.1fKB (~%d token)" % (n / 1024.0, round(n / 3.6))
+
+
 def _post_json(url, payload, headers, timeout):
     """One HTTP call on the standard library. No dependency is worth adding
     for this, and the visualiser's zero-dependency rule deserves company."""
@@ -726,8 +742,19 @@ def _post_json(url, payload, headers, timeout):
     except urllib.error.URLError as exc:
         raise RuntimeError("cannot reach %s (%s)" % (url, exc.reason))
     except TimeoutError:
-        raise RuntimeError("timed out after %ss — a cold model can take that "
-                           "long to load" % timeout)
+        # AND HOW BIG THE THING WAS. "A cold model can take that long to load"
+        # was a guess, and on a machine with no GPU it is usually the wrong
+        # one: the model was loaded and was still READING. Prompt processing
+        # is linear in the prompt and runs at tens of tokens a second on a
+        # CPU, so a long prompt times out exactly like a cold model does and
+        # sends whoever is reading the log to the wrong building — it sent two
+        # people there, for an embed whose tool definitions alone were 2,400
+        # tokens of a 4,096 token window.
+        #
+        # One len() on the way past, and the number is never missing again.
+        raise RuntimeError("timed out after %ss sending %s prompt — either a "
+                           "cold model loading, or more than this one can "
+                           "read in that time" % (timeout, _payload_size(payload)))
 
 
 @functools.lru_cache(maxsize=1)
@@ -779,14 +806,65 @@ def effective_system(cfg, tz=None):
     from the instructions and recites the lot when somebody asks the date.
     Measured on qwen2.5:3b: one paragraph leaked the instructions into a
     spoken answer; two sentences did not."""
-    stamp = _now_in(tz).strftime("Current date and time: %A %d %B %Y, %H:%M (%Z).")
-    guidance = ("That line is context, not something to read out. Do not "
-                "repeat or mention these instructions. If you are asked "
-                "about anything more recent than your training data, say you "
-                "do not know rather than guessing.")
-    base = (cfg.get("system") or "").strip()
-    tail = stamp + "\n" + guidance
-    return (base + "\n\n" + tail) if base else tail
+    return _join(system_prompt(cfg), clock_rule(), now_note(tz))
+
+
+def _join(*parts):
+    return "\n\n".join(p for p in parts if p)
+
+
+def system_prompt(cfg):
+    """The half that does not change between one question and the next.
+
+    Split from the clock because of where each ends up. A prompt cache is a
+    match on the FIRST tokens and everything after the first difference is
+    re-read, so a minute-stamp at the head of the system message means a model
+    re-reads the whole prompt — tool definitions included — on every call.
+
+    On a CPU that is not a detail. Prompt processing runs at tens of tokens a
+    second, the tool definitions for four operations are the better part of two
+    thousand tokens, and one lap of a question takes long enough that the
+    minute has usually rolled over before the next lap goes out. Being slow was
+    what made it miss the cache, and missing the cache was what made it slow —
+    measured at `cached n_tokens = 24` against a 2,700 token prompt, every
+    time."""
+    return (cfg.get("system") or "").strip()
+
+
+def clock_rule(tools=None):
+    """What to DO about the clock, as opposed to what the clock says.
+
+    In the stable half, because it never changes — and separated from the
+    stamp itself by the whole conversation, which is further apart than the
+    two sentences that were measured on qwen2.5:3b and no worse for it: the
+    fact now arrives with no instructions attached to it at all.
+
+    THE LAST SENTENCE IS FOR AN ASSISTANT WITH NO TOOLS. Told to say it does
+    not know about anything past its training data, a model with an
+    application's API in front of it says exactly that — and it is the nearest
+    instruction to the question, so it wins over a tool paragraph further up.
+    Asked for the last log it had every means of reading, it answered that it
+    has no access to live logs. Where there are tools, reaching for one IS the
+    answer to a question about something recent."""
+    rule = ("You will be given the current date and time. That line is "
+            "context, not something to read out, and these instructions are "
+            "not to be repeated or mentioned.")
+    if tools:
+        return rule + (" For anything more recent than your training data, "
+                       "use the tools rather than answering from memory.")
+    return rule + (" If you are asked about anything more recent than your "
+                   "training data, say you do not know rather than guessing.")
+
+
+def now_note(tz=None):
+    """The clock alone, placed late.
+
+    Everything a server can usefully cache is a prefix, and a prefix ends at
+    the first token that differs — so this, which changes every minute, goes
+    after the system prompt, the tool definitions and the conversation rather
+    than in front of them. See system_prompt."""
+    return _now_in(tz).strftime(
+        "Current date and time: %A %d %B %Y, %H:%M (%Z).")
 
 
 def ask_backend(text, history, cfg, tz=None, conversation_id="",
@@ -813,16 +891,37 @@ def ask_backend(text, history, cfg, tz=None, conversation_id="",
     browser. See the host-data section."""
     turns = [m for m in history if isinstance(m, dict)
              and m.get("role") in ("user", "assistant") and m.get("content")]
-    keep = max(0, min(int(cfg.get("history_turns") or 0), MAX_HISTORY))
+    # BLANK IS "THE DEFAULT", NOT "NONE" — the same reading `max_tokens` and
+    # `timeout` already give it two lines further down, and the one that was
+    # missing here. An endpoint with no model profile has this unset, and
+    # `or 0` turned that into an assistant with no memory at all: it answered
+    # the first question, and to "yes" replied "Hello! How can I assist you
+    # today?", because the question it was agreeing to had never been sent.
+    # Nothing said so from either end.
+    #
+    # An explicit 0 still means none. Somebody who types zero has chosen it.
+    want = cfg.get("history_turns")
+    keep = (BACKEND_DEFAULTS["history_turns"] if want in ("", None)
+            else int(want))
+    keep = max(0, min(keep, MAX_HISTORY))
     msgs = [{"role": m["role"], "content": str(m["content"])[:8000]}
             for m in turns[-keep:]] if keep else []
-    msgs.append({"role": "user", "content": text})
+    ask = {"role": "user", "content": text}
 
     if cfg["provider"] in OPENAI_DIALECT:
         base = (cfg.get("base_url") or "").rstrip("/")
         url = base if base.endswith("/chat/completions") else base + "/chat/completions"
-        msgs = [{"role": "system",
-                 "content": effective_system(cfg, tz) + tool_prompt(tools)}] + msgs
+        # EVERYTHING CACHEABLE FIRST, and the clock last. The system prompt and
+        # the tool definitions are identical from one question to the next, so
+        # put together they are a prefix a server can keep — and a minute-stamp
+        # in front of them threw the whole of it away every call. The note goes
+        # in as its own message just before the question instead, where the
+        # model still reads it and nothing before it has changed.
+        head = _join(system_prompt(cfg) + tool_prompt(tools),
+                     clock_rule(tools)).strip()
+        msgs = ([{"role": "system", "content": head}] if head else []) + msgs
+        msgs.append({"role": "system", "content": now_note(tz)})
+        msgs.append(ask)
         # WHAT ALREADY HAPPENED THIS TURN, replayed. The model has to see its
         # own call and the answer that came back or it will make the same call
         # again — this is one conversation to it, and the round trip through
@@ -871,6 +970,11 @@ def ask_backend(text, history, cfg, tz=None, conversation_id="",
             url = base
         else:
             url = re.sub(r"/v1$", "", base) + "/v1/messages"
+        # The clock stays in the system field here. Anthropic's caching is
+        # opt-in per block rather than an implicit prefix match, so there is no
+        # cache for a changing stamp to invalidate — and `system` is a
+        # top-level field, with no way to place a note late among the messages.
+        msgs = msgs + [ask]
         for r in (rounds or []):
             msgs.append({"role": "assistant", "content": [
                 {"type": "tool_use", "id": r["id"], "name": r["op"],
@@ -881,7 +985,8 @@ def ask_backend(text, history, cfg, tz=None, conversation_id="",
         body = {"model": cfg["model"], "messages": msgs,
                 # required here, unlike the OpenAI shape where it is optional
                 "max_tokens": int(cfg.get("max_tokens") or 400)}
-        body["system"] = effective_system(cfg, tz) + tool_prompt(tools)
+        body["system"] = _join(system_prompt(cfg) + tool_prompt(tools),
+                               clock_rule(tools), now_note(tz))
         if tools:
             # The same definitions, one field name apart: `input_schema` here,
             # `parameters` there, and the rest identical.
@@ -7085,6 +7190,106 @@ def app_pending(cfg):
                   if RUNNING.get(k) is not None and RUNNING[k] != cfg[k])
 
 
+def net_wanted(doc=None, cfg=None):
+    """Every listener the SAVED configuration asks for.
+
+    The same derivation `main` uses to bind them, deliberately: the panel's
+    answer to "is this profile live" must not be a second opinion about what
+    happened at startup, because the two would disagree exactly when it
+    mattered. Returns one entry per socket, with `why` set where the profile
+    asks for nothing bindable at all — a port nobody typed, or a port with no
+    endpoint answering on it, which is half a job rather than a fault.
+    """
+    doc = doc if doc is not None else read_routes()
+    cfg = cfg if cfg is not None else read_app()
+    host0 = bind_host(cfg)
+    out = []
+    for n in display_settings()["networks"]:
+        vals = n.get("values") or {}
+        mine = [r for r in net_members(doc, n["id"])
+                if doc["routes"][r].get("enabled", True)]
+        try:
+            port = int(vals.get("port"))
+        except (TypeError, ValueError):
+            port = 0
+        host = net_host(vals, host0)
+        row = {"id": n["id"], "name": n["name"], "host": host, "port": port}
+        if not port:
+            out.append(dict(row, why="no port is set on it"))
+            continue
+        if not mine:
+            out.append(dict(row, why="no endpoint answers on it"))
+            continue
+        out.append(dict(row, why=""))
+        try:
+            redirect = int(vals.get("redirect") or 0)
+        except (TypeError, ValueError):
+            redirect = 0
+        if redirect:
+            out.append({"id": n["id"], "name": n["name"] + " · plain HTTP",
+                        "host": host, "port": redirect, "why": ""})
+    return out
+
+
+def net_state(doc=None, cfg=None):
+    """`net_wanted` with the one fact the panel cannot work out for itself:
+    whether this process is holding that socket right now.
+
+    A PROFILE SAVED WHILE THE SERVER IS UP IS NOT LISTENING, and nothing on
+    screen said so — the first symptom was a dead port two layers away, in
+    somebody else's proxy, with nothing to connect it back to a form that had
+    saved cleanly ten minutes earlier."""
+    return [dict(w, bound=bool(w["port"]) and not w["why"]
+                        and holding_it(w["host"], w["port"]))
+            for w in net_wanted(doc, cfg)]
+
+
+def restart_blockers(cfg=None):
+    """What would fail to bind if this process restarted now, as a list of
+    plain sentences.
+
+    THE POINT OF ASKING BEFORE RESTARTING. A restart into a configuration that
+    cannot bind does not fail loudly — it takes the admin panel down with
+    everything else, and the fix becomes editing JSON on the box by hand. The
+    bind test already exists for the same reason on the way in; this is the
+    same test asked about every socket at once, at the one moment where being
+    wrong is unrecoverable.
+
+    A socket THIS process is holding counts as free: it is about to be
+    released by the same restart that needs it."""
+    cfg = cfg if cfg is not None else read_app()
+    out = []
+    for w in net_wanted(cfg=cfg):
+        if w["why"] or not w["port"]:
+            continue
+        if not port_free(w["port"], w["host"]):
+            out.append("%s wants %s:%d, which something else is holding"
+                       % (w["name"], w["host"], w["port"]))
+    host0 = bind_host(cfg)
+    for key, what in (("admin_port", "the admin panel"),
+                      ("enrol_port", "enrolment")):
+        try:
+            p = int(cfg.get(key) or 0)
+        except (TypeError, ValueError):
+            continue
+        if not p:
+            continue
+        # OURS ALREADY, AND ABOUT TO BE RELEASED BY THE RESTART THAT NEEDS IT.
+        # `_BOUND` holds the network profiles' sockets and not these two, so
+        # without this the enrolment port reads as taken — by this process —
+        # and every restart is refused with a reason that is true and
+        # completely useless.
+        if RUNNING.get(key) == p:
+            continue
+        # The admin port is the one that must never be lost: get this wrong
+        # and the restart removes the only way to correct it.
+        addr = cfg.get("enrol_address") if key == "enrol_port" else None
+        if not port_free(p, str(addr or host0)):
+            out.append("%s wants port %d, which something else is holding"
+                       % (what, p))
+    return out
+
+
 # ------------------------------------------------------- a scheduled restart
 # Nothing supervises this process. `serve.sh` launches it with `setsid nohup`
 # and there is deliberately no systemd unit, because that is what lets the
@@ -7168,6 +7373,28 @@ def restart_due(now=None):
     return now - _last_use >= RESTART_QUIET
 
 
+def hand_over(why):
+    """Launch `serve.sh restart` detached and expect to be killed by it.
+
+    One implementation for the clock and for the button, because they are the
+    same act — and the detail that makes it work either way is `start_new_session`:
+    the death of this process is what the helper was launched to cause, rather
+    than something that takes the helper with it.
+
+    Returns an error string, or "" when the handover is away."""
+    sh = os.path.join(ROOT, "serve.sh")
+    if not os.access(sh, os.X_OK):
+        return "%s is not executable, so there is nothing to hand over to" % sh
+    log = open(RESTART_LOG, "a")
+    log.write("\n=== %s — %s ===\n"
+              % (time.strftime("%Y-%m-%d %H:%M:%S"), why))
+    log.flush()
+    print("%s — handing over to serve.sh" % why, flush=True)
+    subprocess.Popen([sh, "restart"], cwd=ROOT, stdout=log, stderr=log,
+                     stdin=subprocess.DEVNULL, start_new_session=True)
+    return ""
+
+
 def do_scheduled_restart():
     """Hand over to serve.sh and expect to be killed by it."""
     sh = os.path.join(ROOT, "serve.sh")
@@ -7177,14 +7404,10 @@ def do_scheduled_restart():
         _restart["fired"] = True          # do not spin on it every tick
         return
     try:
-        log = open(RESTART_LOG, "a")
-        log.write("\n=== %s — scheduled restart (%s) ===\n"
-                  % (time.strftime("%Y-%m-%d %H:%M:%S"), _restart["at"]))
-        log.flush()
         _restart["fired"] = True
-        print("scheduled restart — handing over to serve.sh", flush=True)
-        subprocess.Popen([sh, "restart"], cwd=ROOT, stdout=log, stderr=log,
-                         stdin=subprocess.DEVNULL, start_new_session=True)
+        err = hand_over("scheduled restart (%s)" % _restart["at"])
+        if err:
+            raise RuntimeError(err)
     except Exception as e:
         # Still marked as fired: a handover that could not be launched will not
         # launch on the next tick either, and a server retrying it every twenty
@@ -7693,8 +7916,23 @@ def validate_embed(obj):
     # and must not start collecting; an internal tool's has, and an audit line
     # naming nobody is not much of an audit line. It is a property of the
     # application rather than of this server, so it lives on the key.
+    # WHICH ASSISTANT THIS SITE TALKS TO, and it belongs on the key rather
+    # than in the address the host frames. A display is at a port and answers
+    # as that port's endpoints; an embed is a key inside somebody else's page,
+    # and every other thing about it — what it draws, what it may do, which
+    # origins may frame it, what it may ask their application for — is decided
+    # here. Deciding the assistant by which hostname their page happens to
+    # name meant moving a site between assistants was an edit to THEIR source,
+    # a deploy on their side, for a choice that was never theirs to make and
+    # is paid for on this one.
+    #
+    # Blank is the old behaviour and stays the default: whatever endpoint the
+    # address it was framed from carries.
+    endpoint = str(obj.get("endpoint") or "")[:32]
+    if endpoint and endpoint not in read_routes()["routes"]:
+        return None, "no endpoint with that id"
     return {"name": name, "preset": preset, "parts": parts, "cap": cap,
-            "origins": origins, "ttl_minutes": ttl,
+            "origins": origins, "ttl_minutes": ttl, "endpoint": endpoint,
             "needs_user": bool(obj.get("needs_user"))}, None
 
 
@@ -7944,6 +8182,7 @@ def new_embed_code(embed_id, rec, user=None):
             "rec": {"name": rec["name"], "parts": list(rec["parts"]),
                     "cap": dict(rec["cap"]), "origins": list(rec["origins"]),
                     "ttl_minutes": rec["ttl_minutes"],
+                    "endpoint": rec.get("endpoint") or "",
                     # WHAT IT MAY ASK THEIR APPLICATION FOR, snapshot with
                     # everything else and for the same reason: an admin
                     # unticking an operation in the seconds between a host
@@ -8013,6 +8252,7 @@ def new_embed_session(embed_id, rec, user=None):
             "id": embed_id, "name": rec["name"],
             "parts": list(rec["parts"]), "cap": dict(rec["cap"]),
             "origins": list(rec["origins"]),
+            "endpoint": rec.get("endpoint") or "",
             "ops": list(rec.get("ops") or []),
             "expires": now_ + rec["ttl_minutes"] * 60,
         }
@@ -8212,9 +8452,19 @@ GRANT_PATH = "/.well-known/resonance.json"
 #: Not a performance limit: a model that has misread its tools will call the
 #: same one for ever, and every lap is a request through somebody's page.
 MAX_TOOL_ROUNDS = 4
-#: How much of one result a model is shown. A log search is the shape this was
-#: built for and forty thousand rows is the shape it must not forward.
-TOOL_RESULT_MAX = 20000
+#: How much of one result a model is shown.
+#:
+#: FOUR THOUSAND CHARACTERS, WHICH IS ABOUT A THOUSAND TOKENS. It was twenty
+#: thousand, chosen against "a log search returns forty thousand rows" and
+#: without asking what the model could actually hold. A small local model has a
+#: 4096-token window in total — tool definitions, system prompt, history and
+#: the result together — so a 17KB answer to `limit=100` did not overflow it,
+#: it exceeded it two and a half times over, and the turn died with a 400 the
+#: person read as the assistant being unreachable.
+#:
+#: The model is TOLD it was truncated, so the recovery is a narrower question
+#: rather than a wrong answer off half a page.
+TOOL_RESULT_MAX = 4000
 #: Only the verbs a description can be trusted about. Everything else has to
 #: be declared as a write in the grant file — see site_ceiling.
 READ_METHODS = ("get", "head")
@@ -8488,6 +8738,131 @@ def refresh_site_spec(rec, url=None, doc=None):
     return rec, None
 
 
+def embed_reach(eid, doc=None, cfg=None):
+    """WHICH ENDPOINTS THIS SITE MAY REACH, as the panel draws them.
+
+    The permission already existed and was only editable from the other side:
+    each endpoint's authorize profile carries a list of the embed keys allowed
+    to use it, so granting one site three endpoints meant opening three
+    profiles and remembering an id. This is the same data read the other way
+    round — one site, every endpoint, ticked or not."""
+    doc = doc if doc is not None else read_routes()
+    cfg = cfg if cfg is not None else display_settings()
+    out = []
+    for rid in route_order(doc):
+        rec = doc["routes"][rid]
+        perm = route_perm(rec, cfg)
+        if perm is None:
+            # No permission named at all, which subject_may refuses outright.
+            # Shown, and not tickable: the fix is on the endpoint, not here.
+            row = {"on": False, "fixed": True,
+                   "note": "no permission set on this endpoint"}
+        elif not perm.get("restricted"):
+            # An unrestricted endpoint is reachable by anything that can reach
+            # the port. Ticking would be a permission it does not need and
+            # would read as one being granted.
+            row = {"on": True, "fixed": True, "note": "open to anything"}
+        else:
+            row = {"on": eid in (perm.get("embeds") or []), "fixed": False,
+                   "note": ""}
+        row.update(id=rid, name=rec.get("name") or rid,
+                   enabled=rec.get("enabled", True))
+        out.append(row)
+    return out
+
+
+def set_embed_reach(eid, want):
+    """Tick this key onto each endpoint's authorize profile, or off it.
+
+    Written through the profiles themselves rather than kept as a second list
+    on the key: one permission with two places to set it is two places to
+    disagree, and the endpoint's own screen would stop telling the truth.
+
+    Returns (changed, shared) — what moved, and any profile that more than one
+    endpoint names, because ticking there grants all of them and an admin
+    should be told rather than find out."""
+    ddoc = read_displays_doc()
+    cfg = ddoc.get("settings")
+    if not isinstance(cfg, dict):
+        return [], []
+    doc = read_routes()
+    users = {}
+    for rid in route_order(doc):
+        pid = str(doc["routes"][rid].get("permission") or "")
+        perm = next((p for p in cfg.get("permissions") or []
+                     if p.get("id") == pid), None)
+        zid = str(((perm or {}).get("values") or {}).get("authz") or "")
+        if zid:
+            users.setdefault(zid, []).append(rid)
+    changed, shared = [], []
+    for rid in route_order(doc):
+        rec = doc["routes"][rid]
+        pid = str(rec.get("permission") or "")
+        perm = next((p for p in cfg.get("permissions") or []
+                     if p.get("id") == pid), None)
+        if not perm:
+            continue
+        zid = str((perm.get("values") or {}).get("authz") or "")
+        az = next((a for a in cfg.get("authzs") or []
+                   if a.get("id") == zid), None)
+        if not az:
+            continue
+        vals = az.setdefault("values", {})
+        lst = list(vals.get("embeds") or [])
+        has, wants = eid in lst, rid in want
+        if has == wants:
+            continue
+        vals["embeds"] = (lst + [eid]) if wants else [x for x in lst if x != eid]
+        changed.append("%s %s" % (rec.get("name") or rid,
+                                  "granted" if wants else "withdrawn"))
+        if len(users.get(zid) or []) > 1:
+            shared.append("%s shares its permission with %s"
+                          % (rec.get("name") or rid,
+                             ", ".join(doc["routes"][o].get("name") or o
+                                       for o in users[zid] if o != rid)))
+    if changed:
+        _write_displays_doc(ddoc)
+    return changed, sorted(set(shared))
+
+
+def embed_look(rec):
+    """THE FACE OF THE ASSISTANT THIS KEY REACHES, as the frame draws it.
+
+    A screen gets its appearance from the layout profile its own row names,
+    handed down in the kiosk block on /display/hello. An embed has no row, so
+    it was handed nothing — and there is no shared appearance to fall back on,
+    deliberately, because a display "reads its appearance from the profiles it
+    names and from nowhere else" (see display_document). Nothing plus nothing
+    is the constants index.html ships with, so an endpoint whose layout says
+    ORB drew as ORB on every wall in the building and as RIDGE inside a host
+    page, and the setting looked like it had not saved.
+
+    The endpoint is the KEY's, not the port's — the same rule the question
+    itself follows, for the same reason.
+
+    THE THREE APPEARANCE PROFILES AND NOTHING ELSE. A layout also carries
+    fullscreen, a clock, a screensaver and whether to listen: those are
+    decisions about a wall in a corridor, and a host page composes its own
+    frame. Only what the assistant LOOKS and SOUNDS like travels."""
+    eid = str((rec or {}).get("endpoint") or "")
+    if not eid:
+        return None
+    route = read_routes()["routes"].get(eid)
+    if not route:
+        return None
+    cfg = display_settings()
+    prof = route_layout(route, cfg)
+    if not prof:
+        return None
+    merged = {}
+    for key, pool in (("look", "looks"), ("motion", "motions"),
+                      ("speech", "speeches")):
+        got = find_look(str(prof.get(key) or ""), cfg.get(pool) or [])
+        if got:
+            merged.update(got)
+    return merged or None
+
+
 def embed_op_list(rec):
     """A site's operations as the panel draws them: everything the
     application permits, each saying whether it writes and whether an admin
@@ -8559,8 +8934,35 @@ def tool_prompt(ops):
             "depends on that application's data rather than on general "
             "knowledge, and say what you found rather than describing the "
             "call you made. Ask for a narrower search rather than requesting "
-            "large amounts of data. If a call is refused, say plainly that "
-            "their account could not do that; do not retry it.")
+            # A REFUSAL AND A WRONG REQUEST ARE NOT THE SAME ANSWER, and one
+            # sentence covering both taught the model to give up on either.
+            # 401 and 403 are that person's account saying no and nothing the
+            # model does will change it. Everything else — a rejected
+            # parameter, a window too wide, a bucket too fine — is this call
+            # being wrong, and these applications answer it by naming the
+            # value that would have worked. Told to retry, a capable model
+            # spends the second lap and gets the data; told not to, it
+            # explains the error to somebody who asked about their logs.
+            "large amounts of data. If a call comes back 401 or 403 their "
+            "account is not allowed it: say so plainly and do not try again. "
+            "Any other failure is this call being wrong rather than refused — "
+            "read what the application said, correct the arguments and call "
+            "it again. Do not describe the corrected call instead of making "
+            "it, and do not repeat a call that failed the same way twice."
+            # AND NEVER ASK PERMISSION TO READ. Observed, twice: asked for the
+            # oldest log, it answered "I would need to query the syslog data —
+            # would you like me to proceed?", and the person said yes to a
+            # model that by then had a bare "yes" and no idea what it had
+            # offered. Nothing was waiting on their answer. A read can only
+            # return what they could have read themselves, which is why reads
+            # go straight through; the one thing that DOES stop and ask is a
+            # write, and that confirmation is drawn by the browser, not by the
+            # model. So an offer to proceed is a turn spent buying permission
+            # that was already given, and it costs the person their question.
+            "\n\nNever ask whether to make a call. Reads need no permission "
+            "and a write is confirmed elsewhere, so an offer to proceed only "
+            "loses a turn: if a tool would answer the question, call it now "
+            "and reply with what came back.")
 
 
 def embed_tool_context(emb, obj):
@@ -8615,6 +9017,32 @@ def embed_tool_context(emb, obj):
                        "args": r.get("args") if isinstance(r.get("args"), dict)
                                else {},
                        "content": content})
+    # WHAT THE APPLICATION ANSWERED, and only the newest one: the page resends
+    # every earlier round on each lap, so logging the list would write the same
+    # line again on every pass.
+    #
+    # THE STATUS AND NEVER THE BODY. A body is that application's data — it has
+    # no business in this server's log — while a status is the one fact that
+    # says whose problem this is. `0` in particular is not an HTTP code: it
+    # means the browser never got a response at all, which is the difference
+    # between "their API said no" and "the call never left the page", and those
+    # two send you to different buildings.
+    if rounds:
+        last = rounds[-1]
+        try:
+            got = json.loads(last["content"])
+        except ValueError:
+            got = {}
+        st = got.get("status")
+        why = ""
+        if not st:
+            body = got.get("body")
+            why = " — " + str(body.get("error"))[:120] if isinstance(body, dict) \
+                  and body.get("error") else " — no response"
+        print("embed %s (%s) <- %s %s%s%s"
+              % ((emb or {}).get("id", "?"), (emb or {}).get("name", "?"),
+                 last["op"], st if st else "no status", why,
+                 " %dB" % len(last["content"]) if st else ""), flush=True)
     if len(rounds) > MAX_TOOL_ROUNDS:
         # The loop's end, and it is a real one: a model that has misread its
         # tools will call the same one until something stops it, and every lap
@@ -8796,7 +9224,8 @@ ADMIN_ONLY_ROUTES = ("/users", "/users/delete", "/users/role", "/app",
                      "/routes/test",
                      "/embeds", "/embeds/update", "/embeds/delete",
                      "/embeds/enable", "/embeds/reissue",
-                     "/embeds/spec", "/embeds/ops",
+                     "/embeds/spec", "/embeds/ops", "/embeds/reach",
+                     "/app/restart",
                      # …and note what is NOT here either: /display/hello, which
                      # is how a display gets its token and therefore has to be
                      # reachable from the listener a display is served on.
@@ -9029,6 +9458,19 @@ class Handler(SimpleHTTPRequestHandler):
         anyone can already open."""
         s = self._embed()
         if not s:
+            # A FRAME WHOSE SESSION HAS GONE IS NOT A PASSER-BY. It presented a
+            # bearer token and the token is dead — expired, or dropped by an
+            # admin's edit or a restart. Falling through to "an ordinary
+            # visitor at the display" then handed it to the display gate, which
+            # judged it on whatever cookie that origin happened to hold and
+            # refused it as an unapproved SCREEN. The person in the panel was
+            # told they were not permitted to use an endpoint, when what had
+            # actually happened was that their session ended.
+            raw = self.headers.get("Authorization") or ""
+            if raw.lower().startswith("bearer "):
+                self._json(401, {"error": "this embed session has ended",
+                                 "embed_expired": True})
+                return None, True
             return None, False
         if not s["cap"].get(want):
             self._json(403, {"error": "this embed is not permitted to %s"
@@ -9902,6 +10344,13 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"app": cfg, "running": RUNNING,
                                     "cert": cert_info(),
                                     "pending": app_pending(cfg),
+                                    # AND WHICH LISTENERS ARE ACTUALLY UP. A
+                                    # profile saved while the server is
+                                    # running binds nothing until it restarts,
+                                    # and that used to be visible only as a
+                                    # dead port somewhere else entirely.
+                                    "nets": net_state(cfg=cfg),
+                                    "blockers": restart_blockers(cfg),
                                     "warning": posture_warning(cfg),
                                     "running_warning": posture_warning(RUNNING),
                                     "addresses": local_addresses(),
@@ -9944,7 +10393,7 @@ class Handler(SimpleHTTPRequestHandler):
                 row = {k: rec.get(k) for k in
                        ("name", "preset", "parts", "cap", "origins",
                         "ttl_minutes", "created", "created_by",
-                        "last_used", "enabled", "needs_user")}
+                        "last_used", "enabled", "needs_user", "endpoint")}
                 row.update(id=eid, sessions=live.get(eid, 0),
                            snippets=embed_snippets(rec, base),
                            # WHAT THIS SITE MAY ASK ITS OWN APPLICATION FOR.
@@ -9958,10 +10407,28 @@ class Handler(SimpleHTTPRequestHandler):
                            grant_seen=bool(rec.get("grant_seen")),
                            grant_note=rec.get("grant_note") or "",
                            ops_dropped=rec.get("ops_dropped") or [],
-                           ops=embed_op_list(rec))
+                           ops=embed_op_list(rec),
+                           # AND WHICH ENDPOINTS IT MAY REACH. The permission
+                           # lives on the endpoints; this is the same data
+                           # read from the site's side, which is where an
+                           # admin setting up one application is looking.
+                           reach=embed_reach(eid))
                 out.append(row)
+            # THE ENDPOINTS, WITH THE SITES THAT MAY NAME THEM. Sent here
+            # rather than left to the panel's own copy: that copy is filled by
+            # whichever tab happened to be opened first, so a site row opened
+            # before the endpoints tab had ever been looked at drew its
+            # assistant picker with nothing in it — and an empty picker saves
+            # an empty value, which reads as a broken save rather than as a
+            # list that had not arrived.
+            _doc = read_routes()
             return self._json(200, {"embeds": out, "parts": list(PARTS),
                                     "presets": PRESETS, "base": base,
+                                    "endpoints": [
+                                        {"id": _rid,
+                                         "name": _doc["routes"][_rid].get("name") or _rid,
+                                         "enabled": _doc["routes"][_rid].get("enabled", True)}
+                                        for _rid in route_order(_doc)],
                                     "ttl": {"min": EMBED_TTL_MIN,
                                             "max": EMBED_TTL_MAX,
                                             "default": EMBED_TTL_DEFAULT}})
@@ -10456,6 +10923,10 @@ class Handler(SimpleHTTPRequestHandler):
                            "path": o["path"], "writes": bool(o.get("writes")),
                            "summary": o.get("summary") or o["op"]}
                           for o in (s.get("ops") or [])],
+                # …AND WHAT IT LOOKS LIKE. See embed_look: the endpoint's own
+                # appearance, which every screen naming the same layout has
+                # been drawing all along and the frame alone was missing.
+                "look": embed_look(v["rec"]),
                 "expires_in": max(0, int(s["expires"] - time.time())),
             }})
 
@@ -10616,7 +11087,8 @@ class Handler(SimpleHTTPRequestHandler):
             # when any of that moves — and stay when it does not, because
             # renaming a site must not take somebody's page dark.
             moved = [k for k in ("parts", "cap", "origins", "ttl_minutes",
-                                 "needs_user") if old.get(k) != rec[k]]
+                                 "needs_user", "endpoint")
+                     if old.get(k) != rec[k]]
             embeds[eid] = rec
             write_embeds(embeds)
             dropped = 0
@@ -10637,6 +11109,39 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(200, {"ok": True, "id": eid, "changed": moved,
                                     "dropped": dropped,
                                     "snippets": embed_snippets(rec, embed_base())})
+
+        if parsed.path == "/app/restart":
+            # THE ONE ACTION THAT CAN REMOVE THE WAY TO UNDO IT. Everything
+            # else in this panel is recoverable from this panel; a restart into
+            # a configuration that cannot bind takes the panel down with the
+            # rest and leaves editing JSON on the box by hand.
+            #
+            # So it is refused rather than attempted, naming what is in the
+            # way. The same bind test already runs when a port is typed — this
+            # asks it about every socket at once, at the moment where being
+            # wrong is unrecoverable rather than merely wrong.
+            s = self._require("admin")
+            if not s:
+                return
+            blockers = restart_blockers()
+            if blockers:
+                print("restart refused for %s: %s"
+                      % (s["user"], "; ".join(blockers)), flush=True)
+                return self._json(409, {"error": "this configuration would not "
+                                                 "come back up",
+                                        "blockers": blockers})
+            err = hand_over("restart requested by %s" % s["user"])
+            if err:
+                return self._json(500, {"error": err})
+            # ANSWERED BEFORE IT DIES, and this is the whole reason the reply
+            # is sent from here rather than after the handover: `serve.sh stop`
+            # is already on its way to kill this process, and a browser waiting
+            # on a socket that closes mid-response reads it as a failed request
+            # rather than as the restart it asked for.
+            return self._json(200, {"ok": True,
+                                    "note": "handed over to serve.sh — this "
+                                            "page will lose the server for a "
+                                            "few seconds"})
 
         if parsed.path == "/embeds/spec":
             # READ THIS SITE'S APPLICATION, and it is a read of two documents:
@@ -10684,6 +11189,31 @@ class Handler(SimpleHTTPRequestHandler):
                                     "grant_note": rec["grant_note"],
                                     "note": rec["spec_note"],
                                     "dropped": rec.get("ops_dropped") or []})
+
+        if parsed.path == "/embeds/reach":
+            s = self._require("admin")
+            if not s:
+                return
+            obj = self._json_body()
+            if obj is None:
+                return
+            eid = str(obj.get("id") or "")
+            embeds = read_embeds()
+            if eid not in embeds:
+                return self._json(404, {"error": "no such embed"})
+            want = {str(x)[:32] for x in (obj.get("endpoints") or [])}
+            changed, shared = set_embed_reach(eid, want)
+            # NO SESSIONS DROPPED, and that is not an omission: this grant is
+            # read on every question through the endpoint's own profile rather
+            # than snapshot into the session, so a withdrawal is true on the
+            # next question without anybody's page going dark.
+            if changed:
+                print("embed key %s (%s) reach changed by %s: %s"
+                      % (eid, embeds[eid].get("name"), s["user"],
+                         "; ".join(changed)), flush=True)
+            return self._json(200, {"ok": True, "changed": changed,
+                                    "shared": shared,
+                                    "reach": embed_reach(eid)})
 
         if parsed.path == "/embeds/ops":
             # THE TICKS. Everything is off until an admin does this, and what
@@ -10876,6 +11406,21 @@ class Handler(SimpleHTTPRequestHandler):
                 if asked:
                     rec["asked"] = asked
                 return self._json(200, {"display": self._display_state(rec)})
+            # A NAME, OR NOTHING. Hanging a screen is a deliberate act — the
+            # page is opened as `?display=Kitchen`, or an enrolment code is
+            # spent — and either way this arrives with a name. A browser that
+            # merely opened the address is somebody looking at a page, and it
+            # must not leave a row in the approval queue for an admin to
+            # wonder about later.
+            #
+            # That was already the stated rule two branches up, and it was
+            # only honoured for a visitor who happened to be SIGNED IN;
+            # everyone else fell through to here and was minted a device.
+            # Twenty rows on the first deployment, eighteen of them unnamed
+            # page loads, and a refusal at an endpoint the person could not
+            # account for — they had never enrolled anything.
+            if not asked:
+                return self._json(200, {})
             token, rec = new_display(asked, hint)
             if not token:
                 return self._json(409, {"error": rec})
@@ -12241,7 +12786,24 @@ class Handler(SimpleHTTPRequestHandler):
             # through an embed, and that is what the default route is for.
             doc = read_routes()
             want = str(obj.get("route") or "")[:32]
-            if self.pinned_net:
+            # THE KEY'S ENDPOINT WINS OVER THE PORT'S, for an embed only. See
+            # validate_embed: which assistant a site reaches is a grant, and
+            # the port it was framed from is an accident of the address its
+            # integrator was given.
+            keyed = str((emb or {}).get("endpoint") or "")
+            if keyed and not (keyed in doc["routes"]
+                              and doc["routes"][keyed].get("enabled", True)):
+                # Deleted or switched off since the key was written. Falling
+                # back to what the address carries is the lesser failure: a
+                # panel that goes silent because somebody renamed an assistant
+                # is worse than one that answers from another and says which.
+                print("embed %s names endpoint %s, which is gone or not "
+                      "answering — falling back to this port's default"
+                      % (emb["id"], keyed), flush=True)
+                keyed = ""
+            if keyed:
+                want = keyed
+            elif self.pinned_net:
                 # A port answers as its own endpoints and no others. Asking
                 # for one it does not carry is a caller at the wrong door —
                 # given this port's default rather than refused, which is the
@@ -12320,6 +12882,20 @@ class Handler(SimpleHTTPRequestHandler):
             tools, rounds, tool_err = embed_tool_context(emb, obj)
             if tool_err:
                 return self._json(400, dict(about, error=tool_err))
+            if emb and tools:
+                # WHAT WENT, IN THE ONE UNIT THAT DECIDES WHETHER IT FITS.
+                # Three separate faults on this endpoint were diagnosed from
+                # guesses — a cold model, a lost conversation, a dropped
+                # history — because the log said what was ASKED and never how
+                # much was sent to ask it. A model's window is the budget
+                # everything here competes for, and the tool definitions alone
+                # can be most of it.
+                print("embed %s (%s) -> %s: %d tool(s), %d turn(s) of history,"
+                      " %d lap(s)"
+                      % (emb["id"], emb["name"], cfg.get("name") or rid,
+                         len(tools), len([m for m in history
+                                          if isinstance(m, dict)]),
+                         len(rounds)), flush=True)
             pending = None
             t0 = time.time()
             try:
@@ -12387,6 +12963,16 @@ class Handler(SimpleHTTPRequestHandler):
                 # person before it goes, and it must not have to work that out
                 # for itself.
                 tc = out["tool_call"]
+                # WHAT WAS ASKED FOR, as the far end will see it. The same line
+                # their own access log should carry, so "we never got it" and
+                # "we got it and refused" can be told apart from one side.
+                print("embed %s (%s) -> %s %s%s (lap %d)"
+                      % (emb["id"], emb["name"], pending["method"].upper(),
+                         pending["path"],
+                         ("?" + "&".join("%s=%s" % kv
+                                         for kv in pending["query"].items()))
+                         if pending["query"] else "",
+                         len(rounds) + 1), flush=True)
                 return self._json(200, dict(
                     about, tool_call=dict(pending, id=tc["id"],
                                           args=tc.get("args") or {}),
@@ -13089,6 +13675,31 @@ def main():
               "for %s. Give each one a network profile under PROFILES \u25b8 "
               "NETWORK, or it cannot be reached."
               % (len(_adrift), ", ".join(sorted(_adrift))), flush=True)
+    # AN ENDPOINT WITH NO SYSTEM PROMPT IS AN ASSISTANT WITH NO INSTRUCTIONS,
+    # and it is reachable, it replies, and nothing about it looks wrong.
+    #
+    # ASKED OF THE RESOLVED CONFIGURATION, not of a field on the route. A
+    # profile reaches an endpoint by two roads — named on the endpoint, or
+    # named on the CONNECTION the endpoint answers through — and the first
+    # draft of this checked only the first. It then told an admin who had
+    # assigned a profile perfectly well that they had not, which is worse than
+    # saying nothing: the profile was there and EMPTY, which is a different
+    # thing to fix and in a different place.
+    _mute = []
+    for _rid2 in _doc["routes"]:
+        _r2 = _doc["routes"][_rid2]
+        if not _r2.get("enabled", True):
+            continue
+        _cfg2 = resolve_route(_doc, _rid2)[1] or {}
+        if _cfg2.get("provider") == "demo" or not _cfg2:
+            continue                      # nothing is asked of a demo route
+        if not str(_cfg2.get("system") or "").strip():
+            _mute.append(_r2.get("name") or _rid2)
+    if _mute:
+        print("WARNING: %d endpoint(s) answer with no system prompt: %s — the "
+              "model is told nothing about what it is or how to reply. Fill in "
+              "the model profile it uses under CONNECTIONS \u25b8 MODELS."
+              % (len(_mute), ", ".join(sorted(_mute))), flush=True)
     for _nid, _names in sorted(_byport.items()):
         if len(_names) > 1:
             _prof = net_profile(_nid) or {}

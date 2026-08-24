@@ -111,6 +111,18 @@ the moment you touch it. It will not start while it is thinking about an answer
 or speaking one, and if nothing happens when you leave a screen alone, then
 whoever runs it has not switched it on for that display.
 
+## When it is thinking
+
+Three dots appear where the answer will be, brightening one after another,
+from the moment you ask until the reply arrives. They mean it is working.
+
+Most answers come back in a moment. One that has to look something up in the
+application the assistant is embedded in takes longer — the question goes out,
+the answer comes back, and the assistant reads it before it says anything — so
+the dots can sit there for the better part of a minute. That is the wait
+working, not a fault. If they disappear without an answer, or you are told it
+could not reach the assistant, that one did fail.
+
 ## Typing instead of talking
 
 The field along the bottom takes typed questions. Press Enter to send. Talking

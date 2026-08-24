@@ -25,7 +25,7 @@ it out; the delay is per address and clears on its own.
 ## How the panel is laid out
 
 **It opens on nothing.** The first thing you see is the mark, at three quarters
-of the panel's width, and the menus — no topics, no box, and no tab lit,
+of the panel's width, and the menu — no topics, no box, and no tab lit,
 because none of them is where you are yet. Press anything and it steps back to
 a watermark behind the work, where it stays for the rest of the session.
 
@@ -41,25 +41,42 @@ opposite colours: ice takes you back to the start, rust ends the session.
 Beside them your name reads as one phrase — name, dash, level — rather than a
 name with a badge after it.
 
-The left column is the whole interface. It is organised as a set of topics,
-and **one topic is open at a time**: opening another closes the one before it,
-so the column stays short enough to take in at a glance rather than becoming a
-wall to scroll through. Clicking the open one closes it, which is a legitimate
-state to leave it in.
+The settings sit to the right of the menu, in the wider of the panel's two
+columns, and they are organised as a set of topics with **one topic open at a
+time**: opening another closes the one before it, so the column stays short
+enough to take in at a glance rather than becoming a wall to scroll through.
+Clicking the open one closes it, which is a legitimate state to leave it in.
 
-**In the bar across the top** are three boxed labels, each naming the links
-beside it. A label is not somewhere you can go — nothing happens when you press
-one. It says what the links after it have in common, and the large space before
-the next label is what separates one subject from the next. The links are links
-rather than tabs, because they do not switch which controls you are editing;
-they change the subject entirely.
+**Down the left is the menu**, six boxed labels with their links under them.
+It stands between the bar at the top and the strip at the foot, and it does not
+scroll with the settings. A label is not somewhere you can go — it says what
+the links under it have in common. The links are links rather than tabs,
+because they do not switch which controls you are editing; they change the
+subject entirely.
+
+A rule reading **PROFILES** divides the menu in two. Above it is the server —
+how it is run, what is allowed to arrive, who it knows about. Below it are the
+three lists an endpoint is assembled from, and every one of those is a profile
+stored in the displays document and picked by name wherever a screen is
+configured.
+
+**Each label folds its own group**, the same way a topic heading folds its
+settings, and the caret on it says which way it is. They fold independently —
+closing one does not open another — and a fresh panel opens with all six out.
+A folded group whose tab you are standing on keeps its name lit, so tidying the
+menu never hides where you are.
+
+The caret at the head of the menu **folds the whole thing away**, which gives
+the settings the width back. Folded, the strip that is left still names the tab
+you are on, running down it in the colour a selected link wears — so closing
+the menu never costs you the answer to *where am I* either.
 
 **Every label is shaded from the display's own palette**, a colour per subject
-— the three in the bar in **blue**, PROFILES, LAYOUTS, CONNECTIONS and
-ACCESS in **ice**, SEARCH in **milk**. They are the same five colours a display can be set to, taken from
-the same values rather than matched by eye, so the panel and the thing it
-configures are not two people's idea of one palette. The colour is there to
-tell the rows apart at a glance; it is not saying anything you have to decode.
+— the six in the menu in **rust**, ACCESS in **ice**, SEARCH in **milk**. They
+are the same colours a display can be set to, taken from the same values rather
+than matched by eye, so the panel and the thing it configures are not two
+people's idea of one palette. The colour is there to tell the groups apart at a
+glance; it is not saying anything you have to decode.
 
 **SETTINGS** — how the server itself is run.
 
@@ -168,6 +185,15 @@ edge:
   under a name. MODELS carries the limits and the system prompt as well, since
   those describe the service rather than the assistant in front of it.
 
+  Its numbers — reply limit, temperature, turns of context, timeout — are
+  **typed, and blank means the default**, which each shows as a placeholder.
+  They were sliders, and a slider cannot be empty: an untouched one sat on the
+  default and read as a saved setting while the profile behind it held nothing.
+  A profile that has never been filled in is an assistant with no system prompt
+  and no memory of the last question, and the panel was the reason that stayed
+  invisible. **An endpoint answering with no system prompt is named in the
+  startup log.**
+
 Each of the three groups reads the same way: the last tab in it is the one that
 *names* the others, and an endpoint names only those. Three pointers on an
 endpoint instead of a dozen fields, and a rule written once rather than copied
@@ -188,9 +214,19 @@ needed for the pair above:
   register, not the form: a key is issued under ENROLLMENTS ▸ EMBED and appears
   here the moment it exists, the same move a screen makes from ▸ DEVICE to
   NODES. This is also where a site is *maintained* — a row opens on the key's
-  own settings, in the same six sections the key was made in: name, preset,
-  what it may do, what it draws, which origins may frame it, whether the host
-  must name the person, and the session and rate numbers.
+  own settings, in the same seven sections the key was made in: name, preset,
+  which assistant it talks to, what it may do, what it draws, which origins may
+  frame it, whether the host must name the person, and the session and rate
+  numbers.
+
+  It also carries **endpoints this site may reach** — the same permission that
+  lives on each endpoint's authorize profile, read from the site's side. It was
+  only editable from the other end, so granting one site three endpoints meant
+  opening three profiles and remembering an id. Ticking here writes through
+  those profiles rather than keeping a second list, because one permission with
+  two places to set it is two places to disagree and the endpoint's own screen
+  would stop telling the truth. An endpoint whose profile is shared with others
+  says so when you tick it: the grant reaches all of them.
 
   **SAVE** rewrites the key in place. Same id, same secret, same grants — so
   nobody at the far end is sent anything, and no authorize profile stops naming
@@ -208,6 +244,13 @@ needed for the pair above:
   the person** is the one edit the far end has to follow: their own endpoint
   must send it from the moment you save, so send them the code on the row
   again.
+
+  **Which assistant a site talks to is set here**, not by the address their
+  page frames. Left blank it behaves as it always did — whatever endpoint
+  answers on the port their integrator was given — and naming one moves the
+  decision off their source and onto this row. Changing it drops the site's
+  live sessions so the next question goes to the new one, and the endpoint's
+  own permissions still apply.
 
   **What it may ask its own application for** is the third block on the row,
   and it is a separate decision with a separate SAVE — a permission over
@@ -239,6 +282,20 @@ needed for the pair above:
   anything they could not already open for themselves, and a write stops and
   asks the person by voice or by button with the real values read back. See
   [Reaching an application's data](host-data.md).
+
+  **What it actually asked for is in `server.log`**, both legs of it:
+
+  ```
+  embed efe2c22ff5da2 (pktLog) -> GET /api/logs/search?limit=1 (lap 1)
+  embed efe2c22ff5da2 (pktLog) <- searchSyslog 200 648B
+  ```
+
+  The outgoing line matches what the application's own access log recorded, so
+  a disagreement about who dropped a call is settled by laying the two side by
+  side. The reply is its status and size only — never the body, which is their
+  data and would leave the machine with the log. **`no status` is not an HTTP
+  code**: it means the browser never got a response, which is the difference
+  between their API refusing and the call never leaving the page.
 
   **DISABLE** takes a site off the air and keeps the row; **DELETE** is final.
   **REISSUE KEY** mints a new secret on the same site — same id, same settings,
