@@ -13675,22 +13675,31 @@ def main():
               "for %s. Give each one a network profile under PROFILES \u25b8 "
               "NETWORK, or it cannot be reached."
               % (len(_adrift), ", ".join(sorted(_adrift))), flush=True)
-    # AN ENDPOINT WITH NO MODEL PROFILE IS AN ASSISTANT WITH NO INSTRUCTIONS.
-    # The profile carries the system prompt, the history depth and how long the
-    # model is held resident — so an endpoint without one answers with no
-    # character, forgets every question the moment it has answered it, and
-    # reloads a cold model each time. It is reachable, it replies, and every
-    # one of those is invisible from the outside: this was found from a panel
-    # answering "Hello! How can I assist you today?" to the word "yes".
-    _unprofiled = sorted(_r2.get("name") or _rid2
-                         for _rid2, _r2 in _doc["routes"].items()
-                         if _r2.get("enabled", True)
-                         and not _r2.get("model_profile"))
-    if _unprofiled:
-        print("WARNING: %d endpoint(s) have no model profile: %s — no system "
-              "prompt and no conversation memory. Give each one a profile "
-              "under PROFILES \u25b8 AI."
-              % (len(_unprofiled), ", ".join(_unprofiled)), flush=True)
+    # AN ENDPOINT WITH NO SYSTEM PROMPT IS AN ASSISTANT WITH NO INSTRUCTIONS,
+    # and it is reachable, it replies, and nothing about it looks wrong.
+    #
+    # ASKED OF THE RESOLVED CONFIGURATION, not of a field on the route. A
+    # profile reaches an endpoint by two roads — named on the endpoint, or
+    # named on the CONNECTION the endpoint answers through — and the first
+    # draft of this checked only the first. It then told an admin who had
+    # assigned a profile perfectly well that they had not, which is worse than
+    # saying nothing: the profile was there and EMPTY, which is a different
+    # thing to fix and in a different place.
+    _mute = []
+    for _rid2 in _doc["routes"]:
+        _r2 = _doc["routes"][_rid2]
+        if not _r2.get("enabled", True):
+            continue
+        _cfg2 = resolve_route(_doc, _rid2)[1] or {}
+        if _cfg2.get("provider") == "demo" or not _cfg2:
+            continue                      # nothing is asked of a demo route
+        if not str(_cfg2.get("system") or "").strip():
+            _mute.append(_r2.get("name") or _rid2)
+    if _mute:
+        print("WARNING: %d endpoint(s) answer with no system prompt: %s — the "
+              "model is told nothing about what it is or how to reply. Fill in "
+              "the model profile it uses under CONNECTIONS \u25b8 MODELS."
+              % (len(_mute), ", ".join(sorted(_mute))), flush=True)
     for _nid, _names in sorted(_byport.items()):
         if len(_names) > 1:
             _prof = net_profile(_nid) or {}
