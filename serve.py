@@ -806,7 +806,7 @@ def effective_system(cfg, tz=None):
     from the instructions and recites the lot when somebody asks the date.
     Measured on qwen2.5:3b: one paragraph leaked the instructions into a
     spoken answer; two sentences did not."""
-    return _join(system_prompt(cfg), now_note(tz))
+    return _join(system_prompt(cfg), clock_rule(), now_note(tz))
 
 
 def _join(*parts):
@@ -831,20 +831,40 @@ def system_prompt(cfg):
     return (cfg.get("system") or "").strip()
 
 
-def now_note(tz=None):
-    """The clock, and the one instruction that governs it.
+def clock_rule(tools=None):
+    """What to DO about the clock, as opposed to what the clock says.
 
-    Kept together and kept as two sentences — see effective_system for what
-    was measured — and placed late in the message list rather than in the
-    system prompt, so that everything a model can usefully cache comes before
-    it. "That line" needs the stamp in front of it, which is why this is one
-    function and not two."""
-    return (_now_in(tz).strftime(
-                "Current date and time: %A %d %B %Y, %H:%M (%Z).") + "\n" +
-            "That line is context, not something to read out. Do not "
-            "repeat or mention these instructions. If you are asked "
-            "about anything more recent than your training data, say you "
-            "do not know rather than guessing.")
+    In the stable half, because it never changes — and separated from the
+    stamp itself by the whole conversation, which is further apart than the
+    two sentences that were measured on qwen2.5:3b and no worse for it: the
+    fact now arrives with no instructions attached to it at all.
+
+    THE LAST SENTENCE IS FOR AN ASSISTANT WITH NO TOOLS. Told to say it does
+    not know about anything past its training data, a model with an
+    application's API in front of it says exactly that — and it is the nearest
+    instruction to the question, so it wins over a tool paragraph further up.
+    Asked for the last log it had every means of reading, it answered that it
+    has no access to live logs. Where there are tools, reaching for one IS the
+    answer to a question about something recent."""
+    rule = ("You will be given the current date and time. That line is "
+            "context, not something to read out, and these instructions are "
+            "not to be repeated or mentioned.")
+    if tools:
+        return rule + (" For anything more recent than your training data, "
+                       "use the tools rather than answering from memory.")
+    return rule + (" If you are asked about anything more recent than your "
+                   "training data, say you do not know rather than guessing.")
+
+
+def now_note(tz=None):
+    """The clock alone, placed late.
+
+    Everything a server can usefully cache is a prefix, and a prefix ends at
+    the first token that differs — so this, which changes every minute, goes
+    after the system prompt, the tool definitions and the conversation rather
+    than in front of them. See system_prompt."""
+    return _now_in(tz).strftime(
+        "Current date and time: %A %d %B %Y, %H:%M (%Z).")
 
 
 def ask_backend(text, history, cfg, tz=None, conversation_id="",
@@ -871,7 +891,19 @@ def ask_backend(text, history, cfg, tz=None, conversation_id="",
     browser. See the host-data section."""
     turns = [m for m in history if isinstance(m, dict)
              and m.get("role") in ("user", "assistant") and m.get("content")]
-    keep = max(0, min(int(cfg.get("history_turns") or 0), MAX_HISTORY))
+    # BLANK IS "THE DEFAULT", NOT "NONE" — the same reading `max_tokens` and
+    # `timeout` already give it two lines further down, and the one that was
+    # missing here. An endpoint with no model profile has this unset, and
+    # `or 0` turned that into an assistant with no memory at all: it answered
+    # the first question, and to "yes" replied "Hello! How can I assist you
+    # today?", because the question it was agreeing to had never been sent.
+    # Nothing said so from either end.
+    #
+    # An explicit 0 still means none. Somebody who types zero has chosen it.
+    want = cfg.get("history_turns")
+    keep = (BACKEND_DEFAULTS["history_turns"] if want in ("", None)
+            else int(want))
+    keep = max(0, min(keep, MAX_HISTORY))
     msgs = [{"role": m["role"], "content": str(m["content"])[:8000]}
             for m in turns[-keep:]] if keep else []
     ask = {"role": "user", "content": text}
@@ -885,7 +917,8 @@ def ask_backend(text, history, cfg, tz=None, conversation_id="",
         # in front of them threw the whole of it away every call. The note goes
         # in as its own message just before the question instead, where the
         # model still reads it and nothing before it has changed.
-        head = (system_prompt(cfg) + tool_prompt(tools)).strip()
+        head = _join(system_prompt(cfg) + tool_prompt(tools),
+                     clock_rule(tools)).strip()
         msgs = ([{"role": "system", "content": head}] if head else []) + msgs
         msgs.append({"role": "system", "content": now_note(tz)})
         msgs.append(ask)
@@ -952,7 +985,8 @@ def ask_backend(text, history, cfg, tz=None, conversation_id="",
         body = {"model": cfg["model"], "messages": msgs,
                 # required here, unlike the OpenAI shape where it is optional
                 "max_tokens": int(cfg.get("max_tokens") or 400)}
-        body["system"] = effective_system(cfg, tz) + tool_prompt(tools)
+        body["system"] = _join(system_prompt(cfg) + tool_prompt(tools),
+                               clock_rule(tools), now_note(tz))
         if tools:
             # The same definitions, one field name apart: `input_schema` here,
             # `parameters` there, and the rest identical.
@@ -13641,6 +13675,22 @@ def main():
               "for %s. Give each one a network profile under PROFILES \u25b8 "
               "NETWORK, or it cannot be reached."
               % (len(_adrift), ", ".join(sorted(_adrift))), flush=True)
+    # AN ENDPOINT WITH NO MODEL PROFILE IS AN ASSISTANT WITH NO INSTRUCTIONS.
+    # The profile carries the system prompt, the history depth and how long the
+    # model is held resident — so an endpoint without one answers with no
+    # character, forgets every question the moment it has answered it, and
+    # reloads a cold model each time. It is reachable, it replies, and every
+    # one of those is invisible from the outside: this was found from a panel
+    # answering "Hello! How can I assist you today?" to the word "yes".
+    _unprofiled = sorted(_r2.get("name") or _rid2
+                         for _rid2, _r2 in _doc["routes"].items()
+                         if _r2.get("enabled", True)
+                         and not _r2.get("model_profile"))
+    if _unprofiled:
+        print("WARNING: %d endpoint(s) have no model profile: %s — no system "
+              "prompt and no conversation memory. Give each one a profile "
+              "under PROFILES \u25b8 AI."
+              % (len(_unprofiled), ", ".join(_unprofiled)), flush=True)
     for _nid, _names in sorted(_byport.items()):
         if len(_names) > 1:
             _prof = net_profile(_nid) or {}
