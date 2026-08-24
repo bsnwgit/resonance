@@ -355,20 +355,44 @@
      REPRESENTATION — it has to be wide enough to show the display as a viewer
      on a desktop sees it. Below 560px the display collapses to its narrow
      layout, icons instead of words, so a preview allowed to shrink past that
-     would quietly start previewing a phone. The strip stays clear of it. */
-  :root{--stage:600px}
+     starts previewing a phone.
+
+     TAKEN DOWN A TENTH, to pay for the menu now standing down the left of the
+     panel. 540 is twenty pixels under the display's own breakpoint, so the
+     preview at the widest window is drawn in the narrow layout — a deliberate
+     trade, not an oversight: the panel is the thing being worked in and the
+     strip is a check on it. Put it back to 560 to clear the breakpoint
+     again. */
+  :root{--stage:540px}
   #wrap{position:fixed;inset:0;display:none;grid-template-columns:1fr var(--stage)}
   #wrap.on{display:grid}
-  /* A laptop cannot afford 600px of preview and a usable panel at once. Take
-     it down to something still above the display's own breakpoint first, and
-     only stack when there is genuinely no width left to split. */
-  @media (max-width:1280px){ :root{--stage:480px} }
+  /* A laptop cannot afford the full strip and a usable panel at once. Take it
+     down first, and only stack when there is genuinely no width left to
+     split. */
+  @media (max-width:1280px){ :root{--stage:432px} }
   @media (max-width:1000px){
     #wrap{grid-template-columns:1fr;grid-template-rows:1fr 320px}
     #panel{border-right:0;border-bottom:1px solid rgba(var(--glass),.12)}
   }
+  /* THREE ROWS AND TWO COLUMNS. The bar across the top and the foot across
+     the bottom run the full width and have not moved; the band between them
+     is split — the menu down the left, the topics in the rest.
+
+     A GRID rather than the column this was, because the menu has to span that
+     middle band exactly: as a flex column it would have had to be nested
+     inside a second box with the scroll, and the bar and the foot would have
+     been laid out against a wrapper rather than against the panel. The old
+     `flex:0 0 auto` / `flex:1 1 auto` on the three children are inert here and
+     have come off with them.
+
+     `minmax(0,1fr)` on both the middle row and the second column: without it a
+     grid track sizes to its content's minimum, and a long topic would push the
+     panel wider than the window instead of scrolling. */
   #panel{
-    position:relative;height:100%;min-height:0;display:flex;flex-direction:column;
+    position:relative;height:100%;min-height:0;
+    display:grid;
+    grid-template-columns:auto minmax(0,1fr);
+    grid-template-rows:auto minmax(0,1fr) auto;
     border-right:1px solid rgba(var(--glass),.12);background:rgba(0,0,0,.35);
   }
   /* the settings scroll; the identity below stays put */
@@ -380,63 +404,175 @@
      the other three, inside the border that says they are one subject. The
      bar above already draws the line this strip was drawing under itself. */
   #panelscroll{
-    flex:1 1 auto;min-height:0;overflow-y:auto;padding:12px 14px 24px;
+    grid-column:2;grid-row:2;
+    min-height:0;overflow-y:auto;padding:12px 14px 24px;
     /* the topics tile against THIS width, not the window's — the panel is one
-       column of a grid and the two are not the same number */
+       column of a grid, this is one column of the panel, and no two of those
+       three are the same number */
     container-type:inline-size;
     /* THE GUTTER IS ALWAYS THERE, whether or not there is anything to scroll.
-       The panel header is inside this box, so the moment the topics populate
-       and a scrollbar appears, every row above them loses its width — the
-       profiles row was laid out against one measure on the first paint and a
-       narrower one a moment later, which is why it fitted and then did not.
-       Reserving the gutter makes the two paints the same width. */
+       It was reserved because the panel header lived in this box and lost its
+       width the moment the topics populated and a scrollbar appeared. That
+       header is gone — the menu is down the left now and outside this box —
+       but the reservation stays: without it the topics re-tile every time a
+       tab is long enough to scroll and the one before it was not. */
     scrollbar-gutter:stable;
   }
-  /* Everything above the topics stays a column at a readable measure. A
-     search field and a row of tabs stretched to 1300px is not more usable
-     for being wider, and the space is better spent on the topics.
+  /* `#panelhead` IS GONE, and so is everything that propped it up — the
+     readable measure it was exempted from, and the sticky positioning that
+     kept the profiles row on screen while the topics scrolled under it. That
+     row is the menu down the left now: it does not scroll, so it does not
+     need to be pinned, and there is nothing left in this box above the
+     topics. */
 
-     The measure is put on the CONTROLS rather than on the block holding
-     them, so the dividers between them are not caught by it. A rule is not
-     a control — it is the edge of a region, and it has to reach as far as
-     the region does or it reads as an underline on the column above it
-     instead of a division of the panel. */
-  /* The tabs are not held to a readable measure. They were a column of boxed
-     controls, where a readable width is the right constraint; they are a row
-     of links behind a label now, and a menu bar that wraps onto three lines at
-     560px is one nobody can scan. The search that used to sit above them, and
-     was held to that measure, is in the foot with the other row. */
-  #panelhead > .profrow{max-width:none}
-  /* …but the tab row itself runs the whole width, out to the edge of the
-     preview, because it now carries two groups that have to sit apart. */
-  /* FIXED WHILE THE TOPICS SCROLL UNDER IT. This row says which list you are
-     editing, and on any tab long enough to scroll it was the first thing to
-     leave the screen — so the one control that answers "where am I" was gone
-     exactly when a long page made you want it.
+  /* ---- the menu down the left --------------------------------------------
+     The band between the bar and the foot, in the panel's first column. It
+     does not scroll with the topics and it is not sticky either: it simply
+     stays, which is what a menu should do and what the row it replaced could
+     only imitate.
 
-     STICKY RATHER THAN LIFTED OUT of #panelscroll. That box is the container
-     the topics tile against (container-type:inline-size) and the gutter is
-     reserved against its width; moving the header out from under it would
-     change what both of those measure, and the profiles row fitting on the
-     first paint and not the second is the bug that reservation exists to fix.
+     ITS WIDTH IS ITS CONTENTS. The grid track is `auto`, the list stretches
+     its buttons to the widest of them, and the widest word in the menu decides
+     the column — no fraction to tune, and nothing to re-tune when a tab is
+     renamed. The gutter is reserved for the same reason the topics reserve
+     theirs: a scrollbar appearing on a short window would otherwise take the
+     width out of the buttons rather than out of the panel.
 
-     THE GROUND IS PAINTED THE WAY THE PANEL PAINTS IT, not approximated. The
-     panel is rgba(0,0,0,.35) over the body's --ink, so an opaque patch picked
-     in hex would be a slightly different colour from the thing beside it —
-     the failure this panel keeps taking out everywhere else. The same
-     translucent black laid over --ink composites to exactly the panel's own
-     ground, whatever --ink is set to.
-
-     The scroll box's 12px of top padding would otherwise scroll away above a
-     header stuck at 0, leaving a band of moving content over the row. So the
-     header takes that padding itself and pulls back over it. */
-  #panelhead{
-    position:sticky;top:0;z-index:5;
-    background:linear-gradient(rgba(0,0,0,.35),rgba(0,0,0,.35)),var(--ink);
-    margin-top:-12px;margin-left:-14px;margin-right:-14px;
-    padding:12px 14px 0;
+     NO BORDER PER GROUP, one border for the menu. The rule down its right is
+     the division between the way around the panel and the panel itself, drawn
+     at .55 — the weight used between subjects, the same one the bar closes
+     itself with. */
+  #panelnav{
+    grid-column:1;grid-row:2;
+    position:relative;z-index:1;
+    display:flex;flex-direction:column;min-height:0;
+    padding:12px 12px 14px 14px;
+    border-right:1px solid rgba(var(--glass),.55);
   }
-  #panelhead > .tabrow{max-width:none}
+  /* TIGHTER THAN A ROW WOULD BE SET. Six labels and twenty-one links is 630px
+     of column, and the band between the bar and the foot is about 690 on a
+     900px window — so the rhythm is trimmed to the point where the whole menu
+     is on screen at the height a desktop actually opens at. Below that it
+     scrolls, which is the honest answer: a menu that fitted at every height
+     would be one with the type squeezed out of it. */
+  #navbody{
+    flex:1 1 auto;min-height:0;overflow-y:auto;scrollbar-gutter:stable;
+    display:flex;flex-direction:column;gap:11px;
+  }
+  .navgrp{display:flex;flex-direction:column;min-width:0}
+  /* The chip stops centring itself — in a row it sat in the middle of the
+     line, in a column it is the heading and belongs at the left edge. Rust,
+     which is what these six wore inside their borders. */
+  #panelnav .tablabel{
+    align-self:flex-start;margin-bottom:4px;
+    border-color:rgba(var(--pal-rust),.75);
+    background:rgba(var(--pal-rust),.30);
+  }
+  /* AND IT IS THE CONTROL THAT FOLDS THE GROUP. A label that does nothing when
+     pressed is the thing this panel keeps taking out, and six groups down a
+     column is more menu than most sessions need open at once — so the name IS
+     the control, the same bargain every topic in the settings box already
+     makes with its own heading.
+
+     A REAL BUTTON, so it is reachable from the keyboard and announces itself
+     as pressable. `font:inherit` because a button does not inherit the face
+     the way the span it replaced did, and the size after it because
+     `.tablabel` sets one that the shorthand would otherwise wipe. */
+  #panelnav .navhead{
+    cursor:pointer;font:inherit;font-size:calc(9px * var(--fs));
+    gap:9px;padding-right:8px;
+  }
+  #panelnav .navhead:hover{border-color:rgba(var(--pal-rust),1)}
+  /* THE SAME CARET EVERY COLLAPSIBLE THING ON THIS PAGE DRAWS, pointing down
+     while the group is open and along while it is not. On the right of the
+     chip rather than the left: the words in the group line up under the word
+     that names them, and a caret in front of the name would shift it off them
+     by its own width. */
+  #panelnav .navhead::after{
+    content:'';width:0;height:0;
+    border-left:4px solid currentColor;
+    border-top:3.5px solid transparent;border-bottom:3.5px solid transparent;
+    transform:rotate(90deg);transition:transform .12s;
+  }
+  #panelnav .navgrp.shut > .navhead::after{transform:rotate(0deg)}
+  #panelnav .navgrp.shut > .tabs{display:none}
+  /* A FOLDED GROUP STILL SAYS IT HOLDS YOU. Folding hides the lit link inside
+     it, and the menu would otherwise stop answering "where am I" the moment
+     you tidied it away — which is the failure the strip down the closed menu
+     exists to prevent, one level in. The head takes the selected link's own
+     colour, and its border comes up to full rust. */
+  #panelnav .navgrp.here > .navhead{
+    color:var(--hue);border-color:rgba(var(--pal-rust),1);
+  }
+  /* The panel's own divider, set for a column a hundred pixels wide rather
+     than for a topic box. Its margins go — the menu's own gap is the air
+     between one thing and the next, and a margin on top of it would open a
+     hole here twice the size of every other join. The gap either side of the
+     word comes down with the measure: at 10px the two rules were stubs, and a
+     rule you cannot see is a label floating in a list of labels. */
+  #panelnav .rulehead{margin:2px 0;gap:7px}
+  /* A COLUMN, and the same class, so everything already written about a tab —
+     the gradient under the selected one, the brightening on hover, the
+     transparent border that keeps the list from moving by a pixel — goes on
+     meaning what it meant. Only the direction changes. */
+  #panelnav .tabs{
+    flex-direction:column;align-items:stretch;flex-wrap:nowrap;
+    margin:0;gap:0;
+  }
+  /* Left-aligned, and indented to the chip's own text. The label's left
+     padding is 11px, so a button at 11px puts the word directly under the
+     word that names it. */
+  #panelnav .tabs button{
+    justify-content:flex-start;text-align:left;padding:2px 9px 2px 11px;
+  }
+  /* The hairline between neighbours was the divider in a ROW. Stacked, the
+     buttons need nothing between them — and a line under every one of them is
+     the border-per-thing this menu exists to be rid of. */
+  #panelnav .tabs button + button{border-left:0}
+
+  /* FOLDED AWAY. The panel is one column of a window whose other column is a
+     live preview, so an open menu is width the topics do not get — and on a
+     deployment that lives on two tabs, that is a poor trade. Pressing this
+     gives it back.
+
+     A CARET rather than a word or a hamburger: the panel already draws one on
+     every collapsible section, pointing at what it will do. This one lies on
+     its side because the thing it opens and shuts is beside it rather than
+     under it. */
+  #b_navshut{
+    align-self:flex-end;flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;
+    width:20px;height:20px;padding:0;margin-bottom:9px;
+    cursor:pointer;font:inherit;
+    background:none;border:1px solid rgba(var(--glass),.30);
+    color:rgba(var(--paper),.75);
+  }
+  #b_navshut:hover{border-color:var(--hue);color:var(--hue)}
+  .navcaret{
+    display:block;width:0;height:0;
+    border-right:4px solid currentColor;
+    border-top:3.5px solid transparent;border-bottom:3.5px solid transparent;
+    transition:transform .12s;
+  }
+  #panelnav.shut{padding-left:7px;padding-right:7px}
+  #panelnav.shut #navbody{display:none}
+  #panelnav.shut #b_navshut{align-self:center}
+  #panelnav.shut .navcaret{transform:rotate(180deg)}
+  /* WHERE YOU ARE, DOWN THE STRIP. The row this menu replaced was made sticky
+     for exactly this reason — on a tab long enough to scroll, the one thing
+     answering "where am I" was gone the moment a long page made you want it —
+     and a menu you can close would put the panel straight back to that. So the
+     name of the tab comes down the closed strip in the colour a selected link
+     wears. Nothing is drawn on the opening state, where there is no tab to
+     name and the mark is the whole page. */
+  #navwhere{display:none}
+  #panelnav.shut #navwhere{
+    display:block;align-self:center;margin-top:2px;
+    writing-mode:vertical-rl;text-orientation:mixed;
+    font-size:calc(9px * var(--fs));letter-spacing:.18em;
+    color:var(--hue);white-space:nowrap;overflow:hidden;
+  }
+
   /* `relative` for .helpside, which is centred against the ROW rather than
      placed between its two sides — see below. */
   .tabrow{position:relative;display:flex;align-items:stretch;gap:14px;
@@ -444,7 +580,7 @@
   .tabside{display:flex;flex-direction:column;min-width:0}
   .tabside .tabs{margin-bottom:0}
   /* Connections is on its own down here now — the admin tabs it used to share
-     the row with are links in the bar at the top. So it takes the left edge
+     the row with are in the menu down the left. So it takes the left edge
      and only the width it needs, rather than half of a row with nothing in
      the other half. The rule that divided the two subjects went with the
      second subject: a boundary with nothing on the far side of it is a line,
@@ -544,7 +680,8 @@
   #panelfoot .tabrow{align-items:flex-end}
   #panelfoot .tabside .tabs{margin-bottom:0}
   #panelfoot{
-    flex:0 0 auto;padding:10px 14px 12px;
+    grid-column:1 / -1;grid-row:3;
+    padding:10px 14px 12px;
     /* same strength as the rules bracketing the save row: this separates the
        settings from the things that are not settings, which is a division
        worth seeing at the same weight */
@@ -599,11 +736,6 @@
     border-color:rgba(var(--pal-rust),.75);
     background:rgba(var(--pal-rust),.30);
   }
-  /* …and the heading over them keeps ice, which is what it always had. */
-  .profhead .tablabel{
-    border-color:rgba(var(--pal-ice),.70);
-    background:rgba(var(--pal-ice),.26);
-  }
   /* The rule either side runs to the label rather than under it, so the two
      lines of `.rulehead` meet the chip's edges. */
   /* The chip brings its own type, so the heading's is only for a rulehead
@@ -620,58 +752,11 @@
      stays as the floor: space-between hands out what is spare and there is
      nothing spare on a narrow panel, so without it these would touch before
      they wrapped. */
-  /* THREE COLUMNS SHARED WITH THE BAR, so the boxes in the two rows stand on
-     the same left edges. space-between could never do that: it distributes
-     what is spare, and the two rows have different content, so the second and
-     third boxes landed 51 and 137 pixels apart. The fractions are this row's
-     natural widths — 455 / 326 / 270 — because it is the wider of the two and
-     must not be squeezed to suit the narrower one.
-
-     What changes on a narrow panel is which thing wraps: the third box used to
-     drop onto a line of its own, which reads as a group belonging to something
-     else, and now the buttons wrap inside a box that stays where it is. */
-  #navlinks, .profrow{
-    display:grid;grid-template-columns:433fr 310fr 257fr;
-    align-items:start;justify-items:start;min-width:0;
-  }
-  /* NO LONGER PUSHED TO THE RIGHT EDGE. CONNECTIONS held the far end of the
-     row on the reasoning that it is the third subject and should read as one —
-     and what that actually bought was a stretch of nothing between it and
-     PERMISSIONS, on the one row that has no space to spare. The three sit
-     together now, evenly gapped, and the space that gap was wasting is what
-     pays for the padding around the words. */
-  /* TIGHTENED SO THE THIRD GROUP STAYS ON THE LINE. Eleven buttons across
-     three boxes is the widest row on the panel, and at the width this opens at
-     CONNECTIONS was wrapping onto a second line — which reads as a group that
-     belongs to something else rather than as the third of three.
-
-     Scoped to this row on purpose: the same trims everywhere would take the
-     air out of rows that have it to spare.
-
-     AND THE TRACKING IS LEFT ALONE. Closing the letters up was the first
-     attempt and it was the wrong space to take: padding is air around the
-     words, tracking is the words themselves, and tightening it changed how
-     the row reads rather than how much room it needs. Only the padding gives
-     — about 110px, which is enough for the third group and no more. */
-  /* THE PADDING GIVES WAY AS THE TYPE GROWS, which is the only version of
-     this that survives. The panel adopts the display's typography — applyType
-     reads `fs` and `face` out of the settings document when the preview says
-     ready — so the row is laid out twice: once at 1.0 on the default face,
-     and again a moment later at whatever the deployment set. Tuned in fixed
-     pixels it fitted on the first paint and wrapped on the second, which is
-     exactly what it looked like.
-     
-     So the space around the words shrinks by roughly what the words grow: at
-     1.0 these are the panel's own values to the pixel, and each step up the
-     scale spends a little of them. `max` keeps it sane at the top of the
-     range, where there is nothing left to give and wrapping is the honest
-     answer. Tracking is not in here — that was the wrong space to take. */
-  /* The same gap on both rows, because a grid puts its columns after its
-     gaps: two rows with one template and two gaps do not line up. */
-  #navlinks, .profrow{gap:max(6px, calc(14px - (var(--fs) - 1) * 25px))}
-  .profrow .tabbox{padding:2px max(5px, calc(10px - (var(--fs) - 1) * 25px)) 4px}
-  .profrow .tabs button{padding:2px max(6px, calc(14px - (var(--fs) - 1) * 37px))}
-  .profhead{margin:2px 0 10px}
+  /* THE THREE-COLUMN GRID THAT HELD THE BOXES IN A ROW is gone, along with
+     the padding that gave way as the type grew to keep the third group on the
+     line. Both existed to fit eleven buttons across a panel that had no room
+     for them; a column has the room, so neither is needed and neither is
+     missed. */
   /* THE BOX IS AS WIDE AS WHAT IS IN IT, like the two at the head of the
      panel — a border drawn out to the width its side happens to have is a box
      around a row of buttons and a lot of nothing.
@@ -745,8 +830,24 @@
   /* The ground the panel sits on, present the whole time. Out of the flow and
      pinned to the panel rather than to the scroll, so it stays put while the
      topics move over it. */
+  /* CENTRED IN THE SETTINGS COLUMN, not in the panel. `inset:0` on a child of
+     the panel spans the menu and the bar and the foot as well, so the middle
+     of it is not the middle of anything you are looking at — the mark sat left
+     of the box it is the ground for, and half under the menu.
+
+     PLACED IN THE GRID. An absolutely positioned grid child that names a grid
+     area is laid out against THAT area rather than against the whole padding
+     box, so this is the same cell #panelscroll occupies — the band between the
+     bar and the foot, right of the menu — and `inset:0` fills it exactly. It
+     is still out of flow, so it still does not scroll with the topics.
+
+     BOTH END LINES ARE WRITTEN OUT, and that is not tidiness. For an
+     absolutely positioned grid child an `auto` end line does not mean "span
+     one" — it resolves to the grid container's own padding edge. `grid-row:2`
+     therefore ran the mark from the bar all the way to the bottom of the
+     panel, through the foot, and centring it in that put it 40px low. */
   #panelhome{
-    position:absolute;inset:0;z-index:0;
+    position:absolute;grid-column:2 / 3;grid-row:2 / 3;inset:0;z-index:0;
     display:flex;align-items:center;justify-content:center;
     /* Never in the way of anything: it is behind the page in every sense, and
        a click that lands on the wallpaper instead of the control under the
@@ -767,9 +868,9 @@
   }
   /* Full strength on the opening state, where it is the only thing there. */
   #panel.home #panelhome{opacity:1;filter:none}
-  /* Three quarters of the panel, which IS the space between the window's left
-     edge and the preview — so a percentage of this column is the measurement
-     without having to know what the preview is set to. */
+  /* Three quarters of the column it is the ground for — a percentage, so it
+     is right whatever the preview is set to and whether or not the menu beside
+     it is folded away. */
   #panelhome img{width:75%;height:auto;max-width:none}
   /* Above the mark, both of them. Without a stacking order of their own they
      share one with it and the answer is whatever the DOM happens to say. */
@@ -1010,12 +1111,18 @@
      identity whatever the logo needs, which overflowed the panel at every
      width this one actually gets. Spanning costs nothing and is exact. */
   #panelbar{
-    flex:0 0 auto;padding:8px 14px 10px;
+    grid-column:1 / -1;grid-row:1;
+    padding:8px 14px 10px;
     display:grid;
     grid-template-columns:auto minmax(0,1fr) auto;
     align-items:center;column-gap:12px;row-gap:9px;
-    /* The rule that divides this is on #navlinks, between the two rows —
-       not under the bar. See there. */
+    /* ONE ROW NOW, and the rule that closes it is its own. It used to be the
+       top border of the second row — the links that have gone to the menu down
+       the left — which meant the bar's own edge disappeared with them. Same
+       weight it was drawn at there: .55, what this panel uses between
+       subjects. What is above this line does not change as you work; what is
+       below it is somewhere to be. */
+    border-bottom:1px solid rgba(var(--glass),.55);
     font-size:calc(9px * var(--fs));letter-spacing:.16em;color:rgba(var(--paper),.75);
   }
   /* Row one, left to right. The mark FILLS THE ROW: the row is 53px because
@@ -1142,24 +1249,9 @@
   /* Row one, hard right. `justify-self` rather than the margin trick the flex
      layout used: in a grid a margin of auto and a 1fr column would fight. */
   #panelbar > #whobox{grid-column:3;grid-row:1;justify-self:end}
-  /* Row two, the whole width, and the rule that divides the header from
-     everything below it sits on TOP of this rather than under the bar.
-
-     Which is the difference between separating the mark, the title and the
-     identity from the places you can go — and separating the whole bar from
-     the settings. It is the first: what is above the line does not change as
-     you work, and everything under it is somewhere to be.
-
-     There was a rule under the bar once and it came off, because it landed a
-     few pixels above the PROFILES rule and made two lines across the panel
-     with nothing between them. PROFILES is gone, so nothing clashes with this
-     one — and it is drawn at .55, the weight this panel uses between
-     subjects, with air either side so the boxes do not sit against it. */
-  #navlinks{
-    grid-column:1 / -1;grid-row:2;
-    border-top:1px solid rgba(var(--glass),.55);
-    padding-top:10px;
-  }
+  /* ROW TWO IS GONE. It carried the three boxed groups of links, and those
+     are the top half of the menu down the left. The rule it drew across the
+     top of itself is on the bar now — see above. */
   /* AND IT IS NOT DRAWN WHERE IT WOULD NOT FIT WHOLE. Lying across the row
      the title cannot push anything, so what it would do instead of
      overflowing is run into the identity beside it — and "AI Voice Interf…"
@@ -1180,26 +1272,29 @@
      twice:
 
         window ≤ 1000    panel = window          fits from 694
-        1001 … 1280      panel = window − 480    fits from 1174
-        window ≥ 1281    panel = window − 600    fits from 1294
+        1001 … 1280      panel = window − 432    fits from 1126
+        window ≥ 1281    panel = window − 540    fits from 1234
 
-     Which is the three bands below — the third is narrow because --stage
-     jumping 480 → 600 at 1281 takes 120px of panel away just as the window
-     gets wider. The mark at the left still says what this is.
+     Which is the two bands below. There used to be a third: the widest band
+     started at 1281 and could not hold the title until 1294, because --stage
+     jumping 480 → 600 took 120px of panel away just as the window got wider.
+     The strip is 540 now, so the step costs 108 and the band starts already
+     wide enough — that gap has closed and the rule that hid the title in it
+     has gone with it.
 
-     A SHORTER TITLE MOVED ALL SIX FIGURES. "Interface Portal" wants 30px less
-     room than the name before it, so every threshold came down by 30 and the
-     panel now draws the title on windows that used to be too narrow for it. */
+     THE MENU DOWN THE LEFT DOES NOT ENTER INTO THIS. The bar spans both
+     columns of the panel's grid, so its width is the panel's whether the menu
+     is open or folded. */
   @media (max-width:693px){ #barwhat{display:none} }
-  @media (min-width:1001px) and (max-width:1173px){ #barwhat{display:none} }
-  @media (min-width:1281px) and (max-width:1293px){ #barwhat{display:none} }
+  @media (min-width:1001px) and (max-width:1125px){ #barwhat{display:none} }
 
   /* …AND AS LARGE AS THE ROOM ALLOWS IN THE BANDS WHERE IT IS DRAWN.
      `available = panel - 2 x (identity + panel padding + clearance)`
      = panel - 2 x (192 + 15 + 20) = panel - 454, and the title wants 282px at
      27, so the size is 27 x available / 282 — 9.574vw, less 9.574% of
      whatever --stage takes plus that 454. Clamped to the 27 it starts at and
-     the 54 that is double.
+     the 54 that is double. The two subtracted figures are 540 + 454 and
+     432 + 454; they move whenever --stage does.
 
      The 15 is the panel's own padding and border, and leaving it out is not
      hypothetical: the first version of this counted the identity and a 12px
@@ -1210,14 +1305,14 @@
      Three rules because --stage takes three widths and each gives the panel a
      different share of the window. They cannot be one: a single vw expression
      would be right in one band and wrong by 120px in the next. */
-  @media (min-width:1294px){
+  @media (min-width:1281px){
     #barwhat{font-size:clamp(var(--title-min),
-                             calc(var(--title-rate) * (100vw - 1054px)),
+                             calc(var(--title-rate) * (100vw - 994px)),
                              var(--title-max))}
   }
-  @media (min-width:1174px) and (max-width:1280px){
+  @media (min-width:1126px) and (max-width:1280px){
     #barwhat{font-size:clamp(var(--title-min),
-                             calc(var(--title-rate) * (100vw - 934px)),
+                             calc(var(--title-rate) * (100vw - 886px)),
                              var(--title-max))}
   }
   @media (min-width:694px) and (max-width:1000px){
@@ -1225,52 +1320,25 @@
                              calc(var(--title-rate) * (100vw - 454px)),
                              var(--title-max))}
   }
-  /* The way around the panel, as LINKS rather than as buttons. They sit in a
-     bar whose other occupants are a title, a help mark and your name, and a
-     row of bordered buttons in among those would read as four controls that
-     do something rather than four places you can go.
+  /* THE LINKS, AND WHAT USED TO BE SAID HERE ABOUT THE ROW THEY SAT IN. The
+     three boxes, the way they spread across the bar, and the scrollbar's width
+     reserved off the right so they lined up with the row below — all of it
+     described a geometry that no longer exists. `--sb` went with it: nothing
+     reads it now, so nothing measures it.
 
-     Marked by weight and colour alone: where you are is the brightest thing
-     in the row, and the rule under it is the only ornament — anything more
-     turns navigation back into buttons. */
-  /* Stretched rather than centred, so the dividers below run the full height
-     of the row and read as one rule broken by words rather than as ticks
-     floating between them. */
-  /* THREE BOXES IN A ROW, wrapping when the panel cannot hold them side by
-     side. The links inside are styled by `.tabs button` like every other tab
-     row on the page — the block that used to style them here said almost the
-     same thing in slightly different numbers, which is how two rows that are
-     meant to look alike stop looking alike. */
-  /* SPREAD ACROSS THE ROW, not bunched at the left. Three boxes with a 10px
-     gap between them left the whole right half of a wide panel empty, which
-     read as a row that had run out rather than as three subjects. The gap
-     stays as the FLOOR — `space-between` distributes what is spare, and on a
-     narrow panel there is none to distribute, so the boxes must still have
-     something between them before they wrap. */
-  /* AND THE BAR IS THE SCROLLBAR NARROWER THAN THE ROW BELOW IT. The row
-     below lives inside #panelscroll and this one does not, so with the same
-     template the columns still landed four pixels apart — the gutter, spent on
-     one row and not the other. Reserved here instead, from --sb, which is
-     measured off the scroll container and is 0 where the scrollbar is an
-     overlay. */
-  #navlinks{padding-right:var(--sb, 0px)}
+     What survives is the reasoning, and it is the menu's now: these are LINKS
+     rather than buttons, marked by weight and colour alone. Where you are is
+     the brightest thing in the list, and the rule under it is the only
+     ornament — anything more turns navigation back into controls. */
   /* Selected is painted with the tab rows' rule, further down — one gradient,
      one place. What stays here is the transparent border it paints into. */
   /* `.navgap` is gone with the run it divided: the boxes divide themselves
      now, and the space between them is the row's own gap. */
-  /* …AND A DIVIDER WITH A LINE IN IT, for a tab that is its own subject and
-     has no boxed title to say so. The gap above cannot do that job: it is
-     34px of nothing, and the thing that stops 34px of nothing reading as the
-     end of the row is the box that follows it. Put before a bare button it
-     looks like the bar broke, which is exactly how it looked.
-
-     Same geometry as every other pair in this row — the buttons' own padding
-     either side, one pixel between — so the rhythm does not change. What
-     changes is the WEIGHT: .55 is the strength the panel draws between
-     subjects, against .28 between links inside one. Same idiom as `.rule`. */
-  .tabs .navrule{
-    width:1px;margin:0;background:rgba(var(--glass),.55);
-  }
+  /* `.navrule` IS GONE. It was a line inside a group, marking the one tab in
+     it that is its own subject — which was worth drawing on a ROW, where a gap
+     alone reads as the bar having broken. In a column the order does that job,
+     and a divider inside a group inside a borderless menu is a third level of
+     line on the one part of the panel that was built to have none. */
   /* ---- the two titles ----
      Neither is a place you can go: SETTINGS names the page you are on, and
      ENROLLMENTS names the pair beside it. Sitting in a row of links in the
@@ -1283,7 +1351,6 @@
      at the top and the two rows of tabs are the same kind of thing — a word
      saying what the links beside it have in common — and two rules that had to
      be kept looking alike would eventually stop being. */
-  #panelbar .bartitle,
   .tablabel{
     display:flex;align-items:center;align-self:center;
     padding:3px 9px 3px 11px;letter-spacing:.2em;
@@ -1303,10 +1370,6 @@
      weights SIGN OUT is filled at, which is the reference for "shaded" on this
      bar. The text stays at the panel's near-white: a label is not pressable
      and does not need the two filled controls' full white as well. */
-  #panelbar .bartitle{
-    border-color:rgba(var(--pal-blue),.70);
-    background:rgba(var(--pal-blue),.26);
-  }
   .tablabel{
     border-color:rgba(var(--pal-ice),.70);
     background:rgba(var(--pal-ice),.26);
@@ -1349,11 +1412,6 @@
      all five land at one weight rather than at one number. */
   #panelfoot .tablabel{background:rgba(var(--pal-ice),.34)}
   #panelfoot .findside .tablabel{background:rgba(var(--pal-ice),.38)}
-  #navlinks .bartitle{margin-left:10px}
-  /* …except the one that opens the bar. That margin is what holds a label off
-     the link before it, and there is no link before the first — left in, it
-     reads as the row starting indented from everything under it. */
-  #navlinks .bartitle:first-child{margin-left:0}
   /* Filled rather than outlined, unlike the ? beside a section heading: those
      are one per section and have their heading right there for context, where
      these two have to be findable on their own from across the panel.
@@ -1521,7 +1579,7 @@
   }
   /* Ice, which HOME wore until this arrived. It is a tab as well as a filled
      control — the only one on this bar that is — so it needs the state the
-     links in #navlinks get from a rule and a colour, and it cannot borrow
+     links in the menu get from a rule and a colour, and it cannot borrow
      theirs: a filled control cannot show "you are here" by going brighter
      when it is already the brightest thing beside it. It goes SOLID instead,
      which is the same idea one step further on. */
@@ -2325,11 +2383,14 @@
   .snip:hover{border-color:var(--hue-dim)}
 
   /* ---- rig: tabs > collapsible sections ---- */
-  /* Built like the bar at the top, because they are doing the bar's job: a
-     boxed label and the places it leads to. They were boxed buttons in a row
+  /* A boxed label and the places it leads to. They were boxed buttons in a row
      of boxes, which read as a row of CONTROLS — things that do something when
      pressed — rather than as somewhere you can go. Marked by colour and a rule
-     under the current one, and separated by the same hairline. */
+     under the current one.
+
+     ONE CLASS, TWO DIRECTIONS. The menu down the left sets these in a column
+     and the strip at the foot keeps them in a row; everything that says what a
+     link IS lives here, and `#panelnav .tabs` changes only the axis. */
   .tabs{display:flex;align-items:stretch;gap:0;margin-bottom:10px;flex-wrap:wrap}
   /* A label on a line of its own, naming the row under it. */
   .tabhead{display:flex}
@@ -2358,8 +2419,8 @@
   /* Between each pair and never after the label: the label already has an edge
      of its own, and a rule against it is a line beside a line. */
   .tabs button + button{border-left:1px solid rgba(var(--glass),.28)}
-  /* THE UNDERLINE UNDER WHATEVER IS SELECTED, wherever one is drawn — the
-     links in the bar at the top and the tab rows under it. ONE RULE rather
+  /* THE UNDERLINE UNDER WHATEVER IS SELECTED, wherever one is drawn —
+     the menu down the left and the strip at the foot. ONE RULE rather
      than a five-stop gradient written out twice: they are the same mark
      meaning the same thing, and two copies is two things to keep in step.
 
@@ -2372,7 +2433,6 @@
      gradient: the transparent border stays as the placeholder that keeps a row
      from moving by a pixel when something is selected, and the paint is a
      background image sitting in its place. */
-  #navlinks button.on,
   .tabs button.on{
     color:var(--hue);
     background-image:linear-gradient(90deg,
@@ -2382,8 +2442,7 @@
     background-position:0 100%;
     background-repeat:no-repeat;
   }
-  /* Brightening, the way a link in the bar does — not a border appearing on
-     something that has none. */
+  /* Brightening — not a border appearing on something that has none. */
   .tabs button:hover:not(:disabled){color:rgba(var(--paper),.95)}
   .findrow{display:flex;margin:0 0 4px}
   /* A BLUE EDGE, because this is the one thing on the row you TYPE IN. The
@@ -2778,7 +2837,7 @@
     <span class="right" id="whobox">
       <!-- What the screens are DOING, as opposed to how they are configured —
            health, the alerts they raised, and the server's own log. It sits
-           here rather than in #navlinks because it is not a subject you
+           here rather than in the menu because it is not a subject you
            administer: those three are the same page under different names,
            and every one of them is read rather than set.
 
@@ -2838,43 +2897,50 @@
       <button id="b_signout" title="end this session">SIGN OUT</button>
       </span>
     </span>
-    <!-- Administering the server, as links in the bar rather than as a row of
-         tabs at the foot. They were never the same kind of thing as the tabs
-         above the settings: those switch which set of controls you are
-         editing, these take you somewhere else entirely — who may sign in, who
-         may connect, what the server itself is. A row that looks like the
-         settings tabs said they were more of them.
+  </div>
 
-         Left, beside the title, because that is where you look for the way
-         around a page. Your name and the way out stay right, where they were:
-         one side is where you are going, the other is who you are.
+  <!-- THE WAY AROUND THE PANEL, DOWN THE LEFT.
 
-         THREE subjects now, each behind its own boxed label with a large space
-         between them, and they read outward from the server: how it is run,
-         then how something comes to be here, then who it knows about — the
-         shape of the deployment first and the people inside it last.
-         ENROLLMENTS keeps the middle because it is the thing an admin is here
-         to DO, with a screen or a person waiting on the far side of it, and
-         because it is the one of the three that touches both its neighbours.
-         SETTINGS used to sit outside this row as the title of the page, which
-         worked while it was the only label and read as a fourth kind of thing
-         the moment there were three. -->
-    <span id="navlinks">
-      <!-- THE THREE SUBJECTS, each in a box that says its own name in its top
-           edge — the same fieldset-and-legend the profile rows use. They were
-           a boxed label followed by a run of links with a wide gap before the
-           next one, which asked the gap to do the dividing and left the label
-           looking like a link that did nothing. A border does it properly:
-           what is inside the box is what the label names, and there is nothing
-           to infer from spacing.
+       It was two rows of boxed groups across the top — three in the bar and
+       three over the topics — and a row is the wrong shape for twenty-one
+       places to go. Every group had to be trimmed to keep the third one on
+       the line (see the padding that gives way as the type grows, further
+       up), the widest row on the panel wrapped anyway on a narrow window, and
+       the row over the topics was the first thing to scroll away.
 
-           They read outward from the server: how it is run, how something
-           comes to be here, and then who it knows about. -->
-      <fieldset class="tabbox">
+       A COLUMN HAS AS MUCH ROOM AS IT NEEDS. The six groups keep their names
+       and their order — how the server is run, what arrives, who it knows
+       about, then what a screen is, who may use it, and what it is wired to —
+       and each group's tabs sit UNDER the label rather than beside it.
+
+       NO BOXES. A fieldset around each group was what said "these belong
+       together" on a row where they stood shoulder to shoulder. In a column
+       the space above a label already says it, and six borders down the side
+       of a panel is a stack of frames rather than a menu.
+
+       BETWEEN THE BAR AND THE FOOT, not past either. The header says what
+       this is and who you are signed in as; the foot is the way to the
+       registers and the search. Both run the full width of the panel and
+       neither has moved. This is the band in between. -->
+  <nav id="panelnav" aria-label="settings sections">
+    <!-- IT FOLDS AWAY. The panel is one column of a two-column window with a
+         live preview in the other, so a menu that is always open is 150px the
+         topics do not get. Pressing this gives them back. -->
+    <button id="b_navshut" type="button"
+            title="fold the menu away"><span class="navcaret"></span></button>
+    <!-- …AND FOLDED AWAY, THE STRIP STILL SAYS WHERE YOU ARE. The row this
+         menu replaced was made sticky for exactly this reason: on a tab long
+         enough to scroll, the one thing answering "where am I" was gone the
+         moment you needed it. A menu you can close would put it back to that,
+         so the name comes down the strip instead. -->
+    <span id="navwhere" aria-hidden="true"></span>
+    <div id="navbody">
+
+      <div class="navgrp">
         <!-- The server itself: its portal, its mail, its maintenance, and the
-             door people arrive at. First of the three, because everything in
-             the two boxes after it happens inside what is decided here. -->
-        <legend><span class="tablabel">SETTINGS</span></legend>
+             door people arrive at. First of the six, because everything in
+             the groups after it happens inside what is decided here. -->
+        <button type="button" class="tablabel navhead">SETTINGS</button>
         <div class="tabs">
           <button id="tab_app" data-tab="app">ADMIN</button>
           <!-- How the server itself is defended, which is administration
@@ -2889,39 +2955,43 @@
                that did both would be a page you cannot safely leave open. -->
           <button id="tab_alerts" data-tab="alerts">ALERT</button>
           <!-- HOW PEOPLE AND SCREENS GET IN, as opposed to who is already in.
-               Divided from the three beside it because those configure the
-               server itself — its portal, its mail, its maintenance — and this
+               Last of the four because the three above configure the server
+               itself — its portal, its mail, its maintenance — and this
                configures a door: which port invitations are accepted on, what
                name the link carries, and what somebody is asked when they
-               request access. The QUEUES those settings feed are in the box to
-               the left; this is where the shape of the door is decided. -->
-          <span class="navrule"></span>
+               request access. The QUEUES those settings feed are in the group
+               below; this is where the shape of the door is decided.
+
+               THE RULE THAT USED TO MARK THE CHANGE OF SUBJECT IS GONE. It was
+               a divider inside a group inside a menu — a third level of line
+               on a column whose whole point is that it has no borders. Order
+               says it now: what is decided about the server comes first, and
+               the door comes last. -->
           <button id="tab_enrolcfg" data-tab="enrolcfg">ENROLL</button>
         </div>
-      </fieldset>
+      </div>
 
-      <fieldset class="tabbox">
+      <div class="navgrp">
         <!-- USER and DEVICE, in the same words the rest of the product uses
              for the two populations: they arrive by different routes with
              different buttons, and neither wants to read the other's queue
              while doing it. -->
-        <legend><span class="tablabel">ENROLLMENTS</span></legend>
+        <button type="button" class="tablabel navhead">ENROLLMENTS</button>
         <div class="tabs">
           <button id="tab_displays" data-tab="displays">USER</button>
           <button id="tab_enrol" data-tab="enrol">DEVICE</button>
-          <!-- THE THIRD THING THAT ENROLS, and it is divided from the two
-               beside it because it is neither of them: what arrives here is an
-               APPLICATION, admitted by a key its server holds rather than by a
-               link somebody opens or a code somebody types. It belongs in this
-               box because the question is the same one — what is allowed to
+          <!-- THE THIRD THING THAT ENROLS, and it is last because it is
+               neither of the two above: what arrives here is an APPLICATION,
+               admitted by a key its server holds rather than by a link
+               somebody opens or a code somebody types. It belongs in this
+               group because the question is the same one — what is allowed to
                turn up — and because a key is issued and revoked exactly the
                way an invitation and a code are. -->
-          <span class="navrule"></span>
           <button id="tab_embeds" data-tab="embeds">EMBED</button>
         </div>
-      </fieldset>
+      </div>
 
-      <fieldset class="tabbox">
+      <div class="navgrp">
         <!-- Who the server knows about, split by which side of the product
              they exist on: ADMIN is an account that reaches THIS panel, USER
              is a person the display side knows about. They are not the same
@@ -2929,88 +2999,82 @@
              configure the server, the other picks up a minted URL and talks to
              it — so they are two places rather than one list with a column
              saying which. -->
-        <legend><span class="tablabel">IDENTITY</span></legend>
+        <button type="button" class="tablabel navhead">IDENTITY</button>
         <div class="tabs">
           <button id="tab_accounts" data-tab="accounts">ADMIN</button>
           <button id="tab_users" data-tab="users">USER</button>
         </div>
-      </fieldset>
-    </span>
-  </div>
+      </div>
+
+      <!-- THE MENU HAS TWO HALVES AND THIS IS WHERE THEY MEET. Above it, the
+           server: how it is run, what is allowed to arrive, who it knows
+           about. Below it, the three lists an endpoint is assembled from —
+           what it looks like, who may use it, what it is wired to — and every
+           one of those is a PROFILE, stored in the displays document and
+           picked by name wherever a screen is configured.
+
+           A `rulehead`, which is the panel's own divider: the rule runs in
+           from both sides and stops at the word, so the label is IN the line
+           rather than sitting above it. Not a chip — the six chips are the
+           groups, and a seventh would read as a seventh group rather than as
+           the name of the three under it.
+
+           PROFILES used to be a heading over the row these three sat in, and
+           it came off because a heading over labelled boxes is a label for a
+           group of labels. In a column it is not that: there is nothing to its
+           left or right, it names the half of the menu below it, and the line
+           it sits in is the division that half needed anyway. -->
+      <div class="rulehead navdiv">PROFILES</div>
+
+      <div class="navgrp">
+        <!-- WHAT A SCREEN IS, in five parts: the four that describe it and the
+             one that names them. LAYOUT reads last because it is built from
+             the four before it. -->
+        <button type="button" class="tablabel navhead">LAYOUTS</button>
+        <div class="tabs">
+          <!-- APPEARANCE rather than LOOK, so the tab and the "Appearance
+               profiles" read as the same subject. data-tab stays "look": it is
+               the storage key, and renaming it would rewrite every stored
+               document for a label. -->
+          <button data-tab="look" class="on">APPEARANCE</button>
+          <!-- GEOMETRY rather than MOTION, and data-tab stays "motion" for the
+               same reason. -->
+          <button data-tab="motion">GEOMETRY</button>
+          <button data-tab="speech">SPEECH</button>
+          <button data-tab="savers">SCREENSAVER</button>
+          <button data-tab="devprof">LAYOUT</button>
+        </div>
+      </div>
+
+      <!-- BETWEEN THE TWO, because it is the third thing an endpoint is made
+           of: what it looks like, who may use it, and what it is wired to. -->
+      <div class="navgrp">
+        <!-- The two halves and then the pair, the order they are built in —
+             the same shape LAYOUTS and CONNECTIONS have. -->
+        <button type="button" class="tablabel navhead">PERMISSIONS</button>
+        <div class="tabs">
+          <button data-tab="authn">AUTHENTICATE</button>
+          <button data-tab="authz">AUTHORIZE</button>
+          <button data-tab="perm">PERMISSION</button>
+        </div>
+      </div>
+
+      <div class="navgrp">
+        <!-- The two halves of an endpoint that are not the endpoint — what it
+             speaks to and what it answers on — and then the pair of them under
+             one name, which is the order they are built in. -->
+        <button type="button" class="tablabel navhead">CONNECTIONS</button>
+        <div class="tabs">
+          <button data-tab="models">MODELS</button>
+          <button data-tab="network">NETWORK</button>
+          <button data-tab="connection">CONNECTION</button>
+        </div>
+      </div>
+
+    </div>
+  </nav>
+
   <div id="panelscroll">
-  <!-- Wrapped so the header keeps a readable measure while the topics below
-       take the full width of a wide panel. -->
-  <div id="panelhead">
-
-  <!-- The two rows configure different things at different scopes: what
-       every viewer sees, and how the server itself is run. Saying so is
-       cheaper than leaving somebody to infer it from which tabs happen to
-       carry the SAVE FOR EVERYONE button. -->
-  <!-- Two groups on one row, full width to the edge of the preview. What a
-       display LOOKS and SOUNDS like on the left; what it is wired to and which
-       machines are here on the right. The rule between them is the point: they
-       are different subjects that happen to share a row. -->
-  <!-- One group, the full width of the panel. What a display looks and
-       sounds like: nothing else shares this row. -->
-  <!-- PROFILES NAMES THE ROW, and the two boxes under it are its parts. It
-       was one box with both groups inside and a stepped top edge; two groups
-       in one box need a label each anyway, and a label inside a box is a box
-       inside a box — the thing this panel has been taking out everywhere else.
-
-       So the heading is a heading, and each group is a box that says its own
-       name in its own top edge. A FIELDSET rather than a label painted over a
-       border: the panel's ground is translucent, so a patch of "background"
-       laid over the line would be a slightly different colour than the thing
-       behind it. A legend cuts a real gap. -->
-  <!-- PROFILES came off the rule above this row. Every box under it already
-       says what it is in its own top edge, and the three boxes in the bar do
-       now as well — a heading over labelled boxes is a label for a group of
-       labels, which is the box-inside-a-box this panel keeps taking out. -->
-  <div class="tabrow profrow">
-    <fieldset class="tabbox">
-      <legend><span class="tablabel">LAYOUTS</span></legend>
-      <!-- WHAT A SCREEN IS, in five parts: the four that describe it and the
-           one that names them. LAYOUT reads last because it is built from the
-           four before it. -->
-      <div class="tabs">
-        <!-- APPEARANCE rather than LOOK, so the tab and the "Appearance
-             profiles" read as the same subject. data-tab stays "look": it is
-             the storage key, and renaming it would rewrite every stored
-             document for a label. -->
-        <button data-tab="look" class="on">APPEARANCE</button>
-        <!-- GEOMETRY rather than MOTION, and data-tab stays "motion" for the
-             same reason. -->
-        <button data-tab="motion">GEOMETRY</button>
-        <button data-tab="speech">SPEECH</button>
-        <button data-tab="savers">SCREENSAVER</button>
-        <button data-tab="devprof">LAYOUT</button>
-      </div>
-    </fieldset>
-    <!-- BETWEEN THE TWO, because it is the third thing an endpoint is made
-         of: what it looks like, who may use it, and what it is wired to. -->
-    <fieldset class="tabbox">
-      <legend><span class="tablabel">PERMISSIONS</span></legend>
-      <!-- The two halves and then the pair, the order they are built in —
-           the same shape LAYOUTS and CONNECTIONS have. -->
-      <div class="tabs">
-        <button data-tab="authn">AUTHENTICATE</button>
-        <button data-tab="authz">AUTHORIZE</button>
-        <button data-tab="perm">PERMISSION</button>
-      </div>
-    </fieldset>
-    <fieldset class="tabbox">
-      <legend><span class="tablabel">CONNECTIONS</span></legend>
-      <!-- The two halves of an endpoint that are not the endpoint — what it
-           speaks to and what it answers on — and then the pair of them under
-           one name, which is the order they are built in. -->
-      <div class="tabs">
-        <button data-tab="models">MODELS</button>
-        <button data-tab="network">NETWORK</button>
-        <button data-tab="connection">CONNECTION</button>
-      </div>
-    </fieldset>
-  </div>
-  </div><!-- /panelhead -->
 
   <div id="grpbox">
   <!-- Which figure it is, and it belongs with how that figure moves rather
@@ -5750,7 +5814,7 @@ key inside an example sends you to a line that cannot answer you.</div>
 
   <div id="panelfoot">
     <!-- CONNECTIONS on its own now: the admin tabs that used to share this row
-         are links in the bar at the top. So it sits at the left edge rather
+         are in the menu down the left. So it sits at the left edge rather
          than in the right half of a row it no longer shares, and the rule that
          divided the two subjects has gone with the second subject — a boundary
          with nothing on the far side of it is a line, not a division.
@@ -5792,8 +5856,8 @@ key inside an example sends you to a line that cannot answer you.</div>
 
              EMBED was on this row once, filed under what an embed IS rather
              than under what an admin does with it. Issuing a credential and
-             revoking it is enrolment, and that half is in the bar at the top
-             with the other two. This is the other half, and it is the half
+             revoking it is enrolment, and that half is in the menu down the
+             left with the other two. This is the other half, and it is the half
              that belongs down here: the register of what was issued. -->
         <button id="tab_sites" data-tab="sites">SITES</button>
       </div>
@@ -13501,13 +13565,18 @@ of the two, and comfortably above what a person actually does — a few a minute
    load: endpoints are added, renamed and switched off while this page is open,
    and a list built at load goes stale exactly on the row somebody opened in
    order to fix it. */
+/* Sent with the sites themselves, so the picker cannot depend on which tab
+   was opened first. RT.routes is the fallback and no longer the source. */
+let EMENDPOINTS = [];
+
 function fillEndpoints(sel, chosen){
   if (!sel) return;
   sel.innerHTML = '';
   const any = document.createElement('option');
   any.value = ''; any.textContent = 'whatever the address carries';
   sel.appendChild(any);
-  (RT.routes || []).forEach(r=>{
+  const list = EMENDPOINTS.length ? EMENDPOINTS : (RT.routes || []);
+  list.forEach(r=>{
     const o = document.createElement('option');
     o.value = r.id;
     o.textContent = r.name + (r.enabled === false ? ' \u2014 not answering' : '');
@@ -13516,7 +13585,7 @@ function fillEndpoints(sel, chosen){
   /* AN ENDPOINT THIS KEY NAMES THAT NO LONGER EXISTS still has to appear, or
      the select falls silently to the first option and the next save rewrites
      the grant to something nobody chose. */
-  if (chosen && !(RT.routes || []).some(r=> r.id === chosen)){
+  if (chosen && !list.some(r=> r.id === chosen)){
     const gone = document.createElement('option');
     gone.value = chosen;
     gone.textContent = 'an endpoint that no longer exists';
@@ -13549,6 +13618,12 @@ function siteEditor(wrap, e){
   const read = ()=> ({id: e.id, name: F('name').value.trim(), preset: preset(),
                       parts: parts(), cap: cap(), origins: origins(),
                       ttl_minutes: Number(F('ttl').value) || 0,
+                      /* The assistant this site talks to. Missing from here
+                         for several rounds, which is why the picker could not
+                         be saved and could not even light SAVE: a field the
+                         reader does not read is a field that never changes
+                         and never travels. */
+                      endpoint: F('endpoint') ? F('endpoint').value : '',
                       needs_user: F('needsuser').checked});
   /* WHAT IS ON SCREEN, AS ONE STRING, so "has this been touched" is a
      comparison rather than seven of them. Saving an untouched row is harmless
@@ -13662,7 +13737,20 @@ async function refreshEmbeds(){
   const box = $('emblist');
   if (!box || ME.role !== 'admin'){ if (box) box.textContent = ''; return; }
   try{
+    /* THE ENDPOINTS FIRST, because a row draws a picker of them. Whichever
+       tab was opened first decides whether they had loaded, so a site row
+       opened before the AI tab had ever been looked at drew an assistant list
+       with nothing in it — the field was there and empty, which reads as the
+       feature not being built rather than as a race. Asked for once, and only
+       when they are missing. */
+    if (!(RT.routes || []).length){
+      try{
+        const r = await api('/routes/all');
+        RT.routes = r.routes || []; RT.default = r.default || '';
+      }catch(e){}
+    }
     const j = await api('/embeds');
+    EMENDPOINTS = j.endpoints || [];
     box.innerHTML = '';
     if (!j.embeds.length){
       box.className = 'note';
@@ -13818,6 +13906,38 @@ async function refreshEmbeds(){
       ed.innerHTML = siteFieldsHTML();
       body.appendChild(ed);
       const editor = siteEditor(ed, e);
+      /* ONE ROW, ONE SAVE. The ticks below are not fields of the key — reach
+         writes to the endpoints' own profiles and the operations write to the
+         site's grant — but they are edited on the same row, and three buttons
+         for one row is three things to remember to press. So they light the
+         same SAVE and go out with it. */
+      let extraDirty = false;
+      const markDirty = ()=>{ extraDirty = true; if (editor.after) editor.after(); };
+      /* THE ASSISTANT PICKER, BOUND DIRECTLY. It is a field of the key like
+         any other and the editor's own listener should light SAVE for it —
+         it did not, reported and reproduced, and a select that cannot be
+         saved is worse than one that is not there. Bound here as well, so
+         the button lights whatever the general path does. */
+      const epSel = ed.querySelector('[data-f="endpoint"]');
+      if (epSel) epSel.addEventListener('change', markDirty);
+
+      /* The two blocks below are built here rather than in siteFieldsHTML
+         because their contents come from the server per row. They are put in
+         the SAME subwrap as the template's own sections, so the collapse
+         handler in siteEditor picks them up and they behave like every other
+         heading on the row instead of being two open slabs at the bottom. */
+      const subwrap = ed.querySelector('.subwrap');
+      const siteSection = (title)=>{
+        const g = document.createElement('div'); g.className = 'subgrp';
+        const h = document.createElement('h5');
+        h.appendChild(document.createTextNode(title));
+        const sum = document.createElement('span'); sum.className = 'subsum';
+        h.appendChild(sum);
+        const bd = document.createElement('div'); bd.className = 'subbody';
+        g.appendChild(h); g.appendChild(bd);
+        (subwrap || body).appendChild(g);
+        return {body: bd, sum: sum};
+      };
 
       /* THE CODE, REBUILT. It was written once, in the response that created
          the key, and never again — so "how is this site wired" was a question
@@ -14005,6 +14125,19 @@ async function refreshEmbeds(){
           const j = await api('/embeds/update',
                               {method:'POST',
                                body: JSON.stringify(editor.read())});
+          /* THE OTHER TWO, ON THE SAME PRESS. They are separate calls because
+             they write to different documents — reach to the endpoints' own
+             profiles, operations to this site's grant — and one row should
+             not need three buttons to say so. Sent after the envelope, so a
+             refused envelope does not half-apply the rest. */
+          const extra = [];
+          try{
+            if (extraDirty){
+              extra.push(...await saveReach());
+              extra.push(...await saveOps());
+              extraDirty = false;
+            }
+          }catch(exErr){ extra.push('but: ' + exErr.message); }
           OPENEM = e.id;
           await refreshEmbeds();
           const n2 = $('sitenote');
@@ -14021,7 +14154,8 @@ async function refreshEmbeds(){
                          : '')
             + (ch.indexOf('needs_user') >= 0
                ? ' The host\u2019s own endpoint has to change with it: send '
-                 + 'them the code on this row again.' : '');
+                 + 'them the code on this row again.' : '')
+            + (extra.length ? ' ' + extra.join('; ') + '.' : '');
         }catch(err2){ note.className = 'note bad'; note.textContent = err2.message; }
       };
       const del = document.createElement('button');
@@ -14036,12 +14170,77 @@ async function refreshEmbeds(){
       /* Lit only by an edit, and only a coherent one. The editor calls this
          on every keystroke and tick; the fields set it up on first paint. */
       editor.after = ()=>{
-        const touched = editor.dirty();
+        const touched = editor.dirty() || extraDirty;
         undo.disabled = !touched;
         save.disabled = !touched || !!editor.err();
       };
       editor.after();
-      body.appendChild(acts);
+      /* DIRECTLY UNDER THE FIELDS IT COMMITS, not at the foot of the row.
+         It was appended last, which put it below the integration snippets —
+         three tabs and forty lines of somebody else's source — so on a row
+         with every section drawn the SAVE was off the bottom of the screen
+         and read as missing. The snippets are reference; these are the
+         controls, and controls belong with what they control. */
+      body.insertBefore(acts, ed.nextSibling);
+
+      /* ===== WHICH ENDPOINTS THIS SITE MAY REACH =====
+         The permission already existed and could only be set from the other
+         side — open each endpoint's authorize profile and remember a key id.
+         This is the same data from the site's side, which is where somebody
+         setting up one application is actually looking. Its own SAVE, because
+         it writes to the endpoints rather than to this key. */
+      const reachSec = siteSection('Endpoints this site may reach');
+
+      const rbox = document.createElement('div');
+      rbox.className = 'oplist';
+
+      function paintReach(list){
+        rbox.innerHTML = '';
+        (list || []).forEach(r=>{
+          const lab = document.createElement('label');
+          const cb = document.createElement('input');
+          cb.type = 'checkbox'; cb.dataset.rid = r.id; cb.checked = !!r.on;
+          /* An unrestricted endpoint, or one with no permission at all, is
+             not this screen's to change — ticking would claim to grant
+             something it does not grant. */
+          cb.disabled = !!r.fixed;
+          lab.appendChild(cb);
+          const nm = document.createElement('span');
+          nm.className = 'opname';
+          nm.textContent = ' ' + r.name;
+          lab.appendChild(nm);
+          const meta = document.createElement('span');
+          meta.className = 'opmeta';
+          meta.textContent = ' ' + [r.note,
+                                    r.enabled === false ? 'not answering' : '']
+                                   .filter(Boolean).join(' \u00b7 ');
+          lab.appendChild(meta);
+          rbox.appendChild(lab);
+        });
+      }
+      const reachSum = ()=>{
+        const on = rbox.querySelectorAll('input:checked').length;
+        const all = rbox.querySelectorAll('input').length;
+        reachSec.sum.textContent = all ? on + ' of ' + all : '';
+      };
+      paintReach(e.reach);
+      reachSum();
+      rbox.addEventListener('change', reachSum);
+
+      /* The row's own SAVE sends this; there is no button of its own. */
+      async function saveReach(){
+        const want = [].slice.call(rbox.querySelectorAll('input:checked'))
+                       .map(cb=> cb.dataset.rid);
+        const j = await api('/embeds/reach',
+                            {method:'POST',
+                             body: JSON.stringify({id: e.id, endpoints: want})});
+        paintReach(j.reach);
+        reachSum();
+        return (j.changed || []).concat(j.shared || []);
+      }
+
+      reachSec.body.appendChild(rbox);
+      rbox.addEventListener('change', markDirty);
 
       /* ===== WHAT THIS SITE MAY ASK ITS OWN APPLICATION FOR =====
          Its own section with its own controls, below the envelope and
@@ -14050,12 +14249,7 @@ async function refreshEmbeds(){
          integrator; this is a permission over somebody else's data, read from
          their server and re-read whenever it changes. Sharing one SAVE would
          mean a rename could not be made without also re-reading their spec. */
-      const hd = document.createElement('div');
-      hd.className = 'namerow';
-      const hb = document.createElement('b');
-      hb.textContent = '3 \u00b7 their application \u2014 what this panel may ask it';
-      hd.appendChild(hb);
-      body.appendChild(hd);
+      const appSec = siteSection('What it may ask their application');
 
       const hrow = document.createElement('div');
       hrow.className = 'namerow';
@@ -14070,7 +14264,7 @@ async function refreshEmbeds(){
       const sread = document.createElement('button');
       sread.textContent = 'READ SPEC';
       hrow.appendChild(surl); hrow.appendChild(sread);
-      body.appendChild(hrow);
+      appSec.body.appendChild(hrow);
 
       /* THE STATE, from the server. Three separate facts and each of them
          changes what an admin should do next: whether a spec has ever been
@@ -14113,7 +14307,7 @@ async function refreshEmbeds(){
             + 'else in that application.';
           opbox.appendChild(em);
         }
-        opsave.disabled = !(list || []).length;
+        /* Nothing to disable any more — the row's SAVE covers this. */
       }
 
       function paintState(o){
@@ -14137,57 +14331,35 @@ async function refreshEmbeds(){
         sn.textContent = bits.join(' \u00b7 ');
       }
 
-      const opacts = document.createElement('div');
-      opacts.className = 'rtacts';
-      const opgap = document.createElement('span');
-      opgap.className = 'spacer';
-      const opsave = document.createElement('button');
-      opsave.textContent = 'SAVE OPERATIONS';
-      opsave.className = 'act-save';
-      opacts.appendChild(opgap); opacts.appendChild(opsave);
-
-      sread.onclick = async ()=>{
-        sn.className = 'note'; sn.textContent = 'reading\u2026';
-        try{
-          const j = await api('/embeds/spec',
-                              {method:'POST',
-                               body: JSON.stringify({id: e.id, url: surl.value.trim()})});
-          surl.value = j.spec_url || surl.value;
-          paintState(j);
-          paintOps(j.ops, '');
-        }catch(err){ sn.className = 'note bad'; sn.textContent = err.message; }
-      };
-
-      opsave.onclick = async ()=>{
+      async function saveOps(){
         const want = [].slice.call(opbox.querySelectorAll('input:checked'))
                        .map(cb=> cb.dataset.op);
-        sn.className = 'note'; sn.textContent = 'saving\u2026';
-        try{
-          const j = await api('/embeds/ops',
-                              {method:'POST',
-                               body: JSON.stringify({id: e.id, ops: want})});
-          sn.className = 'note';
-          /* WHAT IT COST, from the server. Withdrawing an operation drops the
-             sessions holding it, which takes somebody's panel back to the
-             server for a moment — an admin should read that they did it
-             rather than deduce it. */
-          sn.textContent = j.ops.length + ' operation'
-            + (j.ops.length === 1 ? '' : 's') + ' enabled.'
-            + (j.dropped ? ' ' + j.dropped + ' live session'
-                         + (j.dropped === 1 ? '' : 's') + ' dropped \u2014 the '
-                         + 'pages framing this pick the change up within a '
-                         + 'moment.' : '');
-        }catch(err){ sn.className = 'note bad'; sn.textContent = err.message; }
-      };
+        const j = await api('/embeds/ops',
+                            {method:'POST',
+                             body: JSON.stringify({id: e.id, ops: want})});
+        opsSum();
+        return [j.ops.length + ' operation' + (j.ops.length === 1 ? '' : 's')
+                + ' enabled'].concat(
+          j.dropped ? [j.dropped + ' session' + (j.dropped === 1 ? '' : 's')
+                       + ' dropped'] : []);
+      }
 
-      body.appendChild(sn);
-      body.appendChild(opbox);
-      body.appendChild(opacts);
+      appSec.body.appendChild(sn);
+      appSec.body.appendChild(opbox);
+      opbox.addEventListener('change', markDirty);
       paintState(e);
       paintOps(e.ops, '');
+      const opsSum = ()=>{
+        const on = opbox.querySelectorAll('input:checked').length;
+        const all = opbox.querySelectorAll('input').length;
+        appSec.sum.textContent = all ? on + ' of ' + all : 'no spec read';
+      };
+      opsSum();
+      opbox.addEventListener('change', opsSum);
 
       const hn = document.createElement('div');
       hn.className = 'note help';
+      appSec.body.appendChild(hn);
       hn.textContent = 'READ SPEC fetches their OpenAPI document and, beside '
         + 'it, /.well-known/resonance.json \u2014 the file THEY publish saying '
         + 'what they permit. Both have to sit on an origin this site is '
@@ -14197,7 +14369,6 @@ async function refreshEmbeds(){
         + 'voice or by button, with the real values read back to them. Every '
         + 'call is made by their own page carrying that visitor\u2019s login, '
         + 'so nobody reaches data they could not already reach.';
-      body.appendChild(hn);
 
       row.appendChild(body);
       box.appendChild(row);
@@ -14802,23 +14973,12 @@ $('b_docpdf').addEventListener('click', async ()=>{
    replaced in the same tab, and calling this twice would stack a second set
    of listeners on every tab button and heading — so each click would toggle
    twice and appear to do nothing. */
-/* THE SCROLLBAR, AS A NUMBER THE BAR CAN USE. #navlinks is above the scroll
-   container and the row it aligns with is inside it, so the bar is the gutter
-   wider — and two grids with one template but different widths put their
-   columns in different places. Watched rather than measured once: the gutter
-   comes and goes with the length of the tab you are on, and a stale number is
-   a bar that lines up on some tabs and not others. Overlay scrollbars report
-   0, which is the right answer there. */
-function measureGutter(){
-  const ps = document.getElementById('panelscroll');
-  if (!ps) return;
-  document.documentElement.style.setProperty(
-    '--sb', (ps.offsetWidth - ps.clientWidth) + 'px');
-}
-measureGutter();
-if (window.ResizeObserver && document.getElementById('panelscroll'))
-  new ResizeObserver(measureGutter).observe(document.getElementById('panelscroll'));
-window.addEventListener('resize', measureGutter);
+/* THE SCROLLBAR MEASUREMENT IS GONE. It published the gutter's width as --sb
+   so the bar at the top could reserve it and line its three boxed groups up
+   with the three inside the scroll box. Both rows are the menu down the left
+   now; they are in one column, they are outside the scroll, and there is
+   nothing left to line up. A ResizeObserver writing a variable nobody reads is
+   the dead half of a feature, so it came out with the rows. */
 
 let CURRENT_TAB = 'look';
 let navBuilt = false;
@@ -14969,10 +15129,7 @@ function panelNav(){
                           shut.set(g, true); });
     render();
     syncSaveRow();
-    // The gutter comes and goes with the length of the tab, and the bar above
-    // reserves it — re-read here as well as by the observer, which does not
-    // fire when the scroll container keeps its size and only gains a bar.
-    measureGutter();
+    navWhere();
     $('panelscroll').scrollTop = 0;
     if (tab === 'accounts') refreshUsers();
     // Groups live on SECURITY now, and the list is populated by its own fetch
@@ -15078,7 +15235,41 @@ function panelNav(){
     tabButtons.forEach(x=> x.classList.remove('on'));
     render();
     syncSaveRow();
+    navWhere();
   }
+  /* THE MENU FOLDS AWAY, and folded it still says where you are. The name is
+     read off whichever link is lit rather than kept as a second copy of the
+     tab: one source, and it is the same one the highlight uses. Empty on the
+     opening state, where nothing is lit and there is no tab to name. */
+  function navWhere(){
+    const on = tabButtons.find(x=> x.classList.contains('on'));
+    const el = $('navwhere');
+    if (el) el.textContent = on ? (on.textContent || '').trim() : '';
+    /* …and a folded GROUP says it holds you, for the same reason: hiding the
+       lit link would otherwise take the answer with it. Read off the same
+       button the highlight uses, so there is one source and not two. */
+    document.querySelectorAll('#panelnav .navgrp').forEach(g=>{
+      g.classList.toggle('here',
+        g.classList.contains('shut') && !!on && g.contains(on));
+    });
+  }
+  /* EVERY GROUP FOLDS ON ITS OWN NAME. Independently, not one-at-a-time: the
+     settings box opens one topic at a time because its topics are long, and
+     these are four links — closing one to open another would cost a press
+     every time somebody works across two subjects, which is most of the time.
+     They all open on a fresh panel. */
+  document.querySelectorAll('#panelnav .navhead').forEach(h=>{
+    h.addEventListener('click', ()=>{
+      h.parentElement.classList.toggle('shut');
+      navWhere();
+    });
+  });
+  const navEl = $('panelnav'), navShut = $('b_navshut');
+  if (navEl && navShut) navShut.addEventListener('click', ()=>{
+    const shut = navEl.classList.toggle('shut');
+    navShut.title = shut ? 'open the menu' : 'fold the menu away';
+    navWhere();
+  });
   tabButtons.forEach(b=> b.addEventListener('click', ()=> selectTab(b)));
   /* One mark now, in the bar's right-hand end. There were two, one per boxed
      label, and both called this — which said the labels had manuals of their

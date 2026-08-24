@@ -25,7 +25,7 @@ it out; the delay is per address and clears on its own.
 ## How the panel is laid out
 
 **It opens on nothing.** The first thing you see is the mark, at three quarters
-of the panel's width, and the menus — no topics, no box, and no tab lit,
+of the panel's width, and the menu — no topics, no box, and no tab lit,
 because none of them is where you are yet. Press anything and it steps back to
 a watermark behind the work, where it stays for the rest of the session.
 
@@ -41,25 +41,42 @@ opposite colours: ice takes you back to the start, rust ends the session.
 Beside them your name reads as one phrase — name, dash, level — rather than a
 name with a badge after it.
 
-The left column is the whole interface. It is organised as a set of topics,
-and **one topic is open at a time**: opening another closes the one before it,
-so the column stays short enough to take in at a glance rather than becoming a
-wall to scroll through. Clicking the open one closes it, which is a legitimate
-state to leave it in.
+The settings sit to the right of the menu, in the wider of the panel's two
+columns, and they are organised as a set of topics with **one topic open at a
+time**: opening another closes the one before it, so the column stays short
+enough to take in at a glance rather than becoming a wall to scroll through.
+Clicking the open one closes it, which is a legitimate state to leave it in.
 
-**In the bar across the top** are three boxed labels, each naming the links
-beside it. A label is not somewhere you can go — nothing happens when you press
-one. It says what the links after it have in common, and the large space before
-the next label is what separates one subject from the next. The links are links
-rather than tabs, because they do not switch which controls you are editing;
-they change the subject entirely.
+**Down the left is the menu**, six boxed labels with their links under them.
+It stands between the bar at the top and the strip at the foot, and it does not
+scroll with the settings. A label is not somewhere you can go — it says what
+the links under it have in common. The links are links rather than tabs,
+because they do not switch which controls you are editing; they change the
+subject entirely.
+
+A rule reading **PROFILES** divides the menu in two. Above it is the server —
+how it is run, what is allowed to arrive, who it knows about. Below it are the
+three lists an endpoint is assembled from, and every one of those is a profile
+stored in the displays document and picked by name wherever a screen is
+configured.
+
+**Each label folds its own group**, the same way a topic heading folds its
+settings, and the caret on it says which way it is. They fold independently —
+closing one does not open another — and a fresh panel opens with all six out.
+A folded group whose tab you are standing on keeps its name lit, so tidying the
+menu never hides where you are.
+
+The caret at the head of the menu **folds the whole thing away**, which gives
+the settings the width back. Folded, the strip that is left still names the tab
+you are on, running down it in the colour a selected link wears — so closing
+the menu never costs you the answer to *where am I* either.
 
 **Every label is shaded from the display's own palette**, a colour per subject
-— the three in the bar in **blue**, PROFILES, LAYOUTS, CONNECTIONS and
-ACCESS in **ice**, SEARCH in **milk**. They are the same five colours a display can be set to, taken from
-the same values rather than matched by eye, so the panel and the thing it
-configures are not two people's idea of one palette. The colour is there to
-tell the rows apart at a glance; it is not saying anything you have to decode.
+— the six in the menu in **rust**, ACCESS in **ice**, SEARCH in **milk**. They
+are the same colours a display can be set to, taken from the same values rather
+than matched by eye, so the panel and the thing it configures are not two
+people's idea of one palette. The colour is there to tell the groups apart at a
+glance; it is not saying anything you have to decode.
 
 **SETTINGS** — how the server itself is run.
 

@@ -48,11 +48,12 @@ Two roles:
 
 ### The built-in manual
 
-The **?** beside the SETTINGS title opens seven documents covering the display
-and every tab of the admin interface. It is blue, the same blue as every ?
-beside a topic heading, so help is one colour wherever you meet it — there is
-no DOCUMENTATION button in the tab row any more, because it is not something
-you configure. They live as markdown in
+The **?** in the strip at the foot of the panel opens seven documents covering
+the display and every tab of the admin interface. It is blue, the same blue as
+every ? beside a topic heading, so help is one colour wherever you meet it — and
+it sits with ACCESS and the search rather than in the menu, because reading a
+document is a way of getting somewhere, not something you configure. They live
+as markdown in
 `docs/`, are read in a modal over the whole window rather than in the 425px
 column, and each has a **DOWNLOAD PDF** button.
 
