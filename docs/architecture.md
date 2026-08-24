@@ -408,15 +408,42 @@ neither code fires.
 
 **temperature** is not sent to Anthropic at all. The current Claude models
 reject the sampling parameters outright with a 400, and the older ones stop at
-1.0 where this panel's slider goes to 1.5 — a control that quietly breaks half
+1.0 where this panel's field goes to 1.5 — a control that quietly breaks half
 the models is worse than no control. Steer those with the system prompt
-instead. The slider hides itself when Anthropic is selected.
+instead. The field hides itself when Anthropic is selected.
 
 **keep model loaded** (`keep_alive`) is an Ollama extension accepted on its
 OpenAI-compatible path. Without it the model unloads after a few minutes idle
 and the next question waits for it to load again — measured at 28s for a 7b on
 the reference hardware. It means nothing to a hosted provider, and is never
-sent to Anthropic.
+sent to Anthropic. Blank does not mean the placeholder: it means the field is
+not sent, which is what a hosted provider needs, and the model server applies
+its own default instead.
+
+### Blank is a value, and it means the default
+
+`max_tokens`, `temperature`, `history_turns` and `timeout` are stored empty
+until somebody sets them, and empty is read as the documented default — 400,
+0.4, 8 and 120 — the same way in every one of them. `history_turns` was the
+exception and read empty as ZERO, so an endpoint whose model profile had never
+been filled in answered every question with no conversation behind it. It
+replied to the first question and then, told "yes", answered as though a new
+conversation had begun. An explicit zero still means none: somebody who types
+it has chosen it.
+
+These were sliders in the panel and are typed fields now, for the same reason.
+A range input cannot be unset, so an untouched one sat on the default and read
+as configured while the document behind it was empty — the panel was the reason
+the fault stayed invisible. A blank box reads as blank and shows its default as
+a placeholder.
+
+**An endpoint answering with no system prompt is named at startup**, beside the
+one that answers nowhere and the two that share a port. It is reachable, it
+replies, and nothing about it looks wrong from outside. That warning asks the
+RESOLVED configuration rather than a field on the endpoint: a profile reaches
+an endpoint either by being named there or by being named on the connection it
+answers through, and checking only the first told an admin who had assigned one
+that they had not.
 
 **Listing what a host has installed** — asking Ollama's `/api/tags` on the
 same host so a model name is chosen rather than typed from memory — is

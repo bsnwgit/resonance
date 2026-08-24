@@ -5,6 +5,64 @@ rediscovered. For what is planned rather than done, see [Roadmap](roadmap.md).
 
 Newest first.
 
+## 2026-08-24 — a frame that looks like its endpoint, and four faults you could not see
+
+A day spent on one embed answering badly, which turned out to be four separate
+things wearing the same symptom. Every one of them was invisible from outside:
+the panel drew, the log said `ask ok`, and the answers were wrong.
+
+- **An embed had no appearance at all.** A screen gets its look from the layout
+  profile its row names, handed down in the kiosk block. A frame has no row, and
+  there is no shared appearance to inherit — that is deliberate — so it fell all
+  the way through to the constants `index.html` ships with. An endpoint set to
+  ORB drew as orb on every wall in the building and as RIDGE inside a host page,
+  and the setting looked like it had not saved. The grant carries the endpoint's
+  look now. Only the appearance: the fullscreen and clock a layout also carries
+  are decisions about a wall.
+- **A session that ended took the question with it.** A dead bearer token fell
+  through to the display gate and came back *this display may not use that
+  endpoint* — a permissions message for something that was only a session
+  ending. It answers `401 embed_expired` now, the frame asks the loader for a
+  fresh code, and **the same question is sent again**. The first draft said
+  "fetching a new one" and returned, which was worse than silence: the renewal
+  arrived, the panel worked a second later, and the question was gone. Every
+  restart ends every live session, so that was reliably the first question
+  afterwards.
+- **An endpoint with an empty model profile had no memory.** `history_turns`
+  read blank as ZERO where `max_tokens` and `timeout` two lines away read blank
+  as their defaults. So it answered the first question and then, told "yes",
+  replied "Hello! How can I assist you today?" — the offer it was agreeing with
+  had never been sent. Blank is the default now; an explicit zero still means
+  none.
+- **And the panel was the reason nobody looked.** Those numbers were sliders,
+  and a range input cannot be unset: an untouched one sat on the default and
+  read as a saved setting while the document behind it was empty. They are typed
+  fields now, blank shows the default as a placeholder, and an endpoint
+  answering with no system prompt is named in the startup log — asked of the
+  RESOLVED configuration, because a profile reaches an endpoint either by being
+  named there or on the connection it answers through, and checking only the
+  first told an admin who had assigned one that they had not.
+
+**The clock moved to the back of the prompt.** A prompt cache matches from the
+first token, and the system prompt led with a stamp accurate to the minute — so
+every call threw away a prefix that was otherwise identical, tool definitions
+included. On a machine with no GPU that is not a detail: prompt processing runs
+at tens of tokens a second, and one lap takes long enough that the minute has
+usually rolled over before the next goes out. Being slow was what made it miss
+the cache, and missing the cache was what made it slow. Measured on the
+deployment at `cached n_tokens = 24` against a 2,742 token prompt; 1,908 after.
+
+**Smaller, and all from the same afternoon.** `TOOL_RESULT_MAX` 20,000 → 4,000
+characters, because 20 KB is about 5,000 tokens and a small local model's whole
+window is 4,096. The tool paragraph tells a refusal (401, 403 — stop and say so)
+apart from a wrong request (correct the arguments and call again), and forbids
+asking whether to make a call at all. Every embed question logs its tool count,
+history and lap; a timeout names the size of the prompt it was sending, because
+"a cold model can take that long to load" was a guess and on a CPU it is the
+wrong one. `ACCESS ▸ SITES` gained *endpoints this site may reach*, written
+through the endpoints' own authorize profiles. An unnamed `/display/hello` no
+longer mints a device.
+
 ## 2026-08-23 — a listener you can see, a restart you can press, an assistant you can change
 
 Three things, all from the same afternoon of running this against a real

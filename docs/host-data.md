@@ -330,6 +330,15 @@ Three, and none of them blocks using it.
 - **Where a refused call surfaces.** A 403 from the host application reaches
   the model as the result of its call and is answered in words. That is right
   for the person and leaves an admin nothing to look at.
+- **A refusal and a wrong request are told apart.** 401 and 403 are that
+  person's account saying no, and the model is told to say so and stop.
+  Anything else — a rejected parameter, a window too wide, a bucket too fine —
+  is the call being wrong, and these applications answer it by naming the value
+  that would have worked, so the model is told to correct the arguments and
+  call again. One sentence used to cover both and taught it to give up on
+  either. It is also told never to ask whether to make a call: a read needs no
+  permission and a write is confirmed by the browser, so an offer to proceed
+  only costs the person a turn.
 
 - **Only the OpenAI dialect and Anthropic call tools.** Home Assistant does
   its own on its own side and is not affected; `demo` cannot, and a small
@@ -500,9 +509,13 @@ and it is written to be copied as it stands.
         the person, so make it one they can act on.
       * BOUND YOUR RESULTS. A page plus a total, never the whole table. A
         search matching 40,000 rows should return 50 and say 40,000.
-      * *** Results over 20 KB are truncated *** and the model is told they
-        were. It will then ask a narrower question — but only if your
-        operation lets it (see `limit`, above).
+      * *** Results over 4,000 characters are truncated *** and the model
+        is told they were. It will then ask a narrower question — but only
+        if your operation lets it (see `limit`, above). It was 20 KB, which
+        was chosen against "a log search returns 40,000 rows" without
+        asking what a model could hold: 20 KB is around 5,000 tokens, and a
+        small local model's ENTIRE window — tools, prompt, history and
+        result together — is 4,096.
       * *** You have 20 seconds to answer. *** Past that the panel treats
         the call as unanswered and tells the person so.
       * Keep field names stable. They end up in the sentences people read.
@@ -560,7 +573,8 @@ and it is written to be copied as it stands.
                                       your grant file, and nobody has
                                       ticked it at the Resonance end.
                                       Everything starts off, by design.
-      * "results are truncated"    -> over 20 KB. Add/lower `limit`.
+      * "results are truncated"    -> over 4,000 characters. Add/lower
+                                      `limit`.
       * "the assistant says the
          application didn't answer" -> over 20 seconds.
       * "writes never happen"      -> either no grant file, or

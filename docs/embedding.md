@@ -100,6 +100,22 @@ An endpoint that is later deleted or switched off falls back to whatever the
 address carries, and says so in the log. A panel that goes silent because
 somebody renamed an assistant is the worse failure.
 
+**Ticking it onto an endpoint can be done from either side now.** ACCESS ▸
+SITES carries *endpoints this site may reach* — the same permission that lives
+on each endpoint's authorize profile, read from the site's side, which is where
+an admin setting up one application is already looking. It writes through those
+profiles rather than keeping a second list, because one permission with two
+places to set it is two places to disagree. An endpoint whose profile is shared
+with others says so when you tick it: the grant reaches all of them.
+
+**The frame draws itself as that endpoint.** The appearance the endpoint's
+layout names — the figure, the palette, the geometry, the voice — rides down
+with the grant and the panel applies it, so a site embedded in somebody's page
+looks like the assistant it is talking to rather than like the defaults this
+page ships with. Only the appearance: the fullscreen, clock and screensaver a
+layout also carries are decisions about a wall, and a host page composes its
+own frame.
+
 ### Capability — what the application may do
 
 Ask at all, open a microphone, speak. Enforced on the server: an embed denied
@@ -363,6 +379,19 @@ effect on the next session — and a renewal is a next session.
 **Disabling or deleting a key ends its live sessions immediately**, and burns
 any codes minted but not yet spent. Sessions are held in memory, so a restart
 ends them all; the host's server simply mints another.
+
+**A session that ends early recovers by itself, and keeps the question.** The
+renewal above is scheduled, but an admin's edit or a restart stops a session
+before its timer is due — so a question that arrives to find its session gone
+comes back `401` with `embed_expired`, the frame asks the loader for a fresh
+code on the spot, and **the same question is sent again** once the new token is
+in. The person sees an answer, not a lost turn. Only once: a second expiry on
+the same question is a session that will not hold.
+
+That 401 matters on its own. A dead bearer token used to fall through to the
+display gate, be judged on whatever cookie the host's origin happened to hold,
+and come back *this display may not use that endpoint* — a permissions message
+for something that was only ever a session ending.
 
 Failed keys back off geometrically per address, in their own ledger, so a host
 server fumbling its key cannot lock an admin out of the panel.

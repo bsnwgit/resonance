@@ -185,6 +185,15 @@ edge:
   under a name. MODELS carries the limits and the system prompt as well, since
   those describe the service rather than the assistant in front of it.
 
+  Its numbers — reply limit, temperature, turns of context, timeout — are
+  **typed, and blank means the default**, which each shows as a placeholder.
+  They were sliders, and a slider cannot be empty: an untouched one sat on the
+  default and read as a saved setting while the profile behind it held nothing.
+  A profile that has never been filled in is an assistant with no system prompt
+  and no memory of the last question, and the panel was the reason that stayed
+  invisible. **An endpoint answering with no system prompt is named in the
+  startup log.**
+
 Each of the three groups reads the same way: the last tab in it is the one that
 *names* the others, and an endpoint names only those. Three pointers on an
 endpoint instead of a dozen fields, and a rule written once rather than copied
@@ -209,6 +218,15 @@ needed for the pair above:
   which assistant it talks to, what it may do, what it draws, which origins may
   frame it, whether the host must name the person, and the session and rate
   numbers.
+
+  It also carries **endpoints this site may reach** — the same permission that
+  lives on each endpoint's authorize profile, read from the site's side. It was
+  only editable from the other end, so granting one site three endpoints meant
+  opening three profiles and remembering an id. Ticking here writes through
+  those profiles rather than keeping a second list, because one permission with
+  two places to set it is two places to disagree and the endpoint's own screen
+  would stop telling the truth. An endpoint whose profile is shared with others
+  says so when you tick it: the grant reaches all of them.
 
   **SAVE** rewrites the key in place. Same id, same secret, same grants — so
   nobody at the far end is sent anything, and no authorize profile stops naming

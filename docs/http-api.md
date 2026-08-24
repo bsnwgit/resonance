@@ -13,7 +13,7 @@ On every listener:
 | `GET` | `/settings` | the shared interface configuration |
 | `GET` | `/routes` | the routes: presentation to anyone, the routing half only to a caller holding a display token, and `allowed` per route for that caller |
 | `POST` | `/ask` | a question — `{"route": …}` picks one, absent means the default. `{"conversation_id": …}` continues one the endpoint is keeping, and the reply carries that id back. `403 {"refused": "display"}` where this display may not use that route |
-| `POST` | `/display/hello` | a display announcing itself: declared name in, its identity out, and a token in an `HttpOnly` cookie if it had none. Same-origin only |
+| `POST` | `/display/hello` | a display announcing itself: declared name in, its identity out, and a token in an `HttpOnly` cookie if it had none. **A name, or nothing** — arriving without one returns `{}` and mints no device, because hanging a screen is a deliberate act and a browser that merely opened the address is somebody looking at a page. Same-origin only |
 | `POST` | `/display/request` | a device asking for access, answering the form the admin built — or `{"renew": true}`, which asks again on the answers already held. Same-origin only |
 | `POST` | `/display/poll` | a display saying it is still here and asking whether anything has moved: the stamp of ITS OWN configuration, whether an admin has asked it to reload, this server's clock, and the numbers it keeps itself up with. Same-origin only |
 | `POST` | `/display/enrol` | an enrolment code redeemed in place, from the box the display page offers. Spends the code and sets the cookie, without sending anybody back to the address bar. Same-origin only, same back-off as the URL form |
