@@ -450,9 +450,16 @@ is spoken as **"Done."** for the same reason: silence is how a failure sounds.
 
 ### What the model knows
 
-The server appends the current date and time to the system prompt on every
-request, because a model's sense of "now" is frozen at its training cutoff and
-it will otherwise answer that question confidently and wrongly. The time is
+The server states the current date and time on every request, because a model's
+sense of "now" is frozen at its training cutoff and it will otherwise answer
+that question confidently and wrongly. It goes in as its own note immediately
+before the question rather than in the system prompt, and that placement is
+about speed rather than tidiness: a prompt cache matches from the first token,
+so a stamp that changes every minute sitting ahead of the system prompt and the
+tool definitions threw away everything a server could have reused. On a machine
+without a GPU that cost the whole prompt again on every call. The system prompt
+and the tools are identical from one question to the next, so they come first
+and the clock comes last. The time is
 the **display's** local time: the browser reports its IANA zone with each
 question and the server formats accordingly, so a box running on UTC does not
 tell somebody in New York at 8pm that it is already tomorrow.

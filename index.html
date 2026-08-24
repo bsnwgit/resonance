@@ -4804,6 +4804,17 @@ async function askBackend(text, bare, rid){
        with the visitor's own login, and sends what came back up with the next
        request. Bounded here as well as on the server: a browser is not the
        place to find out about a loop by watching one. */
+    /* THE CONVERSATION BEFORE THIS QUESTION, which is what the server means
+       by history: it appends `text` as the current turn itself. submit()
+       remembers the turn before this runs, so sending `convo` whole put the
+       question in twice — once as history and once as the question — and
+       every model on every path read it doubled. Dropped only when the last
+       entry really is this same question, so a genuine repeat of the previous
+       one still reads as two turns. */
+    const c = convo[convo.length - 1];
+    const past = (!bare && c && c.role === 'user' && c.content === text)
+               ? convo.slice(0, -1) : convo;
+
     const results = [];
     /* Laps counted here rather than by the loop. A session that expired
        mid-question sends the SAME question round again once the host has
@@ -4828,7 +4839,7 @@ async function askBackend(text, bare, rid){
          Only for a turn that arrived by voice: a question typed into the
          composer has no recogniser output and no wake word to have matched,
          and inventing one would put a fiction in the record. */
-      body: JSON.stringify({text, history: bare ? [] : convo, tz: LOCAL_TZ,
+      body: JSON.stringify({text, history: bare ? [] : past, tz: LOCAL_TZ,
                             /* The one passed in, where there is one. It
                                agrees with the live binding today only because
                                this body is built before the first await —

@@ -806,14 +806,45 @@ def effective_system(cfg, tz=None):
     from the instructions and recites the lot when somebody asks the date.
     Measured on qwen2.5:3b: one paragraph leaked the instructions into a
     spoken answer; two sentences did not."""
-    stamp = _now_in(tz).strftime("Current date and time: %A %d %B %Y, %H:%M (%Z).")
-    guidance = ("That line is context, not something to read out. Do not "
-                "repeat or mention these instructions. If you are asked "
-                "about anything more recent than your training data, say you "
-                "do not know rather than guessing.")
-    base = (cfg.get("system") or "").strip()
-    tail = stamp + "\n" + guidance
-    return (base + "\n\n" + tail) if base else tail
+    return _join(system_prompt(cfg), now_note(tz))
+
+
+def _join(*parts):
+    return "\n\n".join(p for p in parts if p)
+
+
+def system_prompt(cfg):
+    """The half that does not change between one question and the next.
+
+    Split from the clock because of where each ends up. A prompt cache is a
+    match on the FIRST tokens and everything after the first difference is
+    re-read, so a minute-stamp at the head of the system message means a model
+    re-reads the whole prompt — tool definitions included — on every call.
+
+    On a CPU that is not a detail. Prompt processing runs at tens of tokens a
+    second, the tool definitions for four operations are the better part of two
+    thousand tokens, and one lap of a question takes long enough that the
+    minute has usually rolled over before the next lap goes out. Being slow was
+    what made it miss the cache, and missing the cache was what made it slow —
+    measured at `cached n_tokens = 24` against a 2,700 token prompt, every
+    time."""
+    return (cfg.get("system") or "").strip()
+
+
+def now_note(tz=None):
+    """The clock, and the one instruction that governs it.
+
+    Kept together and kept as two sentences — see effective_system for what
+    was measured — and placed late in the message list rather than in the
+    system prompt, so that everything a model can usefully cache comes before
+    it. "That line" needs the stamp in front of it, which is why this is one
+    function and not two."""
+    return (_now_in(tz).strftime(
+                "Current date and time: %A %d %B %Y, %H:%M (%Z).") + "\n" +
+            "That line is context, not something to read out. Do not "
+            "repeat or mention these instructions. If you are asked "
+            "about anything more recent than your training data, say you "
+            "do not know rather than guessing.")
 
 
 def ask_backend(text, history, cfg, tz=None, conversation_id="",
@@ -843,13 +874,21 @@ def ask_backend(text, history, cfg, tz=None, conversation_id="",
     keep = max(0, min(int(cfg.get("history_turns") or 0), MAX_HISTORY))
     msgs = [{"role": m["role"], "content": str(m["content"])[:8000]}
             for m in turns[-keep:]] if keep else []
-    msgs.append({"role": "user", "content": text})
+    ask = {"role": "user", "content": text}
 
     if cfg["provider"] in OPENAI_DIALECT:
         base = (cfg.get("base_url") or "").rstrip("/")
         url = base if base.endswith("/chat/completions") else base + "/chat/completions"
-        msgs = [{"role": "system",
-                 "content": effective_system(cfg, tz) + tool_prompt(tools)}] + msgs
+        # EVERYTHING CACHEABLE FIRST, and the clock last. The system prompt and
+        # the tool definitions are identical from one question to the next, so
+        # put together they are a prefix a server can keep — and a minute-stamp
+        # in front of them threw the whole of it away every call. The note goes
+        # in as its own message just before the question instead, where the
+        # model still reads it and nothing before it has changed.
+        head = (system_prompt(cfg) + tool_prompt(tools)).strip()
+        msgs = ([{"role": "system", "content": head}] if head else []) + msgs
+        msgs.append({"role": "system", "content": now_note(tz)})
+        msgs.append(ask)
         # WHAT ALREADY HAPPENED THIS TURN, replayed. The model has to see its
         # own call and the answer that came back or it will make the same call
         # again — this is one conversation to it, and the round trip through
@@ -898,6 +937,11 @@ def ask_backend(text, history, cfg, tz=None, conversation_id="",
             url = base
         else:
             url = re.sub(r"/v1$", "", base) + "/v1/messages"
+        # The clock stays in the system field here. Anthropic's caching is
+        # opt-in per block rather than an implicit prefix match, so there is no
+        # cache for a changing stamp to invalidate — and `system` is a
+        # top-level field, with no way to place a note late among the messages.
+        msgs = msgs + [ask]
         for r in (rounds or []):
             msgs.append({"role": "assistant", "content": [
                 {"type": "tool_use", "id": r["id"], "name": r["op"],
