@@ -4651,6 +4651,9 @@ function newReply(rid){
   const body = addMsg('ai', '', rid);
   const caret = document.createElement('span'); caret.className='caret';
   body.parentElement.appendChild(caret);
+  /* Same reason as the dots above: appended after addMsg has already scrolled,
+     and in a narrow panel it can wrap to a line of its own. */
+  followLog();
   return {body, caret, rid};
 }
 
@@ -4673,6 +4676,14 @@ const Thinking = {
     dots.setAttribute('role', 'status');
     dots.setAttribute('aria-label', 'thinking');
     body.appendChild(dots);
+    /* AFTER THE DOTS ARE IN, and that is the whole of the fix. addMsg scrolls
+       as it appends, and at that instant this line is an empty body under a
+       speaker name — the dots arrive afterwards and make the row taller, so
+       the scroll it just did was to a bottom that no longer exists. On a
+       transcript already tall enough to scroll, that left the NAME on the last
+       visible line and the three dots below the fold: the person saw their
+       question, a name, and nothing at all to say the thing was working. */
+    followLog();
     this.el = body.parentElement;
   },
   stop(){
