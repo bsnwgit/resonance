@@ -90,7 +90,7 @@ already generate, and gives the address of it. That is the whole of the
 integration work on their side.
 
 **A site record gains a spec URL.** Beside the origins, the capability and the
-chrome, on the same row under **ACCESS ▸ SITES** where everything else about
+chrome, on the same row under **EndPoints ▸ SITES** where everything else about
 that site is edited — the third block on the row, *their application*. **READ
 SPEC** fetches it, reads the operations out of it, and lists them with a tick
 each; anything that writes is marked. **SAVE OPERATIONS** is what grants them.
@@ -127,7 +127,7 @@ of three separate decisions, each made by somebody with a real claim.
 | | who decides | where it lives |
 |---|---|---|
 | **The ceiling** | the application's owner | a grant file they serve, from their own origin |
-| **What is enabled** | this server's admin | ticks on the row under ACCESS ▸ SITES |
+| **What is enabled** | this server's admin | ticks on the row under EndPoints ▸ SITES |
 | **What that person could do anyway** | the application itself | their session, on every request |
 
 **The data owner sets the outer bound and only they can raise it.** The admin

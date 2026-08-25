@@ -70,6 +70,14 @@ DOCS = [
                 "or as a bubble: embed keys, the four things one fixes, the "
                 "code you hand their developer, and what has to be true of "
                 "the server first."},
+    {"id": "node",    "file": "node-setup.md",
+     "category": "Administration",
+     "title": "Setting up a node", "audience": "admin",
+     "summary": "Every link in the chain, in the order you build it: the "
+                "model, the network profile and its two addresses, the "
+                "connection, the layout, the permission, the endpoint, the "
+                "enrolment door and the code — with a diagram, the rules that "
+                "bite, and what each symptom means."},
     {"id": "hostdata", "file": "host-data.md",
      "category": "Assistants & integration",
      "title": "Reaching an application's data", "audience": "admin",

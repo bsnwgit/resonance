@@ -76,7 +76,7 @@ ticked.
 
 An admin creates a key under **ENROLLMENTS ▸ EMBED** — beside the two other
 things that enrol, a person and a screen. What has been issued is listed under
-**ACCESS ▸ SITES**, the register beside the nodes and the assistants: that tab
+**EndPoints ▸ SITES**, the register beside the nodes and the assistants: that tab
 is the door, this one is the room. A key fixes five things.
 
 ### Which assistant it talks to
@@ -100,7 +100,7 @@ An endpoint that is later deleted or switched off falls back to whatever the
 address carries, and says so in the log. A panel that goes silent because
 somebody renamed an assistant is the worse failure.
 
-**Ticking it onto an endpoint can be done from either side now.** ACCESS ▸
+**Ticking it onto an endpoint can be done from either side now.** EndPoints ▸
 SITES carries *endpoints this site may reach* — the same permission that lives
 on each endpoint's authorize profile, read from the site's side, which is where
 an admin setting up one application is already looking. It writes through those
@@ -220,11 +220,11 @@ data](host-data.md).
 
 One key is one surface. A lobby kiosk and a support widget are two keys,
 separately revocable and separately rate-limited, and the register under
-**ACCESS ▸ SITES** says exactly what each one draws. That is also where a key
+**EndPoints ▸ SITES** says exactly what each one draws. That is also where a key
 is changed afterwards, disabled and deleted; this tab only makes them.
 
 **Nothing here is a decision you are stuck with.** Every field on this form is
-a field on the row under ACCESS ▸ SITES, and **SAVE** there rewrites the key in
+a field on the row under EndPoints ▸ SITES, and **SAVE** there rewrites the key in
 place — same id, same secret, same grants, so nobody at the far end is sent
 anything. Narrow one and the sessions it is holding are dropped, so the change
 is true at once rather than true on paper until they expire; rename it and
@@ -236,7 +236,7 @@ moment you save.
 
 ## What you hand over
 
-Set **SETTINGS ▸ ENROLL ▸ Enroll Embed Server** first — the address a
+Set **SETTINGS ▸ ENROLL ▸ Enroll Embed APP** first — the address a
 stranger's browser reaches this server by, which is not necessarily the name
 your own screens use. It is three fields: the scheme, the host, and a port that
 is **blank behind a reverse proxy**, which is the common case. This server adds
@@ -247,7 +247,7 @@ front of it. Then create the key.
 The panel shows the key **once**, with working code written against that
 address and shaped by that key, each block with its own COPY.
 
-**The code can be shown again; the key cannot.** Every row under ACCESS ▸ SITES
+**The code can be shown again; the key cannot.** Every row under EndPoints ▸ SITES
 carries the same three snippets, rebuilt — they never contained the key, which
 is read from `RESONANCE_KEY` in the host's environment. The secret is stored
 hashed and this server cannot produce it a second time. If it has been lost,

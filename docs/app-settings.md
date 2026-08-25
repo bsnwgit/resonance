@@ -109,7 +109,7 @@ but it **warns at every startup and in the admin panel**, because a laptop
 configured this way that later joins an office network will not have changed
 on the day that matters.
 
-**The warning is on the endpoint**, under ACCESS ▸ AI ▸ *Permission*, because
+**The warning is on the endpoint**, under EndPoints ▸ AI ▸ *Permission*, because
 that is the endpoint anybody can reach — one line saying what being open costs,
 shown only where that endpoint's permission asks nobody to sign in and this
 machine can be reached. This page keeps the count and a pointer, since being reachable is what

@@ -1072,12 +1072,22 @@ if (ENROL && window.history && history.replaceState)
    `?person=` is the one word the server sends back after somebody opens a
    minted link, read once and taken straight out of the address bar — the
    outcome of a thing that happened once has no business surviving a reload.
-   Three answers now: `setup` for an account with no password yet, `ready` for
-   a link that has already been spent, `bad` for one that means nothing. */
+   Four answers now: `setup` for an account with no password yet, `ready` for
+   a link that has already been spent, `expired` for a real one that sat past
+   the limit an administrator set, and `bad` for one that means nothing. */
 /* THE ENROLMENT LISTENER, or not. A door and nothing else: no assistant, no
    microphone, no device token to be issued. Everything this page normally does
    on load answers 404 there, so it does none of it — see enrolOnly. */
 let ENROL_ONLY = false;
+/* THE OTHER DOOR. Same idea, other population: a listener that answers the
+   code box and `/e/` and nothing else. Kept apart from ENROL_ONLY rather than
+   made one flag, because what the page does with them is opposite — that one
+   ends at "you are set up, go here"; this one takes a code and then goes. */
+let DEV_ENROL_ONLY = false;
+/* Where a screen may go once its code is spent, handed over by the server with
+   the enrolment answer. Computed there with the same test that will be applied
+   when it arrives, so a name here is a door that opens. */
+let DEV_PLACES = [];
 /* Where this account can actually be used, handed over by /user/setup once a
    password exists. This listener is not one of them and never will be. */
 let PLACES = [];
@@ -1201,6 +1211,13 @@ function paintGate(){
      that did not work should be told, not left looking at a page behaving as
      though they never clicked it. */
   const failed = PERSON_ARRIVED === 'bad';
+  /* AND THE OTHER FAILURE, which is not the same one. `bad` is a link that
+     means nothing — a typo, or a guess. `lapsed` is a real invitation that sat
+     unopened past the limit an administrator set, and the person holding it
+     has done nothing wrong and needs a new one rather than a corrected
+     address. Telling them apart is the whole reason the server sends a fourth
+     word. */
+  const lapsed = PERSON_ARRIVED === 'expired';
   const head = $('gatehead'), note = $('gatenote');
   const fields = $('gatefields'), links = $('gatelinks');
   const user = $('gateuser'), pass = $('gatepass'), pass2 = $('gatepass2');
@@ -1238,6 +1255,7 @@ function paintGate(){
                          : 'You do not have access here')
       : done    ? 'You are set up'
       : failed             ? 'That link did not work'
+      : lapsed             ? 'That link has run out'
       : invite  ? 'Invitations are accepted here'
       : spent   ? 'That link has been used'
       : setup   ? 'Choose a password'
@@ -1265,6 +1283,10 @@ function paintGate(){
                       + 'administrator has to say which assistant you may use.')
       : failed             ? 'It may have been replaced since it was sent to '
                              + 'you. Ask an administrator for a new one.'
+      : lapsed             ? 'Invitations here are only good for a while, and '
+                             + 'this one is past it. Nothing is wrong with the '
+                             + 'address — ask an administrator to reissue it '
+                             + 'and the new link will work.'
       : invite  ? 'Open the link you were sent. It is the only way in from '
                   + 'this address, and it works nowhere else.'
       : spent   ? 'A password was already chosen with it. Sign in where your '
@@ -1444,7 +1466,7 @@ async function gateArrived(j){
 
 /* Said even where hello never reports a person, which is what a failure is:
    a link that means nothing leaves no cookie to report. */
-if (PERSON_ARRIVED === 'bad')
+if (PERSON_ARRIVED === 'bad' || PERSON_ARRIVED === 'expired')
   window.addEventListener('DOMContentLoaded', paintGate);
 /* The forced state. Nothing else can be done on this page until there is a
    password, so it is set before anything paints rather than switched to. */
@@ -2132,6 +2154,24 @@ async function useCode(){
        reload picks all of that up in the order the page already knows how to
        do it, instead of a second path through the same setup that would have
        to be kept in step with the first. */
+    /* WHERE IT GOES NEXT, on the door that has no assistant on it. The
+       server works it out — subject_may is the same test that will be applied
+       when the screen arrives — and hands over the list with the answer. A
+       screen granted nothing yet has nowhere to be sent and stays here, where
+       this line can say so, which beats a redirect to a port that will refuse
+       it. */
+    DEV_PLACES = (j && j.places) || [];
+    if (DEV_ENROL_ONLY && DEV_PLACES.length){
+      enrolNote('enrolled — opening ' + (DEV_PLACES[0].name || 'the assistant')
+                + '…');
+      location.replace(DEV_PLACES[0].url);
+      return;
+    }
+    if (DEV_ENROL_ONLY){
+      enrolNote('enrolled, and granted no assistant yet — an administrator '
+                + 'ticks one on this screen\u2019s row under ACCESS.', true);
+      return;
+    }
     enrolNote('enrolled — starting up…');
     location.replace('?enrol=ok');
   }catch(e){
@@ -4437,6 +4477,54 @@ function syllables(w){
   return Math.max(1, Math.min(7, n));
 }
 
+/* WHAT A VOICE SHOULD NOT PRONOUNCE — the browser engine's copy of the
+   server's spoken(). The local engine's text goes through /tts and is
+   cleaned there, which is the one place every caller passes; this engine
+   speaks from the page and the server never sees the string, so the rules
+   have to exist twice. Two copies of a rule is a real cost and the
+   alternative is a voice that reads asterisks on half the deployments.
+
+   Only the constructs carrying something a voice must NOT say get a rule of
+   their own — an address, a fence's language, a row of dashes. Emphasis,
+   code spans and strikethrough surround their own words, so the sweep at the
+   foot takes the marks and leaves the words. */
+const SPEECH_MARKS = '*_~`#|<>^\\{}[]';
+function speechPictograph(cp){
+  return (cp >= 0x1F000 && cp <= 0x1FAFF) || (cp >= 0x1F1E6 && cp <= 0x1F1FF)
+      || (cp >= 0x2600 && cp <= 0x27BF)   || (cp >= 0x2190 && cp <= 0x21FF)
+      || cp === 0x200D || cp === 0xFE0F || cp === 0x2B50 || cp === 0x2B55;
+}
+function spokenText(src){
+  let s = String(src == null ? '' : src);
+  s = s.replace(/^[ \t]*(?:```|~~~)[^\n]*\n?/gm, '');
+  s = s.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
+  s = s.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+  s = s.replace(/^[ \t]*(?:[-*_][ \t]*){3,}$\n?/gm, '');
+  s = s.replace(/^[ \t]{0,3}#{1,6}[ \t]*/gm, '');
+  s = s.replace(/^[ \t]{0,3}>[ \t]?/gm, '');
+  s = s.replace(/^[ \t]*(?:[-*+]|\d+[.)])[ \t]+/gm, '');
+  s = s.replace(/^[ \t]*\|?[\s:|-]*\|[\s:|-]*$\n?/gm, '');
+  s = s.replace(/^[ \t]*\|/gm, '');
+  s = s.replace(/\|[ \t]*$/gm, '');
+  s = s.replace(/\|/g, ', ');
+  /* A mark becomes a space only BETWEEN TWO WORDS. Blanking every one turns
+     list_alert_rules into one unsayable word; spacing every one turns
+     "down*." into "down ." and the engine pauses before the full stop. */
+  const word = c => !!c && /[0-9A-Za-z]/.test(c);
+  let out = '';
+  const cp = [...s];
+  cp.forEach((ch, i) => {
+    if (speechPictograph(ch.codePointAt(0))) return;
+    if (SPEECH_MARKS.indexOf(ch) >= 0){
+      if (word(out.slice(-1)) && word(cp[i + 1] || '')) out += ' ';
+      return;
+    }
+    out += ch;
+  });
+  return out.replace(/[ \t]+/g, ' ').replace(/ *\n/g, '\n')
+            .replace(/^ +/gm, '').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 const Speech = {
   supported: typeof window !== 'undefined' && 'speechSynthesis' in window,
   voices: [], voice: null,
@@ -4475,7 +4563,15 @@ const Speech = {
     if (this.pi >= this.parts.length){ this.finish(); return; }
     const part = this.parts[this.pi];
     this.partLen = part.length;
-    const u = new SpeechSynthesisUtterance(part);
+    /* SPOKEN, NOT SHOWN. `parts` stays exactly what the model wrote, because
+       reveal() draws the transcript out of it; only what reaches the engine
+       has its marks taken off. Stripping can only shorten, so the boundary
+       events come back with indices into a shorter string and the caret is
+       scaled back onto the line on screen — exact when there was nothing to
+       strip, which is the ordinary case. */
+    const said = spokenText(part) || part;
+    const grow = part.length / said.length;
+    const u = new SpeechSynthesisUtterance(said);
     if (this.voice) u.voice = this.voice;
     u.rate = S.vrate; u.pitch = S.vpitch;
 
@@ -4484,8 +4580,8 @@ const Speech = {
       if (!this.sawBoundary) ev('boundary');
       this.sawBoundary = true; this.synthetic = false;
       const ci = e.charIndex || 0;
-      const w  = (part.slice(ci).match(/^\S+/) || [''])[0];
-      this.reveal(this.base + ci + w.length);
+      const w  = (said.slice(ci).match(/^\S+/) || [''])[0];
+      this.reveal(this.base + Math.round((ci + w.length) * grow));
       this.syl    = syllables(w);
       this.gap    = Math.max(0.055, 0.185 / S.vrate);
       this.nextAt = now;
@@ -4518,7 +4614,7 @@ const Speech = {
     this.sawBoundary = false;
     this.fallbackAt  = now + 3.0;      // generous until onstart tightens it
     // ~13 chars/sec of speech at rate 1.0
-    this.synthDur = Math.max(0.4, part.length / (13 * S.vrate));
+    this.synthDur = Math.max(0.4, said.length / (13 * S.vrate));
     if (this.pi === 0) evLog.length = 0;
     ev('speak(' + this.pi + ')');
     try { window.speechSynthesis.speak(u); }
@@ -4651,6 +4747,9 @@ function newReply(rid){
   const body = addMsg('ai', '', rid);
   const caret = document.createElement('span'); caret.className='caret';
   body.parentElement.appendChild(caret);
+  /* Same reason as the dots above: appended after addMsg has already scrolled,
+     and in a narrow panel it can wrap to a line of its own. */
+  followLog();
   return {body, caret, rid};
 }
 
@@ -4673,6 +4772,14 @@ const Thinking = {
     dots.setAttribute('role', 'status');
     dots.setAttribute('aria-label', 'thinking');
     body.appendChild(dots);
+    /* AFTER THE DOTS ARE IN, and that is the whole of the fix. addMsg scrolls
+       as it appends, and at that instant this line is an empty body under a
+       speaker name — the dots arrive afterwards and make the row taller, so
+       the scroll it just did was to a bottom that no longer exists. On a
+       transcript already tall enough to scroll, that left the NAME on the last
+       visible line and the three dots below the fold: the person saw their
+       question, a name, and nothing at all to say the thing was working. */
+    followLog();
     this.el = body.parentElement;
   },
   stop(){
@@ -6149,6 +6256,18 @@ const Settings = {
          finds out, and it has to be read before anything is concluded from a
          404 somewhere else. */
       ENROL_ONLY = !!got.enrol_only;
+      DEV_ENROL_ONLY = !!got.dev_enrol_only;
+      /* WHAT THIS PORT LOOKS LIKE, where the server sends it. A listener
+         carrying one endpoint knows the layout that endpoint names, and now
+         says so on this call — the only one a browser with no display record
+         gets an answer from. Without it such a browser wore what this page
+         ships with: the default figure, the default greeting, and the name
+         Resonance, on an address whose endpoint is called something else.
+
+         Applied only while this page is not a known display. A screen with a
+         row of its own gets the same block on `hello`, from the same
+         resolver, and that one is the one about IT. */
+      if (got.kiosk && !Display.known) Kiosk.take(got.kiosk);
       let n = 0;
       Object.keys(got).forEach(k=>{ if (k in S){ S[k] = got[k]; n++; } });
       if (n) repaintAll();
@@ -6888,6 +7007,10 @@ Promise.all([Settings.load(), Display.hello().then(()=> Routes.load())]).then(()
      poll against routes that are not there and end up telling somebody
      accepting an invitation that the screen has lost the server. */
   if (ENROL_ONLY) return enrolOnly();
+  /* …and the same for the device door, for the same reason: neither call above
+     answered here, and everything below would start a poll against routes that
+     are not there. */
+  if (DEV_ENROL_ONLY) return devEnrolOnly();
   /* After BOTH, and not merely when the display answered. The two race, and
      loading the shared settings overwrites S wholesale — so a place's own
      appearance applied when hello came back first would be silently undone a
@@ -6953,6 +7076,21 @@ function enrolOnly(){
      without a live link is somebody who typed the port in. */
   if (GATE !== 'setup')
     GATE = PERSON_ARRIVED === 'ready' ? 'spent' : 'invite';
+  paintGate();
+}
+
+/* THE DEVICE DOOR. The gate is the page here too, and it opens on the code
+   box rather than on a sign-in: somebody is standing at a screen holding six
+   characters and there is nothing else to do at this address. */
+function devEnrolOnly(){
+  document.body.dataset.enrolonly = '1';
+  /* Both, for the reason enrolOnly gives: #request and #gate are each
+     display:none until one of them is set, and the function that normally sets
+     them decides things about a display record that does not exist here. */
+  document.body.toggleAttribute('data-request', true);
+  document.body.toggleAttribute('data-gate', true);
+  Kiosk.applyLook();
+  GATE = 'code';
   paintGate();
 }
 
