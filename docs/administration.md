@@ -60,11 +60,23 @@ three lists an endpoint is assembled from, and every one of those is a profile
 stored in the displays document and picked by name wherever a screen is
 configured.
 
+**The menu is two halves, and each is named.** **CONFIGURATION** holds what the
+server *is* — itself, who arrives at it, who is already in. **PROFILES** holds
+what everything else is composed from. A rule runs down the side of each half
+from its name to the bottom of the last group in it, and a second one down each
+group, so the shape of the menu is visible rather than something you work out
+from the gaps.
+
 **Each label folds its own group**, the same way a topic heading folds its
 settings, and the caret on it says which way it is. They fold independently —
 closing one does not open another — and a fresh panel opens with all six out.
 A folded group whose tab you are standing on keeps its name lit, so tidying the
 menu never hides where you are.
+
+**And each half folds on its own name**, one level out, with the same caret.
+Folding a half does not disturb the groups inside it: they are as you left them
+when you open it again. A folded half whose tab you are standing on keeps its
+name lit too.
 
 The caret at the head of the menu **folds the whole thing away**, which gives
 the settings the width back. Folded, the strip that is left still names the tab
@@ -72,7 +84,10 @@ you are on, running down it in the colour a selected link wears — so closing
 the menu never costs you the answer to *where am I* either.
 
 **Every label is shaded from the display's own palette**, a colour per subject
-— the six in the menu in **rust**, EndPoints in **ice**, SEARCH in **milk**. They
+— the three under CONFIGURATION in **blue**, the three under PROFILES in
+**rust**, EndPoints in **ice**, SEARCH in **milk**. The two halves differ in
+colour for the same reason the rule between them is there: they are two kinds of
+thing, and the colour says so before you read the words. They
 are the same colours a display can be set to, taken from the same values rather
 than matched by eye, so the panel and the thing it configures are not two
 people's idea of one palette. The colour is there to tell the groups apart at a
@@ -635,6 +650,24 @@ screen looks like and what it is allowed to do were never the same question:
 
 They are in that order on the tab because it is the order you build in: the two
 pieces first, then the thing that names them.
+
+**Every profile list works the same way, and all of them can be picked from.**
+Each row carries a tick. Pick one or more and a bar appears over the list:
+
+| | |
+|---|---|
+| **CLONE** | opens a new profile filled in from the one picked — every value, and the name left empty, because that is the one field that must not be a copy. Takes exactly one; with more picked it is offered and disabled |
+| **REMOVE PICKED** | removes them all in one save, after confirming |
+
+The bar is hidden until something is picked. What is picked survives the list
+being redrawn — opening a row, saving, changing tab — because it is remembered
+by which profile it is rather than by where the row was.
+
+**A removal another profile depends on is refused, and the list is put back.**
+An authorize profile a permission names cannot go, and neither can the last
+layout profile; the reason arrives in the note under the list and what you
+picked stays picked so you can act on it. Nothing is removed on screen that the
+document has not actually lost.
 
 **A layout profile is composed, not self-contained.** It names an appearance and
 a screensaver rather than carrying copies of their values, so changing what a

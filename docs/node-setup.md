@@ -140,6 +140,14 @@ else. With no port set, a code is typed at whichever display listener answers.
 links and the enrolment names are read at the moment a link is built. The tab's
 pending line at the foot says when a restart is owed.
 
+## Building on one you already have
+
+Every profile list has a tick on each row. Pick one and **CLONE** opens a new
+profile filled in from it — every value, with the name left empty. Most of a
+second network profile is the first one with a different port, and most of a
+second layout is the first one with one thing changed, so this is usually the
+shorter way in than ADD. **REMOVE PICKED** takes several out in one save.
+
 ## Order of work
 
 1. **PROFILES ▸ MODELS** — make the model.

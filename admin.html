@@ -467,7 +467,103 @@
     flex:1 1 auto;min-height:0;overflow-y:auto;scrollbar-gutter:stable;
     display:flex;flex-direction:column;gap:11px;
   }
-  .navgrp{display:flex;flex-direction:column;min-width:0}
+  .navgrp{display:flex;flex-direction:column;min-width:0;position:relative}
+  /* A LINE DOWN EACH GROUP, from the name to the last thing it holds. The
+     groups were told apart by a gap and by the chip's colour — enough to read
+     one at a time, not enough to see the SHAPE of the menu: where a group
+     begins and how far it runs.
+
+     `top` and `bottom` on the group box, so nothing is measured by hand: the
+     box starts at the chip and ends where its tabs end, which is the last tab
+     exactly. It stays right whatever the type scale does and whatever is added
+     to a group.
+
+     ABOVE THE BUTTONS, and not blocking them. The tabs stretch the full width
+     of the column, so this line falls inside their boxes — a child background
+     paints over a parent's pseudo-element, and the selected tab's gradient
+     would have swallowed it. `pointer-events:none` because a decoration must
+     not eat a click on the link under it.
+
+     HIDDEN ON A FOLDED GROUP. With the tabs away the group is one chip, and a
+     rule the height of a chip is a stub beside a word rather than a line down
+     a list. */
+  #panelnav .navgrp::before{
+    content:'';position:absolute;left:4px;top:2px;bottom:2px;width:1px;
+    background:rgba(var(--glass),.55);
+    z-index:1;pointer-events:none;
+  }
+  #panelnav .navgrp.shut::before{display:none}
+
+  /* ---- the two halves ----
+     A RULE DOWN EACH HALF, from under its name to the bottom of the last group
+     in it, and the same one over again a level in for each group. The menu is a
+     tree two deep and was drawn as a flat column with two captions in it.
+
+     The rail is on the BODY rather than on the half, so its top is where the
+     groups start — just under the label — with nothing measured by hand. Its
+     bottom is the last group's, because that is where the body ends. */
+  .navhalf{display:flex;flex-direction:column;min-width:0}
+  .navhalfbody{
+    position:relative;display:flex;flex-direction:column;gap:11px;
+    /* Room for the half's rule, and the indent that says these belong to the
+       name above them. The groups' own rules are inside their boxes, so this
+       is what keeps the two lines apart rather than a second offset. */
+    margin-left:10px;
+  }
+  #panelnav .navhalfbody::before{
+    content:'';position:absolute;left:-6px;top:2px;bottom:2px;width:1px;
+    background:rgba(var(--glass),.55);
+  }
+  #panelnav .navhalf.shut > .navhalfbody{display:none}
+  /* THE DIVIDER IS THE CONTROL, the same bargain the group chips make with
+     their own names. A real button so it is reachable from the keyboard and
+     announces itself as pressable; the box is stripped back because a button
+     brings a border, a background and a font of its own, and `.rulehead` is
+     already saying what this looks like. Its font-size and colour are left to
+     that class rather than restated here. */
+  #panelnav .navdiv{
+    appearance:none;-webkit-appearance:none;background:none;border:0;padding:0;
+    font-family:inherit;font-weight:inherit;cursor:pointer;width:100%;
+    text-align:left;
+  }
+  #panelnav .navdiv:hover{color:rgba(var(--paper),.85)}
+  /* The same caret every collapsible thing on this page draws, pointing down
+     while the half is open and along while it is not. A real element rather
+     than a pseudo, because both of this heading's pseudo-elements are already
+     the rules either side of the word. */
+  .halfcaret{
+    flex:0 0 auto;width:0;height:0;
+    border-left:4px solid currentColor;
+    border-top:3.5px solid transparent;border-bottom:3.5px solid transparent;
+    transform:rotate(90deg);transition:transform .12s;
+  }
+  #panelnav .navhalf.shut .halfcaret{transform:rotate(0deg)}
+  /* A FOLDED HALF STILL SAYS IT HOLDS YOU, the same rule a folded group
+     follows one level in — folding hides the lit link, and the menu must not
+     stop answering "where am I" because somebody tidied it away. */
+  #panelnav .navhalf.here > .navdiv{color:var(--hue)}
+
+  /* THE TICK ON A PROFILE ROW, and the bar it raises. Both are the panel's
+     existing furniture rather than new shapes: the checkbox is the one the
+     grant lists use, and the bar is a `.seg` of buttons with a count beside
+     it, the same row every register already draws its bulk actions in.
+
+     The bar is HIDDEN until something is picked. A row of actions over a list
+     nobody has selected anything in is two buttons explaining that they do
+     nothing yet. */
+  .profbulk{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    margin:0 0 8px;
+  }
+  .profbulk[hidden]{display:none}
+  .profbulk .pickcount{
+    font-size:calc(8.5px * var(--fs));letter-spacing:.1em;
+    text-transform:uppercase;color:rgba(var(--paper),.62);
+  }
+  /* Hard against the name it picks, and out of the way of the caret. `.top` is
+     the row's own click target, so this needs the margin rather than padding —
+     padding on a checkbox is ignored by every engine here. */
+  .erow .top .pick{margin:0 8px 0 0;flex:0 0 auto}
   /* The chip stops centring itself — in a row it sat in the middle of the
      line, in a column it is the heading and belongs at the left edge. Rust,
      which is what these six wore inside their borders. */
@@ -491,6 +587,26 @@
     gap:9px;padding-right:8px;
   }
   #panelnav .navhead:hover{border-color:rgba(var(--pal-rust),1)}
+  /* THE THREE ABOVE THE PROFILES DIVIDER IN BLUE. Six chips in one colour said
+     they were six of a kind, and they are two halves: what the server IS —
+     itself, who arrives at it, who is already in — and then the profiles
+     everything else is composed from. The rule between them drew the division;
+     the colour says it before you read the words.
+
+     Named on the button rather than taken from position. `:nth-of-type` would
+     have made the palette depend on the order of the markup, which is the sort
+     of rule that goes wrong silently the day a group is added.
+
+     Blue and not ice: ice is EndPoints, at the foot, and a second thing wearing
+     it would read as belonging to that. */
+  #panelnav .navhead.nav-blue{
+    border-color:rgba(var(--pal-blue),.75);
+    background:rgba(var(--pal-blue),.30);
+  }
+  #panelnav .navhead.nav-blue:hover{border-color:rgba(var(--pal-blue),1)}
+  /* The group that holds the lit link comes up to full strength, in its own
+     colour rather than in the one the other half wears. */
+  #panelnav .navgrp.here > .navhead.nav-blue{border-color:rgba(var(--pal-blue),1)}
   /* THE SAME CARET EVERY COLLAPSIBLE THING ON THIS PAGE DRAWS, pointing down
      while the group is open and along while it is not. On the right of the
      chip rather than the left: the words in the group line up under the word
@@ -2944,11 +3060,25 @@
     <span id="navwhere" aria-hidden="true"></span>
     <div id="navbody">
 
+      <!-- THE OTHER HALF, NAMED. PROFILES has headed the second half of this
+           menu since the six groups became a column, and the first half had
+           nothing over it — so the divider read as the start of something
+           rather than as the join between two things. The same rulehead, and
+           `:first-child` already takes the air off the top of one that heads a
+           list instead of dividing it. -->
+      <!-- THE TWO HALVES ARE CONTAINERS NOW, not two dividers with groups
+           loose between them. That is what lets each one carry a rule down its
+           own side and fold on its own name — a divider with nothing under it
+           in the DOM could do neither. -->
+      <div class="navhalf">
+      <button type="button" class="rulehead navdiv">CONFIGURATION<span class="halfcaret"></span></button>
+      <div class="navhalfbody">
+
       <div class="navgrp">
         <!-- The server itself: its portal, its mail, its maintenance, and the
              door people arrive at. First of the six, because everything in
              the groups after it happens inside what is decided here. -->
-        <button type="button" class="tablabel navhead">SETTINGS</button>
+        <button type="button" class="tablabel navhead nav-blue">SETTINGS</button>
         <div class="tabs">
           <button id="tab_app" data-tab="app">ADMIN</button>
           <!-- How the server itself is defended, which is administration
@@ -2984,7 +3114,7 @@
              for the two populations: they arrive by different routes with
              different buttons, and neither wants to read the other's queue
              while doing it. -->
-        <button type="button" class="tablabel navhead">ENROLLMENTS</button>
+        <button type="button" class="tablabel navhead nav-blue">ENROLLMENTS</button>
         <div class="tabs">
           <button id="tab_displays" data-tab="displays">USER</button>
           <button id="tab_enrol" data-tab="enrol">DEVICE</button>
@@ -3007,7 +3137,7 @@
              configure the server, the other picks up a minted URL and talks to
              it — so they are two places rather than one list with a column
              saying which. -->
-        <button type="button" class="tablabel navhead">IDENTITY</button>
+        <button type="button" class="tablabel navhead nav-blue">IDENTITY</button>
         <div class="tabs">
           <button id="tab_accounts" data-tab="accounts">ADMIN</button>
           <button id="tab_users" data-tab="users">USER</button>
@@ -3032,7 +3162,12 @@
            group of labels. In a column it is not that: there is nothing to its
            left or right, it names the half of the menu below it, and the line
            it sits in is the division that half needed anyway. -->
-      <div class="rulehead navdiv">PROFILES</div>
+      </div>
+      </div>
+
+      <div class="navhalf">
+      <button type="button" class="rulehead navdiv">PROFILES<span class="halfcaret"></span></button>
+      <div class="navhalfbody">
 
       <div class="navgrp">
         <!-- WHAT A SCREEN IS, in five parts: the four that describe it and the
@@ -3077,6 +3212,9 @@
           <button data-tab="network">NETWORK</button>
           <button data-tab="connection">CONNECTION</button>
         </div>
+      </div>
+
+      </div>
       </div>
 
     </div>
@@ -10704,6 +10842,13 @@ function paintModels(list){
     row.appendChild(acts);
     box.appendChild(row);
   });
+  profBulk('dp_models', {
+    arr: ()=> DPMODELS, repaint: ()=> paintModels(DPMODELS),
+    setOpen: v=>{ OPENMD = v; }, newId: ()=> profileId('n'),
+    save: ()=> saveDp({models: DPMODELS.filter(x=> (x.name || '').trim())
+                         .map(x=> ({id:x.id, name:x.name, values:x.values}))},
+                      'modelnote'),
+  });
   const btn = $('b_addmodel');
   if (btn){
     const busy = OPENMD >= 0 || DPMODELS.some(x=> x._new);
@@ -10732,6 +10877,143 @@ let DPPERMS  = [], OPENPM = -1;
 /* The shell every one of these rows is: a name, a badge that says what it
    holds, and a foot with SAVE and REMOVE. Written once because the three
    differ only in what goes between the name and the foot. */
+/* ---- picking profiles, cloning one, removing several ----
+   ONE MECHANISM FOR ELEVEN LISTS. Appearance, geometry, speech, screensaver,
+   layout, authenticate, authorize, permission, model, network and connection
+   are painted by nine different functions with nine different row shapes, and
+   the only thing they have in common is the shape of the row: an `.erow` with
+   a `.top`. That is the seam this hooks, so a list gets the tick, the bar and
+   both actions by naming what it is rather than by growing a copy of them.
+
+   The alternative was tried on this panel and failed twice — REMOVE was
+   written out per list and was still broken in three of them after being
+   fixed in two.
+
+   WHAT IS PICKED IS HELD BY ID, not by index and not by the checkbox. Every
+   painter rebuilds its rows from scratch on any repaint, and a repaint happens
+   when a row opens, when anything saves, and when a tab loads — so a tick
+   remembered as a DOM node or a position is a tick that moves to another
+   profile or vanishes. */
+const PROF_PICKED = {};
+
+function profBulk(boxId, o){
+  const box = $(boxId);
+  if (!box) return;
+  const picked = PROF_PICKED[boxId] || (PROF_PICKED[boxId] = new Set());
+  const live = o.arr() || [];
+  /* A profile that has gone — removed here or by somebody else — stops being
+     picked. Left in, it would be counted by the bar and act on nothing. */
+  [...picked].forEach(id=>{ if (!live.some(x=> x && x.id === id)) picked.delete(id); });
+
+  const rows = [...box.children].filter(el=> el.classList
+                                          && el.classList.contains('erow'));
+  rows.forEach((row, i)=>{
+    const rec = live[i];
+    /* A DRAFT HAS NOTHING TO PICK. It is not in the document yet, so it can be
+       neither cloned from nor removed — DISCARD on its own row is what ends
+       it. */
+    if (!rec || rec._new || !rec.id) return;
+    const top = row.querySelector('.top');
+    if (!top || top.querySelector('.pick')) return;
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'pick';
+    cb.checked = picked.has(rec.id);
+    cb.title = 'pick this profile';
+    /* The row opens when its top is clicked and this sits in that top, so the
+       click has to stop here or picking a profile also opens it. */
+    cb.onclick = ev=> ev.stopPropagation();
+    cb.onchange = ()=>{
+      if (cb.checked) picked.add(rec.id); else picked.delete(rec.id);
+      drawBar();
+    };
+    top.insertBefore(cb, top.firstChild);
+  });
+
+  let bar = box.previousElementSibling;
+  if (!bar || !bar.classList || !bar.classList.contains('profbulk')){
+    bar = document.createElement('div');
+    bar.className = 'profbulk';
+    box.parentNode.insertBefore(bar, box);
+  }
+
+  function drawBar(){
+    bar.innerHTML = '';
+    if (!picked.size){ bar.hidden = true; return; }
+    bar.hidden = false;
+    const n = picked.size;
+    const count = document.createElement('span');
+    count.className = 'pickcount';
+    count.textContent = n + (n === 1 ? ' picked' : ' picked');
+    bar.appendChild(count);
+
+    const seg = document.createElement('div');
+    seg.className = 'seg';
+    /* CLONE TAKES EXACTLY ONE. It opens a draft the way ADD does, and a draft
+       is one row — so with several picked there is nothing coherent for it to
+       open. Offered and disabled rather than absent, with the reason on it:
+       a control that disappears is one somebody hunts for. */
+    const clone = document.createElement('button');
+    clone.type = 'button';
+    clone.textContent = 'CLONE';
+    clone.disabled = n !== 1;
+    clone.title = n === 1 ? 'open a new profile filled in from this one'
+                          : 'pick exactly one to clone';
+    clone.onclick = ()=>{
+      const src = (o.arr() || []).filter(x=> x && picked.has(x.id))[0];
+      if (!src) return;
+      const arr = o.arr();
+      /* EVERYTHING BUT WHO IT IS. A deep copy, because a shallow one would
+         hand the clone the SAME values object and editing either would edit
+         both. The name is left empty on purpose: it is the one field that
+         must not be a copy — two profiles with one name is a list an admin
+         cannot act on, and the server refuses a nameless row anyway, so the
+         draft opens asking for the only thing it needs. */
+      const copy = JSON.parse(JSON.stringify(src));
+      copy.id = o.newId ? o.newId() : '';
+      copy._new = true;
+      copy.name = '';
+      arr.push(copy);
+      picked.clear();
+      if (o.setOpen) o.setOpen(arr.length - 1);
+      o.repaint();
+    };
+    seg.appendChild(clone);
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'act-danger';
+    del.textContent = 'REMOVE PICKED';
+    del.onclick = async ()=>{
+      if (!confirm('Remove ' + n + (n === 1 ? ' profile?' : ' profiles?')
+                   + '\n\nAnything naming one of them falls back to what the '
+                   + 'page ships with, visibly.')) return;
+      const arr = o.arr();
+      /* KEPT UNTIL THE SERVER HAS TAKEN IT. A profile another one names is
+         refused — "the permission X uses that authorize profile" — and without
+         this the rows were already gone from the page, so the list on screen
+         disagreed with the document and the next save would have written the
+         disagreement. */
+      const was = arr.slice();
+      for (let i = arr.length - 1; i >= 0; i--)
+        if (arr[i] && picked.has(arr[i].id)) arr.splice(i, 1);
+      const held = [...picked];
+      picked.clear();
+      if (o.setOpen) o.setOpen(-1);
+      const ok = await o.save();
+      if (ok === false){
+        arr.length = 0;
+        was.forEach(x=> arr.push(x));
+        held.forEach(id=> picked.add(id));
+        o.repaint();
+      }
+    };
+    seg.appendChild(del);
+    bar.appendChild(seg);
+  }
+  drawBar();
+}
+
 function profShell(box, arr, i, rec, openIdx, setOpen, summary, repaint){
   const row = document.createElement('div');
   row.className = 'erow';
@@ -10786,9 +11068,17 @@ function removeProfileRow(getArr, rec, repaint, save){
   const arr = getArr() || [];
   const j = arr.findIndex(x=> x === rec
                            || (rec && rec.id && x && x.id === rec.id));
-  if (j >= 0) arr.splice(j, 1);
+  if (j < 0){ repaint(); return; }
+  const gone = arr[j];
+  arr.splice(j, 1);
   if (wasNew){ repaint(); return; }
-  save();
+  /* PUT BACK IF THE SERVER REFUSES. A profile another one names cannot go —
+     the reason lands in the note — and a row removed from the page anyway
+     leaves a list that disagrees with the document until something reloads
+     it. */
+  Promise.resolve(save()).then(ok=>{
+    if (ok === false){ arr.splice(j, 0, gone); repaint(); }
+  });
 }
 
 function profFoot(row, getArr, i, rec, setOpen, repaint, save, canRemove){
@@ -10862,6 +11152,13 @@ function paintAuthns(list){
              ()=> saveDp({authns: DPAUTHNS.filter(x=> (x.name||'').trim())
                     .map(x=> ({id:x.id, name:x.name, values:x.values}))},
                     'authnnote'), true);
+  });
+  profBulk('dp_authns', {
+    arr: ()=> DPAUTHNS, repaint: ()=> paintAuthns(DPAUTHNS),
+    setOpen: v=>{ OPENAN = v; }, newId: ()=> profileId('a'),
+    save: ()=> saveDp({authns: DPAUTHNS.filter(x=> (x.name || '').trim())
+                         .map(x=> ({id:x.id, name:x.name, values:x.values}))},
+                      'authnnote'),
   });
   const btn = $('b_addauthn');
   if (btn){
@@ -10967,6 +11264,17 @@ function paintAuthzs(list){
                                groups:x.values.groups,
                                embeds:x.values.embeds}))}, 'authznote'), true);
   });
+  profBulk('dp_authzs', {
+    arr: ()=> DPAUTHZS, repaint: ()=> paintAuthzs(DPAUTHZS),
+    setOpen: v=>{ OPENAZ = v; }, newId: ()=> profileId('z'),
+    save: ()=> saveDp({authzs: DPAUTHZS.filter(x=> (x.name || '').trim())
+                         .map(x=> ({id:x.id, name:x.name,
+                                    restricted:x.values.restricted,
+                                    displays:x.values.displays,
+                                    identities:x.values.identities,
+                                    groups:x.values.groups,
+                                    embeds:x.values.embeds}))}, 'authznote'),
+  });
   const btn = $('b_addauthz');
   if (btn){
     const busy = OPENAZ >= 0 || DPAUTHZS.some(x=> x._new);
@@ -11069,6 +11377,14 @@ function paintPerms(list){
                                        && x.values.authn && x.values.authz)
                  .map(x=> ({id:x.id, name:x.name, values:x.values}))}, 'permnote');
              }, true);
+  });
+  profBulk('dp_perms', {
+    arr: ()=> DPPERMS, repaint: ()=> paintPerms(DPPERMS),
+    setOpen: v=>{ OPENPM = v; }, newId: ()=> profileId('x'),
+    save: ()=> saveDp({permissions: DPPERMS.filter(x=> (x.name || '').trim()
+                                              && x.values.authn && x.values.authz)
+                         .map(x=> ({id:x.id, name:x.name, values:x.values}))},
+                      'permnote'),
   });
   const btn = $('b_addperm');
   if (btn){
@@ -11226,6 +11542,16 @@ function paintConns(list){
     acts.appendChild(del);
     row.appendChild(acts);
     box.appendChild(row);
+  });
+  profBulk('dp_conns', {
+    arr: ()=> DPCONNS, repaint: ()=> paintConns(DPCONNS),
+    setOpen: v=>{ OPENCN = v; }, newId: ()=> profileId('c'),
+    save: ()=> saveDp({connections: DPCONNS.filter(x=> (x.name || '').trim()
+                                              && x.values.model && x.values.network)
+                         .map(x=> ({id:x.id, name:x.name,
+                                    values:{model:x.values.model,
+                                            network:x.values.network}}))},
+                      'connnote'),
   });
   const btn = $('b_addconn');
   if (btn){
@@ -11500,6 +11826,18 @@ function paintNetworks(list){
     row.appendChild(acts);
     box.appendChild(row);
   });
+  profBulk('dp_networks', {
+    arr: ()=> DPNETS, repaint: ()=> paintNetworks(DPNETS),
+    setOpen: v=>{ OPENNW = v; }, newId: ()=> profileId('w'),
+    save: ()=> saveDp({networks: DPNETS.filter(x=> (x.name || '').trim())
+                         .map(x=> ({id:x.id, name:x.name,
+                                    values:{address: String(x.values.address || ''),
+                                            host: String(x.values.host || '').trim(),
+                                            link_port: String(x.values.link_port || '').trim(),
+                                            port: parseInt(x.values.port, 10),
+                                            redirect: parseInt(x.values.redirect, 10) || 0,
+                                            }}))}, 'networknote'),
+  });
   const btn = $('b_addnetwork');
   if (btn){
     const busy = OPENNW >= 0 || DPNETS.some(x=> x._new);
@@ -11657,7 +11995,8 @@ async function saveProfileList(kind){
     paintProfiles(kind, DPCFG[kind.key] || []);
     reRender();
     prNote(kind, 'saved');
-  }catch(e){ prNote(kind, e.message, true); }
+    return true;
+  }catch(e){ prNote(kind, e.message, true); return false; }
 }
 
 function profSections(tab){
@@ -11807,6 +12146,13 @@ function paintProfiles(kind, list){
     acts.appendChild(del);
     row.appendChild(acts);
     box.appendChild(row);
+  });
+  profBulk(kind.box, {
+    arr: ()=> PROFILES[kind.key],
+    repaint: ()=> paintProfiles(kind, PROFILES[kind.key]),
+    setOpen: v=>{ OPENPR[kind.key] = v; },
+    newId: ()=> profileId(kind.pre),
+    save: ()=> saveProfileList(kind),
   });
   const btn = $(kind.add);
   if (btn){
@@ -12084,6 +12430,12 @@ function paintSavers(list){
     row.appendChild(acts);
     box.appendChild(row);
   });
+  profBulk('dp_savers', {
+    arr: ()=> DPSAVERS, repaint: ()=> paintSavers(DPSAVERS),
+    setOpen: v=>{ OPENSV = v; }, newId: ()=> '',
+    save: ()=> saveDp({savers: DPSAVERS.filter(x=> (x.name || '').trim())},
+                      'savernote'),
+  });
   const btn = $('b_addsaver');
   /* Out of the way while a new profile is being filled in. One that has no id
      yet has never been saved, so offering to make ANOTHER on top of it is a
@@ -12357,6 +12709,11 @@ function paintKiosks(list){
     acts.appendChild(del);
     row.appendChild(acts);
     box.appendChild(row);
+  });
+  profBulk('dp_kiosks', {
+    arr: ()=> DPKIOSKS, repaint: ()=> paintKiosks(DPKIOSKS),
+    setOpen: v=>{ OPENKI = v; }, newId: ()=> newProfileId(),
+    save: saveKiosks,
   });
   const btn = $('b_addkiosk');
   /* Out of the way while a new profile is being filled in. One that has no id
@@ -15870,6 +16227,11 @@ function panelNav(){
       g.classList.toggle('here',
         g.classList.contains('shut') && !!on && g.contains(on));
     });
+    /* …and the half above it, for the same reason one level out. */
+    document.querySelectorAll('#panelnav .navhalf').forEach(h=>{
+      h.classList.toggle('here',
+        h.classList.contains('shut') && !!on && h.contains(on));
+    });
   }
   /* EVERY GROUP FOLDS ON ITS OWN NAME. Independently, not one-at-a-time: the
      settings box opens one topic at a time because its topics are long, and
@@ -15877,6 +16239,15 @@ function panelNav(){
      every time somebody works across two subjects, which is most of the time.
      They all open on a fresh panel. */
   document.querySelectorAll('#panelnav .navhead').forEach(h=>{
+    h.addEventListener('click', ()=>{
+      h.parentElement.classList.toggle('shut');
+      navWhere();
+    });
+  });
+  /* AND EACH HALF ON ITS OWN NAME, one level out. Independently of the groups
+     inside it: folding a half is "I am not working in there today", and it must
+     not throw away which groups somebody had open for when they come back. */
+  document.querySelectorAll('#panelnav .navdiv').forEach(h=>{
     h.addEventListener('click', ()=>{
       h.parentElement.classList.toggle('shut');
       navWhere();
