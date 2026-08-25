@@ -267,7 +267,7 @@ If you were given a code, use **Use Code Instead** — that is a different thing
 from asking, and it needs no decision from anybody.
 
 Fill the form in — an administrator chose what it asks for — and press REQUEST
-ACCESS. Nothing else is needed from you: leave the page open, or come back to
+EndPoints. Nothing else is needed from you: leave the page open, or come back to
 it later. When somebody decides, the screen tells you in a box you have to
 dismiss, so you find out whether you were approved even if you had walked away.
 
@@ -355,5 +355,9 @@ The assistant is told to keep replies short, because they are read aloud and a
 long spoken answer is hard to follow. If you want more, ask for it directly:
 "explain that in more detail" works.
 
-If it says something that looks like a formatting error — reading out asterisks
-or hyphens — that is worth reporting. The reply should be plain prose.
+**It will not read out asterisks or hyphens.** The assistant is asked for plain
+prose, and whatever markdown arrives anyway is turned back into prose before it
+is spoken — so a bulleted answer is read as sentences and a bold word is read as
+a word. What you see in the transcript is what the model actually wrote, marks
+and all; only the voice is cleaned. If you still hear a mark pronounced, that is
+worth reporting.

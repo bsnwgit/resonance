@@ -83,7 +83,10 @@ BACKEND_DEFAULTS = {
     "api_key": "",
     # A voice front-end reads the answer aloud, so the shape of the reply
     # matters as much as its content: markdown, bullets and code fences are
-    # noise when spoken. Say so up front rather than stripping it after.
+    # noise when spoken. Asked for up front, HERE — and taken off again at the
+    # point of synthesis by spoken(), because an instruction is not a defence:
+    # a model holding a tool result reaches for a bulleted list whatever it
+    # was told, and the marks were then read out one at a time.
     "system": ("You are a spoken assistant. Answer in one or two short "
                "sentences unless asked for more. Write plain prose only — no "
                "markdown, lists, headings, or emoji — because your reply is "
@@ -150,6 +153,33 @@ APP_DEFAULTS = {
     # It is not a second binding. The listener answers on `enrol_address`
     # whatever this says; this is the word that goes in front of the port.
     "enrol_host": "",
+    # …AND THE SAME QUESTION FOR A SCREEN, which arrives by a different door.
+    # A person's link is spent on the enrolment listener, which is one port an
+    # admin chose, so it has one name. A screen's code is spent on whichever
+    # DISPLAY listener it was granted, and each of those already carries its
+    # own address on its network profile — so this is not a second binding and
+    # not an override either: it is the word to use where a profile is bound to
+    # every address and names none, which is the case where the link was
+    # previously built out of whatever Host header happened to arrive.
+    "device_enrol_host": "",
+    # …AND ITS OWN DOOR TO ARRIVE AT. A screen's code was typed at whichever
+    # display listener happened to answer, which made "where do screens get
+    # set up" a question with no answer: nothing to firewall, nothing to put on
+    # a commissioning sheet, and a page that hands out a display token sitting
+    # on every assistant this server runs.
+    #
+    # ZERO IS OFF, and off is the default: a deployment that has not asked for
+    # this keeps enrolling screens exactly where it did. Set a port and that
+    # port becomes the one place a code is spent — `/e/` and the page that
+    # takes one, and nothing else.
+    #
+    # NOT THE PERSON'S PORT, and the two are deliberately not merged. That one
+    # must never hand out a display token; this one exists to. They are the
+    # same shape and opposite in the one property that matters.
+    "device_enrol_port": 0,
+    # WHICH INTERFACE it answers on — "" is every one the app itself reaches,
+    # the same meaning enrol_address and a network profile's address give.
+    "device_enrol_address": "",
     # …AND THE ADDRESS AN EMBED IS REACHED AT, which is a different question
     # with a different answer. Enrolment is this organisation's own screens on
     # a network it controls; an embed is a stranger's browser on somebody
@@ -1762,8 +1792,15 @@ def validate_app(obj, current):
                               % what)
             v = "%02d:%s" % (int(m.group(1)), m.group(2))
         cfg[k] = v
-    for k in ("http_port", "https_port", "admin_port", "enrol_port"):
+    for k in ("http_port", "https_port", "admin_port", "enrol_port",
+              "device_enrol_port"):
         if k not in obj:
+            continue
+        # ZERO IS OFF for the device door and only for it, so it is let past
+        # the range check the others take. The rest cannot be switched off:
+        # a server with no admin port is one nobody can fix.
+        if k == "device_enrol_port" and str(obj[k]).strip() in ("", "0"):
+            cfg[k] = 0
             continue
         try:
             v = int(obj[k])
@@ -1776,6 +1813,10 @@ def validate_app(obj, current):
         cfg[k] = v
     ports = [cfg["http_port"], cfg["https_port"], cfg["admin_port"],
              cfg["enrol_port"]]
+    # Off is not a port and several things can be off at once, so it joins the
+    # comparison only when it is set.
+    if cfg.get("device_enrol_port"):
+        ports.append(cfg["device_enrol_port"])
     if len(set(ports)) != len(ports):
         return None, "those ports must all differ"
 
@@ -1824,6 +1865,12 @@ def validate_app(obj, current):
             if not 0 < n < 65536:
                 return None, "a port is between 1 and 65535, or blank for none"
             cfg["embed_port"] = n
+    if "device_enrol_address" in obj:
+        v = str(obj["device_enrol_address"] or "").strip()
+        if v and not address_bindable(v):
+            return None, ("this machine has no address %s — the device "
+                          "enrolment listener would fail to start on it" % v)
+        cfg["device_enrol_address"] = v
     if "enrol_host" in obj:
         v = str(obj["enrol_host"] or "").strip().lower()[:120]
         # A HOSTNAME, not a URL. Somebody pasting https://name/ or name:9703
@@ -1833,6 +1880,14 @@ def validate_app(obj, current):
             return None, ("that reads as a URL rather than a name — just the "
                           "host, with no https:// in front and no port after")
         cfg["enrol_host"] = v
+    if "device_enrol_host" in obj:
+        v = str(obj["device_enrol_host"] or "").strip().lower()[:120]
+        # The same rule as enrol_host above and refused in the same words: a
+        # host, with no scheme in front of it and no port after.
+        if v and not re.match(r"^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$", v):
+            return None, ("that reads as a URL rather than a name — just the "
+                          "host, with no https:// in front and no port after")
+        cfg["device_enrol_host"] = v
     if cfg["bind"] == "address":
         if not cfg["bind_address"]:
             return None, "choose which address to bind, or bind everything"
@@ -1861,9 +1916,20 @@ def validate_app(obj, current):
                 return None, ("port %d is the network profile %s — enrolment "
                               "cannot sit on a port an assistant answers on"
                               % (got, n["name"]))
+            # THE DEVICE DOOR, for a reason of its own: `/e/` already answers
+            # on every display listener, so putting this on one would be two
+            # routes to the same act with two different sets of rules over
+            # them, and only one of them the one an admin named.
+            if got and got == cfg.get("device_enrol_port"):
+                return None, ("port %d is the network profile %s — device "
+                              "enrolment needs a port of its own"
+                              % (got, n["name"]))
 
     host = bind_host(cfg)
-    for k in ("http_port", "https_port", "admin_port", "enrol_port"):
+    for k in ("http_port", "https_port", "admin_port", "enrol_port",
+              "device_enrol_port"):
+        if not cfg.get(k):
+            continue                      # off, so there is nothing to bind
         if cfg[k] != current[k] and not port_free(cfg[k], host):
             return None, ("port %d is already in use by something else on this "
                           "machine — the server would fail to start on it"
@@ -2273,6 +2339,12 @@ DISPLAY_SETTINGS = {
     # Ten minutes is the default because the usual case is somebody walking
     # across a building with six characters in their head.
     "code_minutes": 10,
+    # …and the person's, in the same unit and with the same meaning. ZERO IS
+    # NEVER here too, and it is the DEFAULT rather than a number: a setup link
+    # is handed over and answered whenever somebody gets to it, so a clock on
+    # one is a deployment's choice and not this server's opinion. It is also
+    # what every deployment had before this setting existed.
+    "setup_minutes": 0,
     # Where each population landed when it started working, back when the
     # answer was stored here. It is not any more: `default_group` asks
     # `system_group`, which finds the permanent group of that kind in the
@@ -2383,7 +2455,9 @@ DISPLAY_LIMITS = {"event_days": EVENT_DAYS_LIMITS,
                   # 0 is off — see code_minutes. A week is the top because a
                   # code good for longer than anybody remembers issuing it is
                   # one nobody will think to revoke.
-                  "code_minutes": (0, 10080)}
+                  "code_minutes": (0, 10080),
+                  # The same ceiling, for the same reason.
+                  "setup_minutes": (0, 10080)}
 
 #: The admin panel's own preview frames the real display page, so it says
 #: hello like any other. It is not a display: it is the panel, served from the
@@ -3026,6 +3100,25 @@ def validate_display_settings(obj, current):
             if addr and addr not in have:
                 return None, ("%s: this machine has no address %s — pick one "
                               "of its own, or ANY" % (r["name"], addr))
+            # …AND WHAT TO CALL IT IN A LINK, which is not the same question.
+            # `address` is a BINDING — which interface to listen on — and it
+            # was going straight into every URL this server builds for the
+            # profile: the code a screen is enrolled at, the assistants a
+            # person is sent to after choosing a password, and the assistant a
+            # screen is redirected to once its code is spent. So a deployment
+            # that binds by IP, which is the ordinary way to bind, handed
+            # people an IP and a port instead of a name.
+            #
+            # Optional, and a name rather than a second binding: the listener
+            # answers on `address` whatever this says. The same rule and the
+            # same words as enrol_host and device_enrol_host, which are this
+            # question already answered for the two enrolment doors.
+            hn = str(r["values"].get("host") or "").strip().lower()[:120]
+            if hn and not re.match(r"^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$", hn):
+                return None, ("%s: that reads as a URL rather than a name — "
+                              "just the host, with no https:// in front and "
+                              "no port after" % r["name"])
+            r["values"]["host"] = hn
             # …and whether the port can actually be had there, BEFORE anything
             # is allowed to use it. A port that passes validation and fails at
             # the next restart is a profile that looks saved and is not, found
@@ -3158,6 +3251,13 @@ def validate_display_settings(obj, current):
             # Nothing else belongs on it. A connection is two ids and a name;
             # anything else typed here would be a third place to state
             # something one of the two already says.
+            #
+            # IT HELD A URL FOR ONE VERSION, and that was the wrong home for
+            # it. What a link should say is a property of the LISTENER, not of
+            # the pairing that names one — so it is `host` on the network
+            # profile, offered as Address in links, and read by net_base_for
+            # for every link this server builds. Two places to state one
+            # address is two places to disagree.
             r["values"] = {k: r["values"][k] for k in ("model", "network")}
         cfg["connections"] = rows
     if "permissions" in obj:
@@ -3749,6 +3849,11 @@ def display_named(rec):
     name or nothing: "unnamed display" is prose about an admin's list, and it
     was appearing down the side of the transcript as the name of the person who
     had just spoken."""
+    # A RECORD THAT IS NOT THERE. Every caller of this is handed "whatever the
+    # store has", and a deleted row is a legitimate answer to that — so it is a
+    # name of "" rather than an exception thrown up through a request handler.
+    if not rec:
+        return ""
     if rec.get("name"):
         return rec["name"]
     if rec.get("asked"):
@@ -4132,8 +4237,37 @@ def net_base_for(nid, prefix, host):
         port = 0
     if not port:
         return ""
-    return "https://%s:%d%s" % (str(vals.get("address") or "").strip() or host,
-                                port, prefix)
+    # THE PROFILE'S ADDRESS, or the Host header where it names none.
+    #
+    # `device_enrol_host` USED TO FILL IN HERE and must not: that name was
+    # written when it meant "what to call a display listener in a code's URL",
+    # and it means "what to call the device enrolment door" now. Left in, it
+    # composed the door's name with whichever display port answered — a real
+    # hostname against a port it does not listen on, which reads as a
+    # deployment fault rather than as a setting that has not been finished.
+    # Reported as exactly that: device-enroll.<domain>:9723/e/, where 9723 is
+    # an assistant.
+    # The scheme the listeners are actually running, not an assumption. See
+    # where display_tls is set for what this was and what it cost.
+    scheme = "https" if RUNNING.get("display_tls", True) else "http"
+    # A NAME SET HERE IS THE WHOLE ANSWER — the host AND the port it is reached
+    # on. Behind a reverse proxy those have nothing to do with what this
+    # profile binds: the listener answers on 4201 and the world arrives at the
+    # name on 443, so a link built out of the bind port sends everybody past
+    # the proxy to a port the firewall may not even publish. The port beside
+    # the name decides, and BLANK IS NONE — the scheme's own.
+    named = str(vals.get("host") or "").strip()
+    if named:
+        try:
+            lp = int(vals.get("link_port") or 0)
+        except (TypeError, ValueError):
+            lp = 0
+        return "%s://%s%s%s" % (scheme, named,
+                                (":%d" % lp) if lp else "", prefix)
+    # With no name the binding answers, exactly as it always has.
+    return "%s://%s:%d%s" % (scheme,
+                             str(vals.get("address") or "").strip() or host,
+                             port, prefix)
 
 
 def identity_places(rec, pid, host):
@@ -4161,6 +4295,31 @@ def identity_places(rec, pid, host):
     return out
 
 
+def display_places(rec, did, host):
+    """WHERE THIS SCREEN CAN ACTUALLY GO, as (name, address) pairs.
+
+    The device enrolment listener has no assistant on it — that is the point of
+    it — so a screen that has just spent its code is standing on a port that
+    will never answer it. This is what it is sent to instead, and it is
+    computed rather than configured: `subject_may` is the same test that will
+    be applied when it arrives, so a name here is a door that opens.
+
+    The display half of identity_places, deliberately the same shape. A screen
+    and a person arrive by different doors and the question on the far side of
+    both is the same one."""
+    doc = read_routes()
+    who = dict(rec or {}, id=did)
+    out = []
+    for rid in route_order(doc):
+        r = doc["routes"][rid]
+        if not r.get("enabled", True) or not subject_may(r, disp=who):
+            continue
+        url = net_base_for(route_network(r), "/", host)
+        if url:
+            out.append({"name": r.get("name") or rid, "url": url})
+    return out
+
+
 def enrol_base_for(rec, host, secure, nid=""):
     """Where the code for this row is typed — an address and a port, because a
     code without them is six characters and no idea where to put them. The
@@ -4181,6 +4340,29 @@ def enrol_base_for(rec, host, secure, nid=""):
     nothing chosen is commissioned — and then any profile that names one,
     because `/e/` answers on every display listener and any of them will spend
     the code."""
+    # THE DOOR AN ADMIN NAMED, ahead of everything — including the screen's own
+    # grant. That is the point of it: a deployment that has set a device
+    # enrolment port has said where screens are commissioned, and a code typed
+    # anywhere else would make the answer depend on which endpoint happened to
+    # be ticked. Where no port is set this is skipped entirely and the guesses
+    # below answer exactly as they always did.
+    app = read_app()
+    # CONFIGURED, NOT RUNNING. It read RUNNING, so between setting the port and
+    # restarting there was a window where this answered with the old guess —
+    # and the old guess is a different door. An admin who has just named where
+    # screens are commissioned should be shown that address, not one that will
+    # stop being true at the next restart. That it is not up YET is a separate
+    # fact and is already said in two places: the pending-restart line on this
+    # tab, and the state under the port itself.
+    port = int(app.get("device_enrol_port") or 0)
+    if port:
+        name = str(app.get("device_enrol_host") or "").strip() \
+            or str(app.get("device_enrol_address") or "").strip() \
+            or host
+        return "%s://%s:%d/e/" % (
+            "https" if RUNNING.get("device_enrol_tls",
+                                   RUNNING.get("display_tls", True)) else "http",
+            name, port)
     base = net_base_for(nid, "/e/", host) if nid else ""
     if base:
         return base
@@ -4282,6 +4464,29 @@ def code_deadline(now_):
     same convention `expires` already uses for a grant that does not run out."""
     mins = display_settings()["code_minutes"]
     return now_ + mins * 60 if mins else 0
+
+
+def setup_deadline(now_):
+    """When a setup link minted now stops working, or 0 for never.
+
+    The person's half of code_deadline, and deliberately the same shape: two
+    populations arriving by two doors is not two ideas about how long an
+    invitation is worth. What differs is the default — a screen's code is ten
+    minutes because somebody is walking across a building with six characters
+    in their head, and a person's link is sent and answered whenever they open
+    it, so NEVER is the honest default and a limit is somebody deciding."""
+    mins = display_settings()["setup_minutes"]
+    return now_ + mins * 60 if mins else 0
+
+
+def identity_link_live(rec):
+    """Whether this row's setup link is still worth spending.
+
+    Asked of a LINK and never of an account: once a password is set the stamp
+    is history and the way in is the login form, so an expiry that kept being
+    consulted would lock somebody out of an account they already hold."""
+    when = int((rec or {}).get("setup_expires") or 0)
+    return not when or time.time() < when
 
 
 def redeem_code(raw):
@@ -4513,6 +4718,30 @@ def route_authz_id(rec, cfg):
     return str((perm.get("values") or {}).get("authz") or "")
 
 
+def grant_facts(rec, cfg=None):
+    """WHAT TICKING THIS ENDPOINT IS ACTUALLY WORTH, for the two lists that
+    draw a note beside the tick.
+
+    Resolved THROUGH THE PERMISSION, which is the whole point of it. Both
+    payloads read `restricted` and `needs_signin` straight off the route
+    record — the five fields an endpoint used to carry — and those stopped
+    deciding anything the day an endpoint began naming a permission instead.
+    They are a stale copy kept so that unpicking this later loses nothing, and
+    a panel reading them described endpoints as they had been configured
+    before the migration: an endpoint whose permission requires a sign-in was
+    labelled "open to all anyway".
+
+    NAMING NO PERMISSION IS ITS OWN ANSWER and not a permissive one —
+    subject_may refuses such an endpoint to everybody — so it is said rather
+    than folded into either of the other two."""
+    perm = route_perm(rec, cfg)
+    if perm is None:
+        return {"restricted": True, "needs_signin": True, "no_permission": True}
+    return {"restricted": bool(perm["restricted"]),
+            "needs_signin": bool(perm["needs_signin"]),
+            "no_permission": False}
+
+
 def granted_map(key, cfg=None, doc=None):
     """member id -> the endpoints it may use, read through the permissions.
 
@@ -4560,6 +4789,69 @@ def set_member_endpoints(key, mid, rids):
         aid = route_authz_id(rec, cfg)
         if aid:
             by.setdefault(aid, []).append(rid)
+    # A SHARED RULE ASKED TO SAY TWO THINGS IS SPLIT, not obeyed in one
+    # direction. Two endpoints naming one authorize profile share a grant by
+    # design — that is what naming a rule once means — but it stops being a
+    # design the moment somebody ticks one of them and not the other: the
+    # answer then is that the profile is no longer one rule, and the honest
+    # thing is to make a second. Ticking Office HA and not HA granted both,
+    # every time, with no way to express what was actually wanted.
+    #
+    # The clone keeps the ORIGINAL's values, so nothing about who else it
+    # admits changes; only which endpoints are guarded by which copy. Each
+    # endpoint moving to the clone gets a permission pairing its own
+    # authenticate half with the new authorize one, so sign-in is untouched.
+    #
+    # WHERE THERE IS NO ROOM, the old behaviour stands rather than a failure:
+    # the profile lists are capped, and refusing the save would leave somebody
+    # unable to grant anything at all. The panel says what actually resulted
+    # either way.
+    for aid, here in list(by.items()):
+        yes = [r for r in here if r in want]
+        no = [r for r in here if r not in want]
+        if not (yes and no):
+            continue
+        src = next((z for z in cfg.get("authzs") or []
+                    if z.get("id") == aid), None)
+        if not src:
+            continue
+        authzs = cfg.setdefault("authzs", [])
+        perms = cfg.setdefault("permissions", [])
+        authns = {}
+        for r in yes:
+            pid = str(doc["routes"][r].get("permission") or "")
+            sp = next((x for x in perms if x.get("id") == pid), None)
+            authns.setdefault(str(((sp or {}).get("values") or {}).get("authn")
+                                  or ""), []).append(r)
+        if (len(authzs) + 1 > MAX_LOOKS
+                or len(perms) + len(authns) > MAX_LOOKS):
+            print("grant: %s and %s share %s and there is no room to split it "
+                  "— the grant reaches both"
+                  % (", ".join(doc["routes"][r].get("name") or r for r in yes),
+                     ", ".join(doc["routes"][r].get("name") or r for r in no),
+                     src.get("name") or aid), flush=True)
+            continue
+        nid = "z" + secrets.token_hex(4)
+        newname = ", ".join(doc["routes"][r].get("name") or r for r in yes)
+        authzs.append({"id": nid, "name": (newname or src.get("name") or "")[:40],
+                       "values": json.loads(json.dumps(src.get("values") or {}))})
+        for an, routes_here in authns.items():
+            np = {"id": "x" + secrets.token_hex(4),
+                  "name": (", ".join(doc["routes"][r].get("name") or r
+                                     for r in routes_here))[:40],
+                  "values": {"authn": an, "authz": nid}}
+            perms.append(np)
+            for r in routes_here:
+                doc["routes"][r]["permission"] = np["id"]
+        write_routes(doc)
+        print("grant: split %s so %s can be granted without %s"
+              % (src.get("name") or aid,
+                 ", ".join(doc["routes"][r].get("name") or r for r in yes),
+                 ", ".join(doc["routes"][r].get("name") or r for r in no)),
+              flush=True)
+        by[aid] = no
+        by[nid] = yes
+
     changed = False
     for a in cfg.get("authzs") or []:
         here = by.get(a.get("id") or "") or []
@@ -5047,7 +5339,16 @@ def event_to_sink(row):
     faults serialise on the collector being slow."""
     if not row:
         return
-    who = display_label(read_displays().get(row.get("did"))) if row.get("did") else ""
+    # THE ROW MAY BE GONE, and for one kind of event it always is: a removal
+    # writes the document and then records what it did, so the lookup finds
+    # nothing. display_label was handed that nothing and died on it —
+    # AttributeError inside the handler, AFTER the delete had been written and
+    # BEFORE the response was sent, so the socket closed with no reply. A
+    # browser reports a failed request; anything in front of this server
+    # reports 502; and the row really is gone at the next refresh. Every
+    # deletion of a screen did this.
+    rec = read_displays().get(row.get("did")) if row.get("did") else None
+    who = display_label(rec) if rec else ""
     text = "%s%s%s%s" % ((who + " ") if who else "",
                          EVENT_WORDS.get(row["kind"], row["kind"]),
                          (" [%s]" % row["route"]) if row.get("route") else "",
@@ -5985,6 +6286,13 @@ IDENTITY_DEFAULTS = {
     # the passwords get, because this secret is 32 bytes from the system
     # generator and there is no dictionary to run against it.
     "salt": "", "hash": "",
+    # WHEN THAT SECRET STOPS BEING WORTH ANYTHING, or 0 for never — the same
+    # convention `code_expires` uses on a screen, and for the same reason: an
+    # invitation handed over on Friday is a door standing open until somebody
+    # uses it. Zero is the default and zero is what every link minted before
+    # this existed carries, so nothing already out there is shortened by the
+    # feature arriving.
+    "setup_expires": 0,
     "created": 0, "last_seen": 0,
     "created_by": "",
     # THE LOGIN. An email address, because it is the one handle a person
@@ -6492,9 +6800,11 @@ def new_identity(name, email, by):
     pid = "p" + secrets.token_hex(6)
     secret = secrets.token_urlsafe(32)
     salt, dk = hash_key(secret)
+    now_ = int(time.time())
     rows[pid] = dict(IDENTITY_DEFAULTS, name=name, email=email,
                      salt=salt, hash=dk,
-                     created=int(time.time()), created_by=str(by or "")[:60])
+                     setup_expires=setup_deadline(now_),
+                     created=now_, created_by=str(by or "")[:60])
     write_identities(rows)
     # Filed with their own population the moment they exist, and the group is
     # minted if there is not one — the same rule every other kind follows. A
@@ -6524,7 +6834,11 @@ def reissue_identity(pid):
         return None
     secret = secrets.token_urlsafe(32)
     rec["salt"], rec["hash"] = hash_key(secret)
-    rec.update(pw_salt="", pw_hash="", pw_set_at=0)
+    # A FRESH CLOCK WITH THE FRESH SECRET. Carrying the old stamp forward would
+    # hand somebody a new link that was already dead, which is the one outcome
+    # a recovery path must not produce.
+    rec.update(pw_salt="", pw_hash="", pw_set_at=0,
+               setup_expires=setup_deadline(int(time.time())))
     write_identities(rows)
     _user_fails.pop(pid, None)
     close_user_sessions(pid)
@@ -6587,6 +6901,13 @@ def admin_identities():
                  granted=held.get(pid, []),
                  status=bool(rec.get("status")),
                  wakeword=rec.get("wakeword") or "",
+                 # WHEN THEIR LINK LAPSES, and whether it already has. The
+                 # clock beside a screen's code has been on its row since codes
+                 # could expire; a person's could not until now, so the row had
+                 # nothing to count down. Sent even where it is zero — "never"
+                 # is an answer the panel prints rather than a gap it fills in.
+                 setup_expires=int(rec.get("setup_expires") or 0),
+                 link_live=identity_link_live(rec),
                  ready=identity_ready(rec))
             for pid, rec in sorted(rows.items(), key=lambda kv: kv[1]["created"])]
 
@@ -7185,7 +7506,9 @@ def app_pending(cfg):
             # The listener, and the interface it answers on. NOT enrol_host:
             # that is the word put in front of the port when a link is built,
             # read at the moment one is minted, and nothing binds to it.
-            "enrol_port", "enrol_address")
+            "enrol_port", "enrol_address",
+            # …and the device door, which is a binding in exactly the same way.
+            "device_enrol_port", "device_enrol_address")
     return sorted(k for k in keys
                   if RUNNING.get(k) is not None and RUNNING[k] != cfg[k])
 
@@ -7267,7 +7590,8 @@ def restart_blockers(cfg=None):
                        % (w["name"], w["host"], w["port"]))
     host0 = bind_host(cfg)
     for key, what in (("admin_port", "the admin panel"),
-                      ("enrol_port", "enrolment")):
+                      ("enrol_port", "enrolment"),
+                      ("device_enrol_port", "device enrolment")):
         try:
             p = int(cfg.get(key) or 0)
         except (TypeError, ValueError):
@@ -7283,7 +7607,9 @@ def restart_blockers(cfg=None):
             continue
         # The admin port is the one that must never be lost: get this wrong
         # and the restart removes the only way to correct it.
-        addr = cfg.get("enrol_address") if key == "enrol_port" else None
+        addr = (cfg.get("enrol_address") if key == "enrol_port"
+                else cfg.get("device_enrol_address")
+                if key == "device_enrol_port" else None)
         if not port_free(p, str(addr or host0)):
             out.append("%s wants port %d, which something else is holding"
                        % (what, p))
@@ -9127,6 +9453,93 @@ def get_voice(name):
     return _voices[name]
 
 
+#: Marks with no spoken form. Everything markdown uses to shape a page and
+#: nothing a voice can say — so what is left after the conversion below goes,
+#: rather than being read out one character at a time.
+_SPEECH_MARKS = "*_~`#|<>^\\{}[]"
+
+
+def _pictograph(ch):
+    """Emoji and the arrows and dingbats beside them. An engine either names
+    one out loud or swallows it, and neither is an answer."""
+    o = ord(ch)
+    return (0x1F000 <= o <= 0x1FAFF or 0x1F1E6 <= o <= 0x1F1FF
+            or 0x2600 <= o <= 0x27BF or 0x2190 <= o <= 0x21FF
+            or o in (0x200D, 0xFE0F, 0x2B50, 0x2B55))
+
+
+def spoken(text):
+    """The reply as it should be READ, which is not how it should be shown.
+
+    Every model is asked for plain prose — see BACKEND_DEFAULTS — and most of
+    them oblige most of the time. The ones that do not are read out mark by
+    mark, "asterisk asterisk up asterisk asterisk", and a model answering with
+    a tool result in its hands reaches for a bulleted list by reflex whatever
+    it was told. An instruction cannot be the only defence against that.
+
+    AT THE POINT OF SYNTHESIS, not on the answer. The transcript keeps exactly
+    what the model wrote — somebody reading a table wants the table — and only
+    the voice is changed. It is also the one place every caller passes
+    through: a display, an embed and the voice test all arrive here.
+
+    MARKDOWN IS CONVERTED, NOT CUT. A link keeps its words and loses its
+    address, a heading keeps its line, a bullet keeps its item, code inside a
+    fence is still read. Dropping the marked-up text instead would silently
+    swallow the part of an answer somebody took the trouble to emphasise."""
+    s = str(text or "")
+    # The fence lines go and the code between them stays: it is content, and a
+    # voice that skips it has answered a different question.
+    s = re.sub(r"(?m)^[ \t]*(?:```|~~~)[^\n]*\n?", "", s)
+    # Images before links — the alt text is the only part of one that can be
+    # spoken at all, and an address read aloud is noise in either.
+    s = re.sub(r"!\[([^\]]*)\]\([^)]*\)", r"\1", s)
+    s = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", s)
+    # NO RULE FOR EMPHASIS, CODE SPANS OR STRIKETHROUGH, and none is needed:
+    # those marks surround their own words, so the sweep at the foot takes the
+    # marks and leaves the words. Only the constructs that carry something a
+    # voice must NOT say — an address, a fence's language, a row of dashes —
+    # are worth a rule of their own. It is also two fewer things to keep in
+    # step with the copy of these rules in the page.
+    # A rule is a line of punctuation and says nothing — the line goes with
+    # it, or the pause it leaves is a pause for nothing.
+    s = re.sub(r"(?m)^[ \t]*(?:[-*_][ \t]*){3,}$\n?", "", s)
+    # A heading, a quote and a bullet each keep their line and lose their mark.
+    s = re.sub(r"(?m)^[ \t]{0,3}#{1,6}[ \t]*", "", s)
+    s = re.sub(r"(?m)^[ \t]{0,3}>[ \t]?", "", s)
+    s = re.sub(r"(?m)^[ \t]*(?:[-*+]|\d+[.)])[ \t]+", "", s)
+    # A table's rule line is punctuation; the bars inside a row are where a
+    # reader would pause, so they become the pause rather than a word.
+    s = re.sub(r"(?m)^[ \t]*\|?[\s:|-]*\|[\s:|-]*$\n?", "", s)
+    # The bars that open and close a row are the table's frame and say
+    # nothing; only the ones BETWEEN cells are where a reader would pause.
+    s = re.sub(r"(?m)^[ \t]*\|", "", s)
+    s = re.sub(r"(?m)\|[ \t]*$", "", s)
+    s = s.replace("|", ", ")
+    # A MARK BECOMES A SPACE ONLY BETWEEN TWO WORDS, and nothing anywhere
+    # else. Blanking every one of them turns list_alert_rules into one long
+    # unsayable word; spacing every one of them turns "down*." into "down ."
+    # and the engine pauses before the full stop. Which it is depends on what
+    # sits either side, so that is what this asks.
+    out = []
+    for i, ch in enumerate(s):
+        if _pictograph(ch):
+            continue
+        if ch in _SPEECH_MARKS:
+            prev = out[-1] if out else ""
+            nxt = s[i + 1] if i + 1 < len(s) else ""
+            if prev.isalnum() and nxt.isalnum():
+                out.append(" ")
+            continue
+        out.append(ch)
+    s = "".join(out)
+    # …and the gaps left behind close up, or the engine pauses at each one.
+    s = re.sub(r"[ \t]+", " ", s)
+    s = re.sub(r" *\n", "\n", s)
+    s = re.sub(r"(?m)^ +", "", s)
+    s = re.sub(r"\n{3,}", "\n\n", s)
+    return s.strip()
+
+
 def synth(text, name, rate=1.0):
     """`rate` is a speed multiplier to match the browser engine's meaning.
     Piper expresses it as length_scale, which is the inverse — a longer
@@ -9267,6 +9680,15 @@ PERSON_PREFIX = "/p/"
 ENROL_GET = ("/", "/index.html", "/lockup.svg", "/icon.svg", "/favicon.ico",
              "/settings")
 ENROL_POST = ("/user/setup",)
+#: WHAT THE DEVICE ENROLMENT LISTENER SERVES. The same shape as the two above
+#: and the opposite property: this door exists to hand out a display token, and
+#: the person's exists never to. So it answers the page, what the page draws
+#: itself with, the code typed into it, and the URL form of the same code —
+#: and no assistant, because a screen that has just been enrolled is sent on to
+#: one rather than staying here.
+DEV_ENROL_GET = ("/", "/index.html", "/lockup.svg", "/icon.svg", "/favicon.ico",
+                 "/settings")
+DEV_ENROL_POST = ("/display/enrol",)
 #: the other half of the embed API: reachable from the display listeners,
 #: because that is where a host server and a host browser can actually get to
 EMBED_ROUTES = ("/embed", "/embed/session", "/embed/claim")
@@ -9320,14 +9742,20 @@ class Handler(SimpleHTTPRequestHandler):
     #: portal's, and this one — where invitations are accepted and nothing
     #: else happens. See enrol_only.
     enrol_port = False
+    #: …and the other door. Kept apart from `enrol_port` rather than made one
+    #: "is an enrolment listener" flag: what they may answer is almost
+    #: disjoint, and one flag with two meanings is how a display token ends up
+    #: being handed out on the port that must never hand one out.
+    dev_enrol_port = False
 
     def __init__(self, *args, admin_port=False, redirect_to=None,
-                 pinned_net="", enrol_port=False, **kw):
+                 pinned_net="", enrol_port=False, dev_enrol_port=False, **kw):
         # must land before super().__init__, which serves the request outright
         self.admin_port = admin_port
         self.redirect_to = redirect_to
         self.pinned_net = pinned_net
         self.enrol_port = enrol_port
+        self.dev_enrol_port = dev_enrol_port
         super().__init__(*args, **kw)
 
     def _redirected(self):
@@ -9817,6 +10245,12 @@ class Handler(SimpleHTTPRequestHandler):
         if self.enrol_port:
             if not (path in ENROL_GET or path.startswith(PERSON_PREFIX)):
                 return self._json(404, {"error": "not found"})
+        elif self.dev_enrol_port:
+            # The same closed list, for the other population. `/e/` is the one
+            # prefix it adds, and a person's link 404s here exactly as a
+            # screen's code 404s on theirs.
+            if not (path in DEV_ENROL_GET or path.startswith(ENROL_PREFIX)):
+                return self._json(404, {"error": "not found"})
         elif path.startswith(PERSON_PREFIX):
             return self._json(404, {"error": "not found"})
 
@@ -9917,7 +10351,30 @@ class Handler(SimpleHTTPRequestHandler):
             file_display(out["id"])
             print("display %s (%s) enrolled by code" % (out["id"], display_label(out)),
                   flush=True)
-            _back("ok")
+            # ON THE DEVICE DOOR, "back to the display" is back to a port with
+            # no assistant on it — the screen would sit on the page that
+            # enrolled it, enrolled and answering nobody. So it is sent to the
+            # first assistant it may actually use, computed with the same test
+            # that will be applied when it arrives.
+            #
+            # WITH THE COOKIE, and that is why the header order matters: the
+            # token is set on this response and the browser carries it to the
+            # address in the Location. A screen granted nothing yet has nowhere
+            # to be sent and stays here, where the page can say so — which is a
+            # better answer than a redirect to a port that will refuse it.
+            where = ""
+            if self.dev_enrol_port:
+                host = re.sub(r":\d+$", "", self.headers.get("Host") or "") \
+                    or LOOPBACK
+                places = display_places(out, out["id"], host)
+                where = places[0]["url"] if places else ""
+            if where:
+                self.send_response(303)
+                self.send_header("Location", where)
+                self.send_header("Content-Length", "0")
+                print("display %s sent on to %s" % (out["id"], where), flush=True)
+            else:
+                _back("ok")
             self._set_display_cookie(token)
             self.end_headers()
             return
@@ -9961,7 +10418,14 @@ class Handler(SimpleHTTPRequestHandler):
             # happened.
             where = "bad"
             if rec:
-                where = "ready" if identity_ready(rec) else "setup"
+                # THREE BECAME FOUR. A link that has run out is not a link that
+                # means nothing: the first is somebody holding a real
+                # invitation that sat too long and needs another, the second is
+                # a typo or a guess. Telling them apart is the difference
+                # between "ask for a new one" and "that address is wrong".
+                where = ("ready" if identity_ready(rec)
+                         else "setup" if identity_link_live(rec)
+                         else "expired")
             self.send_response(303)
             self.send_header("Location", "/?person=" + where)
             self.send_header("Content-Length", "0")
@@ -10014,6 +10478,24 @@ class Handler(SimpleHTTPRequestHandler):
             # which reads its appearance from the profiles it names and from
             # nowhere else. See display_document.
             doc = display_document(bool(self.admin_port))
+            # THE LAYOUT THIS PORT CARRIES, for a browser that has no display
+            # record. display_document deliberately strips every setting an
+            # APPEARANCE, GEOMETRY or SPEECH profile owns — a screen wears the
+            # profiles its LAYOUT names, not a document somebody tuned while
+            # looking at a different screen — and the layout itself was only
+            # ever handed over inside _display_state, which needs a row to
+            # exist. So a browser opening a pinned address with no identity got
+            # the document with its appearance removed and nothing put back,
+            # and fell through to what the page ships with: the default figure,
+            # the default greeting, and the name Resonance — on a listener
+            # carrying exactly one endpoint with a layout of its own.
+            #
+            # NOTHING HERE IS PRIVATE. It is the same resolved block a screen
+            # on this port already receives, and the appearance is public by
+            # design: the enrolment page and the panel's preview both dress
+            # themselves from it.
+            if self.pinned_net and not self.admin_port:
+                doc = dict(doc, kiosk=kiosk_of({}, nid=self.pinned_net))
             if self.enrol_port:
                 # WHAT THIS LISTENER IS, told to the page in the one call it
                 # is allowed to make. Without it the page loads believing it
@@ -10022,6 +10504,15 @@ class Handler(SimpleHTTPRequestHandler):
                 # here — end up telling somebody accepting an invitation that
                 # the screen has lost the server.
                 doc = dict(doc, enrol_only=True)
+            if self.dev_enrol_port:
+                # The same fact for the other door, and a different word
+                # because the page does a different thing with it: this one
+                # opens on the code box and, once the code is spent, sends the
+                # screen on to the assistant it was granted. Nothing here
+                # answers a display's poll either, so the same reasoning
+                # applies — a page that believed it was a display would report
+                # a lost server on the port where screens are set up.
+                doc = dict(doc, dev_enrol_only=True)
             return self._json(200, {"settings": doc})
         if path == "/auth/me":
             s = self._session()
@@ -10125,17 +10616,19 @@ class Handler(SimpleHTTPRequestHandler):
                                     # whether an uninvited device has anywhere
                                     # to go — the panel needs the second to
                                     # explain why the switch will not move.
-                                    "endpoints": [{"id": r, "name": doc["routes"][r]["name"],
-                                                   "restricted": doc["routes"][r].get("restricted"),
-                                                   # WHETHER A DEVICE CAN USE IT
-                                                   # AT ALL. Sign-in required
-                                                   # refuses a screen outright,
-                                                   # whatever it was ticked for,
-                                                   # so a tick list that does not
-                                                   # know this offers grants that
-                                                   # reach nothing.
-                                                   "needs_signin": doc["routes"][r].get("needs_signin"),
-                                                   "is_default": r == doc["default"]}
+                                    # WHETHER A DEVICE CAN USE IT AT ALL.
+                                    # Sign-in required refuses a screen
+                                    # outright, whatever it was ticked for, so
+                                    # a tick list that does not know this
+                                    # offers grants that reach nothing — and
+                                    # it is read THROUGH THE PERMISSION, see
+                                    # grant_facts, because the fields on the
+                                    # route itself have not decided anything
+                                    # since endpoints started naming one.
+                                    "endpoints": [dict(grant_facts(doc["routes"][r]),
+                                                       id=r,
+                                                       name=doc["routes"][r]["name"],
+                                                       is_default=r == doc["default"])
                                                   for r in route_order(doc)],
                                     "open_default": open_default(doc),
                                     # Offered rather than typed, and with the
@@ -10319,11 +10812,13 @@ class Handler(SimpleHTTPRequestHandler):
                                     # drawn from an empty array, which is the
                                     # exact failure the grant list's own
                                     # comment describes one population over.
+                                    # …and the same resolution the device
+                                    # list uses, for the same reason.
                                     "endpoints": [
-                                        {"id": r, "name": _doc["routes"][r]["name"],
-                                         "restricted": _doc["routes"][r].get("restricted"),
-                                         "needs_signin": _doc["routes"][r].get("needs_signin"),
-                                         "is_default": r == _doc["default"]}
+                                        dict(grant_facts(_doc["routes"][r]),
+                                             id=r,
+                                             name=_doc["routes"][r]["name"],
+                                             is_default=r == _doc["default"])
                                         for r in route_order(_doc)],
                                     "max": MAX_IDENTITIES,
                                     "pw_min": MIN_PASSWORD,
@@ -10483,6 +10978,11 @@ class Handler(SimpleHTTPRequestHandler):
         # and everything else this server answers is on another listener.
         if getattr(self, "enrol_port", False):
             if self.path.split("?")[0] not in ENROL_POST:
+                return self._json(404, {"error": "not found"})
+        if getattr(self, "dev_enrol_port", False):
+            # One POST here too — the code typed into the box on the page. The
+            # URL form of the same act is a GET and is gated above.
+            if self.path.split("?")[0] not in DEV_ENROL_POST:
                 return self._json(404, {"error": "not found"})
         from urllib.parse import urlparse, parse_qs
         if self._redirected():
@@ -11562,10 +12062,27 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(400, {"error": out, "state": out})
             _code_fails.pop(ip, None)
             file_display(out["id"])
-            print("display %s (%s) enrolled by code, in page"
-                  % (out["id"], display_label(out)), flush=True)
+            # WHICH DOOR IT WAS TYPED AT. Both listeners log the same
+            # sentence otherwise, and "it sent me back to an IP" is a question
+            # about which of them answered — unanswerable from a line that does
+            # not say.
+            print("display %s (%s) enrolled by code, in page, on %s"
+                  % (out["id"], display_label(out),
+                     "the device enrolment door" if self.dev_enrol_port
+                     else "a display listener"), flush=True)
+            # …AND WHERE IT GOES NEXT. On the device enrolment listener the
+            # screen has just been commissioned on a port with no assistant on
+            # it, so "enrolled" and then nothing is the whole of what it would
+            # otherwise see. Sent from here rather than worked out in the page,
+            # because the same test that decides it — subject_may — is the one
+            # that will be applied when the screen arrives.
             body = json.dumps({"ok": True,
-                               "display": self._display_state(out)}).encode()
+                               "display": self._display_state(out),
+                               "places": display_places(
+                                   out, out["id"],
+                                   re.sub(r":\d+$", "",
+                                          self.headers.get("Host") or "")
+                                   or LOOPBACK)}).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
@@ -12061,10 +12578,19 @@ class Handler(SimpleHTTPRequestHandler):
             known = read_routes()["routes"]
             if [r for r in rids if r not in known]:
                 return self._json(404, {"error": "no such endpoint"})
-            set_identity_endpoints(pid, rids)
-            print("identity %s endpoints set by %s — %d granted"
-                  % (pid, s["user"], len(rids)), flush=True)
-            return self._json(200, {"ok": True, "identities": admin_identities()})
+            # WHAT ACTUALLY RESULTED, not what was asked for. set_member_
+            # endpoints has returned this since it was written, for the reason
+            # its own docstring gives — an authorize profile can be named by
+            # more than one endpoint, so ticking one grants every endpoint
+            # sharing its rule — and this route threw it away. The panel then
+            # reported the count it had sent, so an admin who ticked one
+            # endpoint was told one, and found two the next time the page was
+            # loaded.
+            got = set_identity_endpoints(pid, rids)
+            print("identity %s endpoints set by %s — %d asked, %d granted"
+                  % (pid, s["user"], len(rids), len(got)), flush=True)
+            return self._json(200, {"ok": True, "granted": got,
+                                    "identities": admin_identities()})
 
         if parsed.path == "/identities/reissue":
             s = self._require("admin")
@@ -12655,13 +13181,22 @@ class Handler(SimpleHTTPRequestHandler):
                     return self._json(400, {"error": "one of those endpoints "
                                                      "no longer exists — "
                                                      "reload the panel"})
-            # A screen is loaded from ONE address, so a grant spanning two
-            # ports is a screen that cannot exist. Refused here, where the
-            # ticks are, rather than handed out as a code pointing at a port
-            # where half the grant is unreachable.
-            clash = display_network_clash(eps)
-            if clash:
-                return self._json(400, {"error": clash})
+                # A screen is loaded from ONE address, so a grant spanning two
+                # ports is a screen that cannot exist. Refused here, where the
+                # ticks are, rather than handed out as a code pointing at a
+                # port where half the grant is unreachable.
+                #
+                # TWO FAULTS LIVED IN THESE FOUR LINES, both of indentation and
+                # both silent. The clash check sat OUTSIDE this block, so a
+                # caller that sent no `endpoints` at all — which is most of
+                # them, since absent means "not being set" — reached it with
+                # `eps` never assigned and the handler died on a NameError. And
+                # the write sat after a `return`, inside the refusal, so it was
+                # unreachable: this route has never once stored the ticks it
+                # exists to store. Whatever a screen was granted, it kept.
+                clash = display_network_clash(eps)
+                if clash:
+                    return self._json(400, {"error": clash})
                 set_display_endpoints(did, eps)
             displays[did].update(fields)
             write_displays(displays)
@@ -13173,7 +13708,12 @@ class Handler(SimpleHTTPRequestHandler):
             raw = self._body(64 * 1024)
             if raw is None:
                 return self._json(400, {"error": "empty or oversized body"})
-            text = raw.decode("utf-8", "replace").strip()
+            # AS IT SHOULD BE READ. The transcript already holds what the
+            # model wrote; this is the only copy that becomes sound, so it is
+            # where the marks come off — see spoken(). An answer that was
+            # nothing but marks has nothing to say and is refused here rather
+            # than sent to a synthesiser as an empty string.
+            text = spoken(raw.decode("utf-8", "replace"))
             if not text:
                 return self._json(400, {"error": "no text"})
             name = (parse_qs(parsed.query).get("voice") or [None])[0] \
@@ -13227,10 +13767,11 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def make_server(port, admin_port=False, host="0.0.0.0", redirect_to=None,
-                pinned_net="", enrol_port=False):
+                pinned_net="", enrol_port=False, dev_enrol_port=False):
     handler = functools.partial(Handler, directory=ROOT, admin_port=admin_port,
                                 redirect_to=redirect_to, pinned_net=pinned_net,
-                                enrol_port=enrol_port)
+                                enrol_port=enrol_port,
+                                dev_enrol_port=dev_enrol_port)
     return ThreadingHTTPServer((host, port), handler)
 
 
@@ -13538,9 +14079,10 @@ def cert_self_sign(names):
 
 
 def start_tls(port, cert, key, admin_port=False, host="0.0.0.0", pinned_net="",
-              enrol_port=False):
+              enrol_port=False, dev_enrol_port=False):
     srv = make_server(port, admin_port=admin_port, host=host,
-                      pinned_net=pinned_net, enrol_port=enrol_port)
+                      pinned_net=pinned_net, enrol_port=enrol_port,
+                      dev_enrol_port=dev_enrol_port)
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.load_cert_chain(cert, key)
     # Kept, so SECURITY ▸ Certificate can hand it another one later.
@@ -13622,6 +14164,13 @@ def main():
 
     cert, key = os.path.join(ROOT, "cert.pem"), os.path.join(ROOT, "key.pem")
     have_tls = os.path.exists(cert) and os.path.exists(key)
+    # WHAT THE DISPLAY LISTENERS ACTUALLY SPEAK. net_base_for wrote https://
+    # unconditionally, which was harmless while its output was a line in the
+    # panel for somebody to read and correct — and stopped being harmless the
+    # day a screen that had just spent its code was REDIRECTED to it. A
+    # deployment with no certificate would send it to a URL that cannot
+    # connect, with nothing on screen to say why.
+    RUNNING["display_tls"] = bool(have_tls)
     # Bound to loopback, a certificate is not part of the product. Browsers
     # treat http://localhost as a secure context, so the microphone works
     # unprompted and there is nothing for TLS to protect: the traffic never
@@ -13915,6 +14464,57 @@ def main():
     else:
         print("ENROL disabled — no port set, so no invitation can be "
               "accepted.", flush=True)
+
+    # THE OTHER DOOR, on the same terms and with the opposite property. It
+    # hands out a display token, which is the one thing the listener above must
+    # never do — so it is a second listener rather than a second route on that
+    # one, and the two share a shape and nothing else.
+    #
+    # NOT FATAL when the port is taken, the same as every other listener here:
+    # a screen cannot be commissioned until it is fixed, and the panel that
+    # fixes it is still answering.
+    _den = int(app.get("device_enrol_port") or 0)
+    if _den:
+        _dhost = net_host({"address": app.get("device_enrol_address")}, host)
+        try:
+            if have_tls:
+                start_tls(_den, cert, key, host=_dhost, dev_enrol_port=True)
+            else:
+                _dsrv = make_server(_den, host=_dhost, dev_enrol_port=True)
+                threading.Thread(target=_dsrv.serve_forever, daemon=True).start()
+            RUNNING["device_enrol_port"] = _den
+            RUNNING["device_enrol_tls"] = bool(have_tls)
+            RUNNING["device_enrol_address"] = str(
+                app.get("device_enrol_address") or "")
+            _dname = str(app.get("device_enrol_host") or "").strip() \
+                or str(app.get("device_enrol_address") or "").strip() \
+                or (_dhost if _dhost not in ("0.0.0.0", "") else "<this machine>")
+            print("DEVICE ENROL on %s:%d  (%s, codes only) → %s://%s:%d/e/"
+                  % (_dhost, _den, "HTTPS" if have_tls else "HTTP",
+                     "https" if have_tls else "http", _dname, _den), flush=True)
+            if not have_tls and _dhost != LOOPBACK:
+                # A screen enrolled over plain HTTP works; a microphone on it
+                # does not, and the browser will not say why. Said here rather
+                # than found out at the wall.
+                print("       NO CERTIFICATE — a screen set up here will not "
+                      "be able to open a microphone. Run ./make-cert.sh and "
+                      "restart.", flush=True)
+        except OSError as exc:
+            print("DEVICE ENROL on %s:%d  NOT bound: %s — no screen can be set "
+                  "up there until this is free" % (_dhost, _den, exc),
+                  flush=True)
+    else:
+        # OFF IS A STATE THIS PROCESS DECIDED, so it is recorded like any
+        # other. app_pending skips a key RUNNING has never heard of — which is
+        # right for something the process does not own, and wrong here: without
+        # a baseline, setting this port for the first time reported no restart
+        # owed, and an admin who had just named where screens are commissioned
+        # was told nothing was waiting on anything.
+        RUNNING["device_enrol_port"] = 0
+        RUNNING["device_enrol_address"] = str(
+            app.get("device_enrol_address") or "")
+        print("DEVICE ENROL disabled — no port set, so a code is typed at "
+              "whichever display listener answers.", flush=True)
 
     warn = posture_warning(app)
     if warn:

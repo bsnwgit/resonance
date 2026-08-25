@@ -17,7 +17,7 @@ On every listener:
 | `POST` | `/display/request` | a device asking for access, answering the form the admin built — or `{"renew": true}`, which asks again on the answers already held. Same-origin only |
 | `POST` | `/display/poll` | a display saying it is still here and asking whether anything has moved: the stamp of ITS OWN configuration, whether an admin has asked it to reload, this server's clock, and the numbers it keeps itself up with. Same-origin only |
 | `POST` | `/display/enrol` | an enrolment code redeemed in place, from the box the display page offers. Spends the code and sets the cookie, without sending anybody back to the address bar. Same-origin only, same back-off as the URL form |
-| `GET` | `/e/<code>` | the same code, typed as a URL instead — the right shape for a television with a remote and no browser open yet. Spends the code, sets the cookie, and redirects to the display with `?enrol=` saying how it went. Display listeners only |
+| `GET` | `/e/<code>` | the same code, typed as a URL instead — the right shape for a television with a remote and no browser open yet. Spends the code, sets the cookie, and redirects: to the first assistant that screen may use where a **device enrolment listener** is set, otherwise back to the display with `?enrol=` saying how it went. Display listeners, and the device enrolment listener where one is configured |
 
 Display listeners only — the embed does not exist on the admin port:
 

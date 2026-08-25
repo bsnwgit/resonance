@@ -216,7 +216,7 @@ app.get('/api/resonance-code', requireLogin, async (req, res) => {
 ```
 
 Drop the `user` block where the key does not require it. Node, Python and PHP
-are all offered in the panel, rebuilt for your key, under ACCESS ▸ SITES.
+are all offered in the panel, rebuilt for your key, under EndPoints ▸ SITES.
 
 **The endpoint must be behind your login.** Anyone who can reach it gets a
 session on your key and spends your rate limit.

@@ -372,7 +372,7 @@
   @media (max-width:1280px){ :root{--stage:432px} }
   @media (max-width:1000px){
     #wrap{grid-template-columns:1fr;grid-template-rows:1fr 320px}
-    #panel{border-right:0;border-bottom:1px solid rgba(var(--glass),.12)}
+    #panel{border-right:0;border-bottom:1px solid rgba(var(--glass),.55)}
   }
   /* THREE ROWS AND TWO COLUMNS. The bar across the top and the foot across
      the bottom run the full width and have not moved; the band between them
@@ -393,7 +393,15 @@
     display:grid;
     grid-template-columns:auto minmax(0,1fr);
     grid-template-rows:auto minmax(0,1fr) auto;
-    border-right:1px solid rgba(var(--glass),.12);background:rgba(0,0,0,.35);
+    /* THE EDGE BETWEEN THE PANEL AND THE PREVIEW, at the strength every
+       other structural line in here is drawn at. It was .12, which is the
+       weight the hairlines between topics use — and against the preview's own
+       black it disappeared entirely, so the two halves of the window ran
+       together with nothing saying where one stopped. .55 is what `.rule`,
+       `.tabbox` and the ruleheads are, and this division is at least as real
+       as any of them: it is the boundary between what you are editing and
+       what you are watching. */
+    border-right:1px solid rgba(var(--glass),.55);background:rgba(0,0,0,.35);
   }
   /* the settings scroll; the identity below stays put */
   /* Under the bar's own rule, and carrying the next one down, so the button
@@ -647,11 +655,11 @@
   /* The app tab's own commit row, at the foot of the box. Hidden outright
      on every other tab: a save button that belongs to settings you cannot
      currently see is a save button somebody will eventually press. */
-  #approw,.uirow{display:none;margin-top:14px;padding-top:10px;
+  #approw,#enrolrow,.uirow{display:none;margin-top:14px;padding-top:10px;
           border-top:1px solid rgba(var(--glass),.30)}
-  #approw.on,.uirow.on{display:block}
+  #approw.on,#enrolrow.on,.uirow.on{display:block}
 
-  #approw .seg,.uirow .seg{justify-content:flex-end;margin-top:8px}
+  #approw .seg,#enrolrow .seg,.uirow .seg{justify-content:flex-end;margin-top:8px}
   /* ADMIN's SAVE and REVERT used to be given a heavier shape here, and that
      is the last place a container decided what a commit looked like: an id in
      the selector beats `button.act-*` outright, so those two stayed 2px on
@@ -671,7 +679,7 @@
   .uirow .state.alert{color:#eaa8a8}
   /* Spans every column once the topics tile, so it reads as the foot of the
      whole box rather than the tail of whichever column it landed in. */
-  @container (min-width:700px){ #approw,.uirow{grid-column:1/-1} }
+  @container (min-width:700px){ #approw,#enrolrow,.uirow{grid-column:1/-1} }
 
   /* The caption OVER a row of tabs is gone. It was a quiet line above the row
      saying what the row was; it is now a boxed label sitting in the row, the
@@ -1383,7 +1391,7 @@
     border-color:rgba(var(--pal-milk),.70);
     background:rgba(var(--pal-milk),.30);
   }
-  /* ACCESS is rust: it is the only one of the labels that is not a setting —
+  /* EndPoints is rust: it is the only one of the labels that is not a setting —
      it names who and what may reach this server — and a colour of its own is
      what says so before the words do. */
   #panelfoot .connside .tablabel{
@@ -2170,7 +2178,7 @@
   }
   /* …EXCEPT WHERE THERE IS NOTHING ABOVE IT TO DIVIDE FROM. That rule marks
      the end of a list and the start of the control that adds to it. On EMBED
-     the list moved to ACCESS ▸ SITES, so ADD AN EMBED KEY is the first thing
+     the list moved to EndPoints ▸ SITES, so ADD AN EMBED KEY is the first thing
      on the page and its rule was landing a few pixels under the title's —
      two lines across the top with nothing between them.
 
@@ -3216,7 +3224,7 @@ transcript to itself, with no setting per device — including the lines typed b
 somebody signed in, which is what {user} is for.
 
 It resolves to the first of these that exists: the name you gave that row under
-ACCESS, then <b>?display=</b> from its URL, then the first thing typed on its
+EndPoints, then <b>?display=</b> from its URL, then the first thing typed on its
 request form. So a laptop you approved as <i>Sarah laptop</i> labels her lines
 with that, and a wall screen named <i>Kitchen</i> labels its own.
 
@@ -3240,7 +3248,7 @@ recognised is left standing so a typo is visible rather than silent.</div>
          title, the one without a title was the one that looked unfinished.
 
          ASSISTANTS, plural, like the two beside it: the three registers under
-         ACCESS are three populations — what this server answers as, what it
+         EndPoints are three populations — what this server answers as, what it
          answers to, and what may frame it. A row is still an ENDPOINT
          everywhere it is described, which is the right word for the thing;
          this is the word for the set of them. -->
@@ -3559,15 +3567,28 @@ nothing crosses a network. Start it, open localhost, talk to it.</div>
        three are decided in. Stacked rather than laid out in a grid: a grid is
        for a column of ports, and one field at the far right of a wide section
        is a field people scroll past. -->
+  <!-- NAMED FOR THE POPULATION IT SERVES, the same divider Enroll URL and
+       Enroll Time Limit use. This listener is the person's door and only ever
+       was — a screen's code is spent on a display listener and an embed
+       arrives somewhere else again — but that was something you had to know
+       rather than something the page said. -->
+  <div class="rulehead">Person</div>
   <label class="bklab">Interface</label>
   <select id="ap_enroladdr"></select>
   <label class="bklab" for="ap_enrolport">Port</label>
   <input id="ap_enrolport" type="number" inputmode="numeric" class="num">
-  <div class="now" id="now_enrol"></div>
-  <label class="bklab" for="ap_enrolhost">Address in the link</label>
-  <input id="ap_enrolhost" type="text" spellcheck="false" autocomplete="off"
-         autocapitalize="none" placeholder="join.example.com — optional">
-  <div class="note" id="enrolnow"></div>
+  <!-- WHAT IS RUNNING IS NOT SAID HERE ANY MORE. The field holds the
+       configured port now — it was blank until somebody typed in it, which is
+       a control that looks unset on a server that is set — and a second line
+       reading "running on 9703" beside a box saying 9703 is the same number
+       twice. Where the two genuinely differ, the pending-restart note below
+       is what says so, and it says it for every port at once. -->
+  <!-- ADDRESS IN THE LINK IS NOT HERE ANY MORE. It is a NAME and this section
+       is a BINDING — an interface and a port, both of which need a restart,
+       against a word that is read when a link is minted. They read as one
+       subject only because they used to share a SAVE. Both populations' names
+       are together under Enroll URL now, which is where somebody asking "what
+       does the link somebody gets actually say" goes to look. -->
   <div class="note help">Where an invitation is accepted, and the only place
 it can be. A link you hand somebody opens here and <b>nowhere else</b>: the
 same link on any other port of this server answers 404, so somebody who knows
@@ -3584,21 +3605,111 @@ them.
 choice a network profile makes. Leaving it on every address is fine; naming
 one is how you keep enrolment off a network it has no business being on.
 
-<b>Address in the link</b> is optional, and it is a name rather than a second
-binding — the listener answers on the interface above whatever this says. Set
-it and the link reads <i>https://join.example.com:9703/…</i> instead of four
-numbers nobody checks. It has to resolve to the interface above, and the
-certificate has to carry it or every browser will complain: run
-<i>./make-cert.sh &lt;name&gt;</i> and restart.
+What this listener is CALLED in the link people are handed is under
+<b>Enroll URL</b> below, with the screens' equivalent beside it.
 
-Changing the port or the interface needs a restart. The name does not — it is
-read when a link is minted.</div>
+Changing the port or the interface needs a restart.</div>
 
-  <div class="seg actrow">
-    <button id="b_enrolsave" class="act-save">SAVE</button>
-  </div>
-  <div class="note" id="enrolsavenote"></div>
-  <div class="note" id="enrolpending" hidden></div>
+  <!-- THE OTHER POPULATION'S DOOR, and it is a PICKER rather than the two
+       boxes above it. That is not a shortcut: every display listener on this
+       server is a network profile, and `/e/` answers on all of them — so an
+       interface and a port typed here would be a third listener that no
+       profile owns, on a server whose whole design is that none of them is
+       special. The interface and the port are still what decide it; they are
+       the PROFILE'S, and this says which profile.
+
+       What was actually missing was an answer. A screen with nothing ticked
+       yet — which is every screen at the moment somebody asks it for a code —
+       fell back to the default endpoint's profile and then to whichever one
+       named a port, so where a code was typed depended on which assistant
+       happened to be default. -->
+  <div class="rulehead">Device</div>
+  <label class="bklab">Interface</label>
+  <select id="ap_devicenetaddr"></select>
+  <label class="bklab" for="ap_devicenetport">Port</label>
+  <input id="ap_devicenetport" type="number" inputmode="numeric" class="num"
+         placeholder="blank for off">
+  <div class="note help">Where a screen is set up, and the only place it can
+be. A code typed here and <b>nowhere else</b>: the same six characters on any
+other port answer 404, so where screens are commissioned is a thing you can
+firewall, put on a sheet, and say out loud.
+
+<b>Nothing else is on this port.</b> No assistant, no microphone, no
+invitation — it answers the page, the code box on it, and the URL form of the
+same code. A screen that spends its code here is sent straight on to the first
+assistant it was granted, because this port is not one of them.
+
+<b>It is the opposite of the person's door above</b>, in the one property that
+matters: that one must never hand out a display token and this one exists to.
+They are two listeners for that reason and not one with two routes.
+
+<b>Blank is off</b>, and off is what a deployment starts as: a code is typed at
+whichever display listener answers, exactly as before. Set a port and that
+stops being true — every code goes to this address, whatever the screen was
+granted.
+
+Changing either needs a restart.</div>
+
+
+    </div>
+  </section>
+
+  <!-- WHAT A LINK SAYS, for both populations, in one place.
+
+       The two questions are the same question and the answers are not: a
+       person's invitation is spent on the enrolment listener, which is ONE
+       port an admin chose, so it has one name. A screen's code is spent on
+       whichever DISPLAY listener it was granted, and each of those already
+       carries an address on its network profile — so the screens' field is a
+       name for the case where a profile is bound to everything and names none,
+       which is where the link used to be built out of whatever Host header
+       happened to arrive.
+
+       A RULEHEAD PER POPULATION rather than two sections. They are one
+       subject — where does the thing I am about to hand somebody point — and
+       splitting them into two headings would put the answer to one question
+       under two titles. The rule with the word in it is the panel's own
+       divider; see the one over PROFILES in the menu. -->
+  <section class="grp wide" data-tab="enrolcfg">
+    <h4>Enroll URL</h4>
+    <div class="grpbody">
+
+  <div class="rulehead">Person</div>
+  <label class="bklab" for="ap_enrolhost">Address in the link</label>
+  <input id="ap_enrolhost" type="text" spellcheck="false" autocomplete="off"
+         autocapitalize="none" placeholder="join.example.com — optional">
+  <div class="note help">Optional, and a name rather than a second binding —
+the enrolment listener answers on the interface set under <b>Enroll Network</b>
+whatever this says. Set it and the link reads
+<i>https://join.example.com:9703/p/…</i> instead of four numbers nobody checks.
+It has to resolve to that interface, and the certificate has to carry it or
+every browser will complain: run <i>./make-cert.sh &lt;name&gt;</i> and
+restart.
+
+Its own SAVE, because it is not a binding: the port and the interface need a
+restart and this does not — it is read at the moment a link is minted, so a
+name corrected here is right for the next one you hand out.</div>
+
+  <div class="rulehead">Device</div>
+  <label class="bklab" for="ap_devicehost">Address in the link</label>
+  <input id="ap_devicehost" type="text" spellcheck="false" autocomplete="off"
+         autocapitalize="none" placeholder="screens.example.com — optional">
+  <div class="note help">What the <b>device enrolment listener</b> is called in
+the address you hand to whoever is hanging a screen — the same thing the field
+above it does for a person's link, for the other door.
+
+<b>It needs that door to exist.</b> Set an interface and a port under <b>Enroll
+Network ▸ Device</b> and this names it; leave the port blank and this is not
+read at all, because there is no door for it to name and a code is typed at
+whichever display listener answers.
+
+It is a name and not a binding: the listener answers on the interface set over
+there whatever this says. It has to resolve to that interface, and the
+certificate has to carry it or the screen will refuse to open a microphone —
+run <i>./make-cert.sh &lt;name&gt;</i> and restart.
+
+Read when a code is handed out, so the name itself needs no restart.</div>
+
     </div>
   </section>
 
@@ -3613,6 +3724,33 @@ read when a link is minted.</div>
   <section class="grp wide" data-tab="enrolcfg">
     <h4>Enroll Time Limit</h4>
     <div class="grpbody">
+  <!-- ONE QUESTION, TWO POPULATIONS, and they were one control because only
+       one of them could expire. A screen's code always could; a person's link
+       could not, so an invitation sat open until somebody used it. The same
+       divider Enroll URL uses, for the same reason: this is one subject with
+       two answers, not two subjects. -->
+
+  <div class="rulehead">Person</div>
+  <label class="bklab" style="margin-top:2px">A setup link lasts (minutes, 0
+for no limit)</label>
+  <input id="dp_setupmins" class="num" type="number" inputmode="numeric"
+         min="0" max="10080">
+  <div class="note help">How long the link minted under ENROLLMENTS ▸ USER is
+worth anything for. <b>Zero is the default and zero is what this always did</b>
+— an invitation was good until it was spent, so setting a number here is a
+deployment deciding, not this server having an opinion.
+
+Longer than a screen's code, whatever you choose: a code is six characters
+carried across a building in somebody's head, and a link is handed over and
+answered whenever the person it went to gets to it.
+
+The clock runs from the moment a link is minted, so changing this does not
+shorten one already sent. REISSUE gives that person a fresh link on the new
+setting — and a link that has run out says so when it is opened, rather than
+reading as an address somebody typed wrong.</div>
+
+
+  <div class="rulehead">Device</div>
   <label class="bklab" style="margin-top:2px">A code lasts (minutes, 0 for no
 limit)</label>
   <input id="dp_codemins" class="num" type="number" inputmode="numeric"
@@ -3632,10 +3770,6 @@ The clock applies from the moment a code is issued, so changing this does not
 extend one already out there. REISSUE gives that row a fresh one on the new
 setting.</div>
 
-  <div class="seg actrow">
-    <button id="b_codesave" class="act-save">SAVE</button>
-  </div>
-  <div class="note" id="codenote"></div>
     </div>
   </section>
 
@@ -3666,11 +3800,6 @@ The requests themselves arrive under <b>ENROLLMENTS ▸ USER</b>, in the same
 queue as the people you enrolled — chipped <b>FORM</b> where they asked and
 <b>ENROLL</b> where you named them.</div>
 
-  <div class="seg actrow">
-    <button id="b_formsave" class="act-save">SAVE THE FORM</button>
-    <button id="b_formrevert" class="act-undo">REVERT</button>
-  </div>
-  <div class="note" id="formnote"></div>
     </div>
   </section>
 
@@ -3683,7 +3812,7 @@ queue as the people you enrolled — chipped <b>FORM</b> where they asked and
        ENROLL is where the shape of every door is decided; the queues those
        settings feed are elsewhere. This is the embed's door. -->
   <section class="grp wide" data-tab="enrolcfg">
-    <h4>Enroll Embed Server</h4>
+    <h4>Enroll Embed APP</h4>
     <div class="grpbody">
   <label class="bklab" style="margin-top:2px" for="ap_embedhost">Address
 integrators reach this on</label>
@@ -3707,8 +3836,11 @@ integrators reach this on</label>
     <input id="ap_embedport" class="num" type="number" min="1" max="65535"
            inputmode="numeric" autocomplete="off" placeholder="none"
            title="port, if the outside reaches this server on one">
-    <button id="b_embedhost" class="act-save">SAVE</button>
   </div>
+  <!-- NOT A SAVE NOTE. The commit moved to the tab's row at the foot with
+       every other one; this is where the scheme picker says that plain HTTP
+       will not open a microphone, which is a warning about the choice and has
+       to sit with the choice. -->
   <div class="note" id="ehnote"></div>
   <div class="note help">The address a host application's server and its
 visitors both reach this server by — <b>not</b> the address enrolment uses for
@@ -3731,12 +3863,36 @@ rather than a rule because the constraint belongs to the browser and not to
 this field.
 
 It changes nothing that is running. It is the address written into the code
-under ENROLLMENTS ▸ EMBED and shown again on every row of ACCESS ▸ SITES, and
+under ENROLLMENTS ▸ EMBED and shown again on every row of EndPoints ▸ SITES, and
 nothing else reads it. Set it before you make a key: with it empty the
 generated code says YOUR-RESONANCE-HOST, which an admin then edits by hand in
 three places, two of which they will get right.</div>
     </div>
   </section>
+
+  <!-- ONE COMMIT ROW FOR THE WHOLE TAB, the same device #approw is on ADMIN
+       and for the same reason: at the foot of the box across the full width,
+       so it reads as belonging to everything above it rather than to the last
+       topic, and so it is not one more collapsible section you have to open to
+       find out how to save.
+
+       IT REPLACED SIX. Every section here had its own SAVE — the network, both
+       halves of the time limit, both halves of the URL, the form and the embed
+       address — which is seven buttons on one page saying the same word and no
+       way to tell from any of them which of seven things you had just written.
+       They existed because these settings arrived one at a time and each
+       needed a commit that did not reach across a tab boundary. They are all
+       on ONE tab now, so the boundary this row must not cross is the tab's,
+       and it does not: it writes app.json's enrolment and embed keys and the
+       displays document's two limits and the form, and nothing else. -->
+  <div id="enrolrow">
+    <div class="note" id="enrolallnote"></div>
+    <div class="pending" id="enrolpending" hidden></div>
+    <div class="seg actrow">
+      <button id="b_enrolsaveall" class="act-save">SAVE</button>
+      <button id="b_enrolrevert" class="act-undo">REVERT</button>
+    </div>
+  </div>
 
 
 
@@ -4035,7 +4191,7 @@ every browser they had open. An admin never sets or sees a password — one you
 chose would be one you knew.
 
 Deleting takes everything granted to them with it. What they are granted is on
-the endpoint under ACCESS ▸ AI, in the People box.</div>
+the endpoint under EndPoints ▸ AI, in the People box.</div>
     </div>
   </section>
 
@@ -4083,7 +4239,7 @@ the endpoint under ACCESS ▸ AI, in the People box.</div>
        endpoint's allow-list, and anything later that grants something can name
        them the same way. -->
   <!-- Whether the app takes a sign-in at all, and what a grant is worth once
-       given. On SECURITY rather than ACCESS: ACCESS answers WHICH device may
+       given. On SECURITY rather than EndPoints: EndPoints answers WHICH device may
        reach which endpoint, and whether anybody has to be approved in the
        first place is a different question — it is the door, not the key. -->
   <!-- The tab's own title, the same treatment the profile lists get: full
@@ -4532,7 +4688,7 @@ A profile is a <b>port and an address</b>, and nothing about permission. It
 carried two permission switches once — one letting a port take more than one
 endpoint, one making the port itself the grant — and both are gone. Who may
 use an assistant, and whether they have to sign in first, is said on the
-assistant, under ACCESS ▸ AI.
+assistant, under EndPoints ▸ AI.
 
 TLS is the same certificate the display port uses, because the microphone
 needs a secure context and a second certificate for the same machine would be
@@ -4897,7 +5053,7 @@ characters into the box it offers. Case and dashes do not matter —
 <b>k7qp4m</b> is the same as <b>K7QP-4M</b>.
 
 A row leaves this list the moment its code is used and appears under
-ACCESS ▸ NODES, in the one register with every other device, so a grant
+EndPoints ▸ NODES, in the one register with every other device, so a grant
 to all of them is one tick.</div>
     </div>
   </section>
@@ -4931,7 +5087,7 @@ to all of them is one tick.</div>
     <button id="b_bulkstatoff" class="act-undo">HIDE ON SELECTED</button>
   </div>
   <!-- On THIS tab. The result used to be written to the Created Access note,
-       which is on ACCESS — a message nobody standing here could see. -->
+       which is on EndPoints — a message nobody standing here could see. -->
   <div class="note" id="bulknote"></div>
 
   <!-- ONE register. This was two areas, People and Devices, split on how a
@@ -4950,7 +5106,12 @@ to all of them is one tick.</div>
        The section's own title is the heading now. A list with one area in it
        does not need a second name over the top of it. -->
   <div id="conndevices" style="margin-top:2px"></div>
-  <div class="note" id="connnote"></div>
+  <!-- devicesnote, and it was connnote — the same id as the note under the
+       connection profiles on another tab. Two elements with one id means the
+       lookup returns the FIRST in document order, so every message this list
+       wrote landed on PROFILES ▸ CONNECTION, where nobody standing here could
+       read it. -->
+  <div class="note" id="devicesnote"></div>
 
   <div class="note help" style="margin-top:10px">Everything currently connected
 to this server. A display is one device — a screen on a wall, a TV, a laptop,
@@ -5367,11 +5528,11 @@ recorded, and nothing at all until somebody says a wake word.</div>
 
 
   <!-- ============================================================== SITES
-       The register of embeds, under ACCESS with the other two rather than
+       The register of embeds, under EndPoints with the other two rather than
        under the form that makes one. The division is the one this panel
        already draws everywhere else: ENROLLMENTS is where something arrives,
-       ACCESS is where it lives once it has. A screen makes exactly that move
-       from ENROLLMENTS ▸ DEVICE to ACCESS ▸ NODES, and there was no reason
+       EndPoints is where it lives once it has. A screen makes exactly that move
+       from ENROLLMENTS ▸ DEVICE to EndPoints ▸ NODES, and there was no reason
        for an embed to be the exception — the list of keys that exist was
        sitting on the tab that mints them, above a form, which asks one page
        to be both the door and the room.
@@ -5456,7 +5617,7 @@ goes looking for it.</div>
        you were making anything.
 
        It parts from AI in ONE way now: what is here is the draft alone. A
-       saved key is edited in its own row under ACCESS ▸ SITES, where the rest
+       saved key is edited in its own row under EndPoints ▸ SITES, where the rest
        of it already is — this tab issues, that one keeps. The two carry the
        same six sections and the same words, which is why the fields there are
        built from a template rather than cloned off these: this form is
@@ -5476,10 +5637,10 @@ goes looking for it.</div>
          was the one that did not. -->
     <div class="barehead"><span class="listtitle">Embed Enrollment</span></div>
     <div class="grpbody">
-  <!-- THE LIST IS NOT HERE ANY MORE. The keys that exist are under ACCESS ▸
+  <!-- THE LIST IS NOT HERE ANY MORE. The keys that exist are under EndPoints ▸
        SITES, in the row of registers with the nodes and the endpoints. This
        tab issues a credential; that one holds what has been issued — the same
-       move a screen makes from ENROLLMENTS ▸ DEVICE to ACCESS ▸ NODES.
+       move a screen makes from ENROLLMENTS ▸ DEVICE to EndPoints ▸ NODES.
 
        BEHIND THE ?, like every other line of prose in this panel. It was a
        bare .note sitting permanently above the form, on the reasoning that
@@ -5831,11 +5992,11 @@ key inside an example sends you to a line that cannot answer you.</div>
            is one subject, and the label saying so from the border is what
            stops it reading as a fourth link. -->
       <fieldset class="tabbox">
-        <!-- ACCESS, not CONNECTIONS. The word moved: it names the two profile
+        <!-- EndPoints, not CONNECTIONS. The word moved: it names the two profile
              lists at the top of the panel now — what an assistant speaks to
              and what it answers on — and this row is the other question
              entirely, which is who and what may reach this server. -->
-        <legend><span class="tablabel">ACCESS</span></legend>
+        <legend><span class="tablabel">EndPoints</span></legend>
       <div class="tabs">
         <button id="tab_ai" data-tab="ai">AI</button>
         <!-- The register: every device this server knows about. NODES rather
@@ -5848,7 +6009,7 @@ key inside an example sends you to a line that cannot answer you.</div>
              document. -->
         <button id="tab_devices" data-tab="devices">NODES</button>
         <!-- THE THIRD REGISTER, and it is here for the reason NODES is: what
-             has finished arriving belongs under ACCESS, whatever door it came
+             has finished arriving belongs under EndPoints, whatever door it came
              through. A node is a screen on a network you control; a site is a
              page on somebody else’s server holding a key to frame this
              interface. Different doors, one question — what is reaching this
@@ -6683,27 +6844,15 @@ const APP_TEXT = {ap_refresh:'refresh_at', ap_restart:'restart_at',
                   /* enrol_host went with the rest of enrolment. */
                   };
 
-/* WHAT A LINK WILL ACTUALLY SAY, under the three fields that decide it. The
-   pieces are on screen separately and the thing an admin is trying to get
-   right is the sentence they make — which is what gets handed to a person, and
-   the one part of this that is wrong silently. */
-function enrolNow(j){
-  const el = $('enrolnow');
-  if (!el) return;
-  const a = (j && j.app) || {};
-  const running = (j && j.running) || {};
-  const port = a.enrol_port || 0;
-  if (!port){
-    el.className = 'note bad';
-    el.textContent = 'No port set, so no invitation can be accepted.';
-    return;
-  }
-  const host = (a.enrol_host || '').trim() || (a.enrol_address || '').trim()
-             || location.hostname;
-  el.className = 'note';
-  el.textContent = 'Links will read https://' + host + ':' + port + '/p/…'
-    + (running.enrol_port === port ? '' : ' — once this server is restarted');
-}
+/* NO LINK PREVIEWS ON THE ENROLMENT TAB, and that is a decision rather than
+   an omission. Three of them lived here — what a person's link would read,
+   what a screen's code address would read, and whether the device door was
+   bound — and every one of them restated fields that are on screen a few
+   inches above, composed into a sentence that could only ever agree with them
+   or be wrong. Wrong is what they were, twice: once composing a name with
+   another listener's port, once printing one line per network profile. What is
+   actually needed after a save is whether a restart is owed, and the tab's own
+   pending line at the foot says that for every setting at once.
 
 /* SETTINGS ▸ SECURITY ▸ Certificate. Every line of it is read off the file on
    the server rather than out of a settings document, so there is nothing here
@@ -6850,7 +6999,7 @@ function postureSync(){
   $('posturenow').textContent = 'Reachable at ' + where + '.' +
     (bind === 'loopback' ? ' No certificate needed.' : '');
   /* A POINTER, not the warning. The warning itself is on the endpoint it is
-     true of — ACCESS ▸ AI, under Sign in — because that is the control
+     true of — EndPoints ▸ AI, under Sign in — because that is the control
      that causes it and the page somebody actually opens; this is the page
      about exposure, which is only what makes it matter.
 
@@ -6867,7 +7016,7 @@ function postureSync(){
     w.textContent = open.length + (open.length === 1 ? ' assistant needs'
                                                      : ' assistants need')
       + ' no sign-in and can be used by anyone who reaches this machine — '
-      + 'ACCESS ▸ AI. The admin panel always asks.';
+      + 'EndPoints ▸ AI. The admin panel always asks.';
     w.hidden = false;
   } else w.hidden = true;
 }
@@ -6903,7 +7052,11 @@ function showPending(j, into){
                  enrol_address:'the enrolment interface',
                  bind:'reachable at', bind_address:'which address'};
   const run = j.running || {};
-  ['admin', 'enrol'].forEach(k=>{
+  /* ADMIN ONLY. The enrolment one came off with its label — see the comment
+     where the field is. Left in the loop it would have been a write to an
+     element that is not there, which is harmless and is also how a loop comes
+     to name three things and paint one. */
+  ['admin'].forEach(k=>{
     const el = $('now_' + k), p = run[k + '_port'];
     if (el) el.textContent = p ? 'running on ' + p : 'not bound';
   });
@@ -6992,7 +7145,45 @@ async function loadApp(){
       }
       esel.value = j.app.enrol_address || '';
     }
+    /* THE PORT, WHICH WAS NEVER FILLED. The box sat empty on every load and
+       the save guarded against that by skipping an empty one — so a field
+       showing nothing on a server with a port set read as a setting that had
+       never been made. The configured value, not the running one: it is what
+       SAVE writes, and a field disagreeing with its own button is worse than
+       a restart that is owed. */
+    if ($('ap_enrolport'))
+      $('ap_enrolport').value = j.app.enrol_port ? String(j.app.enrol_port) : '';
+    /* THE DEVICE DOOR, filled the same way and blank where it is off — zero is
+       how the document stores "no port" because it is an int, and a box showing
+       0 is a port somebody then has to delete. The interface list is the same
+       one the person's picker offers, because it is the same machine. */
+    if ($('ap_devicenetport'))
+      $('ap_devicenetport').value = j.app.device_enrol_port
+        ? String(j.app.device_enrol_port) : '';
+    const dsel = $('ap_devicenetaddr');
+    if (dsel){
+      dsel.innerHTML = '';
+      const dany = document.createElement('option');
+      dany.value = ''; dany.textContent = 'EVERY ADDRESS';
+      dsel.appendChild(dany);
+      (j.addresses || []).forEach(a=>{
+        const o = document.createElement('option');
+        o.value = a; o.textContent = a; dsel.appendChild(o);
+      });
+      const dwant = j.app.device_enrol_address || '';
+      if (dwant && !(j.addresses || []).includes(dwant)){
+        const o = document.createElement('option');
+        o.value = dwant;
+        o.textContent = dwant + ' \u2014 not on this machine now';
+        dsel.appendChild(o);
+      }
+      dsel.value = dwant;
+    }
     if ($('ap_enrolhost')) $('ap_enrolhost').value = j.app.enrol_host || '';
+    /* The screens' half of the same question — see the section it is in for
+       why one name could not answer both. */
+    if ($('ap_devicehost'))
+      $('ap_devicehost').value = j.app.device_enrol_host || '';
     if ($('ap_embedscheme'))
       $('ap_embedscheme').value = j.app.embed_scheme || 'https';
     if ($('ap_embedhost')) $('ap_embedhost').value = j.app.embed_host || '';
@@ -7000,7 +7191,6 @@ async function loadApp(){
        an int; a field showing 0 is a port somebody then has to delete. */
     if ($('ap_embedport'))
       $('ap_embedport').value = j.app.embed_port ? String(j.app.embed_port) : '';
-    enrolNow(j);
     certPaint(j);
     segSet('ap_bind', j.app.bind);
     postureSync();
@@ -7067,19 +7257,129 @@ $('b_sesssave').addEventListener('click', ()=>{
    together because they are one answer — an interface, a port, and what to
    call the interface — and two of them need a restart while the third does
    not, which is what the pending line under it is for. */
-$('b_enrolsave').addEventListener('click', ()=>{
+/* EVERYTHING ON THE ENROLMENT TAB, in two requests because it is written to
+   two documents — app.json holds the listener, the two names and the embed
+   address; the displays document holds the two limits and the request form.
+   Two requests and ONE button: which file a setting happens to live in is
+   this server's business and not something an admin should have to press
+   twice for.
+
+   THE APP HALF FIRST. It is the half that can be refused — a port already in
+   use, a name that reads as a URL — and a refusal there should leave the rest
+   unwritten rather than half-applied. */
+function enrolAppBody(){
   const port = $('ap_enrolport');
   const body = {
     /* Always sent, empty included: empty is EVERY address, which is a real
-       answer and one somebody has to be able to come back to. */
+       answer and one somebody has to be able to come back to — and the same
+       is true of both names below, where empty is how a name comes back off
+       and the link goes to naming the address again. */
     enrol_address: $('ap_enroladdr') ? ($('ap_enroladdr').value || '') : '',
-    /* …and empty here is how the name is taken back off, so the link goes to
-       naming the address again. */
     enrol_host: ($('ap_enrolhost').value || '').trim(),
+    device_enrol_host: ($('ap_devicehost').value || '').trim(),
+    /* Empty is "whichever one answers", which is a real answer and the one a
+       deployment starts on — so it is sent like the names beside it rather
+       than skipped when blank. */
+    /* Blank is OFF and off is a real answer, so it is sent as 0 rather than
+       skipped — skipping it would make the door impossible to close. */
+    device_enrol_port: ($('ap_devicenetport').value || '').trim() || 0,
+    device_enrol_address: $('ap_devicenetaddr')
+      ? ($('ap_devicenetaddr').value || '') : '',
+    embed_scheme: $('ap_embedscheme').value,
+    embed_host: $('ap_embedhost').value.trim(),
+    embed_port: $('ap_embedport').value.trim(),
   };
   if (port && port.value !== '') body.enrol_port = parseInt(port.value, 10);
-  saveAppBit(body, 'enrolsavenote', 'enrolpending');
+  return body;
+}
+
+$('b_enrolsaveall').addEventListener('click', async ()=>{
+  const note = $('enrolallnote');
+  note.className = 'note';
+  note.textContent = 'saving…';
+  try{
+    const j = await api('/app', {method:'POST',
+                                 body: JSON.stringify(enrolAppBody())});
+    showPending(j, 'enrolpending');
+    /* The shared document's half, on the same press. saveDp repaints from
+       what comes back, so the fields end up showing what was stored rather
+       than what was typed — which is the difference between a save and a
+       hope. */
+    await saveDp({setup_minutes: parseInt($('dp_setupmins').value, 10),
+                  code_minutes: parseInt($('dp_codemins').value, 10),
+                  form: DPFORM.filter(f=> (f.label || '').trim())},
+                 'enrolallnote');
+    if (!note.classList.contains('bad'))
+      note.textContent = (j.pending && j.pending.length)
+        ? 'saved — a restart is needed for the port or the interface, see above'
+        : 'saved — nothing here is waiting on a restart';
+    /* The other tab's copy of the same document, so a pending-restart warning
+       is not stale on whichever of the two you look at next. */
+    loadApp();
+  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
 });
+
+$('b_enrolrevert').addEventListener('click', async ()=>{
+  const note = $('enrolallnote');
+  note.className = 'note';
+  note.textContent = 'reloading from the server…';
+  /* BOTH DOCUMENTS, because the tab is drawn from both. loadApp refills the
+     listener, the names and the embed address; loadDisplays brings the shared
+     settings back and paintDpSettings puts the limits and the form with
+     them. */
+  await loadApp();
+  await loadDisplays();
+  paintDpSettings();
+  if (!note.classList.contains('bad'))
+    note.textContent = 'back to what is saved';
+});
+
+/* The two names had a SAVE each and now go out with the tab's — see
+   enrolAppBody. */
+
+$('b_enrolsaveall').addEventListener('click', async ()=>{
+  const note = $('enrolallnote');
+  note.className = 'note';
+  note.textContent = 'saving…';
+  try{
+    const j = await api('/app', {method:'POST',
+                                 body: JSON.stringify(enrolAppBody())});
+    showPending(j, 'enrolpending');
+    /* The shared document's half, on the same press. saveDp repaints from
+       what comes back, so the fields end up showing what was stored rather
+       than what was typed — which is the difference between a save and a
+       hope. */
+    await saveDp({setup_minutes: parseInt($('dp_setupmins').value, 10),
+                  code_minutes: parseInt($('dp_codemins').value, 10),
+                  form: DPFORM.filter(f=> (f.label || '').trim())},
+                 'enrolallnote');
+    if (!note.classList.contains('bad'))
+      note.textContent = (j.pending && j.pending.length)
+        ? 'saved — a restart is needed for the port or the interface, see above'
+        : 'saved — nothing here is waiting on a restart';
+    /* The other tab's copy of the same document, so a pending-restart warning
+       is not stale on whichever of the two you look at next. */
+    loadApp();
+  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
+});
+
+$('b_enrolrevert').addEventListener('click', async ()=>{
+  const note = $('enrolallnote');
+  note.className = 'note';
+  note.textContent = 'reloading from the server…';
+  /* BOTH DOCUMENTS, because the tab is drawn from both. loadApp refills the
+     listener, the names and the embed address; loadDisplays brings the shared
+     settings back and paintDpSettings puts the limits and the form with
+     them. */
+  await loadApp();
+  await loadDisplays();
+  paintDpSettings();
+  if (!note.classList.contains('bad'))
+    note.textContent = 'back to what is saved';
+});
+
+/* The two names had a SAVE each and now go out with the tab's — see
+   enrolAppBody. */
 
 /* THE RESTART. Confirmed, because it drops every session and every embed on
    the machine for a few seconds — and refused by the SERVER, not by this
@@ -7373,6 +7673,16 @@ to nothing and answers nowhere, which the Network section says.</div>
     <h5>Connection<span class="subsum"></span></h5>
     <div class="subbody">
   <select data-f="connection" class="ppick"></select>
+  <!-- WHY THE LIST IS SHORT, and it had nowhere to be printed. blockFill has
+       written this line since the one-endpoint-per-port rule existed — "2 not
+       offered: another endpoint already answers on those ports" — into a
+       data-r of this name, which was never in this template. So the rule
+       applied and said nothing: on a server where every network profile
+       already has an endpoint, a new one's picker offers NONE and looked
+       simply broken. An element of that name does exist as an ID on PROFILES
+       ▸ CONNECTION — a different element on a different tab, which is what
+       made the omission hard to see. -->
+  <div class="note" data-r="connnote"></div>
   <div class="note help">Which <b>connection</b> this endpoint uses — a model
 and a port, under one name, built under PROFILES ▸ CONNECTION.
 
@@ -7485,7 +7795,7 @@ function routePerm(r){
   /* ALL FOUR LISTS. It carried three, and paintAuthzs has been writing a
      fourth since a key became grantable — so anything asking this helper
      "may that embed use this endpoint" was reading an answer the profile
-     does not give. Nothing asked until the register under ACCESS ▸ SITES
+     does not give. Nothing asked until the register under EndPoints ▸ SITES
      did. */
   return {perm: p, authn: an, authz: az,
           needs_signin: !!a.needs_signin,
@@ -7887,7 +8197,7 @@ function blockFillWho(blk, r){
     /* APPROVED ONLY, the same rule as the people above. A screen that has not
        been approved is one nobody has decided should be here yet, and it is
        refused whatever this list says — so offering it made a tick that could
-       not do anything and looked like it had. Approve it under ACCESS and it
+       not do anything and looked like it had. Approve it under EndPoints and it
        appears. One already ticked stays visible, so a grant is never taken
        away by a list quietly dropping it. */
     const screens = DISPLAYS.filter(d=> d.approved || want.indexOf(d.id) >= 0);
@@ -7905,7 +8215,7 @@ function blockFillWho(blk, r){
       const em = document.createElement('span');
       em.textContent = DISPLAYS.length
         ? 'no approved screens yet — one appears here once it is approved '
-          + 'under ACCESS ▸ NODES'
+          + 'under EndPoints ▸ NODES'
         : 'no displays have loaded the page yet';
       box.appendChild(em);
     }
@@ -9031,14 +9341,31 @@ async function refreshIdentities(){
       const j = await idAction('/identities/endpoints',
                                {id: p.id, endpoints: want});
       if (!j){ gnote.className = 'note bad'; gnote.textContent = ''; return; }
-      /* The record this row was drawn from, brought up to date — so REVERT
-         goes back to what was just saved rather than to what the page was
-         opened with. The list is NOT rebuilt: that would throw away the row
-         somebody has open and this message with it. */
-      p.granted = want;
-      gnote.textContent = want.length
-        ? 'saved — ' + want.length + (want.length === 1 ? ' endpoint' : ' endpoints')
-        : 'saved — nothing granted, so only what is open to everyone';
+      /* WHAT THE SERVER ACTUALLY GRANTED, not what was asked for. An
+         authorize profile is the grant and can be named by more than one
+         endpoint, so ticking one grants every endpoint sharing its rule — the
+         server has returned the resulting set for exactly this reason and the
+         panel wrote back `want`, so an admin who ticked one endpoint was told
+         one and found two the next time the page was loaded.
+
+         The record this row was drawn from is brought up to date with it — so
+         REVERT goes back to what was just saved rather than to what the page
+         was opened with. The list is NOT rebuilt: that would throw away the
+         row somebody has open and this message with it. */
+      const got = Array.isArray(j.granted) ? j.granted : want;
+      p.granted = got;
+      gl.ticks.forEach(c=>{ c.checked = got.indexOf(c.dataset.r) >= 0; });
+      const extra = got.filter(r=> want.indexOf(r) < 0);
+      const named = extra.map(r=> ((RT.routes || [])
+                     .filter(x=> x.id === r)[0] || {}).name || r);
+      gnote.textContent = (got.length
+        ? 'saved — ' + got.length + (got.length === 1 ? ' endpoint' : ' endpoints')
+        : 'saved — nothing granted, so only what is open to everyone')
+        + (named.length
+           ? ' \u00b7 ' + named.join(', ') + (named.length === 1 ? ' came' : ' came')
+             + ' with it: same authorize profile, so the grant is one rule and '
+             + 'reaches both'
+           : '');
     };
     acts.appendChild(gsave);
     const gundo = document.createElement('button');
@@ -9947,6 +10274,7 @@ function paintDpSettings(){
   $('dp_max').value = DPCFG.max_displays;
   $('dp_pending').value = DPCFG.max_pending;
   $('dp_codemins').value = DPCFG.code_minutes;
+  if ($('dp_setupmins')) $('dp_setupmins').value = DPCFG.setup_minutes;
   paintDpForm(DPCFG.form || []);
   PROFILE_KINDS.forEach(k=> paintProfiles(k, DPCFG[k.key] || []));
   paintSavers(DPCFG.savers || []);
@@ -9963,7 +10291,7 @@ function paintDpSettings(){
 /* The two profile lists live on their own tab now, and they are painted from
    the same document the device register loads. So opening PROFILES has to
    fetch it as well, or both lists sit empty until somebody happens to visit
-   ACCESS first and fills them in as a side effect. Lighter than
+   EndPoints first and fills them in as a side effect. Lighter than
    refreshDisplays on purpose: there is no register to sort or draw here, and
    the fields it paints that belong to other tabs are hidden rather than
    absent, so writing to them costs nothing and keeps the two tabs describing
@@ -10097,7 +10425,12 @@ async function saveDp(body, slot){
        next opened, where it would be showing a name that no longer exists. */
     if (RT.routes.length) paintBlocks();
     dpNote('saved', false, slot);
-  }catch(e){ dpNote(e.message, true, slot); }
+    /* WHETHER IT WORKED, for callers that have something to do about it. It
+       returned nothing either way, so a row could clear its own draft state on
+       a save the server had refused — see the network profile's SAVE. Every
+       other caller ignores this and is unaffected. */
+    return true;
+  }catch(e){ dpNote(e.message, true, slot); return false; }
 }
 
 $('b_addfield').addEventListener('click', ()=>{
@@ -10119,20 +10452,14 @@ $('b_dpsave').addEventListener('click', ()=>{
   }, 'dpnote');
 });
 
-$('b_formrevert').addEventListener('click', ()=>{
-  paintDpForm((DPCFG && DPCFG.form) || []);
-  dpNote('back to what is saved', false, 'formnote');
-});
-$('b_formsave').addEventListener('click', ()=>{
-  saveDp({form: DPFORM.filter(f=> (f.label || '').trim())}, 'formnote');
-});
+/* The form's own SAVE and REVERT went to the tab's pair at the foot. It is
+   the one section here whose state is not in a field — DPFORM is an array
+   this page keeps — so it is collected explicitly there rather than read off
+   the DOM. */
 
-/* SETTINGS ▸ ENROLL ▸ Enroll Time Limit, which used to be committed by the AI
-   Requires Permission SAVE on SECURITY. Its own button now that it is on
-   another tab — the same reason the mail settings have theirs. */
-$('b_codesave').addEventListener('click', ()=>{
-  saveDp({code_minutes: parseInt($('dp_codemins').value, 10)}, 'codenote');
-});
+/* Both halves of Enroll Time Limit go out with the tab's SAVE. They had a
+   button each for as long as they were the only thing on the tab written to
+   the shared document; they are two of seven now. */
 
 /* ---- the model profiles ----
    The connection, under a name. Same row, same caret, same one-open-at-a-time
@@ -10367,7 +10694,11 @@ function paintModels(list){
        profile that has gone falls back to `demo`, visibly, rather than being
        moved onto somebody else's credential. */
     del.onclick = ()=>{
-      OPENMD = -1; DPMODELS.splice(i, 1); paintModels(DPMODELS);
+      OPENMD = -1;
+      removeProfileRow(()=> DPMODELS, m, ()=> paintModels(DPMODELS), ()=>
+        saveDp({models: DPMODELS.filter(x=> (x.name || '').trim())
+                  .map(x=> ({id:x.id, name:x.name, values:x.values}))},
+               'modelnote'));
     };
     acts.appendChild(del);
     row.appendChild(acts);
@@ -10432,7 +10763,35 @@ function profShell(box, arr, i, rec, openIdx, setOpen, summary, repaint){
   return {row: row, retitle: retitle};
 }
 
-function profFoot(row, arr, i, rec, setOpen, repaint, save, canRemove){
+/* WHAT REMOVE MEANS, for every profile list on this panel. It is the document
+   the row came out of that has to change; splicing this page's array and
+   repainting only makes the row look gone until the next load brings it back.
+   Six lists had that bug, each written out separately, which is how it was
+   fixed three times and still had three left. It is one rule now and every
+   REMOVE calls it.
+
+   A row nobody has saved yet is the one case with nothing to send: it exists
+   only here, so removing it locally IS removing it. */
+function removeProfileRow(getArr, rec, repaint, save){
+  /* THE LIVE ARRAY, AND THE ROW BY IDENTITY — not the array this row was
+     painted from, and not its index. Every painter REASSIGNS its global on
+     each repaint, and a repaint happens whenever the tab loads or anything
+     saves. So a row built a moment ago holds a different array object than the
+     one the save reads: splicing the old one changed nothing the save could
+     see, the unchanged list was posted, and the panel said "saved" with the
+     row still there. Index is no safer — a repaint renumbers.
+
+     Falls back to the object itself for a row that has no id yet. */
+  const wasNew = !!(rec && rec._new);
+  const arr = getArr() || [];
+  const j = arr.findIndex(x=> x === rec
+                           || (rec && rec.id && x && x.id === rec.id));
+  if (j >= 0) arr.splice(j, 1);
+  if (wasNew){ repaint(); return; }
+  save();
+}
+
+function profFoot(row, getArr, i, rec, setOpen, repaint, save, canRemove){
   const acts = document.createElement('div'); acts.className = 'acts';
   const gap = document.createElement('span'); gap.className = 'spacer';
   acts.appendChild(gap);
@@ -10443,7 +10802,12 @@ function profFoot(row, arr, i, rec, setOpen, repaint, save, canRemove){
   const del = document.createElement('button');
   del.textContent = 'REMOVE'; del.className = 'act-danger';
   const why = canRemove ? '' : canRemove;
-  del.onclick = ()=>{ setOpen(-1); arr.splice(i, 1); repaint(); };
+  /* REMOVED FROM THE DOCUMENT, not from this array. Every one of these lists
+     spliced locally and repainted, so the row vanished, nothing was sent, and
+     the next load brought it straight back — a destructive-looking button that
+     destroyed nothing. `save` is already in scope; it was simply never called.
+     A row nobody has saved yet is the one case with nothing to send. */
+  del.onclick = ()=>{ setOpen(-1); removeProfileRow(getArr, rec, repaint, save); };
   acts.appendChild(del);
   row.appendChild(acts);
 }
@@ -10493,7 +10857,7 @@ function paintAuthns(list){
                   + 'hold one open.';
     sh.row.appendChild(n);
 
-    profFoot(sh.row, DPAUTHNS, i, a, x=>{OPENAN=x;},
+    profFoot(sh.row, ()=> DPAUTHNS, i, a, x=>{OPENAN=x;},
              ()=> paintAuthns(DPAUTHNS),
              ()=> saveDp({authns: DPAUTHNS.filter(x=> (x.name||'').trim())
                     .map(x=> ({id:x.id, name:x.name, values:x.values}))},
@@ -10593,7 +10957,7 @@ function paintAuthzs(list){
         });
       });
     }
-    profFoot(sh.row, DPAUTHZS, i, a, x=>{OPENAZ=x;},
+    profFoot(sh.row, ()=> DPAUTHZS, i, a, x=>{OPENAZ=x;},
              ()=> paintAuthzs(DPAUTHZS),
              ()=> saveDp({authzs: DPAUTHZS.filter(x=> (x.name||'').trim())
                     .map(x=> ({id:x.id, name:x.name,
@@ -10695,7 +11059,7 @@ function paintPerms(list){
       w.className = 'note bad'; w.textContent = bits.join(' · ');
       sh.row.appendChild(w);
     }
-    profFoot(sh.row, DPPERMS, i, p, x=>{OPENPM=x;},
+    profFoot(sh.row, ()=> DPPERMS, i, p, x=>{OPENPM=x;},
              ()=> paintPerms(DPPERMS),
              ()=>{
                if (!v.authn || !v.authz)
@@ -10730,9 +11094,9 @@ if (bAddPerm) bAddPerm.addEventListener('click', ()=>{
 let DPCONNS = [], OPENCN = -1;
 
 function paintConns(list){
-  DPCONNS = (list || []).map(c=> ({id: c.id || '', _new: !!c._new,
-                                   name: c.name || '',
-                                   values: Object.assign({}, c.values || {})}));
+  /* The same rule as the networks above: a connection somebody is halfway
+     through is not the document's to discard. */
+  DPCONNS = keepDrafts(list, DPCONNS);
   const box = $('dp_conns');
   if (!box) return;
   box.innerHTML = '';
@@ -10843,7 +11207,22 @@ function paintConns(list){
     acts.appendChild(save);
     const del = document.createElement('button');
     del.textContent = 'REMOVE'; del.className = 'act-danger';
-    del.onclick = ()=>{ OPENCN = -1; DPCONNS.splice(i, 1); paintConns(DPCONNS); };
+    /* REMOVED FROM THE DOCUMENT, not from this array. It spliced the local
+       list and repainted, so the row vanished, nothing was sent, and the next
+       load brought it back — a destructive-looking button that destroyed
+       nothing. A row nobody has saved yet is the one case with nothing to
+       send: that one is local by definition. */
+    del.onclick = ()=>{
+      OPENCN = -1;
+      removeProfileRow(()=> DPCONNS, c, ()=> paintConns(DPCONNS), ()=>
+        saveDp({connections: DPCONNS.filter(x=> (x.name || '').trim()
+                                                && x.values.model
+                                                && x.values.network)
+                  .map(x=> ({id: x.id, name: x.name,
+                             values: {model: x.values.model,
+                                      network: x.values.network}}))},
+               'connnote'));
+    };
     acts.appendChild(del);
     row.appendChild(acts);
     box.appendChild(row);
@@ -10865,10 +11244,31 @@ if (bAddConn) bAddConn.addEventListener('click', ()=>{
   paintConns(DPCONNS);
 });
 
+/* WHAT THE SERVER SENT, PLUS WHAT SOMEBODY IS STILL TYPING. A row that has
+   never been saved exists only in this page's array, and every repaint rebuilt
+   that array from the document — so opening another tab, which fetches and
+   repaints, threw the half-made profile away without a word. The next screen
+   then showed a picker with no such profile in it, which reads as the picker
+   being broken rather than as the row having been discarded.
+
+   Kept BY ID, because the recursive repaints — every tick and every keystroke
+   calls the painter with its own array — would otherwise stack a draft on top
+   of itself. */
+function keepDrafts(list, held){
+  const out = (list || []).map(x=> ({id: x.id || '', _new: !!x._new,
+                                     name: x.name || '',
+                                     values: Object.assign({}, x.values || {})}));
+  const have = new Set(out.map(x=> x.id));
+  (held || []).forEach(x=>{
+    if (x && x._new && !have.has(x.id))
+      out.push({id: x.id, _new: true, name: x.name || '',
+                values: Object.assign({}, x.values || {})});
+  });
+  return out;
+}
+
 function paintNetworks(list){
-  DPNETS = (list || []).map(n=> ({id: n.id || '', _new: !!n._new,
-                                  name: n.name || '',
-                                  values: Object.assign({}, n.values || {})}));
+  DPNETS = keepDrafts(list, DPNETS);
   const box = $('dp_networks');
   if (!box) return;
   box.innerHTML = '';
@@ -10970,6 +11370,35 @@ function paintNetworks(list){
     ip.onchange = ()=>{ v.address = ip.value; retitle(); };
     field('IP address', ip);
 
+    /* WHAT TO CALL IT IN A LINK, which is not what it binds to. The address
+       above is a binding and was going straight into every URL built from this
+       profile — the code a screen is enrolled at, the assistants a person is
+       sent to after choosing a password, the one a screen is redirected to
+       once its code is spent. Bind by IP, which is the ordinary way to bind,
+       and everybody was handed an IP and a port. Optional, and a name rather
+       than a second binding: the listener answers on the address above
+       whatever this says. */
+    const hn = document.createElement('input');
+    hn.type = 'text'; hn.className = 'nmedit';
+    hn.spellcheck = false; hn.autocapitalize = 'none';
+    hn.value = v.host || ''; hn.placeholder = 'ai.example.com — optional';
+    hn.oninput = ()=>{ v.host = hn.value; retitle(); };
+    field('Address in links', hn);
+
+    /* AND WHICH PORT THAT NAME IS REACHED ON, which is not the port above.
+       Behind a reverse proxy they are different by definition — the listener
+       answers on its own port and the world arrives at the name on 443 — so a
+       link built out of the bind port sends people past the proxy to a port
+       the firewall may not publish. Blank is NONE, the scheme's own, which is
+       the ordinary answer behind a proxy and the same rule the embed address
+       follows with its own port box. Read only where a name is set. */
+    const lp = document.createElement('input');
+    lp.type = 'number'; lp.className = 'nmedit portedit';
+    lp.min = 1; lp.max = 65535; lp.inputMode = 'numeric';
+    lp.value = v.link_port || ''; lp.placeholder = 'none';
+    lp.oninput = ()=>{ v.link_port = lp.value; };
+    field('Port in links', lp);
+
     const pt = document.createElement('input');
     pt.type = 'number'; pt.className = 'nmedit portedit';
     pt.min = 1024; pt.max = 65535; pt.inputMode = 'numeric';
@@ -11003,25 +11432,44 @@ function paintNetworks(list){
 
     const save = document.createElement('button');
     save.textContent = 'SAVE'; save.className = 'act-save';
-    save.onclick = ()=>{
+    save.onclick = async ()=>{
+      /* THIS ROW, NOT THE LIST. It asked whether ANY row had a name, which on
+         a server with four saved profiles is always yes — so pressing SAVE on
+         a nameless or portless draft passed the check, dropped that row out of
+         the payload, sent the four that were already stored, and reported
+         "saved". A 200, an unchanged document, and the row gone at the next
+         repaint. The connection editor next door has always asked about its
+         own row; this is the same question in the server's own words. */
+      const nm = (n.name || '').trim();
+      if (!nm)
+        return dpNote('this profile needs a name before it can be saved',
+                      true, 'networknote');
+      if (!String(v.port == null ? '' : v.port).trim())
+        return dpNote(nm + ': give it a port number', true, 'networknote');
       const keep = DPNETS.filter(x=> (x.name || '').trim());
-      if (!keep.length){
-        dpNote('a profile needs a name before it can be saved', true,
-               'networknote');
-        return;
-      }
-      n._new = false; OPENNW = -1;
       /* THE ADDRESS TRAVELS TOO. It never has: the IP address picker wrote
          `v.address`, the summary line read it back, and the save quietly left
          it out of the payload — so choosing an interface looked like it took,
          survived a repaint from local state, and was gone the moment the
          document was re-read from the server. A control writing to something
          nothing sends is the same fault as one nothing reads. */
-      saveDp({networks: keep.map(x=> ({id:x.id, name:x.name,
+      const ok = await saveDp({networks: keep.map(x=> ({id:x.id, name:x.name,
                 values:{address: String(x.values.address || ''),
+                        /* Sent even when empty, which is how the name comes
+                           back off and links go to naming the address again —
+                           the same rule both enrolment doors follow. */
+                        host: String(x.values.host || '').trim(),
+                        link_port: String(x.values.link_port || '').trim(),
                         port: parseInt(x.values.port, 10),
                         redirect: parseInt(x.values.redirect, 10) || 0,
                         }}))}, 'networknote');
+      /* CLEARED ONLY ON SUCCESS, and it was cleared before the request went.
+         A refused save left the row neither stored nor a draft any more, so
+         the next repaint — anyone's — dropped it with the reason still on
+         screen. It stays open and stays a draft until the server has it. */
+      if (!ok) return;
+      n._new = false; OPENNW = -1;
+      paintNetworks((DPCFG && DPCFG.networks) || []);
     };
     acts.appendChild(save);
 
@@ -11034,8 +11482,19 @@ function paintNetworks(list){
     const on = (RT.routes || []).filter(r=> r.network === n.id)[0];
     if (on){ del.disabled = true;
       del.title = on.name + ' answers on this port — point it elsewhere first'; }
+    /* Same rule as the connection rows: a saved profile is removed from the
+       DOCUMENT, or the next load brings it back. */
     else del.onclick = ()=>{
-      OPENNW = -1; DPNETS.splice(i, 1); paintNetworks(DPNETS);
+      OPENNW = -1;
+      removeProfileRow(()=> DPNETS, n, ()=> paintNetworks(DPNETS), ()=>
+        saveDp({networks: DPNETS.filter(x=> (x.name || '').trim())
+                  .map(x=> ({id:x.id, name:x.name,
+                             values:{address: String(x.values.address || ''),
+                                     host: String(x.values.host || '').trim(),
+                                     link_port: String(x.values.link_port || '').trim(),
+                                     port: parseInt(x.values.port, 10),
+                                     redirect: parseInt(x.values.redirect, 10) || 0,
+                                     }}))}, 'networknote'));
     };
     acts.appendChild(del);
     row.appendChild(acts);
@@ -11617,8 +12076,9 @@ function paintSavers(list){
       // open row is still pointing at what it was found under.
       stopSaverPreview();
       OPENSV = -1;
-      DPSAVERS.splice(i, 1);
-      paintSavers(DPSAVERS);
+      removeProfileRow(()=> DPSAVERS, s, ()=> paintSavers(DPSAVERS), ()=>
+        saveDp({savers: DPSAVERS.filter(x=> (x.name || '').trim())},
+               'savernote'));
     };
     acts.appendChild(del);
     row.appendChild(acts);
@@ -11645,6 +12105,23 @@ function paintSavers(list){
    once still reaches every kiosk using it. */
 let DPKIOSKS = [];
 let OPENKI = -1;
+
+/* THE LIST AS THE SERVER TAKES IT. Written once because it is written out in
+   three places already — clean_kiosks on the server, paintKiosks for the
+   editor, and this — and a field added to some of them is a control that
+   ticks, posts once and comes back off. SAVE and REMOVE both send this. */
+function saveKiosks(){
+  saveDp({kiosks: DPKIOSKS.filter(x=> (x.name || '').trim())
+            .map(x=> ({id:x.id, name:x.name, voice_only:x.voice_only,
+                       look:x.look, motion:x.motion, speech:x.speech,
+                       saver:x.saver, fullscreen:x.fullscreen,
+                       keep_awake:x.keep_awake, listen:x.listen,
+                       wakeword:x.wakeword, wakealiases:x.wakealiases,
+                       sleepword:x.sleepword, sleepaliases:x.sleepaliases,
+                       clock:x.clock,
+                       prompt:x.prompt, prompt_text:x.prompt_text}))},
+         'kiosknote');
+}
 
 function paintKiosks(list){
   DPKIOSKS = (list || []).map(k=> ({id: k.id || '', _new: !!k._new,
@@ -11864,23 +12341,7 @@ function paintKiosks(list){
       }
       k._new = false;
       OPENKI = -1;
-      saveDp({kiosks: keep.map(x=> ({id:x.id, name:x.name, voice_only:x.voice_only,
-                                     look:x.look, motion:x.motion, speech:x.speech,
-                                     saver:x.saver, fullscreen:x.fullscreen,
-                                     keep_awake:x.keep_awake, listen:x.listen,
-                                     wakeword:x.wakeword,
-                                     wakealiases:x.wakealiases,
-                                     sleepword:x.sleepword,
-                                     sleepaliases:x.sleepaliases,
-                                     /* THE THIRD PLACE THIS LIST IS WRITTEN
-                                        OUT — clean_kiosks on the server,
-                                        paintKiosks above, and here. A field
-                                        added to two of the three is a control
-                                        that ticks, posts once and comes back
-                                        off. */
-                                     clock:x.clock,
-                                     prompt:x.prompt, prompt_text:x.prompt_text}))},
-             'kiosknote');
+      saveKiosks();
     };
     acts.appendChild(save);
 
@@ -11891,8 +12352,7 @@ function paintKiosks(list){
       // Removing renumbers everything after it, so the open row is no longer
       // the one it was found under.
       OPENKI = -1;
-      DPKIOSKS.splice(i, 1);
-      paintKiosks(DPKIOSKS);
+      removeProfileRow(()=> DPKIOSKS, k, ()=> paintKiosks(DPKIOSKS), saveKiosks);
     };
     acts.appendChild(del);
     row.appendChild(acts);
@@ -12064,7 +12524,7 @@ function kioskBlock(d){
      which is one question with two answers — a port carries one endpoint, an
      endpoint names one layout, and a page is loaded from exactly one address,
      so the second place to state it could only ever disagree with the first.
-     Which layout a screen wears is read at ACCESS ▸ AI, on the endpoint, and
+     Which layout a screen wears is read at EndPoints ▸ AI, on the endpoint, and
      changing it there changes every screen on that port at once. */
 
   /* Which assistants it may use, ticked here as well as at the moment a code
@@ -12591,7 +13051,7 @@ async function refreshDisplays(){
               + 'endpoint that names it are kept.'))
           /* No box needed here: displayAction opens the row it just changed,
              and a row in this state draws the whole address and code across
-             it with the minutes left beside them. The box on ACCESS exists
+             it with the minutes left beside them. The box on EndPoints exists
              because the button there is on a different tab from this list. */
           displayAction('/displays/reissue', {id: d.id});
       };
@@ -12926,7 +13386,7 @@ function paintPersonEndpoint(){
   if (!(DPEND || []).length){
     const none = document.createElement('div');
     none.className = 'note';
-    none.textContent = 'No endpoints configured yet — ACCESS ▸ AI.';
+    none.textContent = 'No endpoints configured yet — EndPoints ▸ AI.';
     box.appendChild(none);
     return;
   }
@@ -12960,7 +13420,7 @@ function paintNewSetup(){
   if (!(DPEND || []).length){
     const none = document.createElement('div');
     none.className = 'note';
-    none.textContent = 'No endpoints configured yet — ACCESS ▸ AI.';
+    none.textContent = 'No endpoints configured yet — EndPoints ▸ AI.';
     ends.appendChild(none);
     return;
   }
@@ -13042,9 +13502,14 @@ $('dp_name').addEventListener('keydown', e=>{
      so for them an unrestricted endpoint is open to anyone who has, and a
      restricted one is worth ticking.
 
-   Read from the endpoint list on every repaint, so a change made on ACCESS ▸ AI
+   Read from the endpoint list on every repaint, so a change made on EndPoints ▸ AI
    is described correctly the next time either of these lists is drawn. */
 function grantNote(e, kind){
+  /* NAMING NO PERMISSION IS REFUSED, NOT OPEN. It is the strict answer on the
+     server — see route_perm — so a tick here reaches nothing at all, and any
+     of the three notes below would be describing a door that does not open. */
+  if (e.no_permission)
+    return ' \u2014 no permission set, so it refuses everybody';
   if (e.restricted) return '';
   /* Unrestricted, so the tick is worth nothing either way — but to WHOM it is
      open still differs, and differently for each population. Sign-in required
@@ -13153,7 +13618,7 @@ function decide(d, name, row){
    is not the tab anybody pressing APPROVE is looking at. */
 function dispNoteEl(){
   return $({displays: 'asknote', enrol: 'dispnote',
-            devices: 'connnote'}[CURRENT_TAB] || 'dispnote') || $('dispnote');
+            devices: 'devicesnote'}[CURRENT_TAB] || 'dispnote') || $('dispnote');
 }
 
 async function displayAction(path, body, said){
@@ -13906,7 +14371,7 @@ async function refreshEmbeds(){
         ['Reaches', (()=>{
           const rs = siteRoutes(e.id);
           if (!(RT.routes || []).length)
-            return 'no endpoints configured yet \u2014 ACCESS \u25b8 AI';
+            return 'no endpoints configured yet \u2014 EndPoints \u25b8 AI';
           if (rs.length) return rs.map(r=> r.name || 'unnamed').join(', ');
           return 'nothing \u2014 no endpoint\u2019s permission admits this key, '
                + 'so every question is refused. Tick it on an authorize '
@@ -13955,6 +14420,13 @@ async function refreshEmbeds(){
          same SAVE and go out with it. */
       let extraDirty = false;
       const markDirty = ()=>{ extraDirty = true; if (editor.after) editor.after(); };
+      /* …AND THE WAY BACK. The two sections below were bolted onto the row's
+         SAVE through extraDirty and never onto its REVERT, so throwing an
+         edit away restored the fields and left every tick where it had been
+         put — with SAVE still lit over them, so the next press committed the
+         change that had just been discarded. Filled in once those sections
+         exist; a row is drawn before they are. */
+      let revertExtras = ()=>{};
       /* THE ASSISTANT PICKER, BOUND DIRECTLY. It is a field of the key like
          any other and the editor's own listener should light SAVE for it —
          it did not, reported and reproduced, and a select that cannot be
@@ -14151,9 +14623,17 @@ async function refreshEmbeds(){
       const undo = document.createElement('button');
       undo.textContent = 'REVERT';
       undo.className = 'act-undo';    // throws away an edit not yet committed
-      undo.onclick = ()=>{ editor.fill();
-                           const n = $('sitenote');
-                           if (n){ n.className = 'note'; n.textContent = ''; } };
+      undo.onclick = ()=>{
+        editor.fill();
+        /* The ticks and the spec address as well, and extraDirty cleared with
+           them — REVERT means the row says what the server says, not the
+           fields only. */
+        revertExtras();
+        extraDirty = false;
+        editor.after();
+        const n = $('sitenote');
+        if (n){ n.className = 'note'; n.textContent = ''; }
+      };
       const save = document.createElement('button');
       save.textContent = 'SAVE';
       save.className = 'act-save';
@@ -14276,6 +14756,10 @@ async function refreshEmbeds(){
         const j = await api('/embeds/reach',
                             {method:'POST',
                              body: JSON.stringify({id: e.id, endpoints: want})});
+        /* The row's own copy moves with it. It is what REVERT paints back to,
+           and a baseline left at what the register held when it loaded would
+           undo a save that had already happened. */
+        e.reach = j.reach;
         paintReach(j.reach);
         reachSum();
         return (j.changed || []).concat(j.shared || []);
@@ -14379,6 +14863,10 @@ async function refreshEmbeds(){
         const j = await api('/embeds/ops',
                             {method:'POST',
                              body: JSON.stringify({id: e.id, ops: want})});
+        /* The ticks only — `j.ops` is a list of names and `e.ops` is the
+           ceiling as objects, so this moves the flags rather than the list. */
+        const nowOn = new Set(j.ops || []);
+        (e.ops || []).forEach(o=> o.on = nowOn.has(o.op));
         opsSum();
         return [j.ops.length + ' operation' + (j.ops.length === 1 ? '' : 's')
                 + ' enabled'].concat(
@@ -14398,6 +14886,84 @@ async function refreshEmbeds(){
       };
       opsSum();
       opbox.addEventListener('change', opsSum);
+
+      /* AND THE BUTTON THAT READS IT. It was built, labelled and appended,
+         and nothing was ever bound to it — so /embeds/spec, which the server
+         has answered since the day it was written, was a route the panel
+         never called. Pressing READ SPEC did nothing at all, and a control
+         that does nothing reads as an application declaring no operations
+         rather than as a control nobody wired.
+
+         Its own button rather than the row's SAVE, deliberately: this reads
+         somebody else's server and rewrites the ceiling under the ticks, and
+         a rename should not have to wait on their document being up. */
+      sread.type = 'button';
+      sread.onclick = async ()=>{
+        const label = sread.textContent;
+        sread.disabled = true;
+        sread.textContent = 'READING…';
+        sn.className = 'note';
+        sn.textContent = 'reading ' + (surl.value.trim() || 'their spec')
+                       + ' — and the grant file beside it';
+        try{
+          const j = await api('/embeds/spec',
+                              {method:'POST',
+                               body: JSON.stringify({id: e.id,
+                                                     url: surl.value.trim()})});
+          /* Written back onto the row's own record, not just drawn. The
+             register is painted from this list, and a row that redrew for any
+             other reason would otherwise go back to saying no spec had ever
+             been read. */
+          e.spec_url    = j.spec_url;
+          e.ops         = j.ops;
+          e.spec_fetched = Math.floor(Date.now() / 1000);
+          e.grant_seen  = j.grant_seen;
+          e.grant_note  = j.grant_note;
+          e.spec_note   = j.note;
+          e.ops_dropped = j.dropped || [];
+          /* The server resolves a path against this site's own origin, so the
+             field should show what was actually read rather than the three
+             characters that were typed. */
+          if (j.spec_url) surl.value = j.spec_url;
+          paintState(e);
+          paintOps(j.ops, '');
+          opsSum();
+        }catch(err){
+          /* In the state line, where every other fact about their document
+             is. A 502 here is their server being unreachable from THIS one,
+             which is the ordinary case for an application on a private
+             network and is worth reading as their address rather than as a
+             fault in the key. */
+          sn.className = 'note bad';
+          sn.textContent = err.message;
+        }finally{
+          sread.disabled = false;
+          sread.textContent = label;
+        }
+      };
+
+      /* THE ADDRESS IS NOT A FIELD OF THE KEY. SAVE writes the envelope and
+         has never sent this, so lighting it here would be a control promising
+         to keep something nothing stores — the row said nothing at all
+         instead, which is the same promise made quietly. READ SPEC is what
+         commits it, and typing now says so. */
+      surl.addEventListener('input', ()=>{
+        sn.className = 'note';
+        sn.textContent = 'press READ SPEC to read this address — SAVE writes '
+                       + 'the envelope above and does not commit it.';
+      });
+
+      /* WHAT REVERT PUTS BACK, now that there is something to put back. Both
+         sections and the address, from the row's own record — which is what
+         the server last said, kept in step by the two saves above. */
+      revertExtras = ()=>{
+        paintReach(e.reach);
+        reachSum();
+        paintState(e);
+        paintOps(e.ops, '');
+        opsSum();
+        surl.value = e.spec_url || '';
+      };
 
       const hn = document.createElement('div');
       hn.className = 'note help';
@@ -14434,7 +15000,7 @@ function emDraft(on){
     /* The LAST key's code goes with the draft opening — two keys' worth of
        snippets on one screen is a way to send somebody the wrong one.
 
-       The register closes with it. It is on ACCESS ▸ SITES now rather than
+       The register closes with it. It is on EndPoints ▸ SITES now rather than
        underneath this form, so it is no longer a second subject on the screen
        you are looking at — but a row left open there from before you came here
        is a state nobody chose, and the walk over to read the new key should
@@ -14443,7 +15009,24 @@ function emDraft(on){
     const k = $('em_key'); if (k){ k.textContent = ''; k.classList.remove('on'); }
     const kw = $('em_keywrap'); if (kw) kw.hidden = true;
     emShowSnippets(null);
+    /* THE ASSISTANTS, WHICH MAY NOT HAVE ARRIVED YET. EMENDPOINTS is filled
+       by refreshEmbeds, and refreshEmbeds runs on EndPoints ▸ SITES — so opening
+       this tab first and pressing ADD drew the picker holding nothing but
+       "whatever the address carries", which reads as a server with no
+       assistants on it rather than as a list that had not been asked for. The
+       register guards its own picker exactly this way and has since the same
+       fault was found there; the draft was never given the same guard.
+
+       Drawn at once and again when they land, so the control is never empty
+       and whatever was chosen in between survives the second fill. */
     fillEndpoints($('em_endpoint'), '');
+    if (!EMENDPOINTS.length && !(RT.routes || []).length)
+      api('/routes/all').then(r=>{
+        RT.routes = r.routes || [];
+        RT.default = r.default || '';
+        const sel = $('em_endpoint');
+        if (sel) fillEndpoints(sel, sel.value || '');
+      }).catch(()=>{});
     const box = $('emblist');
     if (box) box.querySelectorAll('.erow').forEach(x=> x.classList.add('shut'));
     const nm = $('em_name');
@@ -14454,7 +15037,7 @@ function emDraft(on){
 
 async function embedAction(path, body){
   /* On the tab the buttons are on. Both callers are a row in the register
-     under ACCESS ▸ SITES, and #embnote is over on ENROLLMENTS ▸ EMBED —
+     under EndPoints ▸ SITES, and #embnote is over on ENROLLMENTS ▸ EMBED —
      the fault the bulk bar's note on NODES was moved to fix, which is a
      result written to a page nobody pressing the button can see. */
   const note = $('sitenote');
@@ -14569,11 +15152,11 @@ document.querySelectorAll('.snip').forEach(el=>{
 });
 
 /* ---- the address the snippets are written against ----
-   Its own save rather than saveAppBit, because that one reports on the whole
-   document's pending restarts — and this field owes none. An admin who has a
-   port change waiting would otherwise be told a restart is needed for typing
-   in a hostname, which is both untrue and the kind of untrue that gets a
-   server bounced in the middle of the afternoon. */
+   It had a save of its own, on the reasoning that saveAppBit reports the whole
+   document's pending restarts and this field owes none. True, and it is
+   answered a different way now: the tab commits once and the pending line
+   names which setting is actually waiting, so a hostname no longer reads as a
+   reason to bounce the server. */
 /* SAID WHERE THE CHOICE IS MADE, not discovered afterwards by an integrator
    whose microphone never opens. It is a warning and not a refusal — the
    constraint is the browser's — so it reports and leaves the choice alone. */
@@ -14589,23 +15172,9 @@ if (embSch) embSch.addEventListener('change', ()=>{
   } else { note.className = 'note'; note.textContent = ''; }
 });
 
-$('b_embedhost').addEventListener('click', async ()=>{
-  const note = $('ehnote');
-  note.className = 'note';
-  note.textContent = 'saving…';
-  try{
-    /* Sent even when empty, which is how the name is taken back off — the
-       same rule the enrolment host follows. */
-    await api('/app', {method:'POST', body: JSON.stringify(
-      {embed_scheme: $('ap_embedscheme').value,
-       embed_host: $('ap_embedhost').value.trim(),
-       embed_port: $('ap_embedport').value.trim()})});
-    note.textContent = $('ap_embedhost').value.trim()
-      ? 'saved — new keys will be written against this address'
-      : 'cleared — the code below will say YOUR-RESONANCE-HOST';
-    loadApp();
-  }catch(e){ note.className = 'note bad'; note.textContent = e.message; }
-});
+/* The embed address goes out with the tab's SAVE as well — see
+   enrolAppBody. It is still sent when empty, which is how the name comes back
+   off and the code below goes to saying YOUR-RESONANCE-HOST. */
 
 $('b_addembed').addEventListener('click', async ()=>{
   if (!emCheck()) return;
@@ -14633,7 +15202,7 @@ $('b_addembed').addEventListener('click', async ()=>{
                      + ((j.snippets && !j.snippets.base)
                         ? ' No address is set above, so the code below says '
                           + 'YOUR-RESONANCE-HOST — set one and the code on this '
-                          + 'key\u2019s row under ACCESS \u25b8 SITES is written '
+                          + 'key\u2019s row under EndPoints \u25b8 SITES is written '
                           + 'against it, rather than editing it in by hand.'
                         : '');
     $('em_name').value = ''; $('em_origins').value = '';
@@ -15147,6 +15716,13 @@ function panelNav(){
     const ar = $('approw');
     if (ar) ar.classList.toggle('on',
       tab === 'app' && !(findEl.value || '').trim() && !!ME && ME.role === 'admin');
+    /* ENROLL's, on the same terms. Its sections lost their own buttons to it,
+       so a filtered view must not show it either: what it saves is the whole
+       tab, and a filter is showing part of several. */
+    const er = $('enrolrow');
+    if (er) er.classList.toggle('on',
+      tab === 'enrolcfg' && !(findEl.value || '').trim()
+      && !!ME && ME.role === 'admin');
     /* ADD INSTANCE is not inside any block, because it makes one — it has to
        stay reachable whichever block happens to be open, or the only way to
        add a second endpoint is to first collapse the first. */

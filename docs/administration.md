@@ -72,7 +72,7 @@ you are on, running down it in the colour a selected link wears — so closing
 the menu never costs you the answer to *where am I* either.
 
 **Every label is shaded from the display's own palette**, a colour per subject
-— the six in the menu in **rust**, ACCESS in **ice**, SEARCH in **milk**. They
+— the six in the menu in **rust**, EndPoints in **ice**, SEARCH in **milk**. They
 are the same colours a display can be set to, taken from the same values rather
 than matched by eye, so the panel and the thing it configures are not two
 people's idea of one palette. The colour is there to tell the groups apart at a
@@ -84,6 +84,26 @@ glance; it is not saying anything you have to decode.
   maintenance, and the admin portal's own port. What the app answers on is a
   network profile, not here; signing in and session lifetime are on SECURITY,
   with the rest of who-gets-in.
+
+  A network profile carries an **IP address** and an **Address in links**, and
+  they are not the same question. The first is a *binding* — which interface
+  the listener answers on. The second is optional and is what goes in front of
+  the port in every URL built from that profile: the address a screen types its
+  code at, the assistants a person is sent to after choosing a password, the one
+  a screen is redirected to once its code is spent. Bind by IP, which is the
+  ordinary way to bind, and without this everybody is handed an IP and a port.
+  It is a name and not a second binding — the listener answers on the address
+  above it whatever this says — and it has to resolve there, with a certificate
+  that carries it. **Port in links** sits beside it and is the port that *name*
+  is reached on, which behind a reverse proxy is not the port this profile
+  binds: the listener answers on its own port and the world arrives at the name
+  on 443. **Blank is none** — the scheme's own — which is the ordinary answer
+  behind a proxy. Both are read only where a name is set; leave the name empty
+  and links are the bind address and the bind port, exactly as before.
+
+  It is what a screen is sent to once its code is spent, and what a person is
+  offered after choosing a password — every link this server builds for that
+  profile goes through it.
 - **SECURITY** — who gets in and on what terms: **signing in** and how long an
   admin session lasts, **AI Requires Permission** — whether a general user
   needs approval at all, how long a grant lasts, how many devices and waiting
@@ -98,14 +118,26 @@ glance; it is not saying anything you have to decode.
   configures is read on **STATUS**, which is a different page on purpose: one
   is set and the other is watched, and a page doing both is a page you cannot
   safely leave open.
-- **ENROLL** — the door itself, as against who is already through it: which
-  **port and interface** invitations are accepted on and what **name** the link
-  carries, the **request form** somebody fills in from a display, and how long
-  an **enrolment code** is worth anything for, and **Enroll Embed Server** —
-  the scheme, host and optional port an outside application reaches this server
-  by, which is the embed's equivalent of the two above and is nothing to do
-  with the address your own screens use. The queues those settings feed are
-  under ENROLLMENTS.
+- **ENROLL** — the door itself, as against who is already through it. Five
+  sections, and three of them answer the same question for more than one
+  population: **Enroll Network** is which **port and interface** invitations
+  are accepted on under **Person**, and — under **Device** — the interface and
+  port a screen's code is typed at, which is a listener of its own;
+  **Enroll Time Limit** is how long an invitation is worth
+  anything for, split under a **Person** and a **Device** heading because a
+  setup link and an enrolment code are not the same kind of thing; **Enroll
+  User Form** is what somebody fills in from a display; **Enroll URL** is the
+  **name** each population's link carries, split the same way; and **Enroll
+  Embed APP** is the scheme, host and optional port an outside application
+  reaches this server by, which is nothing to do with the address your own
+  screens use.
+
+  **One SAVE for the whole tab**, at the foot of the box with a REVERT beside
+  it — the same row ADMIN has. Every section here had its own before, which
+  was seven buttons saying the same word with no way to tell which of seven
+  things you had just written. It writes app.json's enrolment and embed keys
+  and the shared document's two limits and the request form, and nothing off
+  this tab. The queues those settings feed are under ENROLLMENTS.
 
 **ENROLLMENTS** — how something comes to be here: SETTINGS on its left decides
 what the server is, IDENTITY on its right is who is here already, and this is
@@ -119,7 +151,7 @@ the one in the middle because it is the one somebody is waiting on.
   nor a screen: an *application*, admitted by a key its server holds rather than
   by a link somebody opens or a code somebody types. This is where one is made
   and where the code you hand its developer is shown, once. What has been issued
-  is listed under ACCESS ▸ SITES.
+  is listed under EndPoints ▸ SITES.
 
 **IDENTITY** — who this server knows about. Two populations that are not one
 list: one signs in with a password to configure the server, the other picks up
@@ -199,7 +231,7 @@ Each of the three groups reads the same way: the last tab in it is the one that
 endpoint instead of a dozen fields, and a rule written once rather than copied
 onto every endpoint that shares it.
 
-**ACCESS**, at the foot — who and what may reach this server, as opposed to
+**EndPoints**, at the foot — who and what may reach this server, as opposed to
 what you administer about it. It was called CONNECTIONS until the word was
 needed for the pair above:
 
@@ -406,7 +438,7 @@ Each of these writes a different document, so each has its own button:
 | SAVE, inside a profile row | that profile alone, and every display naming it | immediately |
 | SAVE, inside an AI endpoint's box | that endpoint alone | immediately, next question |
 | SAVE, on SECURITY | who has to be approved and what a grant is worth | immediately |
-| SAVE, inside Enroll Time Limit | how long a code is worth anything for | immediately |
+| SAVE, at the foot of ENROLL | every section on that tab at once | immediately, except the enrolment port and interface |
 | SAVE, inside Sign in | how you get in | only after a restart |
 | SAVE, inside an authenticate, authorize or permission row | that profile alone, and every endpoint naming it | immediately, next question |
 | SAVE, inside Sessions | how long an admin session lasts | only after a restart |
@@ -552,6 +584,20 @@ only one, so a recovery link can never arrive from a different host than the
 one somebody was originally sent, which is how a legitimate link gets treated
 as a phishing attempt.
 
+**A setup link can be given a clock**, under SETTINGS ▸ ENROLL ▸ Enroll Time
+Limit ▸ **Person**. It is **zero — no limit — by default**, and zero is what
+this always did: an invitation was good until it was spent. Set a number and a
+link that sits unopened past it stops working, and says so when it is opened —
+"that link has run out", which is a different answer from "that link did not
+work" and points the person at asking for a new one rather than at an address
+they think they mistyped. The clock runs from the moment a link is minted, so
+changing the setting does not shorten one already sent; REISSUE gives that
+person a fresh link on the new setting.
+
+Expect it to be longer than a screen's code, whatever you choose. A code is six
+characters carried across a building in somebody's head; a link is handed over
+and answered whenever the person it went to gets to their mail.
+
 **A session is a person or a device, never both, and the URL decides which.** A
 device you approved operates as a device; opening a person's URL on one is
 refused where it is attempted, and the URL is not spent by the refusal. Signing
@@ -568,7 +614,7 @@ question this list is read to answer.
 | **Get a code** | name it, and the code appears with the clock already running |
 | **Waiting for their code** | rows minted and not yet used, with REISSUE for one that ran out |
 
-**ACCESS ▸ NODES** — everything that is working, in one register. A row
+**EndPoints ▸ NODES** — everything that is working, in one register. A row
 moves here on its own the moment it is connected, and leaves the tab it arrived
 through; the door it came through stays with it as a badge, **ASKED** or
 **INVITED**, rather than deciding which list it lands in.
@@ -596,8 +642,17 @@ hallway looks like once still reaches every kiosk using it. Day and night in
 one hallway share an appearance and differ only in the dim — that case is the
 reason the three lists stayed three.
 
+**The layout comes from the PORT, and any browser that opens it gets it.** A
+port carries one endpoint, an endpoint names one layout, and a page is loaded
+from exactly one address — so there is nothing to disambiguate and nothing to
+tick. That includes a browser with no device token at all: open an endpoint's
+address in any browser and it is dressed as that endpoint. It used to depend on
+holding a display record, so opening the address plainly showed the shipped
+defaults — the wrong figure, the wrong greeting, and the product's own name in
+place of the endpoint's — on an address whose endpoint had a layout of its own.
+
 **None of them is the default, and there is no way to make one.** A device
-that names no profile shows what the page itself ships with — a working screen
+whose port carries no layout shows what the page itself ships with — a working screen
 that nobody has dressed, rather than one wearing a profile built for somewhere
 else in the building. Every screen is something an admin picked or something
 plainly unpicked, and the register says which.
@@ -609,7 +664,7 @@ them was put.
 ### Setting a fleet in one place
 
 Eight screens on one assistant are eight rows to set by hand, and they are
-usually all the same kind of place. So an endpoint names a **layout** — ACCESS
+usually all the same kind of place. So an endpoint names a **layout** — EndPoints
 ▸ AI ▸ *Layout* — and every screen opened on that endpoint's **port** takes
 it.
 
@@ -650,7 +705,7 @@ neither wants to read the other's queue while doing it.
 
 So an arrival is under **ENROLLMENTS** — ▸ USER while a person waits on a
 decision, ▸ DEVICE while a screen has not taken its code — and everything
-working is under **ACCESS**, in its own area. A row
+working is under **EndPoints**, in its own area. A row
 moves itself the moment it starts working.
 
 Ordering survives inside each list: anything waiting sorts by how much it wants
@@ -701,11 +756,25 @@ it on a row that is about to leave the list would be a second place to set the
 same thing. Everything a device has to say about itself, it says once it is
 connected.
 
+**Screens can have a door of their own.** SETTINGS ▸ ENROLL ▸ Enroll Network ▸
+**Device** takes an interface and a port, and setting one makes that address the
+only place a code is spent — the same six characters answer 404 everywhere else.
+It is **off by default**, and off means what it always did: a code is typed at
+whichever display listener answers.
+
+It is the person's door in shape and its opposite in the one property that
+matters. That listener must never hand out a display token; this one exists to.
+Nothing else is on it — no assistant, no microphone, no invitation — and a
+screen that spends its code there is sent straight on to the first assistant it
+was granted, because that port is not one of them. A screen granted nothing yet
+stays put and is told so, which beats being redirected to a port that would
+refuse it.
+
 **A clock runs on the row**, above everything else it says and in the one
 colour on it that is not grey: green while there is time, amber in the last
 minute, red once it is spent and telling you to REISSUE. How long it starts at
-is yours, under SETTINGS ▸ ENROLL ▸ Enroll Time Limit, and **zero switches
-it off** — a code is one use, and the row it enrols was approved the moment you
+is yours, under SETTINGS ▸ ENROLL ▸ Enroll Time Limit ▸ **Device**, and
+**zero switches it off** — a code is one use, and the row it enrols was approved the moment you
 created it, so a deployment that mints codes on Friday and hangs the screens
 on Monday is not less safe for it.
 
@@ -991,7 +1060,7 @@ and having to work out which of two rows in two registers was holding it down.
 
 **Per row**, the button is in the row's own bottom bar on both registers, and it
 says the state it is in rather than the state it would move to. **In bulk**, tick
-the rows and use *Status line* — the bar above the device register on ACCESS, and
+the rows and use *Status line* — the bar above the device register on EndPoints, and
 the one above the people on IDENTITY ▸ USER. A screen takes the change at its
 next check-in; a person's applies the next time they sign in.
 
@@ -1054,13 +1123,13 @@ draws from has moved — its own row, or the settings every screen shares.
 Another device arriving, being approved or being deleted is not that, and does
 not disturb the screens it has nothing to do with — so a profile edited here reaches the wall without anybody
 walking to it. Never while somebody is talking to the screen or typing into it;
-it waits until they have finished. RELOAD on a row under ACCESS asks one
+it waits until they have finished. RELOAD on a row under EndPoints asks one
 directly.
 
 
 ### Changing several at once
 
-The bar above the two lists on **ACCESS**. Tick the rows you want and the
+The bar above the two lists on **EndPoints**. Tick the rows you want and the
 controls under it apply to all of them at once.
 
 **Layout is no longer one of them.** It was — pick a profile, press APPLY TO
@@ -1280,7 +1349,7 @@ is held and carried out as part of coming back.
 
 ### Asking a screen to reload
 
-**RELOAD**, on a device's row under ACCESS, asks that screen to reload
+**RELOAD**, on a device's row under EndPoints, asks that screen to reload
 itself
 at its next check-in. What it actually repairs is a display that is alive but
 stuck: it is still checking in, so it is still listening, and a reload is the

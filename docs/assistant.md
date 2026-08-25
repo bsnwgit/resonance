@@ -173,7 +173,7 @@ the utterance: no answer, nothing passed to whatever it was already talking to,
 nothing said out loud, no matter how that browser is configured.
 
 **The lists offer only what a grant can reach.** A screen appears once it is
-approved under ACCESS ▸ NODES; a person appears once they have used their link
+approved under EndPoints ▸ NODES; a person appears once they have used their link
 and chosen a password. Before that a row is refused whatever is ticked, so
 offering it was a tick that could not do anything and looked like it had. One
 already ticked stays on the list whatever state it is in — a list quietly
@@ -183,7 +183,7 @@ Restricting the endpoint that is **default** is worth a moment's thought:
 anything typed into the composer with no name in front of it goes there, so
 displays outside the list get nothing back when somebody types.
 
-**The same ticks are on a person's and a device's own row**, under ACCESS —
+**The same ticks are on a person's and a device's own row**, under EndPoints —
 the list of endpoints there and this list of callers here are two views of one
 grant. Ticking an endpoint on a row writes it into that endpoint's authorize
 profile, which is the thing being read: **so it grants every endpoint sharing
@@ -699,6 +699,17 @@ The shipped prompt asks for one or two sentences of plain prose. **RESET**
 returns to it. That single instruction is the largest difference between a
 voice interface and a text one — change it carefully, and listen to the result
 rather than reading it.
+
+**The voice strips what it cannot say, whatever the prompt asked for.** An
+instruction is not a defence: a model holding a tool result reaches for a
+bulleted list however it was told to answer, and the marks were then read out
+one at a time — "asterisk asterisk up asterisk asterisk". So markdown is turned
+back into prose at the point of synthesis. A link keeps its words and loses its
+address, a heading keeps its line, a bullet keeps its item, code inside a fence
+is still read; emphasis, code spans, table bars, rules and emoji go. **The
+transcript is untouched** — somebody reading a table wants the table, and only
+the voice is changed. Both engines do it: the server's for the neural voice,
+the page's for the browser one, which the server never sees.
 
 ## What the model does and does not know
 

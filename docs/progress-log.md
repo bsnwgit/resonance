@@ -59,7 +59,7 @@ apart from a wrong request (correct the arguments and call again), and forbids
 asking whether to make a call at all. Every embed question logs its tool count,
 history and lap; a timeout names the size of the prompt it was sending, because
 "a cold model can take that long to load" was a guess and on a CPU it is the
-wrong one. `ACCESS ▸ SITES` gained *endpoints this site may reach*, written
+wrong one. `EndPoints ▸ SITES` gained *endpoints this site may reach*, written
 through the endpoints' own authorize profiles. An unnamed `/display/hello` no
 longer mints a device.
 
@@ -261,7 +261,7 @@ naming anything, the far end is sent a credential and wires it in again, and
 all of it to correct a hostname somebody typed wrong. The risk was named
 correctly and charged to the wrong party.
 
-- **A row under ACCESS ▸ SITES is an editing surface**, carrying the same six
+- **A row under EndPoints ▸ SITES is an editing surface**, carrying the same six
   sections the key was made in. `POST /embeds/update` rewrites the record in
   place: same id, same secret, same grants. Nothing at the far end is sent
   anything and no permission stops naming it.

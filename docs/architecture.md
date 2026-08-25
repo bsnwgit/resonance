@@ -51,7 +51,7 @@ Two roles:
 The **?** in the strip at the foot of the panel opens seven documents covering
 the display and every tab of the admin interface. It is blue, the same blue as
 every ? beside a topic heading, so help is one colour wherever you meet it — and
-it sits with ACCESS and the search rather than in the menu, because reading a
+it sits with EndPoints and the search rather than in the menu, because reading a
 document is a way of getting somewhere, not something you configure. They live
 as markdown in
 `docs/`, are read in a modal over the whole window rather than in the 425px
@@ -533,7 +533,7 @@ Measured round-trips on the reference box, cold then warm:
 
 ## Embedding it in another application
 
-An admin creates an **embed key** under ENROLLMENTS ▸ EMBED, beside the person and the screen — the three things that arrive here, each admitted and revoked the same way. What exists is listed under ACCESS ▸ SITES, the third register beside the nodes and the assistants, on the same division the other two already draw: ENROLLMENTS is where something arrives, ACCESS is where it lives once it has. The host application's
+An admin creates an **embed key** under ENROLLMENTS ▸ EMBED, beside the person and the screen — the three things that arrive here, each admitted and revoked the same way. What exists is listed under EndPoints ▸ SITES, the third register beside the nodes and the assistants, on the same division the other two already draw: ENROLLMENTS is where something arrives, EndPoints is where it lives once it has. The host application's
 *server* exchanges it for a one-use code; the host's page frames the result
 and trades the code for a session. Server to server, so the layout it asked
 for and its right to ask are settled before a browser is involved.
