@@ -34,3 +34,6 @@ __pycache__/
 *.pyc
 *.wav
 .DS_Store
+
+# Claude project notes (local only)
+CLAUDE.md
