@@ -1,5 +1,24 @@
 # Contributing to Resonance
 
+Contributions are welcome. Most of this file is about *how the code is meant to
+be written* — the conventions section is the part worth reading before you
+start, because several of the rules in it are load-bearing rather than
+stylistic and a change that breaks one gets sent back.
+
+**Two audiences, and they do different things.** If you have push access to
+this repository, work on a branch of it. If you do not — which is most
+people — fork it, work on a branch of your fork, and open a pull request from
+there. The rest of the workflow is the same either way, with one exception:
+the *Deploying* section below is for maintainers running an install of their
+own, and you are not expected to have one. Say so in the pull request and
+describe what you did test.
+
+**A note on the licence.** This is distributed under the PolyForm Noncommercial
+License 1.0.0, which is source-available rather than open source — commercial
+use is not granted. By opening a pull request you are offering your change for
+release under that same licence. If that is a problem for you, it is better
+raised as an issue before you write anything.
+
 ## Branch strategy
 
 | Branch | Purpose |
@@ -11,6 +30,8 @@
 
 ### Starting new work
 
+With push access, straight off `main`:
+
 ```bash
 cd resonance
 
@@ -20,6 +41,18 @@ git pull
 
 # Create a feature branch
 git checkout -b feature/your-feature-name
+```
+
+Without it, the same thing on a fork. Keep `upstream` so `main` can be
+refreshed without going through the web interface:
+
+```bash
+git clone git@github.com:<you>/resonance.git
+cd resonance
+git remote add upstream git@github.com:bsnwgit/resonance.git
+
+git fetch upstream
+git checkout -b feature/your-feature-name upstream/main
 ```
 
 ### Committing changes
@@ -36,6 +69,13 @@ git push -u origin feature/your-feature-name
 gh pr create --base main --head feature/your-feature-name --title "Your feature title"
 ```
 
+From a fork, `gh` needs telling which repository the pull request is *against*,
+or it opens one on your own copy:
+
+```bash
+gh pr create --repo bsnwgit/resonance --base main --title "Your feature title"
+```
+
 Always cut a brand-new branch off `main` for each round of work — don't reuse a
 branch name across unrelated changes, since a previously merged branch name can
 be silently re-merged as a no-op.
@@ -43,6 +83,10 @@ be silently re-merged as a no-op.
 **PRs are not self-merged.** Open it and leave it for review.
 
 ### Deploying
+
+**Maintainers with an install of their own.** Skip this if you have none —
+run `./check.sh`, say in the pull request what you were able to try, and leave
+the live pass to review.
 
 Deploy to the test server and confirm it works **before** pushing or opening
 the PR, not after. The visualiser, the microphone and the voice pipeline can
@@ -173,9 +217,9 @@ building. Nothing in any list is nominated as a default, in either sense: no
 profile stands in for a choice nobody made, and none of them recreates itself
 when the one before it is deleted.
 
-**Record the non-obvious failures.** The *Engineering notes* section of the
-README exists so the same day isn't lost twice. If something cost you hours and
-the cause was surprising, add it.
+**Record the non-obvious failures.** `docs/engineering-notes.md` exists so the
+same day isn't lost twice. If something cost you hours and the cause was
+surprising, add it.
 
 ## Commit message style
 

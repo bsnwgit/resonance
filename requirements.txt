@@ -1,0 +1,20 @@
+# The whole of it. Two packages, both for speech, and the server runs without
+# either — they are imported at the point of use and a failure is caught and
+# reported through /stt/status rather than taken at startup. Without them you
+# get the demo backend, the browser's own voices, and no local transcription;
+# everything else works.
+#
+# They go in a virtualenv of their own rather than beside the system Python —
+# see the Install section of the README, which also has measured guidance on
+# which transcription model and which voice to start with.
+#
+#     python3 -m venv stt-venv
+#     ./stt-venv/bin/pip install -r requirements.txt
+#
+# Nothing else here has a dependency and that is deliberate: the visualiser is
+# Canvas 2D with no library behind it, and manual.py writes its own PDFs. The
+# reason to keep it that way is that this gets embedded in other people's
+# pages.
+
+faster-whisper        # local speech-to-text; nothing is sent to a third party
+piper-tts             # local neural voices, rendered server-side

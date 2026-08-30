@@ -1,0 +1,35 @@
+# Deliberately short. The one thing worth asking for up front is what the
+# behaviour is FOR, because this project has a roadmap with reasoning attached
+# to each entry, and the useful reply to most suggestions is either "that is
+# planned, here is the entry" or "that was considered and here is what it
+# broke". Neither can be given against a description of a control.
+
+name: Idea
+description: Something it should do, or should do differently
+labels: [idea]
+
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Check [the roadmap](../../blob/main/docs/roadmap.md) and
+        [TODO](../../blob/main/TODO.md) first — both say why things are ordered
+        the way they are, and a good deal is already written down.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What should it do
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: What you are trying to get done
+      description: >-
+        The situation, not the control. A setting is one answer to a problem
+        and rarely the only one, and the problem is the part worth arguing
+        about.
+    validations:
+      required: true

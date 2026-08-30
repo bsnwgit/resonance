@@ -1,0 +1,86 @@
+# The fields here are the ones that decide where a fault lives, because almost
+# every report of "it stopped answering" is one of four different problems and
+# they are indistinguishable from the room. Which listener says whether the
+# admin surface is even involved; the scheme says whether the microphone was
+# ever allowed to open; /stt/status says whether transcription loaded at all;
+# and the assistant says whether the failure is ours or the model's.
+
+name: Bug report
+description: Something does not work — a display, the panel, an embed, speech
+labels: [bug]
+
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        If this is a security problem, close this and use
+        [private vulnerability reporting](../../security/advisories/new)
+        instead.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected instead
+      description: >-
+        The line above the input on the display carries what was heard, how
+        long each stage took, and why an endpoint failed. If it said anything,
+        quote it — it is usually the answer.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where
+      options:
+        - The display
+        - The admin panel
+        - An embed on somebody else's page
+        - An enrolment page
+        - The server itself — it will not start, or it stops
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scheme
+    attributes:
+      label: How it is reached
+      description: >-
+        getUserMedia is refused on an insecure origin, so a microphone that
+        never opens is usually this and nothing else.
+      options:
+        - http://localhost or 127.0.0.1
+        - https:// with a certificate
+        - http:// over a network — not loopback
+    validations:
+      required: true
+
+  - type: input
+    id: assistant
+    attributes:
+      label: Which assistant is behind it
+      description: >-
+        The provider, not the key — demo, Ollama, OpenAI, Anthropic, Home
+        Assistant. The demo backend exists to tell a front-end fault from a
+        model one, so if you have not tried it there, that is the fastest next
+        step.
+      placeholder: demo
+
+  - type: textarea
+    id: status
+    attributes:
+      label: What /stt/status says
+      description: >-
+        Served on the display listener, no sign-in needed. It reports the
+        model, what is loaded, and the error if transcription failed to start.
+      render: json
+
+  - type: textarea
+    id: server
+    attributes:
+      label: Anything in the server log
+      description: >-
+        The startup banner is worth including whole — it names every listener,
+        whether a certificate was found, and the posture warning if there is
+        one. Take out addresses you would rather not publish.
+      render: text

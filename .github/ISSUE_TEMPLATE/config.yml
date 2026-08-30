@@ -1,0 +1,16 @@
+# A vulnerability must not arrive as a public issue, so the route to the right
+# place is offered here rather than left to be found in SECURITY.md after the
+# fact. Blank issues stay off: the bug form asks for the four things that turn
+# "it went quiet" into something diagnosable, and none of them get volunteered.
+#
+# NOTE: the URL below names the repository and has to be corrected if this is
+# ever moved or renamed. A contact link takes an absolute URL — there is no
+# relative form here, unlike the one SECURITY.md uses.
+
+blank_issues_enabled: false
+
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/bsnwgit/resonance/security/advisories/new
+    about: >-
+      Report it privately here, not as an issue. See SECURITY.md.

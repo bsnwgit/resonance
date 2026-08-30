@@ -1,0 +1,43 @@
+# What check.sh does, on every push and every pull request.
+#
+# There is no build step in this project, so nothing reads these files between
+# somebody saving them and a browser running them. That is fine on a machine
+# where check.sh is run before deploying; it is not fine for a contribution
+# arriving from somewhere else, where the first thing to notice a page that
+# does not parse would be a reviewer opening it.
+#
+# It needs node and python3 and nothing else — check.sh only parses, so no
+# virtualenv is built and neither speech package is installed. Both parsers
+# ship with the runner image.
+
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  parse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'        # the floor the README states
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # check.sh treats a missing parser as a failure rather than a skip, so
+      # this cannot pass quietly if either of the two steps above stops
+      # providing what it says it does.
+      # check_calls.py runs from inside check.sh, against both pages. Calling
+      # it again here would add a second line of output and no second check.
+      - name: Parse both pages, embed.js and both modules
+        run: ./check.sh

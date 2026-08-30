@@ -1,0 +1,22 @@
+# Two ecosystems, because there are two and no more: the speech packages in
+# requirements.txt, and the actions the workflow pins.
+#
+# Monthly rather than weekly. There are two dependencies and neither moves
+# fast, and a bot opening pull requests nobody reads teaches people to ignore
+# the ones that matter.
+
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: chore                     # matches the commit style in CONTRIBUTING.md
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: chore
