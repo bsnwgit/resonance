@@ -39,7 +39,7 @@ word, voice and destination:
                                       → answers aloud, keeps the conversation
                                         open for a follow-up
 
-"Hey Claude, draft that email."     → a hosted API
+"Hey Ada, draft that email."        → a hosted API
 ```
 
 Three names, three destinations, one screen. Every wake word is a field
