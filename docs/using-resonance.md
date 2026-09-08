@@ -349,6 +349,24 @@ talking to it or typing into the box.
   refused by an assistant set to answer only to the exact word, and that line
   is the only place you can see it happen.
 
+## If it says it cannot see an application
+
+An answer along the lines of *I have no way to look at that*, about an
+application you are looking at while you ask, is a permission rather than a
+fault, and it is not something the panel can fix from your side. What an
+assistant may ask an application for is switched on per screen by an
+administrator, and it starts off — including when the application has only just
+been added, and including when that same application is answering perfectly
+well somewhere else.
+
+**Say which screen you were on.** That is the part an administrator cannot
+guess, and it is the part that decides where the fix goes. A management screen
+that gathers several applications together counts as its own place, separate
+from each application's own pages, with its own separate list — so an
+application that answers on its own page and claims not to exist on the
+gathering screen is not broken and is not confused. It has been switched on in
+one place and not the other.
+
 ## Getting a better answer
 
 The assistant is told to keep replies short, because they are read aloud and a

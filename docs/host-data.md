@@ -144,6 +144,20 @@ useful, and can never be written to by accident.
 them until an admin ticks them, and operations that appear in a later version
 of the spec appear in the list off. Nothing turns itself on.
 
+**The ticks belong to the site record, not to the application.** One
+application reachable two ways — on its own origin, and again through a front
+end that federates it alongside others — is two site records here, each with
+its own list, and enabling an operation on one grants nothing on the other.
+The second list is the one that gets forgotten, because every symptom points
+away from it: the application is demonstrably working, its grant file is
+correct, and the panel that goes on saying it cannot see the application reads
+as a fault at the far end rather than as an untouched row on another site. A
+federating front end also republishes what it gathers under its own names, so
+the two lists do not share a vocabulary — an operation ticked as
+`listCertificates` on the application's own site appears as
+`pktCert_listCertificates` on the hub's — and there is nothing a copied tick
+could match against even in principle.
+
 ---
 
 ## The grant file

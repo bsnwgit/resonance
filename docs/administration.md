@@ -315,6 +315,22 @@ needed for the pair above:
   limitation to work around: writes become available when its owner publishes
   the file saying so.
 
+  **An application reached through a hub has to be ticked twice.** These ticks
+  are the site's, not the application's. An application registered both on its
+  own origin and with a management front end that federates it — pktHub
+  offering pktCert alongside the rest of the suite — is two rows here, each
+  with a list of its own, and ticking it on one row does not tick it on the
+  other. Expect to be misled by this one: the row that gets missed is the
+  hub's, and by then the application is answering perfectly on its own screens,
+  so the panel on the hub insisting it cannot see the application looks like
+  anything except a row nobody opened. Note also that the names differ, because
+  a hub republishes what it gathers under its own prefix — you are looking for
+  `pktCert_listCertificates` on the hub's row where the application's own row
+  says `listCertificates` — so there is no tick to copy across, only the same
+  decision to take again. If the panel on a hub's screens denies all knowledge
+  of an application the hub plainly displays, open that hub's row and read its
+  list before looking anywhere else.
+
   Both documents have to sit on an origin the site is already registered
   under, so a spec address pointing anywhere else is refused when you press
   the button rather than fetched. **Withdrawing an operation drops the site's

@@ -215,7 +215,12 @@ declares.
 
 Both documents must sit on an origin the site is already registered under.
 Withdrawing an operation drops the site's live sessions, the same way
-narrowing its chrome does. See [Reaching the host application's
+narrowing its chrome does.
+
+**These ticks are this site's alone.** An application you also reach through a
+front end that federates it is a second site with a second list, ticked
+separately and under whatever names that front end republishes it by. Granting
+it here does not grant it there. See [Reaching the host application's
 data](host-data.md).
 
 One key is one surface. A lobby kiosk and a support widget are two keys,
