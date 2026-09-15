@@ -30,7 +30,7 @@ jobs:
         with:
           python-version: '3.10'        # the floor the README states
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
 
