@@ -1882,6 +1882,61 @@
     font-weight:400;letter-spacing:.1em;font-size:calc(8px * var(--fs));
     color:rgba(var(--paper),.5);white-space:nowrap;
   }
+  /* A HEADING INSIDE AN EDITOR, for a block whose fields answer one question.
+     A network profile holds three of them — what this port binds, what our
+     own screens call it, what an integrator calls it — and they had been one
+     undifferentiated column of labels where "Address in links" and "Address
+     integrators reach this on" read as two spellings of one field. Drawn as a
+     rule with the words on it, which is the divider this panel already uses
+     between a list and the control that adds to it. */
+  /* A TITLE, at the weight #panel h4 carries. It was set at the weight of a
+     field LABEL — .42 against a label's .5 — which made the thing naming the
+     block quieter than the things inside it, and it read as another caption
+     rather than as the line dividing one question from the next. Same colour
+     and same tracking as the headings above it, one step smaller because it
+     is a heading inside a block rather than the block's own. */
+  .erow .nwsect{
+    margin:16px 0 4px;padding-top:9px;letter-spacing:.24em;
+    text-transform:uppercase;
+    font-size:calc(8.5px * var(--fs));color:rgba(var(--paper),.9);
+    border-top:1px solid rgba(var(--glass),.14);
+  }
+  .erow .nwsect:first-of-type{margin-top:8px}
+  /* HOST, COLON, PORT — the same shape as the address under ENROLL, because
+     it is the same question asked about one port. The scheme sits flush
+     against the host box: https://name is one string everywhere else it
+     appears, not a setting and a field. */
+  .erow .namerow > .colon{flex:0 0 auto;color:rgba(var(--paper),.45);
+                          font-size:calc(11px * var(--fs));margin:0 -2px}
+  .erow .namerow > select.ppick{flex:0 0 auto;margin-right:-6px}
+  /* Wide enough for a hostname, where .nmedit's 220px basis would have left
+     a fully qualified name scrolling inside the box. */
+  .erow .namerow > input.hostedit{flex:1 1 260px}
+  /* THE HANDOVER. A label column and a value column, so the six facts an
+     integrator is given read as a list of answers rather than as six more
+     controls — nothing in here is editable, and anything that looks like a
+     field on a row full of fields gets clicked. */
+  .erow .handover{margin:6px 0 10px;padding:8px 10px;
+                  background:rgba(0,0,0,.28);
+                  border-left:2px solid rgba(var(--glass),.22)}
+  .erow .handrow{display:flex;align-items:baseline;gap:10px;margin:5px 0}
+  .erow .handrow > b{
+    flex:0 0 92px;font-weight:400;letter-spacing:.1em;
+    font-size:calc(8px * var(--fs));color:rgba(var(--paper),.5);
+  }
+  /* The value is what somebody is here to read, so it is the bright thing on
+     the line — an address in the same monospace it will be pasted as. */
+  .erow .handval{
+    flex:1 1 auto;min-width:0;word-break:break-all;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:calc(9px * var(--fs));color:rgba(var(--paper),.96);
+  }
+  /* …except where the value is a sentence about where to look, which is
+     prose and should not pretend to be a value to copy. */
+  .erow .handval.handnote{
+    font-family:inherit;font-size:calc(8.5px * var(--fs));
+    color:rgba(var(--paper),.62);letter-spacing:.04em;word-break:normal;
+  }
   .erow input.nmedit{
     flex:0 1 220px;min-width:110px;padding:4px 6px;font:inherit;
     font-size:calc(9.5px * var(--fs));letter-spacing:.06em;
@@ -3952,8 +4007,15 @@ queue as the people you enrolled — chipped <b>FORM</b> where they asked and
   <section class="grp wide" data-tab="enrolcfg">
     <h4>Enroll Embed APP</h4>
     <div class="grpbody">
+  <!-- THE DEFAULT DOOR, and no longer the only one. A port carries one
+       assistant, so a deployment running several is running several ports —
+       and this field can name one. Each network profile may now carry its own
+       embed address, and a site whose endpoint answers on that profile gets
+       it; this is what the rest read, which on a server with one assistant is
+       all of them. -->
   <label class="bklab" style="margin-top:2px" for="ap_embedhost">Address
-integrators reach this on</label>
+integrators reach this on, unless the endpoint's network profile names its
+own</label>
   <div class="fieldsave">
     <!-- HTTPS is the answer almost always, and it is first and default for
          that reason. It is a choice rather than a rule because the constraint
@@ -7165,7 +7227,14 @@ function postureSync(){
    else entirely — in a proxy, in somebody else's log, hours later. */
 let NETLIVE = [];
 
+/* The open editors' own "is this listening" lines, re-read whenever the live
+   state arrives. The badges are found in the DOM; these are closures over a
+   row that may since have been repainted, so the list is rebuilt by the paint
+   that creates them. */
+let NETLIVE_WATCH = [];
+
 function paintNetLive(){
+  NETLIVE_WATCH.forEach(f=>{ try{ f(); }catch(_){ } });
   document.querySelectorAll('#dp_networks .badge[data-net]').forEach(el=>{
     const id = el.dataset.net;
     const rows = NETLIVE.filter(x=> x.id === id);
@@ -11598,6 +11667,11 @@ function paintNetworks(list){
   const box = $('dp_networks');
   if (!box) return;
   box.innerHTML = '';
+  /* The rows about to be discarded take their watchers with them. Left to
+     accumulate, every repaint would add another closure over a detached row
+     and paintNetLive would spend its time writing to elements nobody can
+     see. */
+  NETLIVE_WATCH = [];
   DPNETS.forEach((n, i)=>{
     const v = n.values;
     const row = document.createElement('div');
@@ -11654,12 +11728,69 @@ function paintNetworks(list){
       const b = document.createElement('b'); b.textContent = label;
       w.appendChild(b); w.appendChild(el); row.appendChild(w); return el;
     };
+    /* …and the same row carrying SEVERAL controls that spell one value. The
+       label still names the line; what follows it is an address, not three
+       settings that happen to be adjacent. */
+    const fieldRow = (label, els)=>{
+      const w = document.createElement('div'); w.className = 'namerow';
+      const b = document.createElement('b'); b.textContent = label;
+      w.appendChild(b); els.forEach(e=> w.appendChild(e)); row.appendChild(w);
+    };
+    const section = (text)=>{
+      const h = document.createElement('div');
+      h.className = 'nwsect'; h.textContent = text;
+      row.appendChild(h);
+    };
 
     const nm = document.createElement('input');
     nm.type = 'text'; nm.className = 'nmedit'; nm.value = n.name;
     nm.spellcheck = false; nm.placeholder = 'Reception';
     nm.oninput = ()=>{ n.name = nm.value; retitle(); };
     field('Name', nm);
+
+    /* IS THIS PORT ACTUALLY OPEN, said inside the editor and not only as a
+       badge on the collapsed row above it. A badge is for scanning a list;
+       somebody who has just created a profile is looking at the form, and
+       "NOT LISTENING" three lines further up, on a row they have open, is a
+       thing you see afterwards rather than at the time.
+
+       It is the one state on this tab that a correct-looking form cannot
+       reveal: sockets are opened at startup and never under an admin's mouse,
+       so a profile saved on a running server is complete, valid, and dead
+       until somebody restarts. The first symptom otherwise is a dead port in
+       a proxy two layers away, long after the form that caused it. */
+    const nwlive = document.createElement('div');
+    nwlive.className = 'note bad';
+    nwlive.hidden = true;
+    row.appendChild(nwlive);
+    const sayLive = ()=>{
+      const rows = (NETLIVE || []).filter(x=> x.id === n.id);
+      const dead = rows.filter(r=> !r.bound && !r.why);
+      const idle = rows.find(r=> r.why);
+      if (dead.length){
+        nwlive.className = 'note bad';
+        nwlive.textContent = 'NOT LISTENING \u2014 nothing is answering on '
+          + dead.map(r=> r.host + ':' + r.port).join(' or ')
+          + '. Ports are opened when the server starts, so this profile is '
+          + 'saved and not yet in effect. Restart it: RESTART SERVER under '
+          + 'SETTINGS \u25b8 ADMIN, or ./serve.sh restart on the box.';
+        nwlive.hidden = false;
+      } else if (idle){
+        nwlive.className = 'note help';
+        nwlive.textContent = 'Not bound \u2014 ' + idle.why + '.';
+        nwlive.hidden = false;
+      } else {
+        nwlive.hidden = true;
+      }
+    };
+    sayLive();
+    NETLIVE_WATCH.push(sayLive);
+
+    /* THREE QUESTIONS, ASKED IN THIS ORDER: what this port binds, what our
+       own screens and people call it, and what an integrator calls it. They
+       were one column of labels, where the second and third read as two
+       spellings of the same field and got filled in interchangeably. */
+    section('WHAT THIS PORT BINDS');
 
     /* WHICH address this port answers on. Offered rather than typed, for the
        same reason the server's own binding is: an address this machine does
@@ -11696,35 +11827,6 @@ function paintNetworks(list){
     ip.onchange = ()=>{ v.address = ip.value; retitle(); };
     field('IP address', ip);
 
-    /* WHAT TO CALL IT IN A LINK, which is not what it binds to. The address
-       above is a binding and was going straight into every URL built from this
-       profile — the code a screen is enrolled at, the assistants a person is
-       sent to after choosing a password, the one a screen is redirected to
-       once its code is spent. Bind by IP, which is the ordinary way to bind,
-       and everybody was handed an IP and a port. Optional, and a name rather
-       than a second binding: the listener answers on the address above
-       whatever this says. */
-    const hn = document.createElement('input');
-    hn.type = 'text'; hn.className = 'nmedit';
-    hn.spellcheck = false; hn.autocapitalize = 'none';
-    hn.value = v.host || ''; hn.placeholder = 'ai.example.com — optional';
-    hn.oninput = ()=>{ v.host = hn.value; retitle(); };
-    field('Address in links', hn);
-
-    /* AND WHICH PORT THAT NAME IS REACHED ON, which is not the port above.
-       Behind a reverse proxy they are different by definition — the listener
-       answers on its own port and the world arrives at the name on 443 — so a
-       link built out of the bind port sends people past the proxy to a port
-       the firewall may not publish. Blank is NONE, the scheme's own, which is
-       the ordinary answer behind a proxy and the same rule the embed address
-       follows with its own port box. Read only where a name is set. */
-    const lp = document.createElement('input');
-    lp.type = 'number'; lp.className = 'nmedit portedit';
-    lp.min = 1; lp.max = 65535; lp.inputMode = 'numeric';
-    lp.value = v.link_port || ''; lp.placeholder = 'none';
-    lp.oninput = ()=>{ v.link_port = lp.value; };
-    field('Port in links', lp);
-
     const pt = document.createElement('input');
     pt.type = 'number'; pt.className = 'nmedit portedit';
     pt.min = 1024; pt.max = 65535; pt.inputMode = 'numeric';
@@ -11738,6 +11840,88 @@ function paintNetworks(list){
     rd.value = v.redirect || ''; rd.placeholder = 'none';
     rd.oninput = ()=>{ v.redirect = rd.value; retitle(); };
     field('Plain HTTP, redirected here', rd);
+
+    /* WHAT TO CALL IT IN A LINK, which is not what it binds to. The address
+       above is a binding and was going straight into every URL built from
+       this profile — the code a screen is enrolled at, the assistants a
+       person is sent to after choosing a password, the one a screen is
+       redirected to once its code is spent. Bind by IP, which is the ordinary
+       way to bind, and everybody was handed an IP and a port. Optional, and a
+       name rather than a second binding: the listener answers on the address
+       above whatever this says.
+
+       THE PORT BESIDE IT is not the port above either. Behind a reverse proxy
+       they differ by definition — the listener answers on its own and the
+       world arrives at the name on 443 — so a link built out of the bind port
+       sends people past the proxy to a port the firewall may not publish.
+       Blank is NONE, the scheme's own, which is the ordinary answer behind a
+       proxy. On ONE LINE with the name, because host colon port is one
+       address: they were two separately labelled fields, which is what let a
+       name be set with a port that contradicted it. */
+    section('WHAT OUR OWN SCREENS AND PEOPLE CALL IT');
+
+    const hn = document.createElement('input');
+    hn.type = 'text'; hn.className = 'nmedit hostedit';
+    hn.spellcheck = false; hn.autocapitalize = 'none';
+    hn.value = v.host || ''; hn.placeholder = 'ai.example.com — optional';
+    hn.oninput = ()=>{ v.host = hn.value; retitle(); };
+
+    const lpc = document.createElement('span');
+    lpc.className = 'colon'; lpc.textContent = ':';
+
+    const lp = document.createElement('input');
+    lp.type = 'number'; lp.className = 'nmedit portedit';
+    lp.min = 1; lp.max = 65535; lp.inputMode = 'numeric';
+    lp.value = v.link_port || ''; lp.placeholder = 'none';
+    lp.oninput = ()=>{ v.link_port = lp.value; };
+    fieldRow('Address in links', [hn, lpc, lp]);
+
+    /* AND WHAT AN INTEGRATOR CALLS IT, which is a third answer again. The
+       pair above is what to call this port to our own screens and people;
+       this is what goes into the snippet handed to whoever runs the host
+       application, and the two arrive over different names as often as not —
+       the same split the server-wide embed address has always had from
+       enrol_host.
+
+       It WAS server-wide only, which could name exactly one door: a port
+       carries one assistant, so a deployment running several is running
+       several ports, and every site's snippet named the first of them. Blank
+       falls back to that server-wide pair under ENROLL, which is what every
+       site read before this existed and what a single-assistant install still
+       reads — so there is nothing to fill in here on an install with one.
+
+       SCHEME, NAME, PORT, in that order and on one line, the same shape the
+       field under ENROLL has: it is one address being spelled out, and the
+       scheme sits flush against the name because https://name is how it is
+       written everywhere else. */
+    section('WHAT AN INTEGRATOR CALLS IT');
+
+    const es = document.createElement('select');
+    es.className = 'ppick';
+    ['https', 'http'].forEach(x=>{
+      const o = document.createElement('option');
+      o.value = x; o.textContent = x + '://';
+      es.appendChild(o);
+    });
+    es.value = (v.embed_scheme === 'http') ? 'http' : 'https';
+    es.onchange = ()=>{ v.embed_scheme = es.value; };
+
+    const eh = document.createElement('input');
+    eh.type = 'text'; eh.className = 'nmedit hostedit';
+    eh.spellcheck = false; eh.autocapitalize = 'none';
+    eh.value = v.embed_host || '';
+    eh.placeholder = 'blank — the address under ENROLL';
+    eh.oninput = ()=>{ v.embed_host = eh.value; };
+
+    const epc = document.createElement('span');
+    epc.className = 'colon'; epc.textContent = ':';
+
+    const ep = document.createElement('input');
+    ep.type = 'number'; ep.className = 'nmedit portedit';
+    ep.min = 1; ep.max = 65535; ep.inputMode = 'numeric';
+    ep.value = v.embed_port || ''; ep.placeholder = 'none';
+    ep.oninput = ()=>{ v.embed_port = ep.value; };
+    fieldRow('Embed app address', [es, eh, epc, ep]);
 
     /* TWO SWITCHES GONE, and neither is coming back as something else.
        MORE THAN ONE ENDPOINT went because a port carries one, always. THE
@@ -11786,6 +11970,14 @@ function paintNetworks(list){
                            the same rule both enrolment doors follow. */
                         host: String(x.values.host || '').trim(),
                         link_port: String(x.values.link_port || '').trim(),
+                        /* Sent even when empty, for the same reason the two
+                           above are: that is how clearing the embed address
+                           takes, and how the profile goes back to reading the
+                           server-wide one under ENROLL. */
+                        embed_host: String(x.values.embed_host || '').trim(),
+                        embed_scheme: (x.values.embed_scheme === 'http'
+                                       ? 'http' : 'https'),
+                        embed_port: parseInt(x.values.embed_port, 10) || 0,
                         port: parseInt(x.values.port, 10),
                         redirect: parseInt(x.values.redirect, 10) || 0,
                         }}))}, 'networknote');
@@ -11796,6 +11988,12 @@ function paintNetworks(list){
       if (!ok) return;
       n._new = false; OPENNW = -1;
       paintNetworks((DPCFG && DPCFG.networks) || []);
+      /* AND ASK WHAT IS ACTUALLY LISTENING, because this save is the exact
+         moment the answer changed — a profile saved while the server is up
+         is not bound, and the row has just been repainted from local state
+         which cannot know that. Without this the badge stays as it was until
+         something else happens to call loadApp. */
+      loadApp();
     };
     acts.appendChild(save);
 
@@ -11818,6 +12016,10 @@ function paintNetworks(list){
                              values:{address: String(x.values.address || ''),
                                      host: String(x.values.host || '').trim(),
                                      link_port: String(x.values.link_port || '').trim(),
+                                     embed_host: String(x.values.embed_host || '').trim(),
+                                     embed_scheme: (x.values.embed_scheme === 'http'
+                                                    ? 'http' : 'https'),
+                                     embed_port: parseInt(x.values.embed_port, 10) || 0,
                                      port: parseInt(x.values.port, 10),
                                      redirect: parseInt(x.values.redirect, 10) || 0,
                                      }}))}, 'networknote'));
@@ -11834,6 +12036,10 @@ function paintNetworks(list){
                                     values:{address: String(x.values.address || ''),
                                             host: String(x.values.host || '').trim(),
                                             link_port: String(x.values.link_port || '').trim(),
+                                            embed_host: String(x.values.embed_host || '').trim(),
+                                            embed_scheme: (x.values.embed_scheme === 'http'
+                                                           ? 'http' : 'https'),
+                                            embed_port: parseInt(x.values.embed_port, 10) || 0,
                                             port: parseInt(x.values.port, 10),
                                             redirect: parseInt(x.values.redirect, 10) || 0,
                                             }}))}, 'networknote'),
@@ -14827,6 +15033,74 @@ async function refreshEmbeds(){
         ch.appendChild(chb);
         body.appendChild(ch);
 
+        /* WHAT THE FAR END ACTUALLY NEEDS, in one place and in the order they
+           will need it. It was all on this row already and none of it was
+           together: the address inside a <script src>, the assistant in a
+           picker forty lines up, the key only ever in the response that minted
+           it, and the permissions in a section below whose heading reads as
+           though it were the whole of the wiring. Somebody setting up the far
+           end had to know which four places to look, which is exactly what a
+           handover should not require. */
+        const hand = document.createElement('div');
+        hand.className = 'handover';
+        const put = (label, value, note)=>{
+          const r = document.createElement('div'); r.className = 'handrow';
+          const l = document.createElement('b'); l.textContent = label;
+          const v = document.createElement('span');
+          v.className = 'handval' + (note ? ' handnote' : '');
+          v.textContent = value;
+          r.appendChild(l); r.appendChild(v);
+          hand.appendChild(r);
+          return r;
+        };
+        /* THE ADDRESS, and the one line here that is copied rather than read:
+           it is transcribed into another application's settings, and a
+           hostname typed by hand is a hostname typed wrong. */
+        const arow = put('Address', e.snippets.base
+          || 'none — the endpoint this site answers on has no address');
+        if (e.snippets.base)
+          arow.appendChild(siteCopy(()=> e.snippets.base, 'address'));
+        const epName = (EMENDPOINTS || []).filter(x=> x.id === e.endpoint)[0];
+        put('Assistant', epName ? epName.name
+              : (e.endpoint ? e.endpoint
+                 : 'whichever answers on the address above'));
+        put('Key', 'shown once, when issued \u2014 REISSUE KEY below mints a '
+                 + 'new one on this same site', true);
+        put('Person', e.needs_user
+              ? 'their server must name the person on every call'
+              : 'not required', true);
+        /* WHAT THIS SITE MAY REACH, said once and in the place somebody
+           hands over from. Pinned, it is the assistant above and the only
+           question worth answering is whether that grant actually went
+           through \u2014 a pin without it is the 403 this row used to produce. */
+        const grantRows = (e.reach || []).filter(x=> !x.fixed);
+        const pinned = grantRows.filter(x=> x.id === e.endpoint)[0];
+        const rn = grantRows.filter(x=> x.on).length;
+        if (e.endpoint)
+          put('May ask', !pinned
+                ? 'the assistant above, which needs no grant'
+                : (pinned.on ? 'the assistant above \u2014 granted'
+                             : 'the assistant above is NOT granted yet '
+                               + '\u2014 save this row to grant it'), true);
+        else
+          put('May ask', rn ? (rn + ' endpoint(s) \u2014 listed below')
+                            : 'nothing yet \u2014 see the section below', true);
+        /* THE ENDPOINTS THAT ARE NOT A PERMISSION. They were disabled ticks
+           in the section below, which is the one place they could be read as
+           a grant nobody could make. Here they are what they are: facts about
+           how those endpoints are set up. */
+        const openList = (e.reach || []).filter(x=> x.fixed && x.on);
+        if (openList.length)
+          put('Also reachable', openList.map(x=> x.name).join(', ')
+              + ' \u2014 open to anything that can reach the port', true);
+        const noperm = (e.reach || []).filter(x=> x.fixed && !x.on);
+        if (noperm.length)
+          put('Cannot be granted', noperm.map(x=> x.name).join(', ')
+              + ' \u2014 no permission set on the endpoint; fix it there',
+              true);
+        put('Framed by', (e.origins || []).join('  ') || 'nothing listed');
+        body.appendChild(hand);
+
         const r1 = document.createElement('div');
         r1.className = 'namerow';
         const b1 = document.createElement('b');
@@ -15034,6 +15308,14 @@ async function refreshEmbeds(){
             + (ch.indexOf('needs_user') >= 0
                ? ' The host\u2019s own endpoint has to change with it: send '
                  + 'them the code on this row again.' : '')
+            /* THE GRANT THE PICKER MADE, reported because it is a permission
+               that moved without anybody ticking anything \u2014 and on a shared
+               profile it moved further than the endpoint they chose. */
+            + (j.granted ? ' The assistant it now answers on was granted to '
+                         + 'this site.' : '')
+            + ((j.shared || []).length
+               ? ' That permission is shared with ' + j.shared.join(', ')
+                 + ' \u2014 this site may reach those too.' : '')
             + (extra.length ? ' ' + extra.join('; ') + '.' : '');
         }catch(err2){ note.className = 'note bad'; note.textContent = err2.message; }
       };
@@ -15067,22 +15349,68 @@ async function refreshEmbeds(){
          side — open each endpoint's authorize profile and remember a key id.
          This is the same data from the site's side, which is where somebody
          setting up one application is actually looking. Its own SAVE, because
-         it writes to the endpoints rather than to this key. */
-      const reachSec = siteSection('Endpoints this site may reach');
+         it writes to the endpoints rather than to this key.
+
+         MOSTLY IT IS NOT DRAWN AT ALL NOW. Picking the assistant above grants
+         that endpoint — see ensure_embed_reach — so on the ordinary
+         deployment this was a second control that could only disagree with
+         the first, and disagreeing meant a site that 403d on every question.
+         It survives for the two arrangements where it still decides
+         something, and is a readout otherwise. */
+      const rgrants = (e.reach || []).filter(r=> !r.fixed);
+      const rshared = rgrants.filter(r=> (r.shared || []).length);
+      /* PINNED AND NOTHING SHARED is the case that needs no list: one
+         assistant, granted by the picker, and no sibling riding along on the
+         same profile. Left unpinned, the site reaches whatever the address
+         carries and the list is the only way to say which. */
+      const reachMoot = !!e.endpoint && !rshared.length;
+      const reachSec = siteSection(reachMoot
+        ? 'Endpoints this site may reach — set by the assistant above'
+        : 'Endpoints this site may reach');
+
+      /* WHAT TO HAND OVER, said where somebody is thinking about it. Ticking
+         these is the moment an admin is working out what the far end needs,
+         and the answer has two halves that live in two different places on
+         this row: the key, which is shown once and never again, and the
+         address, which is under "How this site is wired" above. Neither is
+         here, and a section about what a site may reach reads as though it
+         were the whole of the wiring. */
+      const rpoint = document.createElement('div');
+      rpoint.className = 'note help';
+      rpoint.textContent = reachMoot
+        ? 'Nothing to set here. This site is pinned to a single assistant '
+        + 'above, and choosing it granted it — no endpoint shares its '
+        + 'permission profile with another, so the grant reaches that one and '
+        + 'no further. Clear the assistant to let this site reach whatever '
+        + 'the address it is framed from carries, and this becomes a list.'
+        : 'These are permissions, not the wiring. What the '
+        + 'application itself needs is the ADDRESS shown under \u201cHow this '
+        + 'site is wired\u201d above \u2014 which follows the endpoint this '
+        + 'site answers on, so it changes if you move the site to another '
+        + 'assistant \u2014 and the KEY, which is shown once when it is '
+        + 'issued or reissued.';
+      reachSec.body.appendChild(rpoint);
 
       const rbox = document.createElement('div');
       rbox.className = 'oplist';
 
       function paintReach(list){
         rbox.innerHTML = '';
-        (list || []).forEach(r=>{
+        /* THE UNTICKABLE ROWS ARE GONE FROM HERE. An unrestricted endpoint,
+           or one with no permission set at all, was drawn as a disabled
+           checkbox — which reads as a grant somebody could not make, when it
+           is not a grant at all but a fact about that endpoint. They are said
+           once, under "How this site is wired", with the rest of the wiring.
+           What is left is only what an admin can actually decide. */
+        (list || []).filter(r=> !r.fixed).forEach(r=>{
           const lab = document.createElement('label');
           const cb = document.createElement('input');
           cb.type = 'checkbox'; cb.dataset.rid = r.id; cb.checked = !!r.on;
-          /* An unrestricted endpoint, or one with no permission at all, is
-             not this screen's to change — ticking would claim to grant
-             something it does not grant. */
-          cb.disabled = !!r.fixed;
+          /* Pinned to one assistant with nothing sharing its profile: the
+             picker above decided this and a second control here could only
+             contradict it. Shown, so the grant is visible, and not editable.
+             Withdrawing is done by moving the pin. */
+          cb.disabled = reachMoot;
           lab.appendChild(cb);
           const nm = document.createElement('span');
           nm.className = 'opname';
@@ -15090,7 +15418,17 @@ async function refreshEmbeds(){
           lab.appendChild(nm);
           const meta = document.createElement('span');
           meta.className = 'opmeta';
+          /* WHO ELSE THIS TICK GRANTS, on the row rather than in the note
+             after saving. The grant is written onto the authorize profile,
+             and a profile named by two endpoints is one permission with two
+             names \u2014 an admin ticking it is granting both, and being told
+             afterwards is being told too late. */
           meta.textContent = ' ' + [r.note,
+                                    (r.shared || []).length
+                                      ? 'shares its permission with '
+                                        + r.shared.join(', ')
+                                        + ' \u2014 ticking grants those too'
+                                      : '',
                                     r.enabled === false ? 'not answering' : '']
                                    .filter(Boolean).join(' \u00b7 ');
           lab.appendChild(meta);
@@ -16110,6 +16448,16 @@ function panelNav(){
     // Groups live on SECURITY now, and the list is populated by its own fetch
     // — without this it would be empty on the tab it lives on.
     if (tab === 'security'){ refreshGroups(); loadApp(); }
+    /* NETWORK NEEDS IT TOO, and not having it is what made a saved-but-dead
+       port invisible. The badge on every profile row and the SAVED, BUT NOT
+       YET IN EFFECT block are both drawn from `j.nets`, which only loadApp
+       fetches — and loadApp ran for SECURITY and for the ports under ADMIN
+       and for nothing else. So the one tab where a profile is created, which
+       is the only place a port comes into existence unbound, was the one tab
+       that could not say so: the row painted "listening" by omission and the
+       first symptom was a dead port in somebody else's proxy, two layers
+       away, hours later. */
+    if (tab === 'network') loadApp();
     if (tab === 'displays' || tab === 'devices' || tab === 'security'
         || tab === 'enrol') refreshDisplays();
     /* STATUS is three fetches because it is three sections, and it needs the

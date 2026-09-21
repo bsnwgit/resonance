@@ -119,6 +119,12 @@ glance; it is not saying anything you have to decode.
   It is what a screen is sent to once its code is spent, and what a person is
   offered after choosing a password — every link this server builds for that
   profile goes through it.
+
+  A profile carries a third address as well — **Embed app address**, what an
+  integrator's browser reaches this port at — which is empty on most installs
+  because an empty one uses the address in links above it. The whole tab,
+  field by field, with worked examples of a deployment behind a reverse proxy
+  and one without, is in **[docs/network-profiles.md](network-profiles.md)**.
 - **SECURITY** — who gets in and on what terms: **signing in** and how long an
   admin session lasts, **AI Requires Permission** — whether a general user
   needs approval at all, how long a grant lasts, how many devices and waiting
@@ -1456,12 +1462,38 @@ loop, and it is what stops an admin who types `14:23` at `14:23` from taking
 the server out from under themselves.
 
 **The one risk worth knowing.** If the new process cannot bind — something else
-took the port while it was down — nothing catches that, and the server stays
-down until somebody looks. That is the residual cost of having no supervisor,
-and it is why this is a field you set deliberately rather than a default. The
-handover is logged to **`restart.log`**, which survives it; `server.log` is
-truncated by every start, so a failure written there would be lost with the
-process that reported it.
+took the port while it was down — the restart itself does not catch that, and
+the server stays down until either the watchdog below comes round or somebody
+looks. That is the residual cost of having no supervisor, and it is why this is
+a field you set deliberately rather than a default. The handover is logged to
+**`restart.log`**, which survives it; `server.log` is kept as `server.log.1` by
+the next start, so a failure written there is still readable afterwards.
+
+### Coming back by itself
+
+Nothing supervises this process, so by default nothing starts it after a
+reboot, and nothing notices if it is killed. Two commands close that, neither
+of which needs root — which is the point, since avoiding root is why there is
+no unit file:
+
+```
+./serve.sh watchdog       # start it if it is down and nobody stopped it
+./serve.sh install-cron   # run that at boot and every two minutes
+```
+
+`install-cron` writes two lines into your own crontab, and says so and stops if
+they are already there. It is safe to run twice.
+
+**A server you stopped stays stopped.** `stop` leaves a marker file,
+`server.stopped`, and the watchdog will not start anything while it is there;
+`start` removes it. That is what keeps the watchdog from reviving a server you
+took down on purpose, and from racing a `restart` while the old process is
+still letting go of its sockets.
+
+**It only sees a process that is gone,** not one that is wedged or answering
+badly. Every start it performs is dated in **`watchdog.log`**, which is worth
+reading occasionally: a file with entries in it means something is killing this
+server regularly, and the watchdog is hiding it rather than fixing it.
 
 Every display sees the restart as a short outage and reloads itself when the
 server answers again — so with this set you rarely also need the nightly

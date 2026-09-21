@@ -26,6 +26,9 @@ alerts.json.tmp
 groups.json
 groups.json.tmp
 server.log
+server.log.1
+server.stopped
+watchdog.log
 restart.log
 voices/
 stt-venv/

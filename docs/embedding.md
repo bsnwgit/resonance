@@ -249,6 +249,30 @@ nothing of its own; it used to append the display port, which is right for a
 browser reaching the process directly and wrong the moment anything sits in
 front of it. Then create the key.
 
+**On a server running more than one assistant, that field is the default
+rather than the answer.** A port carries one assistant, so several assistants
+means several ports, and a proxy in front of them publishes each under its own
+name or its own number — which one address cannot say. Every network profile
+carries the same three fields under **CONNECTIONS ▸ NETWORK**, and a
+site whose endpoint answers on that profile gets them.
+
+**A blank one is not an empty address.** It reads the profile's own *Address
+in links* — the name your screens and people already use for that port — and
+only if that is blank too does it fall back to the server-wide pair above. So
+on a deployment where outsiders and your own equipment reach a port by the
+same name, which is every deployment on an internal network, you fill in one
+address on the profile and this field stays empty. Fill it in when the two
+genuinely differ: a public name in front of an internal one, or a different
+port published outward. The whole tab is described in
+**[docs/network-profiles.md](network-profiles.md)**.
+
+You do not choose the address per site and there is no field for it: the site
+already names its endpoint, an endpoint already names the port it answers on,
+and a site pointed at an assistant by an address somebody typed is a site that
+can be pointed at the wrong one. Change a row's endpoint and its snippets are
+rewritten against the new door — which the far end must then copy, exactly as
+a change of address has always been.
+
 The panel shows the key **once**, with working code written against that
 address and shaped by that key, each block with its own COPY.
 

@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 # Static server for Resonance. Not an app, not a service —
 # deliberately no systemd unit, so it needs no sudo.
-#   ./serve.sh start | stop | status
+#   ./serve.sh start | stop | restart | status | watchdog | install-cron
 set -u
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PIDFILE="$DIR/server.pid"
+# Written by stop, removed by start: the difference between "somebody turned it
+# off" and "it died". The watchdog is the only reader — without this it would
+# fight a deliberate stop, and revive the server mid-restart while the old
+# process is still releasing its sockets.
+DOWNFILE="$DIR/server.stopped"
+WATCHLOG="$DIR/watchdog.log"
 
 # The display port is configurable from the admin page, so read it from the
 # same place the server does. Environment still wins, for a one-off run.
@@ -57,11 +63,16 @@ case "${1:-status}" in
   start)
     p="$(running_pid)"
     if [ -n "$p" ]; then echo "already running (pid $p)"; exit 0; fi
+    rm -f "$DOWNFILE"
     cd "$DIR"
     # the venv carries faster-whisper; fall back to system python (static
     # serving still works, /stt just reports unavailable)
     PY="$DIR/stt-venv/bin/python"
     [ -x "$PY" ] || PY="$(command -v python3)"
+    # Keep the previous run's log. It is the only record of why the server
+    # stopped, and nothing supervises this process — by the time anyone
+    # notices it is down, a truncating restart has already erased the reason.
+    [ -s "$DIR/server.log" ] && mv -f "$DIR/server.log" "$DIR/server.log.1"
     if [ -n "$PORT_EXPLICIT" ]; then
       PORT="$PORT_EXPLICIT" setsid nohup "$PY" "$DIR/serve.py" \
         > "$DIR/server.log" 2>&1 < /dev/null &
@@ -85,6 +96,7 @@ case "${1:-status}" in
     fi
     ;;
   stop)
+    : > "$DOWNFILE"
     p="$(running_pid)"
     if [ -z "$p" ]; then
       echo "not running"
@@ -124,5 +136,31 @@ case "${1:-status}" in
     "$0" stop
     "$0" start
     ;;
-  *) echo "usage: $0 start|stop|restart|status"; exit 1;;
+  watchdog)
+    # Recovery, for cron. Silent when there is nothing to do, so a two-minute
+    # schedule does not mail anybody every two minutes. It starts the server
+    # only when it is down and nobody asked for it to be down — a crash, an
+    # OOM kill, a reboot. Not a supervisor: it cannot see a process wedge, only
+    # one that is gone.
+    [ -f "$DOWNFILE" ] && exit 0
+    [ -n "$(running_pid)" ] && exit 0
+    printf '%s  down — starting\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$WATCHLOG"
+    "$0" start >> "$WATCHLOG" 2>&1
+    ;;
+  install-cron)
+    # Boot start and crash recovery without root, which is the whole reason
+    # there is no unit file. @reboot goes through watchdog rather than start so
+    # that a server deliberately stopped before a reboot stays stopped after it.
+    have="$(crontab -l 2>/dev/null)"
+    case "$have" in
+      *"$DIR/serve.sh watchdog"*)
+        echo "already installed"; exit 0;;
+    esac
+    { [ -n "$have" ] && printf '%s\n' "$have"
+      echo "@reboot $DIR/serve.sh watchdog"
+      echo "*/2 * * * * $DIR/serve.sh watchdog"
+    } | crontab -
+    echo "installed: @reboot and every 2 minutes"
+    ;;
+  *) echo "usage: $0 start|stop|restart|status|watchdog|install-cron"; exit 1;;
 esac
