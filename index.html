@@ -591,6 +591,15 @@
     background:none;border:1px solid rgba(var(--glass),.16);
     color:rgba(var(--paper),.85);cursor:pointer;
   }
+  /* HIDDEN MEANS HIDDEN, and it has to be said here because the narrow-width
+     rule below gives these buttons a display of their own — which outranks
+     the browser's own [hidden] and puts every one of them back on screen.
+     SIGN OUT is the one that matters: it is drawn hidden and revealed only
+     where somebody is signed in, so on a narrow viewport an embedded frame —
+     which has no person and no session to end — grew a control that offered
+     to end one. Said once, on the scope, rather than per button: the next
+     rule to set a display here would bring the bug back with it. */
+  .src button[hidden]{display:none}
   .src button .ico{margin-right:.5em}
   .src button.on{border-color:var(--hue-dim);color:var(--hue)}
   /* same hover feedback the admin page gives, for the three controls a

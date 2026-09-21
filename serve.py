@@ -1514,9 +1514,15 @@ def admin_routes(doc):
 
 def net_profile(nid):
     """A network profile by id, or None."""
+    return net_profile_in(display_settings(), nid)
+
+
+def net_profile_in(cfg, nid):
+    """…and the same lookup against a settings document already in hand, for a
+    caller resolving many rows at once. One read, not one per row."""
     if not nid:
         return None
-    for n in display_settings()["networks"]:
+    for n in (cfg or {}).get("networks") or []:
         if n["id"] == nid:
             return n
     return None
@@ -3119,6 +3125,40 @@ def validate_display_settings(obj, current):
                               "just the host, with no https:// in front and "
                               "no port after" % r["name"])
             r["values"]["host"] = hn
+            # …AND WHAT AN EMBED CALLS IT, which is a third question again.
+            # The pair above is what to call this port to this organisation's
+            # own screens and people; this is what to call it in a snippet
+            # handed to whoever runs the host application, and the two arrive
+            # over different names as often as not. Server-wide until now,
+            # under ENROLL — which could only ever name one door, and a
+            # deployment running an assistant per port has one per port.
+            #
+            # BLANK IS THE FALLBACK, not an empty address: a profile that
+            # names none reads the server-wide pair, which is exactly what
+            # every site read before this field existed. See embed_base_for.
+            en = str(r["values"].get("embed_host") or "").strip().lower()[:120]
+            if en and not re.match(r"^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$", en):
+                return None, ("%s: the embed address reads as a URL rather "
+                              "than a name — just the host, with no https:// "
+                              "in front. The port goes in the field beside it"
+                              % r["name"])
+            r["values"]["embed_host"] = en
+            try:
+                ep = int(r["values"].get("embed_port") or 0)
+            except (TypeError, ValueError):
+                return None, ("%s: the embed port must be a whole number, or "
+                              "blank for none" % r["name"])
+            if ep and not (1 <= ep <= 65535):
+                return None, "%s: %d is not a port number" % (r["name"], ep)
+            r["values"]["embed_port"] = ep
+            # NOT VALIDATED AGAINST THE BINDING, and that is the point of it:
+            # behind a proxy this names 443 while the listener holds 9723, and
+            # a check that the two agreed would refuse the configuration this
+            # field exists to describe.
+            es = str(r["values"].get("embed_scheme") or "https").lower()
+            if es not in ("http", "https"):
+                return None, "%s: the embed scheme is http or https" % r["name"]
+            r["values"]["embed_scheme"] = es
             # …and whether the port can actually be had there, BEFORE anything
             # is allowed to use it. A port that passes validation and fails at
             # the next restart is a profile that looks saved and is not, found
@@ -8323,6 +8363,91 @@ def embed_base(cfg=None):
     return "%s://%s%s" % (scheme, host, ":%d" % port if port else "")
 
 
+def embed_base_for(rec, cfg=None, doc=None, look=None):
+    """…and the same address for ONE SITE, which need not be the same one.
+
+    A PORT CARRIES ONE ASSISTANT — see the listeners note at the top of this
+    file — so a deployment running several is running several ports, and a
+    proxy in front of them publishes each under its own name or its own
+    number. The setting above is one address for the whole server, which was
+    the entire truth while there was one assistant to reach and stopped being
+    it the moment there were two: every site's snippet named the same door,
+    and the second assistant had no address the panel could write.
+
+    A site's endpoint already says which assistant answers it, and an endpoint
+    already names the profile whose port it answers on, so the door is not a
+    new fact to collect — it is the one this row has always implied. Resolved
+    through `route_network` like every other reader of that link.
+
+    THREE ANSWERS, MOST SPECIFIC FIRST, and an empty field means "the next
+    one" rather than "nothing":
+
+        the profile's own embed address
+          → the profile's address in links
+            → the server-wide address under ENROLL
+
+    The middle step is the one that was missing, and its absence is what made
+    this confusing to configure. A deployment where outsiders and our own
+    screens reach a port by the SAME name — which is the ordinary case, and
+    every case on an internal network — had to say so twice, in two boxes a
+    few rows apart whose labels both began with "Address". Filling in one and
+    not the other looked done and was not, and which half silently kept
+    working depended on which box had been used.
+
+    So the second box is now an OVERRIDE rather than a separate fact: fill it
+    only when outsiders genuinely arrive by a different name than our own kit
+    does — a public name in front of an internal one, which is the case that
+    justified two fields in the first place and is not most installs.
+
+    Falling back to the address in links reuses net_base_for rather than
+    rebuilding it, so a site and a screen on one port cannot disagree about
+    what that port is called.
+    """
+    cfg = cfg if cfg is not None else read_app()
+    # `doc` and `look` are handed in by the register, which resolves every row
+    # in one pass: without them this reads three JSON files per site, and a
+    # panel refresh on eleven sites read thirty-three.
+    doc = doc if doc is not None else read_routes()
+    look = look if look is not None else display_settings()
+    route = doc["routes"].get(str(rec.get("endpoint") or "")) or {}
+    nid = route_network(route, look)
+    vals = (net_profile_in(look, nid) or {}).get("values") or {}
+    host = str(vals.get("embed_host") or "").strip()
+    if host:
+        try:
+            port = int(vals.get("embed_port") or 0)
+        except (TypeError, ValueError):
+            port = 0
+        scheme = str(vals.get("embed_scheme") or "https").lower()
+        if scheme not in ("http", "https"):
+            scheme = "https"
+        return "%s://%s%s" % (scheme, host, ":%d" % port if port else "")
+    # THE ADDRESS THIS PORT IS CALLED IN A LINK, but ONLY where the profile
+    # actually names one. net_base_for falls back to the binding and then to a
+    # Host header, and neither belongs in a snippet: a bind address is often
+    # private, and a code an integrator pastes into their own source must not
+    # depend on which name the admin happened to open this panel by. So the
+    # name is read directly, and a profile without one goes on to the
+    # server-wide address instead of to a guess.
+    named = str(vals.get("host") or "").strip()
+    if named:
+        # Built here rather than through net_base_for, which looks the profile
+        # up again through display_settings() and so would ignore the document
+        # this was handed — the register resolves every row against one read,
+        # and a second read is both an extra file and a chance to disagree
+        # with the first. Same shape as that function's named branch: the
+        # scheme the listeners are actually running, the name, and the port
+        # beside the name where there is one.
+        try:
+            lp = int(vals.get("link_port") or 0)
+        except (TypeError, ValueError):
+            lp = 0
+        return "%s://%s%s" % (
+            "https" if RUNNING.get("display_tls", True) else "http",
+            named, ":%d" % lp if lp else "")
+    return embed_base(cfg)
+
+
 #: The one endpoint a host adds to their own application. Named here because it
 #: appears in three snippets and a page tag, and four copies of a string is
 #: three chances for one to be edited and the others not.
@@ -9074,6 +9199,21 @@ def embed_reach(eid, doc=None, cfg=None):
     round — one site, every endpoint, ticked or not."""
     doc = doc if doc is not None else read_routes()
     cfg = cfg if cfg is not None else display_settings()
+    # WHICH ENDPOINTS SHARE A PROFILE WITH WHICH. A grant is written onto the
+    # authorize profile rather than onto the endpoint, so two endpoints naming
+    # one profile are one permission with two names. The panel needs to know
+    # before it draws: where nothing is shared, picking the assistant IS the
+    # grant and there is nothing here to tick; where something is, ticking
+    # reaches further than the row it is on and has to say so.
+    byauthz = {}
+    for rid in route_order(doc):
+        zid = route_authz_id(doc["routes"][rid], cfg)
+        if zid:
+            byauthz.setdefault(zid, []).append(rid)
+    def _siblings(rid):
+        zid = route_authz_id(doc["routes"][rid], cfg)
+        return [doc["routes"][o].get("name") or o
+                for o in byauthz.get(zid) or [] if o != rid]
     out = []
     for rid in route_order(doc):
         rec = doc["routes"][rid]
@@ -9092,7 +9232,8 @@ def embed_reach(eid, doc=None, cfg=None):
             row = {"on": eid in (perm.get("embeds") or []), "fixed": False,
                    "note": ""}
         row.update(id=rid, name=rec.get("name") or rid,
-                   enabled=rec.get("enabled", True))
+                   enabled=rec.get("enabled", True),
+                   shared=_siblings(rid))
         out.append(row)
     return out
 
@@ -9149,6 +9290,60 @@ def set_embed_reach(eid, want):
     if changed:
         _write_displays_doc(ddoc)
     return changed, sorted(set(shared))
+
+
+def ensure_embed_reach(eid, rid):
+    """Grant this key the endpoint it has just been pinned to.
+
+    THE TWO CONTROLS WERE ONE DECISION WEARING TWO HATS. Choosing the
+    assistant decided which endpoint the site talks to and nothing else;
+    the grant that makes that endpoint answer it lived in a separate tick
+    list, on the other side of the row. Setting one without the other is not
+    a narrower permission, it is a site that 403s on every question — see
+    subject_may, where a restricted endpoint answers an embed only if the key
+    is named on its profile. A choice that cannot work unless a second control
+    agrees with it is one control.
+
+    ONLY EVER ADDS. Withdrawing is still the reach list's, because withdrawing
+    is the half an admin must mean: moving a site to another assistant should
+    not silently take away what its own application was still reaching.
+
+    Returns (granted, shared) — whether anything moved, and any sibling
+    endpoint granted along with it, because a permission profile can be named
+    by more than one and an admin should read that here rather than discover
+    it on the other screen."""
+    if not rid:
+        return False, []
+    ddoc = read_displays_doc()
+    cfg = ddoc.get("settings")
+    if not isinstance(cfg, dict):
+        return False, []
+    doc = read_routes()
+    rec = doc["routes"].get(rid)
+    if rec is None:
+        return False, []
+    perm = route_perm(rec, cfg)
+    # NOTHING TO GRANT, and two quite different reasons for it. An endpoint
+    # with no permission at all is refused whatever this writes — the fix is
+    # on the endpoint. An unrestricted one already answers anything that can
+    # reach the port, and writing a name onto its list would record a grant it
+    # does not consult.
+    if perm is None or not perm.get("restricted"):
+        return False, []
+    zid = route_authz_id(rec, cfg)
+    az = next((a for a in cfg.get("authzs") or [] if a.get("id") == zid), None)
+    if az is None:
+        return False, []
+    vals = az.setdefault("values", {})
+    lst = list(vals.get("embeds") or [])
+    if eid in lst:
+        return False, []
+    vals["embeds"] = lst + [eid]
+    _write_displays_doc(ddoc)
+    shared = [doc["routes"][o].get("name") or o
+              for o in route_order(doc)
+              if o != rid and route_authz_id(doc["routes"][o], cfg) == zid]
+    return True, sorted(set(shared))
 
 
 def embed_look(rec):
@@ -10881,10 +11076,15 @@ class Handler(SimpleHTTPRequestHandler):
             # embed_snippets, which reads nothing but needs_user and the
             # address. That is the same property which makes these safe to
             # paste into a ticket, used a second time.
-            base = embed_base()
+            # ONE ADDRESS PER SITE, not one for the register: a site's snippet
+            # names the door its own endpoint answers on. Read once here and
+            # handed down — see embed_base_for for why that matters at eleven
+            # rows.
+            _cfg, _doc, _look = read_app(), read_routes(), display_settings()
             out = []
             for eid, rec in sorted(read_embeds().items(),
                                    key=lambda kv: kv[1].get("created", 0)):
+                base = embed_base_for(rec, _cfg, _doc, _look)
                 row = {k: rec.get(k) for k in
                        ("name", "preset", "parts", "cap", "origins",
                         "ttl_minutes", "created", "created_by",
@@ -10917,8 +11117,13 @@ class Handler(SimpleHTTPRequestHandler):
             # an empty value, which reads as a broken save rather than as a
             # list that had not arrived.
             _doc = read_routes()
+            # THE SERVER-WIDE ADDRESS, not the last row's. Each row carries
+            # its own, resolved through its endpoint — `base` is the fallback
+            # under ENROLL, which is what this field has always meant and what
+            # a reader comparing it against a row's would expect.
             return self._json(200, {"embeds": out, "parts": list(PARTS),
-                                    "presets": PRESETS, "base": base,
+                                    "presets": PRESETS,
+                                    "base": embed_base(_cfg),
                                     "endpoints": [
                                         {"id": _rid,
                                          "name": _doc["routes"][_rid].get("name") or _rid,
@@ -11514,9 +11719,20 @@ class Handler(SimpleHTTPRequestHandler):
                   % (eid, rec["name"], s["user"], ",".join(rec["parts"]) or "none",
                      ",".join(k for k in ("ask", "mic", "speak") if rec["cap"][k])
                      or "none"), flush=True)
+            # A KEY BORN PINNED IS BORN GRANTED, for the same reason an edit
+            # is: the assistant picker is the grant now, and a new site that
+            # answered nothing until somebody found a second control was the
+            # first thing every integration hit.
+            granted, gshared = ensure_embed_reach(eid, rec["endpoint"])
+            if granted:
+                print("embed key %s (%s) granted %s: it was pinned there"
+                      % (eid, rec["name"], rec["endpoint"]), flush=True)
             # The only time the secret exists anywhere but in the caller's
             # hands. Nothing on this server can show it again, which is the
             # point of storing a hash — say so in the panel, loudly.
+            # GRANTED is reported beside it: the row is about to be redrawn
+            # from the register, and a grant made here is one an admin should
+            # read as having happened rather than infer from a tick.
             #
             # AND THE CODE THAT USES IT, generated here for the same reason it
             # is shown here: this is the one moment everything needed to write
@@ -11525,7 +11741,8 @@ class Handler(SimpleHTTPRequestHandler):
             # same way get the same integration instead of six readings of it.
             return self._json(200, {"ok": True, "id": eid,
                                     "key": eid + "." + secret,
-                                    "snippets": embed_snippets(rec, embed_base())})
+                                    "granted": granted, "shared": gshared,
+                                    "snippets": embed_snippets(rec, embed_base_for(rec))})
 
         if parsed.path == "/embeds/update":
             # A SITE IS A THING AN ADMIN MAINTAINS, not a thing they re-issue.
@@ -11591,6 +11808,15 @@ class Handler(SimpleHTTPRequestHandler):
                      if old.get(k) != rec[k]]
             embeds[eid] = rec
             write_embeds(embeds)
+            # THE GRANT FOLLOWS THE CHOICE. Only when the assistant actually
+            # moved: a rename must not re-grant an endpoint an admin withdrew
+            # deliberately from the reach list below.
+            granted, gshared = (ensure_embed_reach(eid, rec["endpoint"])
+                                if "endpoint" in moved else (False, []))
+            if granted:
+                print("embed key %s (%s) granted %s by %s: it was pinned there"
+                      % (eid, rec["name"], rec["endpoint"], s["user"]),
+                      flush=True)
             dropped = 0
             if moved:
                 with _embed_sessions_lock:
@@ -11608,7 +11834,9 @@ class Handler(SimpleHTTPRequestHandler):
             # who has just ticked it needs the line that ticking it requires.
             return self._json(200, {"ok": True, "id": eid, "changed": moved,
                                     "dropped": dropped,
-                                    "snippets": embed_snippets(rec, embed_base())})
+                                    "granted": granted, "shared": gshared,
+                                    "reach": embed_reach(eid),
+                                    "snippets": embed_snippets(rec, embed_base_for(rec))})
 
         if parsed.path == "/app/restart":
             # THE ONE ACTION THAT CAN REMOVE THE WAY TO UNDO IT. Everything
@@ -11842,7 +12070,7 @@ class Handler(SimpleHTTPRequestHandler):
                   % (eid, rec.get("name"), s["user"]), flush=True)
             return self._json(200, {"ok": True, "id": eid,
                                     "key": eid + "." + secret,
-                                    "snippets": embed_snippets(rec, embed_base())})
+                                    "snippets": embed_snippets(rec, embed_base_for(rec))})
 
         if parsed.path == "/display/hello":
             # A display announcing itself, and where a token comes from.
